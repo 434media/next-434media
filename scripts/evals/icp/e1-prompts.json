@@ -14,5 +14,8 @@
   { "id": "eu-trap", "prompt": "Media companies in Germany and the UK" },
   { "id": "canada-trap", "prompt": "Health systems in Toronto and Vancouver" },
   { "id": "decision-makers-generic", "prompt": "Decision-makers at mid-size companies" },
-  { "id": "niche", "prompt": "Fight gear and boxing equipment makers" }
+  { "id": "niche", "prompt": "Fight gear and boxing equipment makers" },
+  { "id": "revenue-stated", "prompt": "Consumer beverage brands in Texas making over $20M, marketing leaders" },
+  { "id": "mexico-trap", "prompt": "Consumer brands in Texas and Mexico that sponsor boxing, marketing leaders" },
+  { "id": "c-keyword-over-tags", "prompt": "Consumer brands that sponsor boxing and combat sports, marketing leaders", "expect": { "no_keyword_with_tags": true }, "expected_failure": "next-434media#179" }
 ]

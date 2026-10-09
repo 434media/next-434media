@@ -1,8 +1,8 @@
 # ICP evals — next-434media#63
 
-These evals measure what changes when prospecting reads the outbound cohorts
-(`icp_cohorts`) instead of `lib/prospecting/icp.md`. They compare outcomes,
-not just output shape. The bar for #63 is:
+These evals measured what changed when prospecting moved from
+`lib/prospecting/icp.md` to the outbound cohorts (`icp_cohorts`). The cohorts
+are now the only targeting source, and `icp.md` is gone. The bar for #63 was:
 - every exclusion decision identical;
 - every flip in the approve decision listed for the founder.
 
@@ -15,20 +15,40 @@ snapshots and eval reports are internal, so they stay out:
 ## E1 — the translator, with its noise floor
 
 ```
-tsx scripts/evals/icp/e1-translator.ts --mode file    --runs 3 --out <dir>/e1-file.json
-tsx scripts/evals/icp/e1-translator.ts --mode cohorts --runs 3 --cohorts <cohorts.json> --out <dir>/e1-cohorts.json
-tsx scripts/evals/icp/e1-compare.ts --a <dir>/e1-file.json --b <dir>/e1-cohorts.json
+tsx scripts/evals/icp/e1-translator.ts --runs 3 --out <dir>/e1.json
+tsx scripts/evals/icp/e1-compare.ts --a <dir>/e1-before.json --b <dir>/e1.json
 ```
 
+**Where the cohorts come from.** Without `--cohorts`, the translator reads
+`icp_cohorts` through the production reader (`lib/firestore-icp-cohorts.ts`),
+so the run needs `GOOGLE_SERVICE_ACCOUNT_KEY` for Firestore. `--cohorts
+<cohorts.json>` substitutes a fixture.
+
+**The revenue check.** A cohort's revenue floor is never a search filter. The
+run exits 1 if any run sets `revenue_range` on a prompt that states no revenue
+figure. The prompt `revenue-stated` is the control: it states one, so its
+filter should stay.
+
+**The other checks.** The run also exits 1 on any location outside the United
+States (cold outbound is US-only, master 5.3; `mexico-trap` is the case), and,
+for a prompt marked `"expect": { "no_keyword_with_tags": true }`, on a niche
+`q_keywords` term sent on top of industry tags (translator rule 11;
+`c-keyword-over-tags` is the case).
+
+**Expected failures.** A prompt marked `"expected_failure": "<issue>"` is a
+known failure tracked by that issue. Its failures are reported but do not fail
+the run, and the run says when it starts passing. `c-keyword-over-tags` is one,
+tracked by next-434media#179.
+
 **What a run does.** Each prompt in `e1-prompts.json` is translated `--runs`
-times in one mode.
+times.
 
 **The noise floor.** Translation is a model call, so two runs of the same
-prompt can differ. The noise floor is the agreement between runs of the same
-mode.
+prompt can differ. The noise floor is the agreement between runs within one
+report.
 
-**How a difference is judged.** A difference between modes counts only where
-cross-mode agreement falls below that floor. It is compared field by field,
+**How a difference is judged.** A difference between two reports counts only
+where their agreement falls below that floor. It is compared field by field,
 using Jaccard similarity on the set-valued filters.
 
 **What a run needs.** It calls the model through the AI Gateway, so it needs

@@ -76,8 +76,9 @@ jobs:
       # (2b fix 11). In-memory store with Firestore-style transaction retries.
       - run: tsx --test lib/__tests__/outreach-claim.test.ts
 
-      # Prospecting on icp_cohorts (next-434media#63): icp-base.md stays equal to
-      # icp.md without its archetypes, the source defaults to icp.md, and the
+      # Prospecting on icp_cohorts (next-434media#63): icp.md stays gone and
+      # icp-base.md keeps its shape, a revenue filter appears only when the
+      # prompt states a figure, the floor stays out of the prompt, and the
       # cohort matcher behaves. Invented cohort rows; the real ones are internal.
       - run: tsx --test lib/__tests__/icp-cohorts.test.ts
 

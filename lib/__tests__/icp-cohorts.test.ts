@@ -8,32 +8,76 @@
  */
 import { test } from "node:test"
 import assert from "node:assert/strict"
-import { readFileSync } from "node:fs"
+import { existsSync, readFileSync } from "node:fs"
 import { join } from "node:path"
-import { parseIcpSource, renderCohorts, withoutArchetypes } from "../prospecting/icp-context"
+import { renderCohorts } from "../prospecting/icp-context"
+import { mapTranslatorOutput, revenueFigureStated } from "../prospecting/translator"
 import { bandFor, matchCohorts } from "../prospecting/cohort-match"
 import { computeFunnelKpis } from "../kpis/funnel"
 import type { Lead } from "../../types/crm-types"
-import { classifyIndustries } from "../prospecting/industry-tags"
+import { classifyIndustries, INDUSTRY_MAP, resolveIndustries, type IcpIndustry } from "../prospecting/industry-tags"
 import { scoreIcpFit } from "../icp/rubric"
-import { scoreCandidate } from "../prospecting/scorer"
+import { isOutsideUnitedStates, scoreCandidate } from "../prospecting/scorer"
 import type { OutboundCohort } from "../sor/types.generated"
 
 const read = (f: string) => readFileSync(join(process.cwd(), "lib/prospecting", f), "utf-8")
 
-test("icp-base.md is icp.md without its buyer archetypes", () => {
+// icp.md is gone: the cohorts are the only targeting source, and icp-base.md
+// is the base context the translator reads with them.
+test("icp-base.md is the base ICP, and icp.md is gone", () => {
+  assert.ok(!existsSync(join(process.cwd(), "lib/prospecting/icp.md")))
   const base = read("icp-base.md").replace(/^<!--[\s\S]*?-->\n/, "")
-  assert.equal(base, withoutArchetypes(read("icp.md")))
+  assert.ok(base.startsWith("# 434 Media Ideal Customer Profile"))
   assert.ok(!base.includes("## Buyer archetypes"))
   assert.ok(base.includes("## Geography") && base.includes("## Negative filters"))
 })
 
-test("the ICP source defaults to file", () => {
-  assert.equal(parseIcpSource(undefined), "file")
-  assert.equal(parseIcpSource(""), "file")
-  assert.equal(parseIcpSource("bogus"), "file")
-  assert.equal(parseIcpSource("shadow"), "shadow")
-  assert.equal(parseIcpSource("cohorts"), "cohorts")
+// ── A cohort's revenue floor is never a search filter (E1, 2026-10-08) ──────
+test("a revenue figure is recognised only when the prompt states one", () => {
+  for (const p of ["CBG companies in Texas making over $20M", "revenue above 20 million", "$500,000 ARR", "companies with 1.5B in sales", "over 500k revenue", "€10M"]) {
+    assert.ok(revenueFigureStated(p), p)
+  }
+  for (const p of ["health systems in San Antonio", "cohort D enterprise brands", "mid-market companies with 100-2,500 employees", "Fortune 500 sponsors", "decision-makers at defense contractors"]) {
+    assert.ok(!revenueFigureStated(p), p)
+  }
+})
+
+test("an unrequested revenue_range is dropped; a requested one is kept", () => {
+  const raw = { organization_locations: ["Texas"], revenue_range_min: 10_000_000 }
+  assert.equal(mapTranslatorOutput(raw, "cohort D enterprise brands in Texas").filters.revenue_range, undefined)
+  assert.deepEqual(mapTranslatorOutput(raw, "brands in Texas over $10M").filters.revenue_range, { min: 10_000_000 })
+})
+
+// ── A fallback never joins keywords (preview, 2026-10-09: cohort A got 0) ──
+// The industries are emptied of tag IDs for the test, so it holds whether or
+// not their real IDs have been captured.
+test("a multi-industry search with no tag IDs sends one keyword, never a joined string", () => {
+  const inds: IcpIndustry[] = ["defense_aerospace", "advanced_manufacturing", "military_veteran"]
+  const saved = inds.map((i) => INDUSTRY_MAP[i].tagIds)
+  try {
+    for (const i of inds) INDUSTRY_MAP[i].tagIds = []
+    const r = resolveIndustries(inds)
+    assert.deepEqual(r.tagIds, [])
+    assert.equal(r.keyword, INDUSTRY_MAP.defense_aerospace.keyword)
+    const q = mapTranslatorOutput({ icp_industries: inds }, "cohort A prospects").filters.q_keywords
+    assert.equal(q, INDUSTRY_MAP.defense_aerospace.keyword)
+    for (const i of inds.slice(1)) assert.ok(!q?.includes(INDUSTRY_MAP[i].keyword), q)
+  } finally {
+    inds.forEach((i, n) => (INDUSTRY_MAP[i].tagIds = saved[n]))
+  }
+})
+
+// ── Cold outbound is US-only (master 5.3) ──────────────────────────────────
+test("a search location outside the United States is recognised", () => {
+  for (const l of ["Mexico", "Monterrey, Mexico", "Germany", "Toronto, Canada", "United Kingdom"]) assert.ok(isOutsideUnitedStates(l), l)
+  for (const l of ["Texas, US", "San Antonio, Texas, US", "New Mexico", "Georgia", "United States", "Puerto Rico"]) assert.ok(!isOutsideUnitedStates(l), l)
+})
+
+test("the translator drops non-US locations, and never searches worldwide", () => {
+  const mixed = mapTranslatorOutput({ organization_locations: ["Texas, US", "Mexico"] }, "boxing sponsors")
+  assert.deepEqual(mixed.filters.organization_locations, ["Texas, US"])
+  const only = mapTranslatorOutput({ organization_locations: ["Mexico"] }, "brands in Mexico")
+  assert.deepEqual(only.filters.organization_locations, ["United States"])
 })
 
 const cohort = (over: Partial<OutboundCohort>): OutboundCohort => ({
@@ -174,13 +218,14 @@ test("the search keyword is not the candidate's industry", () => {
   assert.equal(keyword.score, plain.score)
 })
 
-test("rendered cohorts carry targeting fields, not pitch or proof", () => {
+test("rendered cohorts carry targeting fields, not pitch, proof or the revenue floor", () => {
   const text = renderCohorts([
     cohort({ letter: "B", name: "Health", target_profile: ["Health systems"], qualification_signals: ["Hiring"], revenue_floor: { amount_minor: 1_000_000_000, currency: "USD" } }),
   ])
   assert.ok(text.includes("### Cohort B — Health"))
   assert.ok(text.includes("- Health systems") && text.includes("- Hiring"))
-  assert.ok(text.includes("USD 10,000,000"))
+  // The floor is a qualification gate, not targeting: it stays out of the prompt.
+  assert.ok(!text.includes("10,000,000") && !/revenue floor/i.test(text))
   assert.ok(!text.includes("pitch text"))
 })
 

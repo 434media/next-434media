@@ -19,7 +19,8 @@ import { matchCohorts, type CohortHit, type CohortLike } from "@/lib/prospecting
  *
  * Geography is weighted 20 (heavier than Canva's baseline 10) — 434's
  * South-Texas / Hispanic-market focus is a competitive position, not a
- * generic firmographic. See docs/funnel-step2-icp.md.
+ * generic firmographic. See docs/funnel-step2-icp.md; the rubric table the
+ * translator is prompted with is in lib/prospecting/icp-base.md.
  *
  * FIT only. Title (a person-level qualifier) and intent (engagement, sponsor)
  * are deliberately NOT here — they're separate axes (see lib/score-lead.ts).

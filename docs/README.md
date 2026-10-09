@@ -9,7 +9,7 @@ so check here before treating anything in this folder as work still to do.
 |---|---|
 | [sales-funnel.md](sales-funnel.md) | The funnel model the whole admin is organized around. Start here for orientation. |
 | [content-studio-models.md](content-studio-models.md) | Curated image/video model roster for the Studio picker. Source of truth is `lib/ai-gateway-models.ts`; this is a snapshot. |
-| [../lib/prospecting/icp.md](../lib/prospecting/icp.md) | The ICP. Not just documentation — it is prompted into the prospecting translator, so edits change live filter behavior. |
+| [../lib/prospecting/icp-base.md](../lib/prospecting/icp-base.md) | The base ICP. Not just documentation — it is prompted into the prospecting translator with the `icp_cohorts` rows, so edits change live filter behavior. |
 | [standards/](standards/) | Governing documents mirrored from the 434 context store. Byte-identical copies, never edited here. Currently the Display and Design Standard, which governs the Work page and any surface rendering portfolio records. |
 
 ## Active — work in flight

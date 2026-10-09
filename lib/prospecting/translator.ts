@@ -11,8 +11,9 @@ import {
   resolveIndustries,
   type IcpIndustry,
 } from "./industry-tags"
-import { cohortsContext, icpSourceFromEnv, readIcpFile, type IcpSource } from "./icp-context"
+import { cohortsContext } from "./icp-context"
 import { listIcpCohorts } from "@/lib/firestore-icp-cohorts"
+import { isOutsideUnitedStates } from "./scorer"
 import type { OutboundCohort } from "@/lib/sor/types.generated"
 
 /**
@@ -22,9 +23,8 @@ import type { OutboundCohort } from "@/lib/sor/types.generated"
  * making over $20M") and emits structured ApolloSearchFilters via Anthropic
  * tool-use. Reads the ICP as system context so the LLM knows 434media's ICP —
  * geography priorities, target industries, decision-maker tiers, owned-audience
- * differentiator. Which ICP is set by PROSPECTING_ICP_SOURCE (see
- * icp-context.ts): lib/prospecting/icp.md by default, or icp-base.md plus the
- * outbound cohorts from `icp_cohorts` (next-434media#63).
+ * differentiator. The ICP is icp-base.md plus the outbound cohorts from
+ * `icp_cohorts` (icp-context.ts, next-434media#63).
  *
  * The translator deliberately uses Sonnet (not Opus) — this is a structured
  * extraction task, not creative copy. Sonnet handles tool-use just as well
@@ -198,7 +198,7 @@ export interface TranslateResult {
  * Shape the LLM emits via the tool — looser than ApolloSearchFilters so
  * we can validate before mapping.
  */
-interface RawTranslatedFilters {
+export interface RawTranslatedFilters {
   organization_locations?: string[]
   person_titles?: string[]
   include_similar_titles?: boolean
@@ -216,13 +216,9 @@ interface RawTranslatedFilters {
   ambiguity_note?: string
 }
 
-// Rule 10 names the ICP's own targeting unit: icp.md's buyer archetypes, or
-// the outbound cohorts that replace them in cohorts mode.
-const ARCHETYPE_RULE = `10. PERSONA TIERS. Each ICP archetype above defines Tier 1 (Economic Buyer), Tier 2 (Champion), Tier 3 (End User). For OUTBOUND, the Champion (Tier 2) is usually the best first-touch, so it should be included — not just the C-suite. When the rep names an archetype ("sponsor-buyers", "event partners") or asks broadly for "decision-makers", pull person_titles / person_seniorities from BOTH that archetype's Tier 1 and Tier 2 rows. When the rep names a specific title, respect it exactly and don't widen.`
+const COHORT_RULE = `10. COHORTS. When the rep names or implies one of the outbound cohorts above, build the search from that cohort: its target profile for industry and company type, and its qualification signals for the WHEN axis (rule 13) only if the rep asks for timing. Take person_titles / person_seniorities from the decision-maker titles above, including the Champion-level roles (heads of partnerships, communications, brand) and not just the C-suite. When the rep names a specific title, respect it exactly and don't widen. Set revenue_range_min / revenue_range_max only when the rep states a revenue figure; never infer one from a cohort.`
 
-const COHORT_RULE = `10. COHORTS. When the rep names or implies one of the outbound cohorts above, build the search from that cohort: its target profile for industry and company type, and its qualification signals for the WHEN axis (rule 13) only if the rep asks for timing. Take person_titles / person_seniorities from the decision-maker titles above, including the Champion-level roles (heads of partnerships, communications, brand) and not just the C-suite. When the rep names a specific title, respect it exactly and don't widen. A cohort's revenue floor is a qualification gate, not a search filter: set revenue_range_min only if the rep asks for a revenue floor.`
-
-function buildSystemPrompt(icp: string, source: "file" | "cohorts"): string {
+function buildSystemPrompt(icp: string): string {
   return `You are a B2B lead-prospecting assistant for 434 Media, a media + storytelling company headquartered in San Antonio, Texas. Your single job is to translate a sales rep's free-form prospecting query into structured Apollo search filters.
 
 You MUST call the submit_search_filters tool exactly once. Never respond in text.
@@ -245,9 +241,9 @@ TRANSLATION RULES
 6. Set ambiguity_note ONLY when the query is genuinely ambiguous — acronyms with multiple plausible meanings (CBG, CPG vs. CBG), vague terms that could go several ways. Don't invent ambiguity.
 7. Reasoning must be brief (1–2 sentences) and explain ICP defaults you applied.
 8. Don't translate negative filters (the ICP "exclude agencies/PR firms" rule) — that's the scorer's job, not the search filter's.
-9. NEVER include EU member states, the UK, EEA countries, Switzerland, or Canada in organization_locations. 434media does not pursue cold outbound there (GDPR / CASL). If the user explicitly asks for these regions, set ambiguity_note explaining the constraint and DO NOT include those locations in the filter — let them clarify or pivot. The scorer hard-excludes any EU/CA results that slip through, but the translator should prevent us from burning Apollo credits on them in the first place.
+9. NEVER include EU member states, the UK, EEA countries, Switzerland, or Canada in organization_locations. 434media does not pursue cold outbound there (GDPR / CASL). If the user explicitly asks for these regions, set ambiguity_note explaining the constraint and DO NOT include those locations in the filter — let them clarify or pivot. The scorer hard-excludes any EU/CA results that slip through, but the translator should prevent us from burning Apollo credits on them in the first place. More broadly, cold outbound goes only to prospects in the United States: never put a location outside the US in organization_locations, including Mexico and Latin America, even for Hispanic-market or cross-border cohorts.
 
-${source === "cohorts" ? COHORT_RULE : ARCHETYPE_RULE}
+${COHORT_RULE}
 
 11. INDUSTRY. Emit icp_industries (the ICP industry-category enum) whenever the prompt or the matched archetype implies an industry — this is the primary industry lever. Map industry sub-verticals to their category: 'dev tools / cloud / SaaS / AI / fintech' → tech_saas; 'biotech / medtech / digital health' → healthcare_life_sciences; 'CPG / beverage / apparel' → cpg_consumer; etc. Do NOT route these through q_keywords — a narrow keyword AND-s against every filter and typically returns ZERO. Reserve q_keywords for genuinely orthogonal niche terms only (e.g. 'fight gear', 'prosthetics'), and prefer leaving it empty.
 
@@ -257,10 +253,24 @@ ${source === "cohorts" ? COHORT_RULE : ARCHETYPE_RULE}
 }
 
 export interface TranslateOptions {
-  /** Overrides PROSPECTING_ICP_SOURCE — the evals set it explicitly. */
-  source?: IcpSource
   /** Cohort rows to use instead of reading `icp_cohorts` (evals, tests). */
   cohorts?: OutboundCohort[]
+}
+
+/**
+ * True when the rep's prompt states a revenue figure: a currency amount
+ * ("$20M", "$500,000") or a number with a magnitude ("20 million", "1.5B",
+ * "500k"). Employee counts and other bare numbers do not count.
+ *
+ * The translator keeps revenue_range only when this is true. A cohort's
+ * revenue floor became a search filter in E1 (2026-10-08) despite a prompt
+ * rule against it; this makes the rule deterministic (next-434media#63).
+ */
+export function revenueFigureStated(prompt: string): boolean {
+  return (
+    /[$€£]\s?\d/.test(prompt) ||
+    /\b\d[\d,]*(\.\d+)?\s?(k|m|mm|b|bn|million|billion|thousand)\b/i.test(prompt)
+  )
 }
 
 /**
@@ -272,8 +282,6 @@ export interface TranslateOptions {
  * caller should treat any throw as a translator failure and surface it to
  * the rep as "couldn't parse query — try rephrasing."
  *
- * In shadow mode both ICPs are translated; the icp.md result is returned and
- * the cohorts result is only logged, so a cohorts failure never reaches the rep.
  */
 export async function translatePromptToFilters(
   userPrompt: string,
@@ -283,34 +291,8 @@ export async function translatePromptToFilters(
   if (!trimmed) {
     throw new Error("Translator: prompt is empty")
   }
-  const source = options.source ?? icpSourceFromEnv()
-  const fromCohorts = async () =>
-    translateWith(trimmed, buildSystemPrompt(await cohortsContext(options.cohorts ?? (await listIcpCohorts())), "cohorts"))
-  const fromFile = async () => translateWith(trimmed, buildSystemPrompt(await readIcpFile(), "file"))
-
-  if (source === "cohorts") return fromCohorts()
-  if (source === "file") return fromFile()
-
-  const [file, cohorts] = await Promise.allSettled([fromFile(), fromCohorts()])
-  if (cohorts.status === "rejected") {
-    console.warn("[translator:shadow] cohorts translation failed:", cohorts.reason instanceof Error ? cohorts.reason.message : cohorts.reason)
-  } else if (file.status === "fulfilled") {
-    console.log(`[translator:shadow] ${JSON.stringify(shadowDiff(file.value, cohorts.value))}`)
-  }
-  if (file.status === "rejected") throw file.reason
-  return file.value
-}
-
-/** The filter fields where the two ICPs disagreed — values, not the prompt. */
-function shadowDiff(file: TranslateResult, cohorts: TranslateResult): Record<string, unknown> {
-  const a = { ...file.filters, icp_industries: file.icpIndustries } as Record<string, unknown>
-  const b = { ...cohorts.filters, icp_industries: cohorts.icpIndustries } as Record<string, unknown>
-  const diff: Record<string, unknown> = {}
-  for (const k of new Set([...Object.keys(a), ...Object.keys(b)])) {
-    if (k === "job_posted_at_range") continue // date math, not a mapping choice
-    if (JSON.stringify(a[k]) !== JSON.stringify(b[k])) diff[k] = { file: a[k], cohorts: b[k] }
-  }
-  return diff
+  const cohorts = options.cohorts ?? (await listIcpCohorts())
+  return translateWith(trimmed, buildSystemPrompt(await cohortsContext(cohorts)))
 }
 
 async function translateWith(trimmed: string, system: string): Promise<TranslateResult> {
@@ -327,7 +309,7 @@ async function translateWith(trimmed: string, system: string): Promise<Translate
     // default `high` with no loss in filter quality.
     effort: "low",
     // The ICP block is ~6.7k tokens and byte-identical for the life of a
-    // deploy (cohorts mode: until a cohort row changes), so every call after
+    // deploy (or until a cohort row changes), so every call after
     // the first reads it from cache at ~10% of input rate (measured: $0.019 →
     // $0.0052 per translation).
     cacheSystem: true,
@@ -336,14 +318,28 @@ async function translateWith(trimmed: string, system: string): Promise<Translate
     toolName: FILTERS_TOOL_NAME,
     tool: filtersTool,
   })
+  return mapTranslatorOutput(raw, trimmed)
+}
 
+/**
+ * The model's tool input → ApolloSearchFilters. Pure, so the guards in it are
+ * tested without a model call (lib/__tests__/icp-cohorts.test.ts).
+ */
+export function mapTranslatorOutput(raw: RawTranslatedFilters, prompt: string): TranslateResult {
   // Map LLM output to the strict ApolloSearchFilters shape. The LLM emits
   // a flat shape; we lift revenue_range into a nested object and drop empty
   // arrays/strings so downstream callers don't have to defensive-check.
   const filters: ApolloSearchFilters = {}
 
+  // Cold outbound is US-only (master 5.3). A location outside the US is
+  // dropped; if that leaves none, the search stays in the United States rather
+  // than going worldwide.
   if (raw.organization_locations?.length) {
-    filters.organization_locations = raw.organization_locations
+    const us = raw.organization_locations.filter((l) => !isOutsideUnitedStates(l))
+    if (us.length < raw.organization_locations.length) {
+      console.log("[translator] dropped a location outside the United States:", raw.organization_locations.filter(isOutsideUnitedStates))
+    }
+    filters.organization_locations = us.length ? us : ["United States"]
   }
   if (raw.person_titles?.length) {
     filters.person_titles = raw.person_titles
@@ -362,7 +358,13 @@ async function translateWith(trimmed: string, system: string): Promise<Translate
   if (raw.num_employees_ranges?.length) {
     filters.num_employees_ranges = raw.num_employees_ranges
   }
-  if (raw.revenue_range_min !== undefined || raw.revenue_range_max !== undefined) {
+  // Revenue is a search filter only when the rep stated a figure. A cohort's
+  // revenue floor, or any other inferred default, is dropped here.
+  const revenueAllowed = revenueFigureStated(prompt)
+  if (!revenueAllowed && (raw.revenue_range_min !== undefined || raw.revenue_range_max !== undefined)) {
+    console.log("[translator] dropped an unrequested revenue_range: the prompt states no revenue figure")
+  }
+  if (revenueAllowed && (raw.revenue_range_min !== undefined || raw.revenue_range_max !== undefined)) {
     filters.revenue_range = {}
     if (raw.revenue_range_min !== undefined) {
       filters.revenue_range.min = raw.revenue_range_min
@@ -373,7 +375,7 @@ async function translateWith(trimmed: string, system: string): Promise<Translate
   }
   // Industry — resolve the ICP industry categories to Apollo's precise
   // server-side tag-ID filter. While tag IDs aren't configured yet, this
-  // returns fallback keywords instead, preserving keyword-based industry
+  // returns one fallback keyword instead, preserving keyword-based industry
   // filtering. A niche q_keywords term (if the LLM set one) takes precedence
   // over the generic industry fallback to avoid over-narrowing.
   const industries = (raw.icp_industries ?? []).filter(
@@ -384,7 +386,7 @@ async function translateWith(trimmed: string, system: string): Promise<Translate
     filters.industry_tag_ids = resolved.tagIds
   }
   const nicheKeyword = raw.q_keywords?.trim()
-  const keyword = nicheKeyword || resolved.keywords.join(" ")
+  const keyword = nicheKeyword || resolved.keyword
   if (keyword) {
     filters.q_keywords = keyword
   }

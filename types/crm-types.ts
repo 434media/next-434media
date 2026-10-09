@@ -985,7 +985,8 @@ export interface Lead extends BaseRecord {
   // ICP fit (canonical rubric) — company-level FIT, 0–100, travels prospect →
   // lead → opportunity unchanged. The legacy `score` mirrors this during the
   // transition; `intent_*` holds signals relocated out of fit (engagement,
-  // sponsor, event-source). See lib/icp/rubric.ts + docs/funnel-step2-icp.md.
+  // sponsor, event-source). See lib/icp/rubric.ts + docs/funnel-step2-icp.md;
+  // the base ICP the translator reads is lib/prospecting/icp-base.md.
   icp_fit_score?: number
   icp_grade?: IcpGrade
   icp_breakdown?: IcpFitBreakdown

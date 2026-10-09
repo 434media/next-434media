@@ -5,7 +5,7 @@
  * which takes Apollo's opaque internal ObjectIds (e.g. "5567cd4773696439b10b0000"),
  * NOT free text. The translator can't invent those, so this module maps
  * 434media's controlled ICP industry vocabulary (mirrors the "Industries
- * (positive signals)" section of icp.md) onto Apollo's tag IDs.
+ * (positive signals)" section of icp-base.md) onto Apollo's tag IDs.
  *
  * ── How to populate `tagIds` ────────────────────────────────────────────
  * The IDs are stable per Apollo account. To grab them:
@@ -24,7 +24,7 @@
  * moment any tag IDs are filled in — no code change needed.
  */
 
-// Controlled vocabulary — keep in sync with icp.md "Industries (positive signals)".
+// Controlled vocabulary — keep in sync with icp-base.md "Industries (positive signals)".
 export const ICP_INDUSTRIES = [
   "healthcare_life_sciences",
   "sports_fitness_lifestyle",
@@ -134,29 +134,40 @@ export const INDUSTRY_MAP: Record<IcpIndustry, IndustryMapping> = {
     tagIds: ["5567cd527369643981050000", "5567e28a7369642ae2500000", "5567e1de7369642069ea0100"],
     keyword: "economic development",
   },
-  // defense & space · aviation & aerospace · military (tag IDs not yet captured)
+  // defense & space · aviation & aerospace · military
+  // (captured from Apollo People Search, 2026-10-09)
   defense_aerospace: {
     label: "Defense & aerospace",
-    tagIds: [],
+    tagIds: ["5567e1097369641b5f810500", "5567e0dd73696416d3c20100", "5567e2c572616932bb3b0000"],
     keyword: "defense",
   },
-  // marketing & advertising · public relations & communications (tag IDs not yet captured)
+  // marketing & advertising · public relations & communications
+  // (captured from Apollo People Search, 2026-10-09)
   marketing_agency: {
     label: "Marketing, advertising & PR agencies",
-    tagIds: [],
+    tagIds: ["5567cd467369644d39040000", "5567ce5973696453d9780000"],
     keyword: "advertising agency",
   },
   // machinery · industrial automation · electrical/electronic manufacturing ·
-  // semiconductors · mechanical or industrial engineering (tag IDs not yet captured)
+  // semiconductors · mechanical or industrial engineering
+  // (captured from Apollo People Search, 2026-10-09)
   advanced_manufacturing: {
     label: "Advanced manufacturing",
-    tagIds: [],
+    tagIds: [
+      "5567cd4973696439d53c0000",
+      "5567e1337369641ad2970000",
+      "5567cd4c73696439c9030000",
+      "5567e0d87369640e5aa30c00",
+      "5567ce2673696453d95c0000",
+    ],
     keyword: "manufacturing",
   },
-  // military · veterans' health and services · defense workforce (tag IDs not yet captured)
+  // military (captured from Apollo People Search, 2026-10-09). Apollo has no
+  // veterans' services or defense-workforce industry, so the military tag
+  // stands for all three.
   military_veteran: {
     label: "Military health & veteran services",
-    tagIds: [],
+    tagIds: ["5567e2c572616932bb3b0000"],
     keyword: "veteran",
   },
 }
@@ -228,8 +239,12 @@ export function classifyIndustries(industry?: string | null, company?: string | 
 export interface ResolvedIndustry {
   /** Apollo industry tag IDs to filter on (precise, server-side). */
   tagIds: string[]
-  /** Fallback industry keywords for q_keywords (used only when no tag IDs). */
-  keywords: string[]
+  /**
+   * One fallback industry keyword for q_keywords, used only when no selected
+   * industry has tag IDs. Never several joined: Apollo matches every word of
+   * q_keywords, so "defense manufacturing veteran" returns nothing.
+   */
+  keyword: string | null
 }
 
 /**
@@ -238,19 +253,26 @@ export interface ResolvedIndustry {
  * Prefers precise server-side tag IDs. Falls back to fuzzy keywords ONLY when
  * NONE of the selected industries have tag IDs configured — mixing a precise
  * tag-ID filter with a fuzzy AND keyword would wrongly narrow the tag-matched
- * results. Returns deduped arrays.
+ * results.
+ *
+ * The fallback is ONE keyword: the first selected industry's, which is the
+ * model's primary choice. Apollo's q_keywords is a single string that must
+ * match in full, so joining keywords narrows to their intersection (cohort A's
+ * three industries joined to "defense manufacturing veteran" and returned
+ * nothing, preview 2026-10-09). Sending each separately would take one search
+ * per industry. Once an industry's tag IDs are captured it never falls back.
  */
 export function resolveIndustries(industries: IcpIndustry[]): ResolvedIndustry {
   const tagIds = new Set<string>()
-  const fallbackKeywords = new Set<string>()
+  let fallbackKeyword: string | null = null
 
   for (const key of industries) {
     const m = INDUSTRY_MAP[key]
     if (!m) continue
     m.tagIds.forEach((id) => tagIds.add(id))
-    if (!m.tagIds.length) fallbackKeywords.add(m.keyword)
+    if (!m.tagIds.length && fallbackKeyword === null) fallbackKeyword = m.keyword
   }
 
-  if (tagIds.size > 0) return { tagIds: [...tagIds], keywords: [] }
-  return { tagIds: [], keywords: [...fallbackKeywords] }
+  if (tagIds.size > 0) return { tagIds: [...tagIds], keyword: null }
+  return { tagIds: [], keyword: fallbackKeyword }
 }

@@ -41,7 +41,7 @@ export function draftToFilters(draft: ProspectDraft): ApolloSearchFilters {
   // Niche keyword wins; else fall back to the industry keyword (interim, while
   // tag IDs are unpopulated). Mirrors the translator's own reconciliation.
   const niche = q_keywords?.trim()
-  const keyword = niche || resolved.keywords.join(" ")
+  const keyword = niche || resolved.keyword
   if (keyword) filters.q_keywords = keyword
 
   return filters
@@ -78,14 +78,16 @@ export interface ArchetypePreset {
   draft: ProspectDraft
 }
 
-// Default outbound posture — contactable contacts, Texas-first (per icp.md).
+// Default outbound posture — contactable contacts, Texas-first (per icp-base.md).
 const OUTBOUND_EMAIL: ApolloEmailStatus[] = ["verified", "likely to engage"]
 const TEXAS: string[] = ["Texas, US"]
 
 /**
  * The four 434media buyer archetypes as click-to-load presets. Titles/seniorities
- * combine Tier-1 (Economic Buyer) + Tier-2 (Champion) from icp.md so outbound can
- * open on the Champion. Reps edit before searching.
+ * combine Tier-1 (Economic Buyer) + Tier-2 (Champion), so outbound can open on
+ * the Champion. Reps edit before searching. These presets are now the only
+ * record of the archetypes: icp.md, which defined them, was removed when the
+ * outbound cohorts became the translator's only targeting source (#63).
  */
 export const ARCHETYPE_PRESETS: ArchetypePreset[] = [
   {
