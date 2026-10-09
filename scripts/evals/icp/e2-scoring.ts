@@ -45,7 +45,7 @@ interface FilterSet {
 // Optional: the cohort matcher only exists once the #63 switch lands. The
 // baseline runs without it.
 type CohortMatcher = (
-  text: { industry?: string; company?: string },
+  company: { industry?: string; company?: string; employeeCount?: number; annualRevenue?: number },
   cohorts: unknown[],
 ) => { key: string } | null
 
@@ -154,7 +154,15 @@ async function main() {
       : null
     const cohort =
       matcher && cohorts
-        ? matcher({ industry: c.person.organization?.industry, company: c.person.organization?.name }, cohorts)
+        ? matcher(
+            {
+              industry: c.person.organization?.industry,
+              company: c.person.organization?.name,
+              employeeCount: c.person.organization?.estimated_num_employees,
+              annualRevenue: c.person.organization?.annual_revenue,
+            },
+            cohorts,
+          )
         : undefined
     const bySet: Record<string, { score: number; grade: string; excluded: boolean; approve: boolean }> = {}
     for (const s of sets) {

@@ -347,7 +347,10 @@ export function computeFunnelKpis(
     const byKey = new Map<string, CohortMatchStat>()
     let cohortMatched = 0
     for (const l of leads) {
-      const m = matchCohort({ industry: l.industry, company: l.company }, cohorts)
+      const m = matchCohort(
+        { industry: l.industry, company: l.company, employeeCount: l.employee_count, annualRevenue: l.annual_revenue },
+        cohorts,
+      )
       if (!m) continue
       cohortMatched++
       const stat = byKey.get(m.key) ?? { key: m.key, letter: m.letter, name: m.name, count: 0 }

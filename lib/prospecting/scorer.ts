@@ -9,7 +9,9 @@ import { scoreIcpFit } from "@/lib/icp/rubric"
  * prospect's score is the SAME 0–100 fit + grade the lead carries downstream
  * (Step 2 — one score everywhere). This file owns the prospecting-only
  * concerns:
- *   - hard exclusions (competitor agencies, EU/UK/CA jurisdictions) → score -1
+ *   - the hard jurisdiction exclusion (EU/UK/EEA/CH/CA) → score -1
+ *   (Agencies are no longer excluded: they are an outbound cohort — founder
+ *   ruling 2026-10-08, the master over the old ICP doc.)
  *   - the contact qualifier (title) — a person-level signal, NOT company fit,
  *     so it's surfaced separately rather than folded into the fit score
  *   - the approve-into-queue threshold
@@ -27,18 +29,13 @@ import { scoreIcpFit } from "@/lib/icp/rubric"
  */
 export const DEFAULT_FIT_THRESHOLD = Number(process.env.PROSPECTING_FIT_THRESHOLD) || 60
 
-// ─── Negative ICP patterns (hard exclusions) ────────────────────────────
-
-/**
- * Org-name patterns that match marketing agencies, PR firms, advertising
- * firms, etc. — 434media's competitors per the ICP doc. Hard-exclude.
- */
-const NEGATIVE_ORG_PATTERNS: RegExp[] = [
-  /\b(marketing|advertising|public relations|communications|brand|creative|digital marketing)\s+(agency|group|firm|partners|consultancy|consulting|studio|shop)\b/i,
-  /\b(agency|firm|consultancy)\b.*\b(marketing|advertising|public relations)\b/i,
-  /\bPR firm\b/i,
-  /\bad agency\b/i,
-]
+// ─── Hard exclusions ────────────────────────────────────────────────────
+//
+// Jurisdiction is the only hard exclusion. Agencies used to be one (an
+// org-name pattern match on agencies, PR and advertising firms, as competitors
+// per icp.md). The master's outbound cohorts name agencies as production
+// clients, so the founder ruled on 2026-10-08 that the master wins and the
+// agency exclusion is removed (next-434media#63, cohort E).
 
 /**
  * Jurisdictions where 434media does NOT pursue cold outbound. Per the ICP
@@ -256,18 +253,7 @@ export function scoreCandidate(
 ): ScoredPerson {
   const orgName = person.organization?.name ?? ""
 
-  // Hard exclusion 1 — competitor agencies / PR firms.
-  for (const pattern of NEGATIVE_ORG_PATTERNS) {
-    if (pattern.test(orgName)) {
-      return excludedResult(
-        person,
-        `Negative ICP filter: "${orgName}" appears to be an agency or PR/marketing firm — explicitly excluded by the ICP doc.`,
-        `Excluded: organization "${orgName}" matches a negative ICP pattern (agency / PR / marketing firm).`,
-      )
-    }
-  }
-
-  // Hard exclusion 2 — EU/CA jurisdictions (strict cold-outreach consent laws).
+  // Hard exclusion — EU/CA jurisdictions (strict cold-outreach consent laws).
   const jurisdiction = isExcludedJurisdiction(person)
   if (jurisdiction.excluded) {
     return excludedResult(
