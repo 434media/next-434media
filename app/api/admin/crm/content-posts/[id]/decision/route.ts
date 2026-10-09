@@ -1,6 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { getSession, isAuthorizedAdmin, isCrmSuperAdmin } from "@/lib/auth"
-import { getContentPostById, updateContentPost } from "@/lib/firestore-crm"
+import { getContentPostById, updateContentPost, decideOwnedMeta } from "@/lib/firestore-crm"
 import { sendCommentNotification } from "@/lib/notifications"
 import { TEAM_MEMBERS } from "@/components/crm/types"
 import type {
@@ -27,6 +27,8 @@ export const runtime = "nodejs"
 interface DecisionBody {
   decision?: "approved" | "rejected"
   note?: string
+  expectedRevision?: number
+  expectedManifestHash?: string
 }
 
 // Resolve a content post's assignee (a display name like "Jesse Hernandez") to
@@ -84,6 +86,14 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
   const post = await getContentPostById(id)
   if (!post) {
     return NextResponse.json({ error: "Content post not found" }, { status: 404 })
+  }
+
+  if (post.owned_meta) {
+    if (process.env.VERCEL_ENV !== "production" || process.env.OWNED_META_PUBLISHING_ENABLED !== "true") return NextResponse.json({ error: "Publisher disabled" }, { status: 423 })
+    try {
+      const batch = await decideOwnedMeta(id, body.expectedRevision!, body.expectedManifestHash!, decision, { email: session.email, name: session.name?.trim() || session.email }, note)
+      return NextResponse.json({ success: true, status: decision, batch })
+    } catch { return NextResponse.json({ error: "Review changed or already decided; reload the exact publisher manifest" }, { status: 409 }) }
   }
 
   const now = new Date().toISOString()

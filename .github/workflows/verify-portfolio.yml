@@ -80,3 +80,6 @@ jobs:
       # icp.md without its archetypes, the source defaults to icp.md, and the
       # cohort matcher behaves. Invented cohort rows; the real ones are internal.
       - run: tsx --test lib/__tests__/icp-cohorts.test.ts
+
+      # Owned Meta: offline state machine and fake-transport regression tests.
+      - run: tsx --test lib/__tests__/owned-meta-publisher.test.ts
