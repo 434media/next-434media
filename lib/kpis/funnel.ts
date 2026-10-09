@@ -351,7 +351,7 @@ export function computeFunnelKpis(
         { industry: l.industry, company: l.company, employeeCount: l.employee_count, annualRevenue: l.annual_revenue },
         cohorts,
       )
-      if (!m) continue
+      if (!m || m.status !== "match") continue
       cohortMatched++
       const stat = byKey.get(m.key) ?? { key: m.key, letter: m.letter, name: m.name, count: 0 }
       stat.count++

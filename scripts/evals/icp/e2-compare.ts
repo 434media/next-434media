@@ -15,9 +15,13 @@ interface Row {
   lead_grade: string | null
   lead_breakdown?: Breakdown
   icp_match: boolean | null
+  lead_review?: string | null
   cohort?: string | null
-  cohort_detail?: { terms: string[]; bySize: boolean; byRevenueBand: boolean; weight?: number } | null
-  by_set: Record<string, { score: number; grade: string; excluded: boolean; approve: boolean; breakdown?: Breakdown }>
+  cohort_detail?: Record<string, unknown> | null
+  by_set: Record<
+    string,
+    { score: number; grade: string; excluded: boolean; approve: boolean; review?: string; breakdown?: Breakdown }
+  >
 }
 
 /** Which rubric dimensions moved, e.g. "industry 22→0". */
@@ -31,12 +35,18 @@ function why(a: Breakdown, b: Breakdown): string {
 function cohortWhy(r: Row): string {
   const d = r.cohort_detail
   if (!d) return "no match"
+  if (d.status === "review") return `review: ${d.reason}`
+  if (d.via === "industry") return `industry ${(d.industries as string[]).join(", ")}`
+  if (d.via === "size") return `size band ${d.band} (by ${d.sizeBasis})`
   const parts = []
-  if (d.terms.length) parts.push(`words ${d.terms.join(", ")}`)
+  if (Array.isArray(d.terms) && d.terms.length) parts.push(`words ${d.terms.join(", ")}`)
   if (d.bySize) parts.push("enterprise size")
   if (d.byRevenueBand) parts.push("revenue band + signal word")
   return parts.join("; ") || "match"
 }
+
+// A candidate under review is neither approved nor rejected.
+const decision = (x: { approve: boolean; review?: string }) => (x.review ? "review" : String(x.approve))
 interface Report {
   git_sha: string
   generated_at: string
@@ -90,9 +100,9 @@ for (const b of before.rows) {
     const x = b.by_set[s]
     const y = a.by_set[s]
     if (x.excluded !== y.excluded) exclusionDiffs.push(`${b.id} (${b.company}) [${s}]: excluded ${x.excluded} → ${y.excluded}`)
-    if (x.approve !== y.approve) {
+    if (decision(x) !== decision(y)) {
       approveFlips.push(
-        `${b.id} (${b.company}) [${s}]: approve ${x.approve} → ${y.approve} (score ${x.score} → ${y.score}; ${why(x.breakdown, y.breakdown)})`,
+        `${b.id} (${b.company}) [${s}]: approve ${decision(x)} → ${decision(y)} (score ${x.score} → ${y.score}; ${why(x.breakdown, y.breakdown)}${y.review ? `; ${y.review}` : ""})`,
       )
     }
   }

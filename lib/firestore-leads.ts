@@ -59,6 +59,7 @@ function normalize(id: string, raw: FirebaseFirestore.DocumentData): Lead {
     score_breakdown: (raw.score_breakdown || {}) as Lead["score_breakdown"],
     icp_fit_score: typeof raw.icp_fit_score === "number" ? raw.icp_fit_score : undefined,
     icp_grade: (raw.icp_grade || undefined) as Lead["icp_grade"],
+    icp_review: typeof raw.icp_review === "string" ? raw.icp_review : null,
     icp_breakdown:
       raw.icp_breakdown && typeof raw.icp_breakdown === "object"
         ? (raw.icp_breakdown as Lead["icp_breakdown"])
@@ -175,6 +176,7 @@ export async function createLead(input: LeadCreateInput): Promise<Lead> {
     icp_fit_score: scored.icp_fit_score,
     icp_grade: scored.icp_grade,
     icp_breakdown: scored.icp_breakdown,
+    icp_review: scored.icp_review,
     intent_score: scored.intent_score,
     intent_breakdown: scored.intent_breakdown,
     employee_count: input.employee_count ?? null,
@@ -302,6 +304,7 @@ export async function updateLead(id: string, patch: LeadUpdateInput): Promise<Le
     icp_fit_score: scored.icp_fit_score,
     icp_grade: scored.icp_grade,
     icp_breakdown: scored.icp_breakdown,
+    icp_review: scored.icp_review,
     intent_score: scored.intent_score,
     intent_breakdown: scored.intent_breakdown,
     enriched_at: new Date().toISOString(),
@@ -865,6 +868,7 @@ export async function incrementEngagement(
     icp_fit_score: scored.icp_fit_score,
     icp_grade: scored.icp_grade,
     icp_breakdown: scored.icp_breakdown,
+    icp_review: scored.icp_review,
     intent_score: scored.intent_score,
     intent_breakdown: scored.intent_breakdown,
     enriched_at: new Date().toISOString(),

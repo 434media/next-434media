@@ -978,6 +978,11 @@ export interface Lead extends BaseRecord {
   icp_fit_score?: number
   icp_grade?: IcpGrade
   icp_breakdown?: IcpFitBreakdown
+  // Set when the ICP fit could not place the lead in a cohort because its size
+  // is unknown (no revenue, no employee count): Industry is left out of the fit
+  // and the lead is marked for review instead of scored as no-fit. Holds why.
+  // Computed on every write (next-434media#63).
+  icp_review?: string | null
   intent_score?: number
   intent_breakdown?: { engagement?: number; sponsor?: number; event?: number }
 
@@ -1075,6 +1080,7 @@ export type LeadCreateInput = Omit<
   | "icp_fit_score"
   | "icp_grade"
   | "icp_breakdown"
+  | "icp_review"
   | "intent_score"
   | "intent_breakdown"
   | "email_opens"
@@ -1105,6 +1111,7 @@ export type LeadUpdateInput = Partial<
     | "icp_fit_score"
     | "icp_grade"
     | "icp_breakdown"
+    | "icp_review"
     | "intent_score"
     | "intent_breakdown"
     | "enriched_at"

@@ -45,10 +45,13 @@ interface FilterSet {
 
 // Optional: the cohort matcher only exists once the #63 switch lands. The
 // baseline runs without it.
+// Two shapes over time: the prose matcher returned { key, terms, ... }; the
+// structured matcher returns { status: "match", key, via, ... } or
+// { status: "review", reason }.
 type CohortMatcher = (
   company: { industry?: string; company?: string; employeeCount?: number; annualRevenue?: number },
   cohorts: unknown[],
-) => { key: string; terms?: string[]; bySize?: boolean; byRevenueBand?: boolean; weight?: number } | null
+) => Record<string, unknown> | null
 
 // Since #63's scoring change the scorers take the cohorts as a last argument.
 // Code from before it ignores the extra argument, so one script runs on both.
@@ -176,14 +179,20 @@ async function main() {
             cohorts,
           )
         : undefined
-    const bySet: Record<string, { score: number; grade: string; excluded: boolean; approve: boolean; breakdown: unknown }> = {}
+    const bySet: Record<
+      string,
+      { score: number; grade: string; excluded: boolean; approve: boolean; review?: string; breakdown: unknown }
+    > = {}
     for (const s of sets) {
-      const scored = scoreCandidateWith(c.person, s.filters, cohorts ?? [])
+      const scored = scoreCandidateWith(c.person, s.filters, cohorts ?? []) as ReturnType<typeof scoreCandidate> & {
+        needsReview?: string
+      }
       bySet[s.name] = {
         score: scored.score,
         grade: scored.grade,
         excluded: scored.score === -1,
         approve: isAboveThreshold(scored.score),
+        ...(scored.needsReview ? { review: scored.needsReview } : {}),
         breakdown: scored.breakdown,
       }
     }
@@ -195,12 +204,17 @@ async function main() {
       lead_fit: leadFit?.icp_fit_score ?? null,
       lead_grade: leadFit?.icp_grade ?? null,
       lead_breakdown: leadFit?.icp_breakdown ?? null,
+      lead_review: (leadFit as { icp_review?: string | null } | null)?.icp_review ?? null,
       icp_match: leadFit ? leadFit.icp_fit_score >= ICP_MATCH_THRESHOLD : null,
-      cohort: cohort === undefined ? undefined : cohort?.key ?? null,
-      cohort_detail:
-        cohort === undefined || cohort === null
-          ? cohort
-          : { terms: cohort.terms ?? [], bySize: !!cohort.bySize, byRevenueBand: !!cohort.byRevenueBand, weight: cohort.weight },
+      cohort:
+        cohort === undefined
+          ? undefined
+          : cohort === null
+            ? null
+            : cohort.status === "review"
+              ? "review"
+              : ((cohort.key as string) ?? null),
+      cohort_detail: cohort === undefined || cohort === null ? cohort : cohort,
       by_set: bySet,
     })
   }
@@ -220,8 +234,9 @@ async function main() {
     summary: {
       icp_match_rate: leadRows.length ? leadRows.filter((r) => r.icp_match).length / leadRows.length : 0,
       cohort_match_rate: matcher
-        ? leadRows.filter((r) => r.cohort).length / Math.max(leadRows.length, 1)
+        ? leadRows.filter((r) => r.cohort && r.cohort !== "review").length / Math.max(leadRows.length, 1)
         : null,
+      review_count_leads: leadRows.filter((r) => r.lead_review).length,
       approve_count_no_filters: rows.filter((r) => r.by_set.none.approve).length,
       excluded_count_no_filters: rows.filter((r) => r.by_set.none.excluded).length,
       synthetic_expectation_mismatches: synthMismatch,

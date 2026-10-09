@@ -27,6 +27,8 @@ export interface ScoreResult {
   icp_fit_score: number
   icp_grade: IcpGrade
   icp_breakdown: IcpFitBreakdown
+  /** Why the lead needs review (size unknown, no cohort by industry), or null. */
+  icp_review: string | null
   // Relocated intent signals (engagement / sponsor / event-source)
   intent_score: number
   intent_breakdown: { engagement?: number; sponsor?: number; event?: number }
@@ -96,6 +98,7 @@ export function scoreLead(input: ScoreInput, cohorts: CohortLike[]): ScoreResult
     icp_fit_score: fit.fit,
     icp_grade: fit.grade,
     icp_breakdown: fit.breakdown,
+    icp_review: fit.needsReview ?? null,
     intent_score: intent,
     intent_breakdown,
   }

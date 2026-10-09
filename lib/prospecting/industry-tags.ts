@@ -35,6 +35,13 @@ export const ICP_INDUSTRIES = [
   "nonprofit_mission",
   "cpg_consumer",
   "civic_econ_dev",
+  // Added 2026-10-09 for the outbound cohorts' structured match fields
+  // (next-434media#63): cohort A needed a defense category, cohort E an agency
+  // category. The cohort schema in 434-context ("05 System of Record/schemas/
+  // cohort.schema.json", match.industries) holds a copy of this list: change
+  // both together.
+  "defense_aerospace",
+  "marketing_agency",
 ] as const
 
 export type IcpIndustry = (typeof ICP_INDUSTRIES)[number]
@@ -123,6 +130,74 @@ export const INDUSTRY_MAP: Record<IcpIndustry, IndustryMapping> = {
     tagIds: ["5567cd527369643981050000", "5567e28a7369642ae2500000", "5567e1de7369642069ea0100"],
     keyword: "economic development",
   },
+  // defense & space · aviation & aerospace · military (tag IDs not yet captured)
+  defense_aerospace: {
+    label: "Defense & aerospace",
+    tagIds: [],
+    keyword: "defense",
+  },
+  // marketing & advertising · public relations & communications (tag IDs not yet captured)
+  marketing_agency: {
+    label: "Marketing, advertising & PR agencies",
+    tagIds: [],
+    keyword: "advertising agency",
+  },
+}
+
+/**
+ * Which ICP industries a company's own industry text and name point to — the
+ * reverse of INDUSTRY_MAP, for scoring a lead or a candidate against the
+ * cohorts' structured match fields (lib/prospecting/cohort-match.ts).
+ *
+ * Terms are Apollo industry names (as listed per category above) and the plain
+ * words people type into a lead's industry field. A term matches as a whole
+ * word or phrase at a word start, so "health" matches "healthcare" and
+ * "Health Science" but "ai" never matches inside "maintenance".
+ */
+export const INDUSTRY_TERMS: Record<IcpIndustry, string[]> = {
+  healthcare_life_sciences: [
+    "health", "hospital", "medical", "medicine", "pharma", "biotech", "life science",
+    "clinic", "nursing", "dental", "medical device",
+  ],
+  sports_fitness_lifestyle: ["sport", "fitness", "boxing", "athletic", "martial art", "wellness", "fight"],
+  tech_saas: [
+    "software", "information technology", "saas", "internet", "computer", "it services",
+    "it system", "cyber", "artificial intelligence", "tech",
+  ],
+  capital_vc: [
+    "venture capital", "private equity", "investment", "financial services", "accelerator",
+    "incubator", "angel investor",
+  ],
+  media_broadcast: ["media", "broadcast", "television", "radio", "publishing", "entertainment", "film", "newspaper"],
+  education_workforce: ["education", "university", "college", "school", "e-learning", "training", "workforce", "academy"],
+  nonprofit_mission: [
+    "nonprofit", "non-profit", "philanthropy", "foundation", "civic & social", "religious",
+    "ministries", "charity", "charitable",
+  ],
+  cpg_consumer: ["consumer goods", "food", "beverage", "retail", "apparel", "cosmetics", "restaurant"],
+  civic_econ_dev: ["government", "public policy", "economic development", "think tank", "chamber of commerce", "municipal"],
+  defense_aerospace: ["defense", "defence", "aerospace", "aviation", "military"],
+  marketing_agency: [
+    "marketing & advertising", "advertising", "public relations", "marketing agency",
+    "creative agency", "pr firm", "agency",
+  ],
+}
+
+function escapeRe(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+}
+
+const TERM_PATTERNS: [IcpIndustry, RegExp][] = ICP_INDUSTRIES.flatMap((ind) =>
+  INDUSTRY_TERMS[ind].map((t): [IcpIndustry, RegExp] => [ind, new RegExp(`(^|[^a-z])${escapeRe(t)}`, "i")]),
+)
+
+/** The ICP industries a company's industry text and name point to. */
+export function classifyIndustries(industry?: string | null, company?: string | null): IcpIndustry[] {
+  const text = `${industry ?? ""} | ${company ?? ""}`.toLowerCase()
+  if (!text.replace(/[|\s]/g, "")) return []
+  const found = new Set<IcpIndustry>()
+  for (const [ind, re] of TERM_PATTERNS) if (re.test(text)) found.add(ind)
+  return ICP_INDUSTRIES.filter((i) => found.has(i))
 }
 
 export interface ResolvedIndustry {

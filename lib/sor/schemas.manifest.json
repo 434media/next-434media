@@ -1,17 +1,18 @@
 {
-  "generated": "2026-10-05",
+  "generated": "2026-10-09",
   "schemas": {
-    "cohort.schema.json": "3c8be15db7b4fe80",
+    "cohort.schema.json": "60ad6886aa1f571c",
     "cohort_rule.schema.json": "6dba9c5ea2c43de8",
     "contractor.schema.json": "0e30b1e384417bfe",
     "launch_dependency.schema.json": "b60a01e2bf2af341",
     "partner_service.schema.json": "27d5fa1bf7ad7543",
     "policy_document.schema.json": "4e1d0184b8692961",
     "portfolio_record.schema.json": "299576a4a45c00dc",
+    "pricing_exception.schema.json": "30bd46b76e2e2ded",
     "qualification_threshold.schema.json": "4b346713da931afd",
     "rate_card_line.schema.json": "099711957961ffe2",
     "talent_relationship.schema.json": "f0414d7b7a227ea1",
     "work_page_section.schema.json": "af3bd0fab24e4fe8"
   },
-  "typesBody": "c6cbe4d42056c1a6"
+  "typesBody": "29b8d466490cae3e"
 }

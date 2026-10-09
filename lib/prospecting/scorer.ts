@@ -225,6 +225,12 @@ export interface ScoredPerson {
   breakdown: IcpFitBreakdown
   /** Title fit (0–20) — a contact qualifier, NOT part of the company fit score. */
   contactQualifier: number
+  /**
+   * Set when the company could not be placed in a cohort because its size is
+   * unknown: Industry is left out of the score and the candidate is marked for
+   * review instead of scored as no-fit. Holds why.
+   */
+  needsReview?: string
   /** Set when score is -1 — explains why the candidate was excluded. */
   excluded?: string
   /** Per-dimension explanations, for the review tray. */
@@ -283,7 +289,7 @@ export function scoreCandidate(
   const title = scoreTitle(person)
 
   const reasons = [
-    `Industry +${fit.breakdown.industry}`,
+    fit.needsReview ? `Industry: review — ${fit.needsReview}` : `Industry +${fit.breakdown.industry}`,
     `Location +${fit.breakdown.location}`,
     `Company size +${fit.breakdown.companySize}`,
   ]
@@ -297,6 +303,7 @@ export function scoreCandidate(
     breakdown: fit.breakdown,
     contactQualifier: title.score,
     reasons,
+    ...(fit.needsReview ? { needsReview: fit.needsReview } : {}),
   }
 }
 
