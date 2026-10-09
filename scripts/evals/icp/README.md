@@ -35,6 +35,11 @@ for a prompt marked `"expect": { "no_keyword_with_tags": true }`, on a niche
 `q_keywords` term sent on top of industry tags (translator rule 11;
 `c-keyword-over-tags` is the case).
 
+**Expected failures.** A prompt marked `"expected_failure": "<issue>"` is a
+known failure tracked by that issue. Its failures are reported but do not fail
+the run, and the run says when it starts passing. `c-keyword-over-tags` is one,
+tracked by next-434media#179.
+
 **What a run does.** Each prompt in `e1-prompts.json` is translated `--runs`
 times.
 

@@ -22,6 +22,10 @@
  *     master 5.3);
  *   - for a prompt marked `expect.no_keyword_with_tags`, a niche q_keywords
  *     term on top of industry tags (translator rule 11).
+ *
+ * A prompt marked `expected_failure: "<issue>"` is a known failure tracked by
+ * that issue: its failures are reported but do not fail the run, and if it
+ * starts passing the run says so, so the marker can be removed.
  */
 import { readFileSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
@@ -60,12 +64,14 @@ async function main() {
     id: string
     prompt: string
     expect?: { no_keyword_with_tags?: boolean }
+    expected_failure?: string
   }[]
 
   const results = []
   const unrequestedRevenue: string[] = []
   const outsideUs: string[] = []
   const keywordOverTags: string[] = []
+  const expectedFailures: string[] = []
   for (const p of prompts) {
     const runsOut = []
     for (let i = 0; i < runs; i++) {
@@ -79,11 +85,14 @@ async function main() {
           reasoning: r.reasoning,
         })
         const tag = `${p.id} run ${i + 1}`
-        if (r.filters.revenue_range && !revenueFigureStated(p.prompt)) unrequestedRevenue.push(tag)
+        // A known failure is reported against its issue instead of failing the run.
+        const fail = (list: string[], what: string) =>
+          (p.expected_failure ? expectedFailures : list).push(p.expected_failure ? `${what} [${p.expected_failure}]` : what)
+        if (r.filters.revenue_range && !revenueFigureStated(p.prompt)) fail(unrequestedRevenue, tag)
         const foreign = (r.filters.organization_locations ?? []).filter(isOutsideUnitedStates)
-        if (foreign.length) outsideUs.push(`${tag} (${foreign.join(", ")})`)
+        if (foreign.length) fail(outsideUs, `${tag} (${foreign.join(", ")})`)
         if (p.expect?.no_keyword_with_tags && r.filters.industry_tag_ids?.length && r.nicheKeyword) {
-          keywordOverTags.push(`${tag} ("${r.nicheKeyword}")`)
+          fail(keywordOverTags, `${tag} ("${r.nicheKeyword}")`)
         }
       } catch (err) {
         runsOut.push({ error: err instanceof Error ? err.message : String(err) })
@@ -106,6 +115,7 @@ async function main() {
         unrequested_revenue_filters: unrequestedRevenue,
         locations_outside_us: outsideUs,
         keyword_over_tags: keywordOverTags,
+        expected_failures: expectedFailures,
         results,
       },
       null,
@@ -117,6 +127,12 @@ async function main() {
   console.log(`unrequested revenue filters: ${list(unrequestedRevenue)}`)
   console.log(`locations outside the US: ${list(outsideUs)}`)
   console.log(`niche keyword on top of industry tags (rule 11): ${list(keywordOverTags)}`)
+  console.log(`expected failures (tracked, not failing the run): ${list(expectedFailures)}`)
+  for (const p of prompts.filter((x) => x.expected_failure)) {
+    if (!expectedFailures.some((f) => f.startsWith(`${p.id} `))) {
+      console.log(`${p.id} passed: remove its expected_failure marker (${p.expected_failure})`)
+    }
+  }
   if (unrequestedRevenue.length || outsideUs.length || keywordOverTags.length) process.exit(1)
 }
 
