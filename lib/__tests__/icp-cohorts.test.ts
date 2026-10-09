@@ -11,7 +11,7 @@ import assert from "node:assert/strict"
 import { readFileSync } from "node:fs"
 import { join } from "node:path"
 import { parseIcpSource, renderCohorts, withoutArchetypes } from "../prospecting/icp-context"
-import { cohortTerms, matchCohort } from "../prospecting/cohort-match"
+import { cohortTerms, isLarge, isSizeDefined, matchCohort, LARGE_EMPLOYEES, LARGE_REVENUE_USD } from "../prospecting/cohort-match"
 import type { OutboundCohort } from "../sor/types.generated"
 
 const read = (f: string) => readFileSync(join(process.cwd(), "lib/prospecting", f), "utf-8")
@@ -80,4 +80,33 @@ test("rendered cohorts carry targeting fields, not pitch or proof", () => {
   assert.ok(text.includes("- Health systems") && text.includes("- Hiring"))
   assert.ok(text.includes("USD 10,000,000"))
   assert.ok(!text.includes("pitch text"))
+})
+
+const SIZED = [
+  ...COHORTS,
+  cohort({ key: "cohort-d", letter: "D", name: "Scale", target_profile: ["Fortune 500 companies", "Major regional enterprises", "Dealer groups"] }),
+]
+
+test("a cohort is size-defined by its own scale wording", () => {
+  assert.equal(isSizeDefined(SIZED[3]), true)
+  assert.equal(isSizeDefined(COHORTS[1]), false)
+})
+
+test("large means either measure; unknown size is not large", () => {
+  assert.equal(isLarge({ employeeCount: LARGE_EMPLOYEES }), true)
+  assert.equal(isLarge({ annualRevenue: LARGE_REVENUE_USD }), true)
+  assert.equal(isLarge({ employeeCount: LARGE_EMPLOYEES - 1, annualRevenue: LARGE_REVENUE_USD - 1 }), false)
+  assert.equal(isLarge({}), false)
+})
+
+test("a large company with no word in common matches the size-defined cohort", () => {
+  const m = matchCohort({ industry: "banking", company: "Harbor Bank", employeeCount: 20000 }, SIZED)
+  assert.equal(m?.key, "cohort-d")
+  assert.equal(m?.bySize, true)
+  assert.equal(matchCohort({ industry: "banking", company: "Harbor Bank", employeeCount: 40 }, SIZED), null)
+})
+
+test("an industry word still outweighs size: a large health system stays in health", () => {
+  const m = matchCohort({ industry: "hospital & health care", employeeCount: 12000, annualRevenue: 3_500_000_000 }, SIZED)
+  assert.equal(m?.key, "cohort-b")
 })
