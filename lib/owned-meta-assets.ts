@@ -1,22 +1,18 @@
 import { createHash } from "node:crypto"
-import type { MetaAsset, MetaBatch } from "./owned-meta-publisher"
+import type { MetaAsset } from "./owned-meta-publisher"
 import { MetaBlocked } from "./owned-meta-publisher"
 
-export const META_BUCKET = "groovy-ego-462522-v2.firebasestorage.app"
-export const META_PREFIX = "owned-meta/434/approved/"
-export const META_UPLOADER = "meta-media-uploader-434@groovy-ego-462522-v2.iam.gserviceaccount.com"
 // Server-memory safeguard, NOT a Meta format limit. Larger exports need an approved streaming path.
 export const MAX_SOURCE_BYTES = 64 * 1024 * 1024
 export function assetDigest(bytes: Uint8Array): string { return createHash("sha256").update(bytes).digest("hex") }
-export function approvedObject(batch: MetaBatch, asset: MetaAsset): { key: string; url: string } {
-  if (!/^[a-zA-Z0-9_-]+$/.test(batch.id) || !/^[a-f0-9]{64}$/.test(asset.sha256)) throw new MetaBlocked("Invalid immutable object identity")
-  const extension = asset.mime === "video/mp4" ? "mp4" : asset.mime === "image/png" ? "png" : "jpg"
-  const key = `${META_PREFIX}${batch.manifest.brand}/${batch.id}/${asset.sha256}.${extension}`
-  return { key, url: `https://storage.googleapis.com/${META_BUCKET}/${key}` }
+/** Existing public, UUID-named content exports only; never creates another copy. */
+export function assertApprovedBlobUrl(raw: string, origins: string[]): string {
+  const u=new URL(raw)
+  if(u.protocol!=="https:" || u.username || u.password || u.search || u.hash || !u.hostname.endsWith(".public.blob.vercel-storage.com") || !origins.includes(u.origin) || !/^\/content-posts\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}[.-][a-zA-Z0-9._-]+$/.test(u.pathname)) throw new MetaBlocked("Use an existing approved-store UUID Blob export; do not copy or transform it")
+  return u.toString()
 }
 export async function readTrustedAsset(url: string, origins: string[], fetcher: typeof fetch = fetch): Promise<Uint8Array> {
-  const u = new URL(url)
-  if (u.protocol !== "https:" || u.username || u.password || !origins.includes(u.origin) || /^(localhost|127\.|\[|0\.)/.test(u.hostname)) throw new MetaBlocked("Asset source is not an approved HTTPS origin")
+  const u = new URL(assertApprovedBlobUrl(url,origins))
   const response = await fetcher(u, { redirect: "error", cache: "no-store" })
   if (!response.ok || !response.body) throw new MetaBlocked("Cannot read approved export; refresh its source for review")
   if (Number(response.headers.get("content-length") || 0) > MAX_SOURCE_BYTES) throw new MetaBlocked("Export exceeds the 64 MiB server safety bound")
@@ -35,38 +31,6 @@ export function verifyAssetBytes(asset: MetaAsset, bytes: Uint8Array): void {
   const signature = asset.mime === "image/jpeg" ? b[0] === 0xff && b[1] === 0xd8 : asset.mime === "image/png" ? b.subarray(0, 8).equals(Buffer.from([137,80,78,71,13,10,26,10])) : b.subarray(4,8).toString() === "ftyp"
   if (!signature) throw new MetaBlocked("Media signature does not match approved MIME type")
 }
-export async function uploadApprovedAsset(args: { batch: MetaBatch; asset: MetaAsset; bytes: Uint8Array; accessToken: () => Promise<string>; fetcher?: typeof fetch }): Promise<string> {
-  verifyAssetBytes(args.asset, args.bytes)
-  const { key, url } = approvedObject(args.batch, args.asset)
-  const fetcher = args.fetcher ?? fetch
-  const token = await args.accessToken()
-  const target = new URL(`https://storage.googleapis.com/upload/storage/v1/b/${META_BUCKET}/o`)
-  target.searchParams.set("uploadType", "media"); target.searchParams.set("name", key); target.searchParams.set("ifGenerationMatch", "0")
-  const response = await fetcher(target, { method: "POST", headers: { authorization: `Bearer ${token}`, "content-type": args.asset.mime }, body: Buffer.from(args.bytes), redirect: "error" })
-  if (!response.ok && response.status !== 412) throw new MetaBlocked("Create-only upload failed; retry can reuse a verified existing object")
-  // Includes a 412 after a lost successful response: exact public bytes may be reused, never overwritten.
-  const publicBytes = await readTrustedAsset(url, ["https://storage.googleapis.com"], fetcher)
-  verifyAssetBytes(args.asset, publicBytes)
-  return url
-}
-/** Dedicated WIF only. Never falls back to Firebase/GOOGLE_SERVICE_ACCOUNT_KEY or ADC. */
-export async function getMetaUploadAccessToken(env: Record<string, string | undefined> = process.env): Promise<string> {
-  if (env.VERCEL_ENV !== "production" || env.OWNED_META_PUBLISHING_ENABLED !== "true") throw new MetaBlocked("Production publishing is disabled")
-  const audience = env.OWNED_META_WIF_AUDIENCE
-  if (!audience || !/^https:\/\/iam\.googleapis\.com\/projects\/\d+\/locations\/global\/workloadIdentityPools\/meta-publisher-434\/providers\/vercel-production$/.test(audience)) throw new MetaBlocked("Dedicated production WIF audience is not configured")
-  const { getVercelOidcToken } = await import("@vercel/oidc")
-  const subjectToken = await getVercelOidcToken({ audience })
-  const exchange = await fetch("https://sts.googleapis.com/v1/token", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ audience: audience.replace("https:", ""), grantType: "urn:ietf:params:oauth:grant-type:token-exchange", requestedTokenType: "urn:ietf:params:oauth:token-type:access_token", scope: "https://www.googleapis.com/auth/cloud-platform", subjectTokenType: "urn:ietf:params:oauth:token-type:jwt", subjectToken }), redirect: "error" })
-  if (!exchange.ok) throw new MetaBlocked("Dedicated WIF exchange failed")
-  const federated = await exchange.json() as { access_token?: string }
-  if (!federated.access_token) throw new MetaBlocked("WIF exchange returned no token")
-  const impersonation = await fetch(`https://iamcredentials.googleapis.com/v1/projects/-/serviceAccounts/${META_UPLOADER}:generateAccessToken`, { method: "POST", headers: { authorization: `Bearer ${federated.access_token}`, "content-type": "application/json" }, body: JSON.stringify({ scope: ["https://www.googleapis.com/auth/devstorage.read_write"], lifetime: "3600s" }), redirect: "error" })
-  if (!impersonation.ok) throw new MetaBlocked("Dedicated uploader impersonation failed")
-  const result = await impersonation.json() as { accessToken?: string }
-  if (!result.accessToken) throw new MetaBlocked("Uploader token missing")
-  return result.accessToken
-}
-
 /** Measures pixels/duration from bytes; supplied form metadata is never a format gate. */
 export function measureExport(bytes: Uint8Array): { mime: MetaAsset["mime"]; width: number; height: number; duration?: number } {
   const b=Buffer.from(bytes)

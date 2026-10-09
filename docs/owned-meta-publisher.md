@@ -1,127 +1,132 @@
-# Owned Meta publisher
+# Optional owned Meta publisher
 
-Status: implementation under review, disabled by default. No live-account, IAM,
-credential, deployment or publishing setup is performed by this code change.
+Status: draft PR, disabled until separately approved setup and activation. This is
+an optional API adapter. Audrey's existing Canva, export/import and native/manual
+publishing workflow is not replaced. The existing manual mark-posted endpoint,
+generation engine, Blob upload routes and analytics credentials remain unchanged.
 
-## Boundaries
+## Four review corrections
 
-- Existing four-brand configuration; strict resolver, no TXMX fallback.
-- Existing ContentDetailDrawer review and Firestore content records.
-- Stills, IG ordered carousels / FB organic multi-photo, and video.
-- Operator-triggered actions. No scheduler, worker, lease or automatic takeover.
-- One transaction claim per post and one-way final intent per destination.
-- Retry preparation; never blindly retry final publication. A published photo,
-  feed call and ordinary video call are final operations too.
-- Exact revision/hash approval, retained batch/attempt history, archive instead
-  of deletion, and distinct API-verified versus operator-confirmed results.
-- Preview routes cannot mutate publisher records. No tests use real credentials,
-  Firestore, public uploads or Meta calls.
+1. Reuse the public UUID-named Vercel Blob exports the app already creates. No
+   GCS copy, upload identity, WIF setup, bucket/ACL change or added OIDC dependency.
+2. Publishing uses only OWNED_META_TOKEN_TXMX/VEMOS/MILCITY/AMPD. There is no
+   fallback to INSTAGRAM_ACCESS_TOKEN_* used by analytics.
+3. A fresh, uncached read of crm_meta/owned_meta_enabled controls every mutation
+   boundary. Missing/unreadable state is disabled. Only production may publish.
+4. API version, format rules, dated official sources and AI-label handling live in
+   lib/owned-meta-formats.ts, not editable environment capability JSON.
 
-## Configuration before separately approved activation
+## Existing-system boundaries
 
-Production alone is insufficient: OWNED_META_PUBLISHING_ENABLED and each
-OWNED_META_ENABLED_TXMX/VEMOS/MILCITY/AMPD must explicitly equal true. Default is
-false. Do not set them as part of deploying a review PR.
+The adapter takes saved, public Blob export references. Private Canva/Drive
+review does NOT automatically become a Blob asset: a human still uses the
+existing approved export/upload or ingest step. No new upload bridge is claimed.
 
-Use existing INSTAGRAM_ACCESS_TOKEN_{brand}, FACEBOOK_PAGE_ID_{brand} and
-INSTAGRAM_BUSINESS_ACCOUNT_ID_{brand}. Vemos uses INSTAGRAM_APP_ID_VEMOS; other
-brands may supply INSTAGRAM_APP_ID_{brand} or the existing shared app ID.
-OWNED_META_API_VERSION_{brand} defaults to the existing v23.0, but that default
-is not evidence of capability. Explicit capability evidence must match it.
+Exact public URL, SHA-256, size, measured dimensions/duration, item order, captions,
+account IDs, placement and AI choice are bound to one immutable approved revision.
+The authenticated preview verifies the bytes before serving them. The adapter
+rechecks those exact bytes immediately before Meta handoff and fails if changed.
+Only configured public Blob store origins and the existing content-posts UUID
+path pattern are accepted; redirects and mutable-looking paths are rejected.
 
-OWNED_META_EVIDENCE_{brand} is a server-only JSON record with verifiedAt,
-credentialKind system_user_page, appId, pageId, instagramId, apiVersion and
-format-specific limits under formats. Keys are instagram:still:feed,
-instagram:carousel:feed, instagram:video:reels, facebook:still:feed,
-facebook:carousel:feed, facebook:video:video and facebook:video:reels. Each entry
-requires mimeTypes, maxBytes, maxItems, minAspect, maxAspect, maxDuration and
-aiLabel. These are actual verified endpoint limits, never copied product guesses.
-An AI Facebook Reel also requires facebookReelAiPhase finish verified for the
-chosen version. Missing evidence holds that destination. Check permissions before
-first live use per brand and after a permission failure; no periodic audit loop.
-A permission failure writes its timestamp in existing crm_meta and blocks use
-until evidence has been reverified after that failure.
+The app's existing Blob put paths use UUIDs and do not request overwrite; the SDK
+rejects overwrites by default. That is the app's append-only convention, not an
+absolute immutability guarantee against an authorized overwrite/delete. Source
+objects must remain available while Meta processes them. There is no new copy,
+cleanup, image conversion, crop or metadata stripping. A 64 MiB/export memory
+safety bound is explicitly an application limit, not a Meta platform limit.
 
-All credentials must originate from the approved System User/Page chain. This
-module neither creates nor proves grants. Setup and first live test remain human
-authorization gates. No personal-token fallback.
+Manual posts without an opted-in publisher batch retain existing behavior. Batch
+approval/history, archive protection, stopped-run recovery and exact-post manual
+evidence are confined to the optional adapter. API-verified and operator-confirmed
+outcomes are labeled separately. No automatic final-publish retry, worker,
+scheduler, lease, unattended continuation or creative optimization is introduced.
 
-## Private review and public media
+## Separately approved first-test setup
 
-Approved export references must already be saved on the content post. The server
-accepts only HTTPS origins explicitly listed in OWNED_META_SOURCE_ORIGINS, follows
-no redirects, and does not assume private Drive authentication. It measures
-PNG/JPEG/MP4 metadata from bytes and hashes the exact export. The drawer preview
-is served through a checksum-verifying authenticated streaming response. Mutable
-source changes fail rather than silently updating the approved export.
+Start with MilCityUSA only; other brand switches remain false.
 
-A 64 MiB per-export memory safety ceiling is an implementation bound, not a Meta
-platform limit. Larger exports or inaccessible private sources require an
-approved durable source/streaming path. No new public draft store is created.
+- Confirm the existing app, Page and professional IG identity relationship.
+- Verify a System User-origin Page publishing credential and necessary content
+  tasks/scopes. The credential is entered securely as OWNED_META_TOKEN_MILCITY;
+  this PR creates/installs no token and changes no grants.
+- Keep existing Page/IG/app identity bindings. Vemos's separate app is preserved.
+- OWNED_META_EVIDENCE_MILCITY contains only appId, pageId, instagramId,
+  credentialKind system_user_page and verifiedAt. It records completed identity/
+  lineage verification, not arbitrary format allowances. A permission failure
+  pauses the brand until evidence has been reverified after the failure.
+- Set OWNED_META_SOURCE_ORIGINS to the exact existing public Blob store origin(s),
+  never a wildcard or all Vercel customer stores. These are public URLs, not secrets.
+- After separate merge/activation approval, create/update the runtime switch:
+  crm_meta/owned_meta_enabled with enabled true and brands.milcity true, all other
+  brand booleans false. No code in this PR enables the document. A false global
+  flag stops every brand; a false brand flag stops that brand. Every enabled()
+  check rereads Firestore, including after slow byte verification and immediately
+  before final dispatch. It cannot recall a request already sent.
+- Preview endpoints cannot mutate publisher records, regardless of switch state.
+  Read-only reconciliation remains possible in production while publishing is off.
 
-Only approved bytes become public in
-`groovy-ego-462522-v2.firebasestorage.app`, under `owned-meta/434/approved/`.
-The prefix is a code convention, NOT an IAM security boundary. The bucket remains
-fine-grained. The separately approved setup is the dedicated
-`meta-media-uploader-434` identity with bucket-level Storage Object Creator,
-without a condition, following the existing media-pipeline precedent. Its role
-adds no read/list/delete/overwrite rights; inherited/public access still applies.
-Never use the retiring broad Google key for these uploads or change bucket ACLs.
+No GCS or Google IAM setup is needed for this revision. Existing Firestore
+infrastructure/credentials are not changed or retired by this PR.
 
-Production-only Vercel OIDC/WIF supplies short-lived credentials to
-`meta-media-uploader-434@groovy-ego-462522-v2.iam.gserviceaccount.com`.
-OWNED_META_WIF_AUDIENCE must identify the dedicated meta-publisher-434 pool and
-vercel-production provider. Exact trust/identity setup is separately approved.
-No ADC or GOOGLE_SERVICE_ACCOUNT_KEY fallback is present in the uploader.
+## Reviewed API contract
 
-Use ifGenerationMatch=0. A lost successful upload response is recovered by
-verifying exact public bytes and reusing the existing object, never overwriting.
-No object deletion or lifecycle policy is introduced. A failed post does not
-revoke approved public exposure. All bytes/provenance are preserved, without
-metadata stripping or invented C2PA claims.
+Publisher-only version is pinned in code; analytics retain their existing version.
+Sources were inspected on 2026-10-09. Refresh the code contract during a reviewed
+version/requirement change, not through environment overrides.
 
-## Disclosure and recovery
+- IG still: JPEG, at most 8 MB, aspect 4:5–1.91:1. Widths outside 320–1440 are
+  described as automatically scaled by Meta, not automatically rejected.
+- IG carousel: at most 10 images/videos/mixed. Images follow image limits. The
+  adapter holds differing item aspects to avoid an unapproved first-item crop.
+  Distinct carousel-video numeric limits were not established; Reel limits are
+  not silently applied to a VIDEO child.
+- IG Reel: MOV/MP4 supported by Meta; this parser handles MP4. At most 300 MB,
+  width 1920, aspect 0.01–10, duration 3–900 s; 9:16 is recommended. Official
+  encoding requirements include H.264/HEVC, 23–60 fps and audio constraints.
+- FB photo: at most 10 MB. Meta supports JPEG/BMP/PNG/GIF/TIFF; this adapter
+  measures JPEG/PNG. PNG at most 1 MB is a recommendation, not a rejection gate.
+  Use caption on /photos; message/name are deprecated.
+- FB multi-photo: unpublished /photos followed by final /feed attached_media.
+  No numerical photo-count ceiling was verified; no ad-carousel limit is borrowed.
+- FB Reel: documented supported subset 9:16, at least 540×960, fixed 24–60 fps,
+  duration 3–90 s. No maximum file bytes was established from the current guide.
+- FB ordinary video: /videos supports file_url; numerical size/duration limits
+  were not established in the inspected reference. None are invented here.
 
-AI flags are sent only for reviewed AI-generated posts. IG carousel labeling is
-on the parent. Facebook photos/feed have no verified equivalent parameter in
-the inspected official SDK, so affected AI still/multi-photo jobs require manual
-platform handling. The ordinary video and Reel paths support a conditional AI
-flag, gated by verified version/phase capability. Metadata is retained but does
-not guarantee an automatic label.
+The byte parser measures size, pixels, orientation and duration. It does not claim
+to verify GOP/chroma/audio or every encoding parameter. For the controlled video
+pilot, inspect the actual export's codec/frame-rate/audio with existing tools;
+Meta processing and the authorized first-live test remain necessary evidence.
 
-API verification requires the exact saved remote ID in the intended account's
-published collection, a trusted permalink and required disclosure readback.
-Only the first 100 returned published items are checked; absence remains unknown,
-not proof of non-publication. Explicit super-admin manual evidence can close an
-unknown/label-held job, with an exact-content attestation and actor/time/hash.
-It is labeled operator-confirmed, never API-verified. Neither closure reopens
-final publication. Claims interrupted before final intent can be released by an
-operator; known unused preparation may be reset with its IDs retained in history.
-A claim interrupted after final intent needs explicit super-admin evidence that
-the exact run terminated/cancelled, never elapsed-time inference. That recovery
-retains final intents and allows read-only reconciliation. A delayed response can
-append an ID only to its exact final attempt; it cannot dispatch another job or
-overwrite conflicting/operator evidence. Without termination evidence, stay held.
+## AI and controlled pilot
 
-Share-to-feed is an explicit reviewed/hash-bound IG video choice. No automatic
-crop, placement substitution, standalone Story fallback or fabricated tagging.
-Analytics join on account and remote ID; missing metrics are not zero. Automated
-optimization and Facebook analytics expansion are outside this patch.
+Only posts explicitly marked AI-generated send the AI parameter. Official IG
+June 22, 2026 changes apply to all versions: is_ai_generated on media creation,
+carousel parent only, with published-media readback. The current FB Reel guide
+explicitly documents is_ai_generated on finish/publish. FB photos/feed have no
+verified equivalent; the SDK-only ordinary-video flag is not treated as proved
+label behavior. Only those affected AI placements require manual handling.
+Preserve existing C2PA/IPTC bytes; do not promise Meta auto-labeling from metadata.
 
-## Verification
+After separate approvals: one plain still on both platforms, then video,
+carousel and AI-video tests one at a time. For each, verify exact accounts,
+content/order, captions, genuine tags, AI disclosure when required, final IDs,
+permalinks and retained logs. Native account tagging is not implemented by this adapter; a caption mention is
+not proof of a real account tag. Keep required native tags in the established
+workflow until an actual verified tag path exists. Native Story resharing is an explicit separate
+pass/fail check, never a standalone Story substitute. Run Audrey's actual
+access-to-review-to-publish flow before calling the extension complete.
 
-Focused tests: `tsx --test lib/__tests__/owned-meta-publisher.test.ts`.
-Tests use injected fake transport and transaction-style memory stores. Run these
-with the repository's existing required checks. Typecheck, build and UI review
-must be reported separately; an offline core pass is not a full application pass.
+Tests remain mocked/offline until those approvals. Use the existing verification
+workflow. Do not call a source/typecheck pass a rendered UI or live-platform pass.
 
-Primary references checked 2026-10-09:
-- https://github.com/facebook/facebook-python-business-sdk/tree/main/facebook_business/adobjects
-- https://www.postman.com/meta/instagram/documentation/6yqw8pt/instagram-api
-- https://www.postman.com/meta/facebook/request/juhnm3q/4-publish-reel
-- https://vercel.com/docs/oidc/gcp
-- https://docs.cloud.google.com/storage/docs/request-preconditions
-- https://vercel.com/kb/guide/how-to-bypass-vercel-body-size-limit-serverless-functions
+## Primary sources
 
-SDK shape is not account/version verification. Exact permissions, format limits,
-visible labels, keyless access and end-to-end publication remain activation gates.
+- https://vercel.com/docs/vercel-blob/using-blob-sdk (allowOverwrite default)
+- https://developers.facebook.com/documentation/instagram-platform/instagram-graph-api/reference/ig-user/media (updated 2026-09-28)
+- https://developers.facebook.com/documentation/instagram-platform/content-publishing (updated 2026-06-30)
+- https://developers.facebook.com/documentation/instagram-platform/changelog#ai-info-label (2026-06-22)
+- https://developers.facebook.com/docs/graph-api/reference/page/photos/
+- https://developers.facebook.com/documentation/video-api/guides/reels-publishing (updated 2026-07-30; Step 3 Quick Reference includes AI flag)
+- https://developers.facebook.com/docs/graph-api/reference/page/videos/

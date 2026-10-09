@@ -1,33 +1,16 @@
+import { checkReviewedFormat, OWNED_META_GRAPH_VERSION } from "./owned-meta-formats"
 import { MetaBlocked, MetaPermissionError, type MetaDestination, type MetaManifest, type MetaProvider } from "./owned-meta-publisher"
 
-export interface MetaFormatCapability {
-  mimeTypes: string[]
-  maxBytes: number
-  maxItems: number
-  minAspect: number
-  maxAspect: number
-  maxDuration: number
-  aiLabel: boolean
-}
 export interface MetaPublishingEvidence {
   verifiedAt: string
   credentialKind: "system_user_page"
   appId: string
   pageId: string
   instagramId: string
-  apiVersion: string
-  formats: Record<string, MetaFormatCapability>
-  facebookReelAiPhase?: "finish"
 }
-export function capabilityKey(m: MetaManifest, d: MetaDestination): string { return `${d}:${m.format}:${m.placements[d]}` }
 export function checkMetaCapability(m: MetaManifest, d: MetaDestination, e: MetaPublishingEvidence): string | null {
-  if (!e || e.credentialKind !== "system_user_page" || !Number.isFinite(Date.parse(e.verifiedAt)) || Object.entries(m.destinations).some(([k,v]) => e[k as keyof MetaPublishingEvidence] !== v)) return "First-live permission/account verification required"
-  const c = e.formats[capabilityKey(m,d)]
-  if (!c || !Array.isArray(c.mimeTypes) || !Number.isFinite(c.maxBytes) || c.maxBytes <= 0 || !Number.isSafeInteger(c.maxItems) || c.maxItems < 1 || !Number.isFinite(c.minAspect) || c.minAspect <= 0 || !Number.isFinite(c.maxAspect) || c.maxAspect < c.minAspect || !Number.isFinite(c.maxDuration) || c.maxDuration < 0) return "This API format needs verified limits before publishing"
-  if (m.aiGenerated && (d === "facebook" && m.format !== "video" || !c.aiLabel || d === "facebook" && m.placements.facebook === "reels" && e.facebookReelAiPhase !== "finish")) return "AI disclosure requires manual platform handling for this post"
-  if (d === "facebook" && m.format === "carousel" && m.assets.some(a => a.mime === "video/mp4")) return "Facebook organic multi-photo posts require stills; approve a different rendition"
-  if (m.assets.length > c.maxItems || m.assets.some(a => !c.mimeTypes.includes(a.mime) || a.size > c.maxBytes || a.width/a.height < c.minAspect || a.width/a.height > c.maxAspect || a.duration !== undefined && a.duration > c.maxDuration)) return "Approved export is outside the verified format limits; do not crop or substitute"
-  return null
+  if (!e || e.credentialKind!=="system_user_page" || !Number.isFinite(Date.parse(e.verifiedAt)) || ["appId","pageId","instagramId"].some(k=>e[k as "appId"|"pageId"|"instagramId"]!==m.destinations[k as "appId"|"pageId"|"instagramId"]))return "First-live permission/account verification required"
+  return checkReviewedFormat(m,d)
 }
 interface PublishedItem { id: string; permalink?: string; permalink_url?: string; attachments?: { data?: { target?: { id?: string } }[] } }
 interface GraphResponse {
@@ -35,12 +18,12 @@ interface GraphResponse {
   error?: { code?: number }; status_code?: string; status?: { processing_phase?: { status?: string } }
   data?: PublishedItem[]; is_ai_generated?: boolean
 }
-export function createMetaProvider(args: { accessToken: string; evidence: MetaPublishingEvidence; fetcher?: typeof fetch; beforeMutation: () => Promise<void> }): MetaProvider {
+export function createMetaProvider(args: { accessToken: string; evidence: MetaPublishingEvidence; fetcher?: typeof fetch; beforeMutation: (urls?: string[]) => Promise<void> }): MetaProvider {
   const fetcher = args.fetcher ?? fetch
   const graph = async (path: string, values: Record<string, unknown> = {}, method: "GET" | "POST" = "GET") => {
     if (!/^\d+(?:_\d+)?(\/(media|media_publish|photos|feed|videos|video_reels|published_posts))?$/.test(path)) throw new MetaBlocked("Unrecognized Meta endpoint")
-    if (method === "POST") await args.beforeMutation()
-    const url = new URL(`https://graph.facebook.com/${args.evidence.apiVersion}/${path}`)
+    if (method === "POST") await args.beforeMutation([values.url,values.image_url,values.video_url,values.file_url].filter((v):v is string=>typeof v==="string"))
+    const url = new URL(`https://graph.facebook.com/${OWNED_META_GRAPH_VERSION}/${path}`)
     const params = new URLSearchParams()
     for (const [k,v] of Object.entries(values)) if (v !== undefined) params.set(k, typeof v === "object" ? JSON.stringify(v) : String(v))
     if (method === "GET") url.search = params.toString()
@@ -90,7 +73,7 @@ export function createMetaProvider(args: { accessToken: string; evidence: MetaPu
           await keep("upload_url",upload.toString())
         }
         if (!p.uploaded) {
-          await args.beforeMutation()
+          await args.beforeMutation([urls[0]])
           const response = await fetcher(p.upload_url, { method: "POST", headers: { authorization: `OAuth ${args.accessToken}`, file_url: urls[0] }, redirect: "error" })
           if (!response.ok) { if ([401,403].includes(response.status)) throw new MetaPermissionError(); throw new MetaBlocked("Facebook unpublished video upload failed") }
           await keep("uploaded","true")
@@ -103,7 +86,7 @@ export function createMetaProvider(args: { accessToken: string; evidence: MetaPu
     async publish(m,d,urls,p) {
       const ai = m.aiGenerated ? { is_ai_generated: true } : {}
       if (d === "instagram") return id((await graph(`${m.destinations.instagramId}/media_publish`,{ creation_id:p.container },"POST")).id)
-      if (m.format === "still") { const r = await graph(`${m.destinations.pageId}/photos`,{ url:urls[0], message:m.captions.facebook,published:true },"POST"); return id(r.post_id || r.id) }
+      if (m.format === "still") { const r = await graph(`${m.destinations.pageId}/photos`,{ url:urls[0], caption:m.captions.facebook,published:true },"POST"); return id(r.post_id || r.id) }
       if (m.format === "carousel") return id((await graph(`${m.destinations.pageId}/feed`,{ message:m.captions.facebook,attached_media:m.assets.map((_,i)=>({media_fbid:p[`photo_${i}`]})) },"POST")).id)
       if (m.placements.facebook === "video") return id((await graph(`${m.destinations.pageId}/videos`,{ file_url:urls[0],description:m.captions.facebook,published:true,...ai },"POST")).id)
       const r = await graph(`${m.destinations.pageId}/video_reels`,{ upload_phase:"finish",video_id:p.video,video_state:"PUBLISHED",description:m.captions.facebook,...ai },"POST")

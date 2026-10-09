@@ -1,3 +1,4 @@
+import { OWNED_META_GRAPH_VERSION } from "./owned-meta-formats"
 import type { InstagramConfigStatus, InstagramAppConfig } from "../types/instagram-config"
 
 // TXMX Boxing Instagram configuration
@@ -177,17 +178,17 @@ export function getOwnedMetaIdentity(brand: import("./owned-meta-publisher").Met
   const suffix = suffixes[brand]
   if (!suffix) throw new Error("Unknown publishing brand")
   const appId = brand === "vemos" ? env.INSTAGRAM_APP_ID_VEMOS : (env[`INSTAGRAM_APP_ID_${suffix}`] || env.INSTAGRAM_APP_ID)
-  const result = { appId: appId || "", pageId: env[`FACEBOOK_PAGE_ID_${suffix}`] || "", instagramId: env[`INSTAGRAM_BUSINESS_ACCOUNT_ID_${suffix}`] || "", apiVersion: env[`OWNED_META_API_VERSION_${suffix}`] || "v23.0" }
+  const result = { appId: appId || "", pageId: env[`FACEBOOK_PAGE_ID_${suffix}`] || "", instagramId: env[`INSTAGRAM_BUSINESS_ACCOUNT_ID_${suffix}`] || "", apiVersion: OWNED_META_GRAPH_VERSION }
   if ([result.appId,result.pageId,result.instagramId].some(v => !/^\d+$/.test(v))) throw new Error("Brand publishing identities are not configured")
   return result
 }
 export function getOwnedMetaPublishingConfig(brand: import("./owned-meta-publisher").MetaBrand, env: Record<string, string | undefined> = process.env) {
-  if (env.VERCEL_ENV !== "production" || env.OWNED_META_PUBLISHING_ENABLED !== "true" || env[`OWNED_META_ENABLED_${brand.toUpperCase()}`] !== "true") throw new Error("Brand publishing is disabled")
+  if (env.VERCEL_ENV !== "production") throw new Error("Publishing credentials are production-only")
   const identity = getOwnedMetaIdentity(brand,env)
-  const accessToken = env[`INSTAGRAM_ACCESS_TOKEN_${brand.toUpperCase()}`]
+  const accessToken = env[`OWNED_META_TOKEN_${brand.toUpperCase()}`]
   if (!accessToken) throw new Error("Brand publishing credential is unavailable")
   let evidence: import("./instagram-publishing").MetaPublishingEvidence
   try { evidence = JSON.parse(env[`OWNED_META_EVIDENCE_${brand.toUpperCase()}`] || "null") } catch { throw new Error("Brand capability evidence is invalid") }
-  if (!evidence || evidence.credentialKind !== "system_user_page" || Object.entries(identity).some(([k,v]) => evidence[k as keyof typeof evidence] !== v)) throw new Error("First-live System User/Page capability evidence required")
+  if (!evidence || Object.keys(evidence).some(k=>!["appId","pageId","instagramId","verifiedAt","credentialKind"].includes(k)) || evidence.credentialKind !== "system_user_page" || !Number.isFinite(Date.parse(evidence.verifiedAt)) || ["appId","pageId","instagramId"].some(k => evidence[k as "appId"|"pageId"|"instagramId"] !== identity[k as "appId"|"pageId"|"instagramId"])) throw new Error("First-live System User/Page capability evidence required")
   return { ...identity, accessToken, evidence }
 }

@@ -6,6 +6,7 @@ export type MetaDestination = "instagram" | "facebook"
 export type MetaFormat = "still" | "carousel" | "video"
 export interface MetaAsset {
   name: string
+  url: string
   sha256: string
   size: number
   mime: "image/jpeg" | "image/png" | "video/mp4"
@@ -75,7 +76,7 @@ export function validateManifest(value: unknown): asserts value is MetaManifest 
   if (m.format !== "carousel" && m.assets.length !== 1 || m.format === "carousel" && m.assets.length < 2) throw new MetaBlocked("Invalid asset count")
   if (typeof m.instagramShareToFeed !== "boolean" || typeof m.aiGenerated !== "boolean" || typeof m.publicHostingApproved !== "boolean") throw new MetaBlocked("Explicit AI and public hosting choices required")
   for (const a of m.assets) {
-    if (!a || typeof a.name !== "string" || !a.name || !/^[a-f0-9]{64}$/.test(a.sha256) || !Number.isSafeInteger(a.size) || a.size < 1 || !["image/jpeg", "image/png", "video/mp4"].includes(a.mime) || !Number.isFinite(a.width) || a.width <= 0 || !Number.isFinite(a.height) || a.height <= 0) throw new MetaBlocked("Invalid asset identity or metadata")
+    if (!a || typeof a.url !== "string" || !a.url.startsWith("https://") || typeof a.name !== "string" || !a.name || !/^[a-f0-9]{64}$/.test(a.sha256) || !Number.isSafeInteger(a.size) || a.size < 1 || !["image/jpeg", "image/png", "video/mp4"].includes(a.mime) || !Number.isFinite(a.width) || a.width <= 0 || !Number.isFinite(a.height) || a.height <= 0) throw new MetaBlocked("Invalid asset identity or metadata")
     if (a.mime === "video/mp4" && (!Number.isFinite(a.duration) || a.duration! <= 0)) throw new MetaBlocked("Video duration required")
     if (!a.provenance || !["present", "absent", "unverified"].includes(a.provenance.metadata) || [a.provenance.source, a.provenance.templateRevision, a.provenance.generator].some(v => typeof v !== "string")) throw new MetaBlocked("Provenance must be explicit, including unknown values")
   }
@@ -111,7 +112,7 @@ export function guardedContentUpdate(existing: Record<string, unknown>, updates:
 export async function runOwnedMeta(args: {
   id: string; runId: string; store: MetaStore; provider: MetaProvider
   enabled: (brand: MetaBrand) => Promise<boolean>
-  upload: (batch: MetaBatch) => Promise<string[]>
+  resolveAssets: (batch: MetaBatch) => Promise<string[]>
   now?: () => string
 }): Promise<MetaBatch> {
   const { id, runId, store, provider } = args
@@ -135,9 +136,9 @@ export async function runOwnedMeta(args: {
   })
   try {
     let r = await store.read(id)
-    if (!r.batch.publicAssets.length && Object.values(blockers).some(x => !x)) {
+    if (Object.values(blockers).some(x => !x)) {
       if (!await args.enabled(r.batch.manifest.brand)) throw new MetaBlocked("Publishing disabled")
-      const urls = await args.upload(r.batch)
+      const urls = await args.resolveAssets(r.batch)
       await mutate(current => { current.batch.publicAssets = urls })
     }
     for (const destination of ["instagram", "facebook"] as const) {
@@ -232,4 +233,30 @@ export function confirmStoppedRun(record: MetaRecord, expectedClaim: string, act
   if(!expectedClaim || record.batch.claim!==expectedClaim || !actor || evidence.trim().length<20) throw new MetaBlocked("Exact stopped run and observed termination evidence required")
   record.batch.stoppedRuns=[...(record.batch.stoppedRuns || []),{id:expectedClaim,by:actor,at,evidence:evidence.trim()}]
   record.batch.claim=null
+}
+
+/** Missing/malformed runtime switches fail closed. Callers must supply a fresh read. */
+export function runtimePublishingEnabled(value: unknown, brand?: MetaBrand): boolean {
+  if(!value || typeof value!=="object")return false
+  const state=value as {enabled?:unknown;brands?:Partial<Record<MetaBrand,unknown>>}
+  return state.enabled===true && (!brand || state.brands?.[brand]===true)
+}
+
+/** Slow asset checks must not hide an archive, revoked approval or stopped run. */
+export async function validateMetaMutationBoundary(args: {
+  enabled: () => Promise<boolean>
+  read: () => Promise<MetaRecord>
+  verify: () => Promise<void>
+  batchId: string
+  runId: string
+}): Promise<void> {
+  const current = async () => {
+    const r=await args.read();assertApproved(r)
+    if(r.batch.id!==args.batchId || r.batch.claim!==args.runId)throw new MetaBlocked("Current publishing claim required")
+  }
+  if(!await args.enabled())throw new MetaBlocked("Publishing is disabled")
+  await current()
+  await args.verify()
+  await current()
+  if(!await args.enabled())throw new MetaBlocked("Publishing stopped before dispatch")
 }

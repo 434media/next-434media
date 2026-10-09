@@ -1233,13 +1233,13 @@ function OwnedMetaPanel({ post, onChanged }: { post: ContentPost; onChanged?: ()
       <label className="block text-sm">Canva design/template revision<input className="block w-full border rounded p-2" placeholder="Exact revision or unknown" value={template} onChange={e=>setTemplate(e.target.value)}/></label>
 
       <label className="flex gap-2 text-sm"><input type="checkbox" checked={ai} onChange={e=>setAi(e.target.checked)}/>This post contains AI-generated content</label>
-      <label className="flex gap-2 text-sm"><input type="checkbox" checked={hosting} onChange={e=>setHosting(e.target.checked)}/>I approve public hosting of these final exports</label>
+      <label className="flex gap-2 text-sm"><input type="checkbox" checked={hosting} onChange={e=>setHosting(e.target.checked)}/>I approve using these existing public exports for this post</label>
       <button type="button" disabled={busy||!hosting} className="border rounded px-3 py-2 disabled:opacity-50" onClick={()=>action({action:"prepare",brand,format,captions:{instagram:instagramCaption,facebook:facebookCaption},placements:{instagram:format==="video"?"reels":"feed",facebook:format==="video"?facebookPlacement:"feed"},instagramShareToFeed:shareToFeed,aiGenerated:ai,publicHostingApproved:hosting,templateRevision:template})}>Prepare exact review manifest</button>
     </div>}
     {batch&&<div className="space-y-2 text-sm">
       <p>Revision {batch.manifest.revision} · {batch.manifest.brand} · {batch.manifest.format} · Feed share: {batch.manifest.instagramShareToFeed?"yes":"no"} · AI generated: {batch.manifest.aiGenerated?"yes":"no"}</p>
       <p className="break-all text-xs">App {batch.manifest.destinations.appId} · Page {batch.manifest.destinations.pageId} · Instagram {batch.manifest.destinations.instagramId}</p>
-      <p>Instagram placement: {batch.manifest.placements.instagram}; Facebook placement: {batch.manifest.placements.facebook}; public hosting: {batch.manifest.publicHostingApproved?"approved":"not approved"}</p>
+      <p>Instagram placement: {batch.manifest.placements.instagram}; Facebook placement: {batch.manifest.placements.facebook}; public export use: {batch.manifest.publicHostingApproved?"approved":"not approved"}</p>
       <p className="break-all text-xs">Approval fingerprint: {batch.hash}</p>
       {batch.manifest.assets.map((a,i)=><div key={a.sha256+String(i)} className="border rounded p-2">
         <p>{i+1}. {a.mime} · {a.width} × {a.height} · {a.size} bytes</p>

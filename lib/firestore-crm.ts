@@ -1,4 +1,4 @@
-import { guardedContentUpdate, draftBatch, manifestHash, MetaBlocked, type MetaManifest, type MetaBatch, type MetaStore, type MetaRecord, type MetaBrand } from "./owned-meta-publisher"
+import { runtimePublishingEnabled, guardedContentUpdate, draftBatch, manifestHash, MetaBlocked, type MetaManifest, type MetaBatch, type MetaStore, type MetaRecord, type MetaBrand } from "./owned-meta-publisher"
 import { getDb, admin } from "./firebase-admin"
 import { normalizeAssigneeName } from "../components/crm/types"
 import type {
@@ -1743,4 +1743,12 @@ export async function ownedMetaPermissionBlocked(brand: MetaBrand, verifiedAt: s
 }
 export async function blockOwnedMetaPermission(brand: MetaBrand): Promise<void> {
   await getDb().collection("crm_meta").doc(`owned_meta_permission_${brand}`).set({failed_at:new Date().toISOString()})
+}
+
+/** Runtime kill switch: deliberately bypasses every application list/config cache. */
+export async function ownedMetaRuntimeEnabled(brand?: MetaBrand, readSwitch: () => Promise<unknown> = async () => (await getDb().collection("crm_meta").doc("owned_meta_enabled").get()).data()): Promise<boolean> {
+  if(process.env.VERCEL_ENV!=="production")return false
+  try {
+    return runtimePublishingEnabled(await readSwitch(),brand)
+  } catch { return false }
 }

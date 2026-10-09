@@ -1,6 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { getSession, isAuthorizedAdmin, isCrmSuperAdmin } from "@/lib/auth"
-import { getContentPostById, updateContentPost, decideOwnedMeta } from "@/lib/firestore-crm"
+import { getContentPostById, updateContentPost, decideOwnedMeta, ownedMetaStore, ownedMetaRuntimeEnabled } from "@/lib/firestore-crm"
 import { sendCommentNotification } from "@/lib/notifications"
 import { TEAM_MEMBERS } from "@/components/crm/types"
 import type {
@@ -89,7 +89,7 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
   }
 
   if (post.owned_meta) {
-    if (process.env.VERCEL_ENV !== "production" || process.env.OWNED_META_PUBLISHING_ENABLED !== "true") return NextResponse.json({ error: "Publisher disabled" }, { status: 423 })
+    if (process.env.VERCEL_ENV !== "production" || !await ownedMetaRuntimeEnabled((await ownedMetaStore().read(id)).batch.manifest.brand)) return NextResponse.json({ error: "Publisher disabled" }, { status: 423 })
     try {
       const batch = await decideOwnedMeta(id, body.expectedRevision!, body.expectedManifestHash!, decision, { email: session.email, name: session.name?.trim() || session.email }, note)
       return NextResponse.json({ success: true, status: decision, batch })
