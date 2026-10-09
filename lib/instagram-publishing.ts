@@ -1,3 +1,4 @@
+import { safeMetaError, type MetaOperation } from "./owned-meta-errors"
 import { checkReviewedFormat, OWNED_META_GRAPH_VERSION } from "./owned-meta-formats"
 import { MetaBlocked, MetaPermissionError, type MetaDestination, type MetaManifest, type MetaProvider } from "./owned-meta-publisher"
 
@@ -20,7 +21,7 @@ interface GraphResponse {
 }
 export function createMetaProvider(args: { accessToken: string; evidence: MetaPublishingEvidence; fetcher?: typeof fetch; beforeMutation: (urls?: string[]) => Promise<void> }): MetaProvider {
   const fetcher = args.fetcher ?? fetch
-  const graph = async (path: string, values: Record<string, unknown> = {}, method: "GET" | "POST" = "GET") => {
+  const graphFor = (destination: MetaDestination, operation: MetaOperation) => async (path: string, values: Record<string, unknown> = {}, method: "GET" | "POST" = "GET") => {
     if (!/^\d+(?:_\d+)?(\/(media|media_publish|photos|feed|videos|video_reels|published_posts))?$/.test(path)) throw new MetaBlocked("Unrecognized Meta endpoint")
     if (method === "POST") await args.beforeMutation([values.url,values.image_url,values.video_url,values.file_url].filter((v):v is string=>typeof v==="string"))
     const url = new URL(`https://graph.facebook.com/${OWNED_META_GRAPH_VERSION}/${path}`)
@@ -30,9 +31,10 @@ export function createMetaProvider(args: { accessToken: string; evidence: MetaPu
     const response = await fetcher(url, { method, headers: { authorization: `Bearer ${args.accessToken}` }, ...(method === "POST" ? { body: params } : {}), redirect: "error", cache: "no-store" })
     const data = await response.json().catch(() => ({})) as GraphResponse
     if (!response.ok) {
-      if ([10,190,200].includes(data.error?.code || 0) || response.status === 401 || response.status === 403) throw new MetaPermissionError()
+      const detail = safeMetaError(response.status, data, destination, operation, args.accessToken)
+      if ([10,190,200].includes(detail.code || 0) || response.status === 401 || response.status === 403) throw new MetaPermissionError(detail)
       // Never put vendor bodies/URLs/tokens in exceptions or operational logs.
-      throw new MetaBlocked(`Meta request failed (HTTP ${response.status}); inspect persisted phase before retry`)
+      throw new MetaBlocked(`Meta request failed (HTTP ${response.status}); inspect persisted phase before retry`, detail)
     }
     return data
   }
@@ -40,6 +42,7 @@ export function createMetaProvider(args: { accessToken: string; evidence: MetaPu
   return {
     preflight: (m,d) => checkMetaCapability(m,d,args.evidence),
     async prepare(m,d,urls,saved,checkpoint) {
+      const graph = graphFor(d,"prepare")
       const p = { ...saved }
       const keep = async (key: string, value: string) => { await checkpoint(key,value); p[key] = value }
       const ai = m.aiGenerated ? { is_ai_generated: true } : {}
@@ -75,7 +78,7 @@ export function createMetaProvider(args: { accessToken: string; evidence: MetaPu
         if (!p.uploaded) {
           await args.beforeMutation([urls[0]])
           const response = await fetcher(p.upload_url, { method: "POST", headers: { authorization: `OAuth ${args.accessToken}`, file_url: urls[0] }, redirect: "error" })
-          if (!response.ok) { if ([401,403].includes(response.status)) throw new MetaPermissionError(); throw new MetaBlocked("Facebook unpublished video upload failed") }
+          if (!response.ok) { const detail=safeMetaError(response.status, await response.json().catch(()=>({})), d, "prepare", args.accessToken); if ([401,403].includes(response.status) || [10,190,200].includes(detail.code || 0)) throw new MetaPermissionError(detail); throw new MetaBlocked("Facebook unpublished video upload failed",detail) }
           await keep("uploaded","true")
         }
         const state = await graph(p.video, { fields: "status" })
@@ -84,6 +87,7 @@ export function createMetaProvider(args: { accessToken: string; evidence: MetaPu
       return { ready:true, preparation:p }
     },
     async publish(m,d,urls,p) {
+      const graph = graphFor(d,"publish")
       const ai = m.aiGenerated ? { is_ai_generated: true } : {}
       if (d === "instagram") return id((await graph(`${m.destinations.instagramId}/media_publish`,{ creation_id:p.container },"POST")).id)
       if (m.format === "still") { const r = await graph(`${m.destinations.pageId}/photos`,{ url:urls[0], caption:m.captions.facebook,published:true },"POST"); return id(r.post_id || r.id) }
@@ -94,6 +98,7 @@ export function createMetaProvider(args: { accessToken: string; evidence: MetaPu
       return id(p.video)
     },
     async verify(m,d,remoteId) {
+      const graph = graphFor(d,"verify")
       // Membership in the destination's published collection is state AND ownership evidence.
       // A direct media lookup/permalink alone can describe an unpublished upload.
       const listing = await graph(`${d === "instagram" ? m.destinations.instagramId : m.destinations.pageId}/${d === "instagram" ? "media" : "published_posts"}`, { fields: d === "instagram" ? "id,permalink" : "id,permalink_url,attachments{target{id}}", limit: 100 })

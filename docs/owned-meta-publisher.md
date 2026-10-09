@@ -130,3 +130,33 @@ workflow. Do not call a source/typecheck pass a rendered UI or live-platform pas
 - https://developers.facebook.com/docs/graph-api/reference/page/photos/
 - https://developers.facebook.com/documentation/video-api/guides/reels-publishing (updated 2026-07-30; Step 3 Quick Reference includes AI flag)
 - https://developers.facebook.com/docs/graph-api/reference/page/videos/
+
+## Read-only connection diagnostics
+
+The super-admin Content drawer has **Check connection (read only)** for an existing
+batch. Its production-only GET uses the configured `OWNED_META_TOKEN_*` internally,
+including while switches or the permission marker block publishing. It has no
+persistence or mutation capability. It observes `/me` ID, configured Page's linked
+Instagram ID, the first 25 Page published posts and Instagram media, and the saved
+Instagram container status. It never follows pagination or creates media.
+
+Configured IDs are distinct from observed IDs. App identity and publishing scopes
+remain unverified. A successful read does not establish publish permission; an
+exact-caption candidate does not verify approved media; an empty window does not
+prove absence. The check does not reconcile, clear a marker, advance evidence, or
+make an uncertain final publication eligible for retry. Status is re-read after
+provider checks and a changed batch is rejected.
+
+Future provider failures retain only HTTP status, numeric code/subcode, validated
+trace ID, operation, destination and timestamp. Vendor messages, response bodies,
+URLs, headers and credentials are excluded. Execution failure summaries are
+recorded in the existing cron log, and per-job evidence preserves the existing
+claim/final-intent safeguards. Historical errors discarded before this patch
+cannot be recovered by the check.
+
+Read contracts: Meta's [Graph overview (`me`)](https://developers.facebook.com/docs/graph-api/overview/#me),
+[Page fields](https://developers.facebook.com/docs/graph-api/reference/page/),
+[Page published posts](https://developers.facebook.com/docs/graph-api/reference/page/published_posts/),
+[PagePost fields](https://developers.facebook.com/docs/graph-api/reference/page-post/),
+and [official Page-token IG-container example](https://www.postman.com/meta/instagram/request/munmruq/get-ig-container-status).
+Verified against official sources on 2026-10-09. Existing graph version remains unchanged.
