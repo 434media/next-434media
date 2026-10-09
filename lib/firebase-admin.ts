@@ -30,8 +30,8 @@ function parseKey(raw: string): Record<string, string> {
 function getCredentials(): ServiceAccountCredentials {
   // GOOGLE_SERVICE_ACCOUNT_KEY is the single source of truth for the 434 Media
   // service account — Firestore Admin, GA4, and Search Console all use this key.
-  // (The Gmail-notification path in lib/notifications.ts is the one exception:
-  // it uses a separate delegation-enabled SA via FIREBASE_CLIENT_EMAIL/KEY.)
+  // (Mention notification emails go through Resend, so no other Google
+  // credential is needed.)
   const serviceAccountKey = process.env.GOOGLE_SERVICE_ACCOUNT_KEY
   if (!serviceAccountKey) {
     throw new Error("GOOGLE_SERVICE_ACCOUNT_KEY is not set — it is required for Firebase Admin / Firestore.")
