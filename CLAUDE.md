@@ -78,6 +78,24 @@ reversible proceeds; everything that lands or governs stops for a second reader.
 
 **Work outside the build sequence waits.** The order of work is the build sequence in `434_Process_Log_and_SOP.md`. A task that is not in it waits until the founder adds it there — not because the idea is wrong, but because an order nobody can see is not an order. Raise it; do not start it.
 
+**Before any disable, delete, rotation or permission reduction, run the
+pre-change check.** This covers a credential, account or resource, and
+applies to proposing the change as well as making it. It mirrors 434-context's
+`CLAUDE.md`. Record three things:
+
+- **Consumers:** search the code of every repository in
+  `docs/context/"04 Build"/434_System_Map.md` (clone them; GitHub's code
+  search misses private repositories), and list the environment variables in
+  every Vercel project there. Record each code path, script, cron, environment
+  variable and machine that uses the target, and how it was established.
+- **Last use:** console evidence where it exists (Policy Analyzer's
+  last-authentication query, runtime logs), with its date and the window it
+  covers.
+- **Owner:** of the credential, account or resource, and of each consumer.
+
+Put the evidence in the proposal and the run log. **If any consumer is
+unverified, the proposal says so, and nothing changes until it is resolved.**
+
 **Jurisdiction policy is one constant.** 434 Media does not cold-outreach the
 EU/UK/EEA/Switzerland/Canada (GDPR/CASL). The single source of truth is
 `EXCLUDED_COUNTRIES` in [lib/prospecting/scorer.ts](lib/prospecting/scorer.ts).
