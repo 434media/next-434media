@@ -162,8 +162,9 @@ alone drops a translation from ~$0.019 to ~$0.0052 on the cached path.
 - [docs/README.md](docs/README.md) — status index for `docs/`. Says which plans
   are live intent and which are shipped. Check it before actioning any plan;
   `docs/archive/` describes finished work, not current intent.
-- [lib/prospecting/icp.md](lib/prospecting/icp.md) — the ICP the prospecting
-  translator is prompted with. Editing it changes live filter behavior.
+- [lib/prospecting/icp-base.md](lib/prospecting/icp-base.md) — the base ICP the prospecting
+  translator is prompted with, alongside the `icp_cohorts` rows. Editing it
+  changes live filter behavior.
 - [docs/standards/](docs/standards/) — where to find the governing documents
   that govern code. Nothing governing is copied here: the Display and Design
   Standard, which governs the Work page and any surface rendering portfolio

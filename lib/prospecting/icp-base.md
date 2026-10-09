@@ -1,4 +1,4 @@
-<!-- icp.md without its "Buyer archetypes" section (next-434media#63). In cohorts mode the translator reads this plus the icp_cohorts rows in place of icp.md. While icp.md exists, lib/__tests__/icp-cohorts.test.ts keeps the two in step: edit icp.md, then regenerate this file from it. -->
+<!-- The base ICP (next-434media#63). The prospecting translator reads this plus the icp_cohorts rows, which are the only targeting source; lib/prospecting/icp.md and its buyer archetypes are gone. Editing this file changes live filter behaviour. lib/__tests__/icp-cohorts.test.ts checks its shape. -->
 # 434 Media Ideal Customer Profile (ICP)
 
 System context for the Leads-page prospecting feature. Concatenated into LLM

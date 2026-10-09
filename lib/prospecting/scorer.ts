@@ -36,7 +36,7 @@ export const DEFAULT_FIT_THRESHOLD = Number(process.env.PROSPECTING_FIT_THRESHOL
 //
 // Jurisdiction is the only hard exclusion. Agencies used to be one (an
 // org-name pattern match on agencies, PR and advertising firms, as competitors
-// per icp.md). The master's outbound cohorts name agencies as production
+// per the ICP doc, now lib/prospecting/icp-base.md). The master's outbound cohorts name agencies as production
 // clients, so the founder ruled on 2026-10-08 that the master wins and the
 // agency exclusion is removed (next-434media#63, cohort E).
 

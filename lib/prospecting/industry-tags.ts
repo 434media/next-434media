@@ -5,7 +5,7 @@
  * which takes Apollo's opaque internal ObjectIds (e.g. "5567cd4773696439b10b0000"),
  * NOT free text. The translator can't invent those, so this module maps
  * 434media's controlled ICP industry vocabulary (mirrors the "Industries
- * (positive signals)" section of icp.md) onto Apollo's tag IDs.
+ * (positive signals)" section of icp-base.md) onto Apollo's tag IDs.
  *
  * ── How to populate `tagIds` ────────────────────────────────────────────
  * The IDs are stable per Apollo account. To grab them:
@@ -24,7 +24,7 @@
  * moment any tag IDs are filled in — no code change needed.
  */
 
-// Controlled vocabulary — keep in sync with icp.md "Industries (positive signals)".
+// Controlled vocabulary — keep in sync with icp-base.md "Industries (positive signals)".
 export const ICP_INDUSTRIES = [
   "healthcare_life_sciences",
   "sports_fitness_lifestyle",
