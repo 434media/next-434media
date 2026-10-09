@@ -1,10 +1,10 @@
 import type { IcpGrade, IcpFitBreakdown } from "@/types/crm-types"
 import {
-  INDUSTRY_SIGNALS,
   SOUTH_TEXAS_CITIES,
   TEXAS_CITIES,
   HISPANIC_TARGETED_METROS,
 } from "@/lib/icp/taxonomy"
+import { matchCohort, type CohortLike } from "@/lib/prospecting/cohort-match"
 
 /**
  * Canonical ICP FIT score — the single source of truth (Step 2).
@@ -75,11 +75,16 @@ export interface IcpCompanyInput {
   growthStage?: GrowthStage
   /** Event-activity signals — research-sourced; scored only when provided. */
   eventActivity?: EventActivitySignal
-  // Fallback hints for the prospecting path when real fields are obfuscated
-  // (Apollo Free plan): filter keywords inform industry, filter locations
-  // inform location. Ignored when real data is present.
-  keywordHint?: string
+  // Fallback hint for the prospecting path when real fields are obfuscated
+  // (Apollo Free plan): filter locations inform location. Ignored when real
+  // data is present. The search keyword is NOT a hint for industry: the
+  // keyword describes the search, not the candidate (next-434media#63).
   locationHint?: string
+  /**
+   * The outbound cohorts (icp_cohorts). Industry is scored from them through
+   * the cohort matcher; there is no hand-written industry list.
+   */
+  cohorts: CohortLike[]
 }
 
 export interface IcpFitResult {
@@ -106,19 +111,22 @@ export function icpGrade(fit: number): IcpGrade {
 
 // ─── Dimension scorers (company-level) ──────────────────────────────────
 
-// Industry (max 25) — reuses the prospecting INDUSTRY_SIGNALS taxonomy
-// (434's real verticals). Scores are already 22–25; cap at the dimension max.
+// Industry (max 25) — from the outbound cohorts (icp_cohorts) through the
+// cohort matcher: the company's own industry, name and size against each
+// cohort's target profile. A match as strong as one word only that cohort uses
+// (weight 1) earns the full 25; weaker matches earn their share (an
+// enterprise-size match alone, 0.5 → 13). No cohort, no industry points.
 function scoreIndustry(input: IcpCompanyInput): number {
-  const haystack = [input.industry, input.orgName, input.keywordHint]
-    .filter(Boolean)
-    .join(" ")
-    .toLowerCase()
-  if (!haystack.trim()) return 0
-  let best = 0
-  for (const sig of INDUSTRY_SIGNALS) {
-    if (sig.patterns.some((p) => p.test(haystack)) && sig.score > best) best = sig.score
-  }
-  return Math.min(best, 25)
+  const match = matchCohort(
+    {
+      industry: input.industry,
+      company: input.orgName,
+      employeeCount: input.employeeCount,
+      annualRevenue: input.annualRevenue,
+    },
+    input.cohorts,
+  )
+  return match ? Math.round(25 * Math.min(1, match.weight)) : 0
 }
 
 // Location (max 20) — 434's geography priority, rescaled heavier than Canva's

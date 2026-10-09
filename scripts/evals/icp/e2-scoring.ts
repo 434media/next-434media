@@ -17,6 +17,7 @@ import { execSync } from "node:child_process"
 import { scoreCandidate, isAboveThreshold, DEFAULT_FIT_THRESHOLD } from "../../../lib/prospecting/scorer"
 import { scoreLead } from "../../../lib/score-lead"
 import type { ApolloPerson, ApolloSearchFilters } from "../../../lib/prospecting/apollo"
+import type { CohortLike } from "../../../lib/prospecting/cohort-match"
 import type { LeadSource } from "../../../types/crm-types"
 
 interface SnapshotLead {
@@ -47,7 +48,18 @@ interface FilterSet {
 type CohortMatcher = (
   company: { industry?: string; company?: string; employeeCount?: number; annualRevenue?: number },
   cohorts: unknown[],
-) => { key: string } | null
+) => { key: string; terms?: string[]; bySize?: boolean; byRevenueBand?: boolean; weight?: number } | null
+
+// Since #63's scoring change the scorers take the cohorts as a last argument.
+// Code from before it ignores the extra argument, so one script runs on both.
+type LeadScorer = (input: Parameters<typeof scoreLead>[0], cohorts: CohortLike[]) => ReturnType<typeof scoreLead>
+type CandidateScorer = (
+  person: ApolloPerson,
+  filters: ApolloSearchFilters,
+  cohorts: CohortLike[],
+) => ReturnType<typeof scoreCandidate>
+const scoreLeadWith = scoreLead as unknown as LeadScorer
+const scoreCandidateWith = scoreCandidate as unknown as CandidateScorer
 
 function arg(name: string): string | undefined {
   const i = process.argv.indexOf(`--${name}`)
@@ -126,7 +138,7 @@ async function main() {
   const leads = JSON.parse(readFileSync(snapshotPath, "utf-8")) as SnapshotLead[]
   const synthetic = JSON.parse(readFileSync(join(__dirname, "e2-synthetic.json"), "utf-8")) as SyntheticCase[]
   const cohortsPath = arg("cohorts")
-  const cohorts = cohortsPath ? (JSON.parse(readFileSync(cohortsPath, "utf-8")) as unknown[]) : null
+  const cohorts = cohortsPath ? (JSON.parse(readFileSync(cohortsPath, "utf-8")) as CohortLike[]) : null
   const matcher = cohorts ? await loadMatcher() : null
   const sets = filterSets(arg("filters"))
 
@@ -139,7 +151,7 @@ async function main() {
   for (const c of cases) {
     // Lead path: the canonical fit a stored lead carries (no filters involved).
     const leadFit = c.lead
-      ? scoreLead({
+      ? scoreLeadWith({
           company: c.lead.company ?? "",
           industry: c.lead.industry ?? undefined,
           location: c.lead.location ?? undefined,
@@ -150,7 +162,7 @@ async function main() {
           // Engagement is intent, not fit; zero keeps the fit comparison clean.
           email_opens: 0,
           email_clicks: 0,
-        })
+        }, cohorts ?? [])
       : null
     const cohort =
       matcher && cohorts
@@ -164,14 +176,15 @@ async function main() {
             cohorts,
           )
         : undefined
-    const bySet: Record<string, { score: number; grade: string; excluded: boolean; approve: boolean }> = {}
+    const bySet: Record<string, { score: number; grade: string; excluded: boolean; approve: boolean; breakdown: unknown }> = {}
     for (const s of sets) {
-      const scored = scoreCandidate(c.person, s.filters)
+      const scored = scoreCandidateWith(c.person, s.filters, cohorts ?? [])
       bySet[s.name] = {
         score: scored.score,
         grade: scored.grade,
         excluded: scored.score === -1,
         approve: isAboveThreshold(scored.score),
+        breakdown: scored.breakdown,
       }
     }
     rows.push({
@@ -181,8 +194,13 @@ async function main() {
       expect_excluded: c.expect_excluded,
       lead_fit: leadFit?.icp_fit_score ?? null,
       lead_grade: leadFit?.icp_grade ?? null,
+      lead_breakdown: leadFit?.icp_breakdown ?? null,
       icp_match: leadFit ? leadFit.icp_fit_score >= ICP_MATCH_THRESHOLD : null,
       cohort: cohort === undefined ? undefined : cohort?.key ?? null,
+      cohort_detail:
+        cohort === undefined || cohort === null
+          ? cohort
+          : { terms: cohort.terms ?? [], bySize: !!cohort.bySize, byRevenueBand: !!cohort.byRevenueBand, weight: cohort.weight },
       by_set: bySet,
     })
   }

@@ -1,6 +1,7 @@
 import type { ApolloPerson, ApolloSearchFilters } from "./apollo"
 import type { IcpGrade, IcpFitBreakdown } from "@/types/crm-types"
 import { scoreIcpFit } from "@/lib/icp/rubric"
+import type { CohortLike } from "./cohort-match"
 
 /**
  * Stage 3 — ICP scorer (prospecting path).
@@ -16,8 +17,10 @@ import { scoreIcpFit } from "@/lib/icp/rubric"
  *     so it's surfaced separately rather than folded into the fit score
  *   - the approve-into-queue threshold
  *
- * Free-plan obfuscation is handled by passing the search filters as fallback
- * hints to the rubric (filter keywords → industry, filter locations → location).
+ * Free-plan obfuscation is handled by passing the search's locations to the
+ * rubric as a location fallback. The search keyword is not passed: it describes
+ * the search, not the candidate, so it never counts as the candidate's industry.
+ * Industry is scored from the outbound cohorts (icp_cohorts).
  */
 
 // ─── Configuration ──────────────────────────────────────────────────────
@@ -250,6 +253,7 @@ function excludedResult(person: ApolloPerson, message: string, reason: string): 
 export function scoreCandidate(
   person: ApolloPerson,
   filters: ApolloSearchFilters,
+  cohorts: CohortLike[],
 ): ScoredPerson {
   const orgName = person.organization?.name ?? ""
 
@@ -272,8 +276,8 @@ export function scoreCandidate(
     state: person.state || person.organization?.state,
     employeeCount: person.organization?.estimated_num_employees,
     annualRevenue: person.organization?.annual_revenue,
-    keywordHint: filters.q_keywords,
     locationHint: (filters.organization_locations || []).join(" "),
+    cohorts,
   })
 
   const title = scoreTitle(person)
@@ -303,8 +307,9 @@ export function scoreCandidate(
 export function scoreCandidates(
   people: ApolloPerson[],
   filters: ApolloSearchFilters,
+  cohorts: CohortLike[],
 ): ScoredPerson[] {
-  const scored = people.map((p) => scoreCandidate(p, filters))
+  const scored = people.map((p) => scoreCandidate(p, filters, cohorts))
   return scored.sort((a, b) => {
     if (a.score === -1 && b.score !== -1) return 1
     if (b.score === -1 && a.score !== -1) return -1

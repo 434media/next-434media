@@ -1,6 +1,7 @@
 import { Timestamp, FieldValue } from "firebase-admin/firestore"
 import { getDb } from "./firebase-admin"
 import { scoreLead } from "./score-lead"
+import { listIcpCohorts } from "./firestore-icp-cohorts"
 import { trackLeadCapture, trackLeadQualified } from "./ga4-events"
 import { makeTag, normalizeLegacyTags } from "./tag-taxonomy"
 import {
@@ -155,7 +156,7 @@ export async function createLead(input: LeadCreateInput): Promise<Lead> {
     email_opens: 0,
     email_clicks: 0,
     tags: input.tags,
-  })
+  }, await listIcpCohorts())
 
   const doc = {
     name: input.name,
@@ -291,7 +292,7 @@ export async function updateLead(id: string, patch: LeadUpdateInput): Promise<Le
     email_opens: merged.email_opens,
     email_clicks: merged.email_clicks,
     tags: merged.tags,
-  })
+  }, await listIcpCohorts())
 
   const update: FirebaseFirestore.UpdateData<FirebaseFirestore.DocumentData> = {
     ...patch,
@@ -856,7 +857,7 @@ export async function incrementEngagement(
     email_opens: updated.email_opens,
     email_clicks: updated.email_clicks,
     tags: updated.tags,
-  })
+  }, await listIcpCohorts())
   await ref.update({
     score: scored.score,
     priority: scored.priority,

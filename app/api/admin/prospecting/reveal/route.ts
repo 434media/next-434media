@@ -3,6 +3,7 @@ import { getSession, isAuthorizedAdmin } from "@/lib/auth"
 import { ApolloError, enrichPersonById } from "@/lib/prospecting/apollo"
 import type { ApolloSearchFilters } from "@/lib/prospecting/apollo"
 import { scoreCandidate } from "@/lib/prospecting/scorer"
+import { listIcpCohorts } from "@/lib/firestore-icp-cohorts"
 
 // POST /api/admin/prospecting/reveal
 //
@@ -70,6 +71,6 @@ export async function POST(req: NextRequest) {
   }
 
   // Re-score against the same search filters now that firmographics are real.
-  const candidate = scoreCandidate(enriched, filters)
+  const candidate = scoreCandidate(enriched, filters, await listIcpCohorts())
   return NextResponse.json({ success: true, revealed: true, candidate })
 }

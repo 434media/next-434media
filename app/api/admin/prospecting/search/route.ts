@@ -7,6 +7,7 @@ import {
 } from "@/lib/prospecting/apollo"
 import type { ApolloSearchFilters } from "@/lib/prospecting/apollo"
 import { translatePromptToFilters } from "@/lib/prospecting/translator"
+import { listIcpCohorts } from "@/lib/firestore-icp-cohorts"
 import {
   scoreCandidates,
   DEFAULT_FIT_THRESHOLD,
@@ -130,7 +131,7 @@ export async function POST(req: NextRequest) {
   }
 
   // ── 3. Score ──
-  const candidates = scoreCandidates(searchResult.people, filters)
+  const candidates = scoreCandidates(searchResult.people, filters, await listIcpCohorts())
 
   return NextResponse.json({
     success: true,

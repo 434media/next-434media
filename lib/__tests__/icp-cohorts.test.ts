@@ -11,7 +11,17 @@ import assert from "node:assert/strict"
 import { readFileSync } from "node:fs"
 import { join } from "node:path"
 import { parseIcpSource, renderCohorts, withoutArchetypes } from "../prospecting/icp-context"
-import { cohortTerms, isLarge, isSizeDefined, matchCohort, LARGE_EMPLOYEES, LARGE_REVENUE_USD } from "../prospecting/cohort-match"
+import {
+  cohortTerms,
+  isLarge,
+  isSizeDefined,
+  matchCohort,
+  parseRevenueBand,
+  LARGE_EMPLOYEES,
+  LARGE_REVENUE_USD,
+} from "../prospecting/cohort-match"
+import { scoreIcpFit } from "../icp/rubric"
+import { scoreCandidate } from "../prospecting/scorer"
 import type { OutboundCohort } from "../sor/types.generated"
 
 const read = (f: string) => readFileSync(join(process.cwd(), "lib/prospecting", f), "utf-8")
@@ -109,4 +119,73 @@ test("a large company with no word in common matches the size-defined cohort", (
 test("an industry word still outweighs size: a large health system stays in health", () => {
   const m = matchCohort({ industry: "hospital & health care", employeeCount: 12000, annualRevenue: 3_500_000_000 }, SIZED)
   assert.equal(m?.key, "cohort-b")
+})
+
+// ── Scoring reads the cohort table (next-434media#63) ─────────────────────
+
+const WITH_BAND = [
+  ...SIZED.slice(0, 3),
+  cohort({
+    key: "cohort-d",
+    letter: "D",
+    name: "Scale",
+    target_profile: [
+      "Fortune 500 companies",
+      "Dealer groups and multi-location operators",
+      "Mid-market companies ($10M–$1B annual revenue) with meaningful marketing, event, communications or workforce activity",
+    ],
+  }),
+  cohort({ key: "cohort-e", letter: "E", name: "Agencies", target_profile: ["Advertising agencies", "Public-relations agencies"] }),
+]
+
+test("a revenue band is parsed from the row, with its signal words", () => {
+  const band = parseRevenueBand(WITH_BAND[3].target_profile[2])
+  assert.deepEqual(band, {
+    minUsd: 10_000_000,
+    maxUsd: 1_000_000_000,
+    signals: ["marketing", "event", "communication", "workforce"],
+  })
+  assert.equal(parseRevenueBand("Health systems"), null)
+})
+
+test("a band's words never match on their own: 'mid-market' is not 'marketing'", () => {
+  assert.ok(!cohortTerms(WITH_BAND[3]).includes("market"))
+  assert.equal(matchCohort({ industry: "marketing" }, WITH_BAND), null)
+})
+
+test("mid-market: inside the band with a signal word matches; outside or silent does not", () => {
+  const inBand = matchCohort({ industry: "events & marketing services", annualRevenue: 50_000_000 }, WITH_BAND)
+  assert.equal(inBand?.key, "cohort-d")
+  assert.equal(inBand?.byRevenueBand, true)
+  assert.equal(matchCohort({ industry: "events", annualRevenue: 5_000_000 }, WITH_BAND), null) // under $10M
+  assert.equal(matchCohort({ industry: "plumbing", annualRevenue: 50_000_000 }, WITH_BAND), null) // no signal
+})
+
+test("enterprise is $1B+ revenue or 1,000+ employees", () => {
+  assert.equal(LARGE_REVENUE_USD, 1_000_000_000)
+  assert.equal(LARGE_EMPLOYEES, 1000)
+  assert.equal(matchCohort({ industry: "banking", annualRevenue: 2_000_000_000 }, WITH_BAND)?.bySize, true)
+})
+
+test("dealer groups match on their own words, whatever their size", () => {
+  assert.equal(matchCohort({ industry: "automotive", company: "Lone Star Dealership Group" }, WITH_BAND)?.key, "cohort-d")
+})
+
+test("PR and advertising agencies match the agency cohort, even mid-sized", () => {
+  assert.equal(matchCohort({ industry: "public relations & communications", company: "Lonestar PR firm" }, WITH_BAND)?.key, "cohort-e")
+  assert.equal(matchCohort({ industry: "marketing & advertising", annualRevenue: 40_000_000 }, WITH_BAND)?.key, "cohort-e")
+})
+
+test("rubric industry comes from the cohorts; none, no points", () => {
+  assert.equal(scoreIcpFit({ industry: "hospital & health care", cohorts: WITH_BAND }).breakdown.industry, 25)
+  assert.equal(scoreIcpFit({ industry: "real estate", cohorts: WITH_BAND }).breakdown.industry, 0)
+  assert.equal(scoreIcpFit({ industry: "hospital & health care", cohorts: [] }).breakdown.industry, 0)
+})
+
+test("the search keyword is not the candidate's industry", () => {
+  const person = { id: "p", first_name: "A", organization: { name: "Canes", industry: "real estate" } }
+  const plain = scoreCandidate(person, {}, WITH_BAND)
+  const keyword = scoreCandidate(person, { q_keywords: "health boxing military" }, WITH_BAND)
+  assert.equal(keyword.breakdown.industry, 0)
+  assert.equal(keyword.score, plain.score)
 })

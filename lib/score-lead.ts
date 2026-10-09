@@ -1,6 +1,7 @@
 import type { Lead, LeadPriority, LeadScoreBreakdown, IcpGrade, IcpFitBreakdown } from "@/types/crm-types"
 import { isSponsorTagged } from "./tag-taxonomy"
 import { scoreIcpFit } from "./icp/rubric"
+import type { CohortLike } from "./prospecting/cohort-match"
 
 /**
  * Inline lead scoring. Runs on every write; no Cloud Function needed.
@@ -36,7 +37,11 @@ type ScoreInput = Pick<
   "location" | "industry" | "title" | "company" | "employee_count" | "annual_revenue" | "source" | "email_opens" | "email_clicks" | "tags"
 >
 
-export function scoreLead(input: ScoreInput): ScoreResult {
+/**
+ * `cohorts` are the outbound cohorts (icp_cohorts); the rubric scores Industry
+ * from them. Callers read them with listIcpCohorts().
+ */
+export function scoreLead(input: ScoreInput, cohorts: CohortLike[]): ScoreResult {
   // ── ICP FIT (company-level, canonical rubric) — the source of truth ──
   const fit = scoreIcpFit({
     industry: input.industry,
@@ -44,6 +49,7 @@ export function scoreLead(input: ScoreInput): ScoreResult {
     location: input.location,
     employeeCount: input.employee_count,
     annualRevenue: input.annual_revenue,
+    cohorts,
   })
 
   // ── INTENT (relocated out of fit) — likelihood to engage right now ──
