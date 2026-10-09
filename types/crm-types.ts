@@ -564,6 +564,10 @@ export const CRM_COLLECTIONS = {
   ASSETS: "crm_assets",
   DECKS: "crm_decks",
   LEADS: "leads",
+  // Outbound ICP cohorts — system-of-record rows (master §5.6–5.10), written by
+  // the 434-context sor-sync loader, read-only here. Not the Digital Canvas
+  // cohorts below.
+  ICP_COHORTS: "icp_cohorts",
   // Digital Canvas cohort program
   COHORTS: "crm_cohorts",
   BUILDERS: "crm_builders",

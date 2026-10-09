@@ -1,5 +1,3 @@
-import { promises as fs } from "fs"
-import path from "path"
 import { tool } from "ai"
 import { z } from "zod"
 import { generateGatewayToolCall, GATEWAY_TEXT_MODELS } from "@/lib/ai-gateway-text"
@@ -13,15 +11,20 @@ import {
   resolveIndustries,
   type IcpIndustry,
 } from "./industry-tags"
+import { cohortsContext, icpSourceFromEnv, readIcpFile, type IcpSource } from "./icp-context"
+import { listIcpCohorts } from "@/lib/firestore-icp-cohorts"
+import type { OutboundCohort } from "@/lib/sor/types.generated"
 
 /**
  * Stage 2 — LLM prompt translator.
  *
  * Takes a rep's free-form prospecting query (e.g. "CBG companies in Texas
  * making over $20M") and emits structured ApolloSearchFilters via Anthropic
- * tool-use. Reads lib/prospecting/icp.md as system context so the LLM knows
- * 434media's ICP — geography priorities, target industries, decision-maker
- * tiers, owned-audience differentiator.
+ * tool-use. Reads the ICP as system context so the LLM knows 434media's ICP —
+ * geography priorities, target industries, decision-maker tiers, owned-audience
+ * differentiator. Which ICP is set by PROSPECTING_ICP_SOURCE (see
+ * icp-context.ts): lib/prospecting/icp.md by default, or icp-base.md plus the
+ * outbound cohorts from `icp_cohorts` (next-434media#63).
  *
  * The translator deliberately uses Sonnet (not Opus) — this is a structured
  * extraction task, not creative copy. Sonnet handles tool-use just as well
@@ -31,23 +34,6 @@ import {
  * No Apollo credits consumed here — this stage is pure LLM. Apollo only
  * gets called downstream once the rep approves a query.
  */
-
-const ICP_PATH = path.join(process.cwd(), "lib/prospecting/icp.md")
-
-let _icpContextCache: string | null = null
-
-/**
- * Read icp.md once per process lifetime. The doc is part of the build, so
- * it's stable for the lifetime of any given deploy. To pick up edits in
- * dev, restart the server (or pull the cache into a state-aware mechanism
- * later if rep-edit-without-deploy becomes a need).
- */
-async function getIcpContext(): Promise<string> {
-  if (_icpContextCache) return _icpContextCache
-  const content = await fs.readFile(ICP_PATH, "utf-8")
-  _icpContextCache = content
-  return content
-}
 
 // ─── Tool schema (input shape the LLM emits) ────────────────────────────
 
@@ -230,7 +216,13 @@ interface RawTranslatedFilters {
   ambiguity_note?: string
 }
 
-function buildSystemPrompt(icp: string): string {
+// Rule 10 names the ICP's own targeting unit: icp.md's buyer archetypes, or
+// the outbound cohorts that replace them in cohorts mode.
+const ARCHETYPE_RULE = `10. PERSONA TIERS. Each ICP archetype above defines Tier 1 (Economic Buyer), Tier 2 (Champion), Tier 3 (End User). For OUTBOUND, the Champion (Tier 2) is usually the best first-touch, so it should be included — not just the C-suite. When the rep names an archetype ("sponsor-buyers", "event partners") or asks broadly for "decision-makers", pull person_titles / person_seniorities from BOTH that archetype's Tier 1 and Tier 2 rows. When the rep names a specific title, respect it exactly and don't widen.`
+
+const COHORT_RULE = `10. COHORTS. When the rep names or implies one of the outbound cohorts above, build the search from that cohort: its target profile for industry and company type, and its qualification signals for the WHEN axis (rule 13) only if the rep asks for timing. Take person_titles / person_seniorities from the decision-maker titles above, including the Champion-level roles (heads of partnerships, communications, brand) and not just the C-suite. When the rep names a specific title, respect it exactly and don't widen. A cohort's revenue floor is a qualification gate, not a search filter: set revenue_range_min only if the rep asks for a revenue floor.`
+
+function buildSystemPrompt(icp: string, source: "file" | "cohorts"): string {
   return `You are a B2B lead-prospecting assistant for 434 Media, a media + storytelling company headquartered in San Antonio, Texas. Your single job is to translate a sales rep's free-form prospecting query into structured Apollo search filters.
 
 You MUST call the submit_search_filters tool exactly once. Never respond in text.
@@ -255,13 +247,20 @@ TRANSLATION RULES
 8. Don't translate negative filters (the ICP "exclude agencies/PR firms" rule) — that's the scorer's job, not the search filter's.
 9. NEVER include EU member states, the UK, EEA countries, Switzerland, or Canada in organization_locations. 434media does not pursue cold outbound there (GDPR / CASL). If the user explicitly asks for these regions, set ambiguity_note explaining the constraint and DO NOT include those locations in the filter — let them clarify or pivot. The scorer hard-excludes any EU/CA results that slip through, but the translator should prevent us from burning Apollo credits on them in the first place.
 
-10. PERSONA TIERS. Each ICP archetype above defines Tier 1 (Economic Buyer), Tier 2 (Champion), Tier 3 (End User). For OUTBOUND, the Champion (Tier 2) is usually the best first-touch, so it should be included — not just the C-suite. When the rep names an archetype ("sponsor-buyers", "event partners") or asks broadly for "decision-makers", pull person_titles / person_seniorities from BOTH that archetype's Tier 1 and Tier 2 rows. When the rep names a specific title, respect it exactly and don't widen.
+${source === "cohorts" ? COHORT_RULE : ARCHETYPE_RULE}
 
 11. INDUSTRY. Emit icp_industries (the ICP industry-category enum) whenever the prompt or the matched archetype implies an industry — this is the primary industry lever. Map industry sub-verticals to their category: 'dev tools / cloud / SaaS / AI / fintech' → tech_saas; 'biotech / medtech / digital health' → healthcare_life_sciences; 'CPG / beverage / apparel' → cpg_consumer; etc. Do NOT route these through q_keywords — a narrow keyword AND-s against every filter and typically returns ZERO. Reserve q_keywords for genuinely orthogonal niche terms only (e.g. 'fight gear', 'prosthetics'), and prefer leaving it empty.
 
 12. EMAIL STATUS. 434media uses Apollo primarily for outbound, so default contact_email_status to ['verified','likely to engage'] to keep results contactable. Only widen to include 'unverified' if the rep explicitly asks for maximum reach. Mention this default in reasoning.
 
 13. HIRING SIGNAL (the WHEN axis). Apollo's API can't filter by buying intent, but it CAN filter on hiring activity — the best available buying-moment proxy. When the rep asks for timing / expansion / growth / "just hired" / "scaling" / "actively hiring" signals: set hiring_job_titles for specific roles being hired (use the archetype's Tier-1/Tier-2 title language), OR min_active_job_postings for a generic "is hiring" (e.g. 1), plus hiring_posted_within_days for recency (default 90 when recency is implied). Leave ALL hiring fields empty for ordinary firmographic searches — never impose a hiring constraint the rep didn't ask for.`
+}
+
+export interface TranslateOptions {
+  /** Overrides PROSPECTING_ICP_SOURCE — the evals set it explicitly. */
+  source?: IcpSource
+  /** Cohort rows to use instead of reading `icp_cohorts` (evals, tests). */
+  cohorts?: OutboundCohort[]
 }
 
 /**
@@ -272,17 +271,49 @@ TRANSLATION RULES
  * Throws if the model fails to call the tool (rare with tool_choice). The
  * caller should treat any throw as a translator failure and surface it to
  * the rep as "couldn't parse query — try rephrasing."
+ *
+ * In shadow mode both ICPs are translated; the icp.md result is returned and
+ * the cohorts result is only logged, so a cohorts failure never reaches the rep.
  */
 export async function translatePromptToFilters(
   userPrompt: string,
+  options: TranslateOptions = {},
 ): Promise<TranslateResult> {
   const trimmed = userPrompt.trim()
   if (!trimmed) {
     throw new Error("Translator: prompt is empty")
   }
+  const source = options.source ?? icpSourceFromEnv()
+  const fromCohorts = async () =>
+    translateWith(trimmed, buildSystemPrompt(await cohortsContext(options.cohorts ?? (await listIcpCohorts())), "cohorts"))
+  const fromFile = async () => translateWith(trimmed, buildSystemPrompt(await readIcpFile(), "file"))
 
-  const icp = await getIcpContext()
+  if (source === "cohorts") return fromCohorts()
+  if (source === "file") return fromFile()
 
+  const [file, cohorts] = await Promise.allSettled([fromFile(), fromCohorts()])
+  if (cohorts.status === "rejected") {
+    console.warn("[translator:shadow] cohorts translation failed:", cohorts.reason instanceof Error ? cohorts.reason.message : cohorts.reason)
+  } else if (file.status === "fulfilled") {
+    console.log(`[translator:shadow] ${JSON.stringify(shadowDiff(file.value, cohorts.value))}`)
+  }
+  if (file.status === "rejected") throw file.reason
+  return file.value
+}
+
+/** The filter fields where the two ICPs disagreed — values, not the prompt. */
+function shadowDiff(file: TranslateResult, cohorts: TranslateResult): Record<string, unknown> {
+  const a = { ...file.filters, icp_industries: file.icpIndustries } as Record<string, unknown>
+  const b = { ...cohorts.filters, icp_industries: cohorts.icpIndustries } as Record<string, unknown>
+  const diff: Record<string, unknown> = {}
+  for (const k of new Set([...Object.keys(a), ...Object.keys(b)])) {
+    if (k === "job_posted_at_range") continue // date math, not a mapping choice
+    if (JSON.stringify(a[k]) !== JSON.stringify(b[k])) diff[k] = { file: a[k], cohorts: b[k] }
+  }
+  return diff
+}
+
+async function translateWith(trimmed: string, system: string): Promise<TranslateResult> {
   // Forced single-tool extraction through the AI Gateway — equivalent to the
   // prior Anthropic `tool_choice: { type: "tool" }`. Returns the validated
   // tool input (schema-checked against filtersSchema).
@@ -296,10 +327,11 @@ export async function translatePromptToFilters(
     // default `high` with no loss in filter quality.
     effort: "low",
     // The ICP block is ~6.7k tokens and byte-identical for the life of a
-    // deploy, so every call after the first reads it from cache at ~10% of
-    // input rate (measured: $0.019 → $0.0052 per translation).
+    // deploy (cohorts mode: until a cohort row changes), so every call after
+    // the first reads it from cache at ~10% of input rate (measured: $0.019 →
+    // $0.0052 per translation).
     cacheSystem: true,
-    system: buildSystemPrompt(icp),
+    system,
     prompt: trimmed,
     toolName: FILTERS_TOOL_NAME,
     tool: filtersTool,

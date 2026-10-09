@@ -531,6 +531,10 @@ function FunnelScoreboard({ kpis }: { kpis: FunnelKpis }) {
       </div>
       <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
         <ScoreStat label="ICP match" value={pct(kpis.icpMatchRate)} />
+        <ScoreStat
+          label="Cohort match"
+          value={kpis.cohortMatchRate === null || kpis.cohortMatchRate === undefined ? "—" : pct(kpis.cohortMatchRate)}
+        />
         <ScoreStat label="Lead → Won" value={pct(leadToWon)} />
         <ScoreStat label="Time to Won" value={ttwLabel} />
         <span className="inline-flex items-center gap-1 text-[12px] font-medium text-neutral-700 transition-all group-hover:gap-1.5">
