@@ -41,7 +41,7 @@ export function draftToFilters(draft: ProspectDraft): ApolloSearchFilters {
   // Niche keyword wins; else fall back to the industry keyword (interim, while
   // tag IDs are unpopulated). Mirrors the translator's own reconciliation.
   const niche = q_keywords?.trim()
-  const keyword = niche || resolved.keywords.join(" ")
+  const keyword = niche || resolved.keyword
   if (keyword) filters.q_keywords = keyword
 
   return filters

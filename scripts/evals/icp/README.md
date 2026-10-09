@@ -29,6 +29,12 @@ run exits 1 if any run sets `revenue_range` on a prompt that states no revenue
 figure. The prompt `revenue-stated` is the control: it states one, so its
 filter should stay.
 
+**The other checks.** The run also exits 1 on any location outside the United
+States (cold outbound is US-only, master 5.3; `mexico-trap` is the case), and,
+for a prompt marked `"expect": { "no_keyword_with_tags": true }`, on a niche
+`q_keywords` term sent on top of industry tags (translator rule 11;
+`c-keyword-over-tags` is the case).
+
 **What a run does.** Each prompt in `e1-prompts.json` is translated `--runs`
 times.
 

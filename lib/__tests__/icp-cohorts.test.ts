@@ -15,9 +15,9 @@ import { mapTranslatorOutput, revenueFigureStated } from "../prospecting/transla
 import { bandFor, matchCohorts } from "../prospecting/cohort-match"
 import { computeFunnelKpis } from "../kpis/funnel"
 import type { Lead } from "../../types/crm-types"
-import { classifyIndustries } from "../prospecting/industry-tags"
+import { classifyIndustries, INDUSTRY_MAP, resolveIndustries, type IcpIndustry } from "../prospecting/industry-tags"
 import { scoreIcpFit } from "../icp/rubric"
-import { scoreCandidate } from "../prospecting/scorer"
+import { isOutsideUnitedStates, scoreCandidate } from "../prospecting/scorer"
 import type { OutboundCohort } from "../sor/types.generated"
 
 const read = (f: string) => readFileSync(join(process.cwd(), "lib/prospecting", f), "utf-8")
@@ -46,6 +46,38 @@ test("an unrequested revenue_range is dropped; a requested one is kept", () => {
   const raw = { organization_locations: ["Texas"], revenue_range_min: 10_000_000 }
   assert.equal(mapTranslatorOutput(raw, "cohort D enterprise brands in Texas").filters.revenue_range, undefined)
   assert.deepEqual(mapTranslatorOutput(raw, "brands in Texas over $10M").filters.revenue_range, { min: 10_000_000 })
+})
+
+// ── A fallback never joins keywords (preview, 2026-10-09: cohort A got 0) ──
+// The industries are emptied of tag IDs for the test, so it holds whether or
+// not their real IDs have been captured.
+test("a multi-industry search with no tag IDs sends one keyword, never a joined string", () => {
+  const inds: IcpIndustry[] = ["defense_aerospace", "advanced_manufacturing", "military_veteran"]
+  const saved = inds.map((i) => INDUSTRY_MAP[i].tagIds)
+  try {
+    for (const i of inds) INDUSTRY_MAP[i].tagIds = []
+    const r = resolveIndustries(inds)
+    assert.deepEqual(r.tagIds, [])
+    assert.equal(r.keyword, INDUSTRY_MAP.defense_aerospace.keyword)
+    const q = mapTranslatorOutput({ icp_industries: inds }, "cohort A prospects").filters.q_keywords
+    assert.equal(q, INDUSTRY_MAP.defense_aerospace.keyword)
+    for (const i of inds.slice(1)) assert.ok(!q?.includes(INDUSTRY_MAP[i].keyword), q)
+  } finally {
+    inds.forEach((i, n) => (INDUSTRY_MAP[i].tagIds = saved[n]))
+  }
+})
+
+// ── Cold outbound is US-only (master 5.3) ──────────────────────────────────
+test("a search location outside the United States is recognised", () => {
+  for (const l of ["Mexico", "Monterrey, Mexico", "Germany", "Toronto, Canada", "United Kingdom"]) assert.ok(isOutsideUnitedStates(l), l)
+  for (const l of ["Texas, US", "San Antonio, Texas, US", "New Mexico", "Georgia", "United States", "Puerto Rico"]) assert.ok(!isOutsideUnitedStates(l), l)
+})
+
+test("the translator drops non-US locations, and never searches worldwide", () => {
+  const mixed = mapTranslatorOutput({ organization_locations: ["Texas, US", "Mexico"] }, "boxing sponsors")
+  assert.deepEqual(mixed.filters.organization_locations, ["Texas, US"])
+  const only = mapTranslatorOutput({ organization_locations: ["Mexico"] }, "brands in Mexico")
+  assert.deepEqual(only.filters.organization_locations, ["United States"])
 })
 
 const cohort = (over: Partial<OutboundCohort>): OutboundCohort => ({

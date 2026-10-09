@@ -94,6 +94,46 @@ export const EXCLUDED_COUNTRY_CODES: Set<string> = new Set([
 ])
 
 /**
+ * Every country name except the United States, from the runtime's own region
+ * names (ISO 3166-1 alpha-2, English). US territories stay in, and "Georgia" is
+ * left out because a bare "Georgia" is far more often the US state.
+ */
+const NON_US_COUNTRY_NAMES: Set<string> = (() => {
+  const keep = new Set(["US", "PR", "GU", "VI", "AS", "MP", "UM", "GE"])
+  const names = new Set<string>()
+  const dn = new Intl.DisplayNames(["en"], { type: "region" })
+  for (let a = 65; a <= 90; a++) {
+    for (let b = 65; b <= 90; b++) {
+      const code = String.fromCharCode(a, b)
+      if (keep.has(code)) continue
+      try {
+        const name = dn.of(code)
+        if (name && name !== code) names.add(name.toLowerCase())
+      } catch {
+        // not a region code
+      }
+    }
+  }
+  return names
+})()
+
+/**
+ * Whether a search location names a country other than the United States, by
+ * its last comma-separated part ("Monterrey, Mexico", "Mexico", "Germany").
+ * "New Mexico" and "Texas, US" are not.
+ *
+ * Cold outbound is sent only to prospects in the United States (master 5.3),
+ * so the translator never searches outside it. EXCLUDED_COUNTRIES above is the
+ * narrower GDPR/CASL list the scorer and approve gate enforce on candidates;
+ * this is the search-side rule.
+ */
+export function isOutsideUnitedStates(location: string): boolean {
+  const parts = location.split(",").map((p) => p.trim().toLowerCase()).filter(Boolean)
+  const last = parts[parts.length - 1] ?? ""
+  return NON_US_COUNTRY_NAMES.has(last) || EXCLUDED_COUNTRIES.has(last)
+}
+
+/**
  * Returns whether a candidate is in an excluded jurisdiction. Checks both
  * the person's country and their organization's country — Apollo populates
  * one or the other depending on the data source.

@@ -15,13 +15,19 @@
  * current VERCEL_OIDC_TOKEN. Cohort rows and reports are internal: keep them
  * out of this public repository (see README.md).
  *
- * Exits 1 if any run sets a revenue filter on a prompt that states no revenue
- * figure: a cohort's revenue floor is never a search filter.
+ * Exits 1 if any check fails, on any run:
+ *   - a revenue filter on a prompt that states no revenue figure (a cohort's
+ *     revenue floor is never a search filter);
+ *   - a location outside the United States (cold outbound is US-only,
+ *     master 5.3);
+ *   - for a prompt marked `expect.no_keyword_with_tags`, a niche q_keywords
+ *     term on top of industry tags (translator rule 11).
  */
 import { readFileSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 import { execSync } from "node:child_process"
 import { revenueFigureStated, translatePromptToFilters } from "../../../lib/prospecting/translator"
+import { isOutsideUnitedStates } from "../../../lib/prospecting/scorer"
 import type { OutboundCohort } from "../../../lib/sor/types.generated"
 
 function arg(name: string): string | undefined {
@@ -50,10 +56,16 @@ async function main() {
   }
   const cohortsPath = arg("cohorts")
   const cohorts = cohortsPath ? (JSON.parse(readFileSync(cohortsPath, "utf-8")) as OutboundCohort[]) : undefined
-  const prompts = JSON.parse(readFileSync(join(__dirname, "e1-prompts.json"), "utf-8")) as { id: string; prompt: string }[]
+  const prompts = JSON.parse(readFileSync(join(__dirname, "e1-prompts.json"), "utf-8")) as {
+    id: string
+    prompt: string
+    expect?: { no_keyword_with_tags?: boolean }
+  }[]
 
   const results = []
   const unrequestedRevenue: string[] = []
+  const outsideUs: string[] = []
+  const keywordOverTags: string[] = []
   for (const p of prompts) {
     const runsOut = []
     for (let i = 0; i < runs; i++) {
@@ -66,7 +78,13 @@ async function main() {
           ambiguityNote: r.ambiguityNote ?? null,
           reasoning: r.reasoning,
         })
-        if (r.filters.revenue_range && !revenueFigureStated(p.prompt)) unrequestedRevenue.push(`${p.id} run ${i + 1}`)
+        const tag = `${p.id} run ${i + 1}`
+        if (r.filters.revenue_range && !revenueFigureStated(p.prompt)) unrequestedRevenue.push(tag)
+        const foreign = (r.filters.organization_locations ?? []).filter(isOutsideUnitedStates)
+        if (foreign.length) outsideUs.push(`${tag} (${foreign.join(", ")})`)
+        if (p.expect?.no_keyword_with_tags && r.filters.industry_tag_ids?.length && r.nicheKeyword) {
+          keywordOverTags.push(`${tag} ("${r.nicheKeyword}")`)
+        }
       } catch (err) {
         runsOut.push({ error: err instanceof Error ? err.message : String(err) })
       }
@@ -86,6 +104,8 @@ async function main() {
         generated_at: new Date().toISOString(),
         git_sha: gitSha(),
         unrequested_revenue_filters: unrequestedRevenue,
+        locations_outside_us: outsideUs,
+        keyword_over_tags: keywordOverTags,
         results,
       },
       null,
@@ -93,8 +113,11 @@ async function main() {
     ),
   )
   console.log(`E1 → ${out}`)
-  console.log(`unrequested revenue filters: ${unrequestedRevenue.length ? unrequestedRevenue.join(", ") : "none"}`)
-  if (unrequestedRevenue.length) process.exit(1)
+  const list = (xs: string[]) => (xs.length ? xs.join(", ") : "none")
+  console.log(`unrequested revenue filters: ${list(unrequestedRevenue)}`)
+  console.log(`locations outside the US: ${list(outsideUs)}`)
+  console.log(`niche keyword on top of industry tags (rule 11): ${list(keywordOverTags)}`)
+  if (unrequestedRevenue.length || outsideUs.length || keywordOverTags.length) process.exit(1)
 }
 
 main().catch((err) => {

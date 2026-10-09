@@ -13,6 +13,7 @@ import {
 } from "./industry-tags"
 import { cohortsContext } from "./icp-context"
 import { listIcpCohorts } from "@/lib/firestore-icp-cohorts"
+import { isOutsideUnitedStates } from "./scorer"
 import type { OutboundCohort } from "@/lib/sor/types.generated"
 
 /**
@@ -240,7 +241,7 @@ TRANSLATION RULES
 6. Set ambiguity_note ONLY when the query is genuinely ambiguous — acronyms with multiple plausible meanings (CBG, CPG vs. CBG), vague terms that could go several ways. Don't invent ambiguity.
 7. Reasoning must be brief (1–2 sentences) and explain ICP defaults you applied.
 8. Don't translate negative filters (the ICP "exclude agencies/PR firms" rule) — that's the scorer's job, not the search filter's.
-9. NEVER include EU member states, the UK, EEA countries, Switzerland, or Canada in organization_locations. 434media does not pursue cold outbound there (GDPR / CASL). If the user explicitly asks for these regions, set ambiguity_note explaining the constraint and DO NOT include those locations in the filter — let them clarify or pivot. The scorer hard-excludes any EU/CA results that slip through, but the translator should prevent us from burning Apollo credits on them in the first place.
+9. NEVER include EU member states, the UK, EEA countries, Switzerland, or Canada in organization_locations. 434media does not pursue cold outbound there (GDPR / CASL). If the user explicitly asks for these regions, set ambiguity_note explaining the constraint and DO NOT include those locations in the filter — let them clarify or pivot. The scorer hard-excludes any EU/CA results that slip through, but the translator should prevent us from burning Apollo credits on them in the first place. More broadly, cold outbound goes only to prospects in the United States: never put a location outside the US in organization_locations, including Mexico and Latin America, even for Hispanic-market or cross-border cohorts.
 
 ${COHORT_RULE}
 
@@ -330,8 +331,15 @@ export function mapTranslatorOutput(raw: RawTranslatedFilters, prompt: string): 
   // arrays/strings so downstream callers don't have to defensive-check.
   const filters: ApolloSearchFilters = {}
 
+  // Cold outbound is US-only (master 5.3). A location outside the US is
+  // dropped; if that leaves none, the search stays in the United States rather
+  // than going worldwide.
   if (raw.organization_locations?.length) {
-    filters.organization_locations = raw.organization_locations
+    const us = raw.organization_locations.filter((l) => !isOutsideUnitedStates(l))
+    if (us.length < raw.organization_locations.length) {
+      console.log("[translator] dropped a location outside the United States:", raw.organization_locations.filter(isOutsideUnitedStates))
+    }
+    filters.organization_locations = us.length ? us : ["United States"]
   }
   if (raw.person_titles?.length) {
     filters.person_titles = raw.person_titles
@@ -367,7 +375,7 @@ export function mapTranslatorOutput(raw: RawTranslatedFilters, prompt: string): 
   }
   // Industry — resolve the ICP industry categories to Apollo's precise
   // server-side tag-ID filter. While tag IDs aren't configured yet, this
-  // returns fallback keywords instead, preserving keyword-based industry
+  // returns one fallback keyword instead, preserving keyword-based industry
   // filtering. A niche q_keywords term (if the LLM set one) takes precedence
   // over the generic industry fallback to avoid over-narrowing.
   const industries = (raw.icp_industries ?? []).filter(
@@ -378,7 +386,7 @@ export function mapTranslatorOutput(raw: RawTranslatedFilters, prompt: string): 
     filters.industry_tag_ids = resolved.tagIds
   }
   const nicheKeyword = raw.q_keywords?.trim()
-  const keyword = nicheKeyword || resolved.keywords.join(" ")
+  const keyword = nicheKeyword || resolved.keyword
   if (keyword) {
     filters.q_keywords = keyword
   }

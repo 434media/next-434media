@@ -228,8 +228,12 @@ export function classifyIndustries(industry?: string | null, company?: string | 
 export interface ResolvedIndustry {
   /** Apollo industry tag IDs to filter on (precise, server-side). */
   tagIds: string[]
-  /** Fallback industry keywords for q_keywords (used only when no tag IDs). */
-  keywords: string[]
+  /**
+   * One fallback industry keyword for q_keywords, used only when no selected
+   * industry has tag IDs. Never several joined: Apollo matches every word of
+   * q_keywords, so "defense manufacturing veteran" returns nothing.
+   */
+  keyword: string | null
 }
 
 /**
@@ -238,19 +242,26 @@ export interface ResolvedIndustry {
  * Prefers precise server-side tag IDs. Falls back to fuzzy keywords ONLY when
  * NONE of the selected industries have tag IDs configured — mixing a precise
  * tag-ID filter with a fuzzy AND keyword would wrongly narrow the tag-matched
- * results. Returns deduped arrays.
+ * results.
+ *
+ * The fallback is ONE keyword: the first selected industry's, which is the
+ * model's primary choice. Apollo's q_keywords is a single string that must
+ * match in full, so joining keywords narrows to their intersection (cohort A's
+ * three industries joined to "defense manufacturing veteran" and returned
+ * nothing, preview 2026-10-09). Sending each separately would take one search
+ * per industry. Once an industry's tag IDs are captured it never falls back.
  */
 export function resolveIndustries(industries: IcpIndustry[]): ResolvedIndustry {
   const tagIds = new Set<string>()
-  const fallbackKeywords = new Set<string>()
+  let fallbackKeyword: string | null = null
 
   for (const key of industries) {
     const m = INDUSTRY_MAP[key]
     if (!m) continue
     m.tagIds.forEach((id) => tagIds.add(id))
-    if (!m.tagIds.length) fallbackKeywords.add(m.keyword)
+    if (!m.tagIds.length && fallbackKeyword === null) fallbackKeyword = m.keyword
   }
 
-  if (tagIds.size > 0) return { tagIds: [...tagIds], keywords: [] }
-  return { tagIds: [], keywords: [...fallbackKeywords] }
+  if (tagIds.size > 0) return { tagIds: [...tagIds], keyword: null }
+  return { tagIds: [], keyword: fallbackKeyword }
 }
