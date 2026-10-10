@@ -29,9 +29,9 @@ export default function ContentPage() {
   // Holds the latest loadContentPosts so the stable onSaved callback can re-sync
   // without depending on the hook's return (which is defined below).
   const loadRef = useRef<() => void>(() => {})
-  // Set right before a save resolves so the deep-link reopen effect doesn't
-  // bounce the drawer back open when the post list state updates.
-  const suppressReopenRef = useRef(false)
+  // Remember a dismissed/superseded URL until navigation catches up, so list
+  // updates cannot reopen it after save/delete/Close or a newer direct choice.
+  const dismissedContentIdRef = useRef<string | null>(null)
 
   // After a successful save: suppress the reopen race, drop the ?openContent=
   // param so the drawer stays closed, and re-sync the list so the Calendar
@@ -41,7 +41,7 @@ export default function ContentPage() {
     if (sp?.get("openContent")) {
       // Editing an open post: arm the guard and drop the deep-link param so the
       // post-save list update doesn't bounce the drawer back open.
-      suppressReopenRef.current = true
+      dismissedContentIdRef.current = sp.get("openContent")
       const params = new URLSearchParams(sp.toString())
       params.delete("openContent")
       const qs = params.toString()
@@ -59,13 +59,28 @@ export default function ContentPage() {
     showContentPostForm,
     setShowContentPostForm,
     isSavingContentPost,
-    handleAddContentPost,
-    handleOpenContentPost,
+    handleAddContentPost: addContentPost,
+    handleOpenContentPost: openContentPost,
+    handleOpenContentPostFromNotification,
+    cancelPendingContentPostOpen,
     handleSaveContentPost,
     handleDeleteContentPost,
     handleMoveContentPost,
     handleBulkDeleteContentPosts,
   } = useContentPostHandlers({ setToast, onSaved: handleSaved })
+
+  // A direct choice wins immediately, even before router.replace updates the
+  // URL. Otherwise an in-flight list refresh can start another lookup for the
+  // old URL and replace the drawer the user just chose.
+  const handleOpenContentPost = useCallback((post: Parameters<typeof openContentPost>[0]) => {
+    dismissedContentIdRef.current = searchParams?.get("openContent") ?? null
+    openContentPost(post)
+  }, [searchParams, openContentPost])
+
+  const handleAddContentPost = useCallback(() => {
+    dismissedContentIdRef.current = searchParams?.get("openContent") ?? null
+    addContentPost()
+  }, [searchParams, addContentPost])
 
   // Keep the ref pointed at the current loader for handleSaved.
   useEffect(() => {
@@ -124,23 +139,20 @@ export default function ContentPage() {
   const openContentId = searchParams?.get("openContent") ?? null
   useEffect(() => {
     if (!openContentId) {
+      dismissedContentIdRef.current = null
       if (showContentPostForm) {
         setShowContentPostForm(false)
         setEditingContentPost(null)
       }
       return
     }
-    // A just-completed save updates contentPosts; don't let that re-open the
-    // drawer we just closed (the ?openContent= param is being cleared too).
-    if (suppressReopenRef.current) {
-      suppressReopenRef.current = false
-      return
-    }
-    if (contentPosts.length === 0) return
-    const target = contentPosts.find((p) => p.id === openContentId)
-    if (!target) return
+    // A list refresh must not reopen a dismissed/superseded drawer while the
+    // old ?openContent= param is still waiting for router.replace.
+    if (dismissedContentIdRef.current === openContentId) return
+    dismissedContentIdRef.current = null
     if (editingContentPost?.id === openContentId && showContentPostForm) return
-    handleOpenContentPost(target)
+    void handleOpenContentPostFromNotification(openContentId)
+    return cancelPendingContentPostOpen
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [openContentId, contentPosts])
 
@@ -155,6 +167,8 @@ export default function ContentPage() {
   }, [showContentPostForm, editingContentPost?.id])
 
   const closeContentDrawer = () => {
+    cancelPendingContentPostOpen()
+    dismissedContentIdRef.current = searchParams?.get("openContent") ?? null
     setShowContentPostForm(false)
     setEditingContentPost(null)
     if (searchParams?.get("openContent")) {

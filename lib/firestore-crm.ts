@@ -1294,7 +1294,10 @@ export async function getContentPosts(): Promise<ContentPost[]> {
 
   try {
     const db = getDb()
-    const snapshot = await db.collection(CRM_COLLECTIONS.CONTENT_POSTS).orderBy("date_to_post", "desc").get()
+    // Firestore orderBy excludes documents that omit the ordered field. Drafts
+    // may legitimately have no date, so fetch all and order the visible posts
+    // below instead of silently hiding them from the board.
+    const snapshot = await db.collection(CRM_COLLECTIONS.CONTENT_POSTS).get()
     const results = snapshot.docs.filter(doc => doc.data().archived !== true).map((doc) => {
       const data = doc.data()
       return {
@@ -1304,6 +1307,15 @@ export async function getContentPosts(): Promise<ContentPost[]> {
         created_at: convertTimestamp(data.created_at),
         updated_at: convertTimestamp(data.updated_at),
       } as ContentPost
+    })
+
+    results.sort((a, b) => {
+      const aDate = a.date_to_post || ""
+      const bDate = b.date_to_post || ""
+      if (aDate !== bDate) return aDate < bDate ? 1 : -1
+      // Match Firestore's descending document-ID tie breaker; undated drafts
+      // follow dated posts without assigning them a made-up schedule.
+      return a.id === b.id ? 0 : a.id < b.id ? 1 : -1
     })
 
     setCache(cacheKey, results)
