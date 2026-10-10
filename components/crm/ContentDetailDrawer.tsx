@@ -570,8 +570,9 @@ export function ContentDetailDrawer({
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">Date to Post</label>
+                  <label htmlFor="content-date-to-post" className="block text-sm font-medium text-gray-700 mb-1.5">Date to Post</label>
                   <input
+                    id="content-date-to-post"
                     type="date"
                     value={formData.date_to_post}
                     onChange={(e) => setFormData(prev => ({ ...prev, date_to_post: e.target.value }))}

@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useState, type Dispatch, type SetStateAction } from "react"
+import { useCallback, useEffect, useRef, useState, type Dispatch, type SetStateAction } from "react"
 import type { ContentPost, Toast as ToastType } from "../components/crm/types"
 
 // Content-post (Social Calendar) state + handlers, extracted from
@@ -15,7 +15,7 @@ import type { ContentPost, Toast as ToastType } from "../components/crm/types"
 
 interface UseContentPostHandlersProps {
   setToast: Dispatch<SetStateAction<ToastType | null>>
-  // Called after a content post is successfully created or updated. The page
+  // Called after a content post is successfully created, updated or deleted. The page
   // uses this to clear the ?openContent= deep-link param and re-sync the list
   // so the Calendar reflects the saved date.
   onSaved?: () => void
@@ -27,6 +27,14 @@ export function useContentPostHandlers({ setToast, onSaved }: UseContentPostHand
   const [editingContentPost, setEditingContentPost] = useState<ContentPost | null>(null)
   const [showContentPostForm, setShowContentPostForm] = useState(false)
   const [isSavingContentPost, setIsSavingContentPost] = useState(false)
+  const pendingOpenRef = useRef<AbortController | null>(null)
+
+  const cancelPendingContentPostOpen = useCallback(() => {
+    pendingOpenRef.current?.abort()
+    pendingOpenRef.current = null
+  }, [])
+
+  useEffect(() => cancelPendingContentPostOpen, [cancelPendingContentPostOpen])
 
   const loadContentPosts = useCallback(async () => {
     try {
@@ -42,46 +50,55 @@ export function useContentPostHandlers({ setToast, onSaved }: UseContentPostHand
   }, [setToast])
 
   const handleAddContentPost = useCallback(() => {
+    cancelPendingContentPostOpen()
     setEditingContentPost(null)
     setShowContentPostForm(true)
-  }, [])
+  }, [cancelPendingContentPostOpen])
 
   const handleOpenContentPost = useCallback((post: ContentPost) => {
+    cancelPendingContentPostOpen()
     setEditingContentPost(post)
     setShowContentPostForm(true)
-  }, [])
+  }, [cancelPendingContentPostOpen])
 
-  // Open a specific post by id — used by the notification handoff, where the
-  // posts array may not be loaded yet. Fetches on demand, then opens the drawer.
+  // The board can be empty, stale or filtered. Resolve missing deep-link and
+  // notification IDs through the authenticated single-record endpoint.
   const handleOpenContentPostFromNotification = useCallback(
     async (postId: string) => {
-      let posts = contentPosts
-      if (posts.length === 0) {
-        try {
-          const response = await fetch("/api/admin/crm/content-posts")
-          if (response.ok) {
-            const data = await response.json()
-            posts = data.posts || []
-            setContentPosts(posts)
-          }
-        } catch {
-          /* ignore — handled by the not-found branch below */
-        }
-      }
-
-      const post = posts.find((p) => p.id === postId)
+      cancelPendingContentPostOpen()
+      const post = contentPosts.find((p) => p.id === postId && !p.archived)
       if (post) {
-        setEditingContentPost(post)
+        handleOpenContentPost(post)
+        return
+      }
+      const controller = new AbortController()
+      pendingOpenRef.current = controller
+      try {
+        const response = await fetch(`/api/admin/crm/content-posts?id=${encodeURIComponent(postId)}`, {
+          signal: controller.signal,
+        })
+        if (!response.ok) throw new Error("Content post unavailable")
+        const data = await response.json()
+        // Abort is best-effort: also ignore a response that wins the network
+        // race after Close, navigation, a newer open, or unmount.
+        if (pendingOpenRef.current !== controller) return
+        if (data.post?.id !== postId || data.post.archived) throw new Error("Content post unavailable")
+        setEditingContentPost(data.post)
         setShowContentPostForm(true)
-      } else {
-        setToast({ message: "Could not find the content post", type: "error" })
+      } catch {
+        if (pendingOpenRef.current === controller) {
+          setToast({ message: "Could not find the content post", type: "error" })
+        }
+      } finally {
+        if (pendingOpenRef.current === controller) pendingOpenRef.current = null
       }
     },
-    [contentPosts, setToast],
+    [contentPosts, setToast, cancelPendingContentPostOpen, handleOpenContentPost],
   )
 
   const handleSaveContentPost = useCallback(
     async (postData: Partial<ContentPost>) => {
+      cancelPendingContentPostOpen()
       setIsSavingContentPost(true)
       try {
         if (editingContentPost) {
@@ -137,7 +154,7 @@ export function useContentPostHandlers({ setToast, onSaved }: UseContentPostHand
         setIsSavingContentPost(false)
       }
     },
-    [editingContentPost, setToast, onSaved],
+    [editingContentPost, setToast, onSaved, cancelPendingContentPostOpen],
   )
 
   // Lightweight status move for the Board's drag-and-drop. Optimistically flips
@@ -215,6 +232,7 @@ export function useContentPostHandlers({ setToast, onSaved }: UseContentPostHand
 
   const handleDeleteContentPost = useCallback(
     async (postId: string) => {
+      cancelPendingContentPostOpen()
       try {
         const response = await fetch(`/api/admin/crm/content-posts?id=${postId}`, {
           method: "DELETE",
@@ -224,11 +242,12 @@ export function useContentPostHandlers({ setToast, onSaved }: UseContentPostHand
         setShowContentPostForm(false)
         setEditingContentPost(null)
         setToast({ message: "Content post deleted successfully", type: "success" })
+        onSaved?.()
       } catch {
         setToast({ message: "Failed to delete content post", type: "error" })
       }
     },
-    [setToast],
+    [setToast, onSaved, cancelPendingContentPostOpen],
   )
 
   return {
@@ -244,6 +263,7 @@ export function useContentPostHandlers({ setToast, onSaved }: UseContentPostHand
     handleAddContentPost,
     handleOpenContentPost,
     handleOpenContentPostFromNotification,
+    cancelPendingContentPostOpen,
     handleSaveContentPost,
     handleDeleteContentPost,
     handleMoveContentPost,
