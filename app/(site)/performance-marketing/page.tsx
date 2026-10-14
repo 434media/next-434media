@@ -7,9 +7,9 @@ import type { Metadata } from "next"
 // colour is the generated `--434-*` palette, and the logo and navigation come
 // from PublicShell. Nothing here restates a standard.
 //
-// Not indexed and not in the sitemap: public indexing is a separate founder
-// decision from publication (handoff, phase 3). Flip `robots` and add the
-// sitemap entry together when it is made.
+// Indexed and listed in app/sitemap.ts, as every page this workstream publishes
+// is (founder decision, 2026-10-14). Trackers come from PublicShell like any
+// public page.
 //
 // No call to action: Paid Search and Conversion Optimization are Ntooitive
 // services (Policy 2.11), so the page offers no 434 action beside them.
@@ -24,7 +24,6 @@ export const metadata: Metadata = {
   title: "Demand Drives Performance",
   description,
   alternates: { canonical: "/performance-marketing" },
-  robots: { index: false, follow: true },
   openGraph: {
     title: "Demand Drives Performance | 434 MEDIA",
     description,
