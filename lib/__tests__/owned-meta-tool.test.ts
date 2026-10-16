@@ -191,3 +191,38 @@ test("Slack reader is GET-only, exact-ts, token-safe; webhook accepts only Slack
   assert.equal(await postSlackNotice("x", undefined, fetcher), "skipped")
   assert.equal(await postSlackNotice("x", "https://evil.example/services/x", fetcher), "skipped")
 })
+
+test("an approval for an earlier asset revision cannot approve the current files", async () => {
+  // Revision 1 was shown in Slack; the export then changed, producing revision 2 with new bytes.
+  const old = record(manifest(), false), changed = manifest(); changed.revision = 2; changed.assets[1] = { ...changed.assets[1], sha256: "f".repeat(64), size: 9 }
+  const current = { ...record(changed, false), revision: 2 }; current.batch.id = "batch-2"
+  assert.notEqual(old.batch.hash, current.batch.hash)
+  const s = new Store(current)
+  const oldMessage = async () => ({ ts: "1792145804.228509", user: FOUNDER, text: `approve ${old.batch.hash.slice(0, 12)}` })
+  const approval = { channel: "C0C9RQE54SG", ts: "1792145804.228509" }
+  // Caller replays the old revision/hash: refused before Slack is even read.
+  const replay = deps(s, provider(), { readSlackMessage: async () => { throw new Error("must not read") } })
+  const r1 = await call(replay, { action: "approve", postId: "p", revision: 1, hash: old.batch.hash, approval }); assert.equal(r1.status, 409); assert.deepEqual(replay.decided, [])
+  // Caller names the current revision, but the founder's message quotes the old hash: refused.
+  const mismatch = deps(s, provider(), { readSlackMessage: oldMessage })
+  const r2 = await call(mismatch, { action: "approve", postId: "p", revision: 2, hash: current.batch.hash, approval }); assert.equal(r2.status, 409); assert.match((await r2.json()).error, /hash/); assert.deepEqual(mismatch.decided, [])
+  // Unapproved current revision never publishes.
+  const p = provider(), d = deps(s, p)
+  assert.equal((await call(d, exec(s))).status, 409); assert.deepEqual(p.calls, [])
+})
+
+test("continuation selects only approved, unclaimed, processing destinations without a final intent", () => {
+  const base = () => { const r = record(); r.batch.jobs.instagram.status = "processing"; return r }
+  assert.deepEqual(needsContinuation(base()), ["instagram"])
+  const cases: [string, (r: MetaRecord) => void][] = [
+    ["unapproved", r => { delete r.batch.approval }],
+    ["revoked", r => { r.batch.revoked = true }],
+    ["archived", r => { r.archived = true }],
+    ["excluded", r => { r.excluded = true }],
+    ["claimed by a live run", r => { r.batch.claim = "other-run" }],
+    ["final intent recorded", r => { r.batch.jobs.instagram.finalIntent = { id: "x:instagram", at: NOW } }],
+    ["recovery attempt pending", r => { r.batch.jobs.instagram.retry = { id: "x", priorIntentId: "y", by: "a", at: NOW, evidence: "e", approvedHash: r.batch.hash, duplicateRiskAccepted: true } }],
+  ]
+  for (const [why, change] of cases) { const r = base(); change(r); assert.deepEqual(needsContinuation(r), [], why) }
+  for (const status of ["ready", "final_started", "verified", "operator_confirmed", "manual_required", "needs_reconciliation"] as const) { const r = record(); r.batch.jobs.instagram.status = status; r.batch.jobs.facebook.status = status; assert.deepEqual(needsContinuation(r), [], status) }
+})
