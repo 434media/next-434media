@@ -1826,3 +1826,41 @@ export async function ownedMetaRuntimeEnabled(brand?: MetaBrand, readSwitch: () 
     return runtimePublishingEnabled(await readSwitch(),brand)
   } catch { return false }
 }
+
+// ============================================
+// CANVA CONNECTION + STAGED EXPORTS (owned Meta workflow)
+// ============================================
+import type { CanvaTokenStore } from "./canva-connect"
+import type { StagedExport } from "./content-exports"
+
+/** One document, rotated atomically. Holds token material: never returned by any route or tool. */
+export function canvaTokenStore(): CanvaTokenStore {
+  const ref = () => getDb().collection("crm_meta").doc("canva_connection")
+  return {
+    async read() {
+      const data = (await ref().get()).data()
+      if (!data || typeof data.refreshToken !== "string") return null
+      return { accessToken: String(data.accessToken || ""), refreshToken: data.refreshToken, expiresAt: String(data.expiresAt || "1970-01-01T00:00:00.000Z"), ...(typeof data.scope === "string" ? { scope: data.scope } : {}) }
+    },
+    async write(next) {
+      await ref().set({ ...next, rotatedAt: new Date().toISOString() })
+    },
+  }
+}
+
+export async function findContentPostByCanvaDesignId(designId: string): Promise<ContentPost | null> {
+  const snap = await getDb().collection(CRM_COLLECTIONS.CONTENT_POSTS).where("canva_design_id", "==", designId).limit(5).get()
+  const live = snap.docs.filter(d => d.data().archived !== true)
+  if (!live.length) return null
+  const data = live[0].data()
+  return { ...data, id: live[0].id, assets: normalizeAssets(data.assets), created_at: convertTimestamp(data.created_at), updated_at: convertTimestamp(data.updated_at) } as ContentPost
+}
+
+/**
+ * Attaches a staged export to its record through the guarded update path, so an
+ * existing unstarted publisher draft is invalidated (new revision) exactly as a
+ * manual asset edit would be, and a started batch is refused.
+ */
+export async function attachStagedExport(id: string, designId: string, staged: StagedExport): Promise<ContentPost> {
+  return updateContentPost(id, { assets: staged.assets, canva_design_id: designId, export_fingerprint: staged.fingerprint, export_staged_at: new Date().toISOString() })
+}
