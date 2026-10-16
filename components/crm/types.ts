@@ -286,7 +286,7 @@ export type MediaKind = "image" | "video"
 export type AspectRatio = "9:16" | "1:1" | "4:5" | "16:9" | "1.91:1" | "other"
 
 // How the asset entered the system — drives the provenance trail in review.
-export type AssetSource = "upload" | "higgsfield" | "ai_gateway"
+export type AssetSource = "upload" | "higgsfield" | "ai_gateway" | "canva"
 
 // A generated/stored media asset persisted in the reusable library (crm_assets),
 // independent of any content post. Extends Asset with library metadata so it can
@@ -333,6 +333,14 @@ export interface Asset {
   higgsfieldJobId?: string
   prompt?: string
   model?: string
+  // Server-measured identity of a staged export (lib/content-exports.ts). The
+  // publisher re-measures bytes itself; these let a reviewer and the approval
+  // refer to exact files before a batch exists.
+  sha256?: string
+  bytes?: number
+  canvaDesignId?: string
+  canvaExportJobId?: string
+  page?: number // 1-based page within the Canva design
 }
 
 // Calendar view mode for social calendar
@@ -366,6 +374,12 @@ export interface ContentPost {
   owned_meta_revision?: number
   owned_meta_history?: boolean
   archived?: boolean
+  // Canva is the permanent creative source; the staged JPEG exports under
+  // `assets` are references to it. export_fingerprint is the SHA-256 of the
+  // ordered asset hashes, so an approval can name the exact files it covers.
+  canva_design_id?: string
+  export_fingerprint?: string
+  export_staged_at?: string
 
   id: string
   user: string  // Assigned user (dropdown)

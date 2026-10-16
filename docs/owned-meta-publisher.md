@@ -227,3 +227,126 @@ perform a separately authorized live test before activation:
 Canon reviewed read-only through the GitHub connector under founder approval:
 434-context commit `068cd39f1fb41ed6290ba432a13af68ec799383d`, master 2.0.30.
 No governing artifacts were changed. Base: next-434media `b47a20e` (PR #176).
+
+## Content MCP route — Slack → Smartie → publisher (added 2026-10-16)
+
+Status: code complete and offline-tested; not deployed; not connected; no live
+export or publish has run. Writer: Claude Code, on `claude/owned-meta-tool-route`.
+
+### Shape
+
+`app/api/content/mcp/route.ts` is a second MCP server beside the system-of-record
+one, hosted the same way (`mcp-handler` 2.1.1 + `@modelcontextprotocol/server` 2).
+Its tool logic is `lib/content-mcp-tools.ts`, written against injected data access
+so the whole surface runs in `lib/__tests__/content-publishing.test.ts` with no
+network. The publisher's own actions moved, unchanged, from the admin route into
+`lib/owned-meta-actions.ts`; the admin route and the MCP route both call it, so
+there is one gate set, not two.
+
+The path Smartie follows, one tool per step, each returning `ok` plus a stable
+`code` on refusal (`not_authorized`, `not_found`, `blocked`, `invalid`,
+`unavailable`):
+
+1. `find_content_records` / `create_content_record` — bounded lookup; create
+   returns the record already bound to the Canva design id, or an unposted
+   exact-title match, before it ever creates. A posted record is returned with a
+   note and is never replaced.
+2. `stage_canva_export` — exports the design as JPEG pages through the Connect
+   API (`lib/canva-connect.ts`), measures and SHA-256s each page, writes them to
+   the existing public Blob store under `content-posts/<uuid>-<design>-pNN.jpg`
+   (the path `assertApprovedBlobUrl` already accepts), attaches them through the
+   guarded update, and returns `export_fingerprint` (SHA-256 of the ordered page
+   hashes). Idempotent: an identical export reuses the existing objects.
+3. `prepare_meta_batch` — refuses unless `expected_fingerprint` equals the
+   record's staged fingerprint, so the review names exact bytes; then the existing
+   `prepare` path builds the immutable manifest and hash. Returns per-destination
+   preflight blockers from the reviewed format rules.
+4. `approve_meta_batch` — the founder's decision on one revision + hash, recorded
+   by `decideOwnedMeta` exactly as the admin decision route does. Only a CRM super
+   admin identified by the token's email claim may call it.
+5. `publish_meta_batch` — the existing `execute` run: claim, saved containers,
+   processing continuation, one final publish per destination, verification,
+   permalinks. `manual_required` destinations come back as `unsupported[]` without
+   blocking the other. `publication: "uncertain"` means a final call was made and
+   its outcome is unknown; the tool says not to retry.
+6. `reconcile_meta_batch`, `record_manual_publication`, `get_meta_batch_status`,
+   `check_meta_connection`, `check_meta_credentials`, `check_canva_connection` —
+   read-back and evidence tools. Credential health reports configured ids, the
+   evidence date, the runtime switches and a `/me` self-read; never the credential.
+
+### Access (the one new grant)
+
+OpenAI's custom MCP connectors accept OAuth or no authentication only; there is
+no static key option (https://developers.openai.com/api/docs/guides/custom-mcp-server,
+read 2026-10-16). So the existing `SOR_MCP_TOKEN_INTERNAL` cannot carry Smartie,
+and the Polí connection cannot be reused either: its tokens are bound to the
+Polí resource audience and must not be accepted by a different resource.
+
+The route therefore verifies RS256 access tokens from `CONTENT_MCP_ISSUER` for
+audience `CONTENT_MCP_AUDIENCE` against the issuer's JWKS (Node crypto, no new
+dependency), publishes RFC 9728 metadata at
+`/.well-known/oauth-protected-resource/api/content/mcp`, and maps the token's
+`scope` claim onto `content:read`, `content:write`, `content:approve`,
+`meta:read`, `meta:publish`. The static SOR token is accepted read-only
+(`content:read`, `meta:read`) for non-ChatGPT clients.
+
+Setup that this code does not perform (founder, explicit):
+- In the Auth0 tenant Polí already uses, create one API (resource identifier =
+  the production URL `https://434media.com/api/content/mcp`) with those five
+  scopes, enable it for the ChatGPT client registration method the tenant already
+  supports, and add the `email` claim to its access tokens.
+- Set `CONTENT_MCP_ISSUER` (the tenant issuer, trailing slash as the tenant
+  prints it) and `CONTENT_MCP_AUDIENCE` on the Vercel project.
+- In ChatGPT developer mode, add the connector at that URL; consent once as
+  `marcos@434media.com`. That consent is the grant: approvals and runs are
+  attributed to that email, and `content:approve` is honoured only for a CRM
+  super admin.
+
+### Canva
+
+The Canva app ChatGPT exposes to Smartie has no export, so the server exports.
+Verified against the Connect API reference on 2026-10-16: `POST /v1/exports`
+needs `design:content:read`; JPG takes `quality` 1–100; jobs are polled; download
+URLs expire after 24 hours; refresh tokens are single-use and rotate on every
+refresh, so `lib/canva-connect.ts` persists the rotated token to
+`crm_meta/canva_connection` before using the new access token. A Developer Portal
+app with REST APIs enabled issues a client id/secret immediately and the owner can
+connect it to their own account without marketplace review; "private" apps are a
+separate Enterprise-plan construct and are not needed
+(https://www.canva.dev/docs/connect/creating-integrations/, read 2026-10-16).
+
+Setup that this code does not perform (founder, explicit):
+- Create the Developer Portal app, turn on **Canva REST APIs**, select
+  `design:content:read` and `design:meta:read`, add the redirect URL
+  `https://434media.com/api/admin/integrations/canva`, generate the secret.
+- Set `CANVA_CLIENT_ID` and `CANVA_CLIENT_SECRET` on the Vercel project.
+- Signed in as a CRM super admin, open
+  `/api/admin/integrations/canva?start=1` once; the PKCE flow stores the rotated
+  refresh token. `GET /api/admin/integrations/canva` reports connection health
+  without token material.
+
+### What changed in the publisher itself
+
+- Facebook photo/feed with `aiGenerated`: the earlier blanket `manual_required`
+  treated "no API label parameter" as "cannot publish". Meta's requirement is
+  disclosure; the Page `/photos` and `/feed` references expose no label field
+  (rechecked 2026-10-16). The gate is now the caption: an explicit disclosure
+  such as "Made with AI" is required before approval, and `verify` does not read
+  back `is_ai_generated` for that placement. Reels and Instagram keep the
+  readable flag and the readback.
+- `prepare` additionally refuses when a staged asset's stored `sha256` differs
+  from the bytes it measures.
+- No change to claims, final-intent, recovery, kill switches or evidence writes.
+
+### Record `Opb3LOHpfZPFoxdQ720F` (the Army carousel)
+
+Live on Instagram and Facebook before this work. It must not be republished and
+no replacement record may be created. The code enforces the second half:
+`create_content_record` returns the record bound to the design id, and
+`stage_canva_export`, `prepare_meta_batch` and `publish_meta_batch` refuse a
+record whose status is `posted`. Reconciling the record itself — confirming its
+status is `posted` and its permalinks are recorded — was not done in this pass
+(no Firestore access from the build session) and remains a read-only check for
+the founder or Smartie once connected: `find_content_records` with the id, then
+`record_manual_publication` with the two live permalinks if a batch exists, or
+the admin "mark posted" path if it does not.

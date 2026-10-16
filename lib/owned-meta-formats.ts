@@ -12,6 +12,12 @@ export const FORMAT_SOURCES = {
   facebookVideos: "https://developers.facebook.com/docs/graph-api/reference/page/videos/",
 } as const
 
+/** Caption self-disclosure accepted where Meta exposes no API label field. */
+export const AI_CAPTION_DISCLOSURE = /\b(?:AI[- ]generated|made with AI|created with AI|generated with AI|generated using AI)\b/i
+export function hasAiCaptionDisclosure(caption: string): boolean { return AI_CAPTION_DISCLOSURE.test(caption || "") }
+/** Destinations whose AI disclosure is the caption rather than a readable platform flag. */
+export function aiDisclosureIsCaption(m: MetaManifest, destination: MetaDestination): boolean { return destination === "facebook" && m.format !== "video" }
+
 /** Reviewed constraints, never caller/environment policy. MB uses conservative decimal bytes. */
 export const META_FORMAT_RULES = {
   instagramImage: { mimeTypes: ["image/jpeg"], maxBytes: 8_000_000, minAspect: 4/5, maxAspect: 1.91 },
@@ -57,7 +63,12 @@ export function checkReviewedFormat(m: MetaManifest, destination: MetaDestinatio
   if(m.format!=="video"){
     if(m.assets.some(a=>a.mime==="video/mp4"))return "Facebook organic multi-photo posts require stills; approve a different rendition"
     if(m.assets.some(a=>a.size>META_FORMAT_RULES.facebookPhoto.maxBytes))return "Facebook photos cannot exceed 10 MB"
-    if(m.aiGenerated)return "Facebook photo/feed AI labeling is unverified; use manual platform handling for this post"
+    // Meta's AI-info label on Facebook photos is applied by Meta's own detection
+    // or the composer's self-disclosure; the Page /photos and /feed references
+    // expose no label parameter (rechecked 2026-10-16). Meta's requirement is
+    // disclosure, which a caption satisfies; the earlier blanket block treated
+    // "no API parameter" as "cannot publish". Keep the gate on the caption.
+    if(m.aiGenerated && !hasAiCaptionDisclosure(m.captions.facebook))return "Facebook photo/feed has no API label parameter; add an explicit AI disclosure to the Facebook caption (for example 'Made with AI') before approval"
     return null
   }
   if(m.placements.facebook==="reels") {

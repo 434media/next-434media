@@ -84,3 +84,7 @@ jobs:
 
       # Owned Meta: offline state machine and fake-transport regression tests.
       - run: tsx --test lib/__tests__/owned-meta-publisher.test.ts
+
+      # Content MCP: Canva export staging, record dedupe, token verification and
+      # the tool surface, all against injected fakes. No network.
+      - run: tsx --test lib/__tests__/content-publishing.test.ts
