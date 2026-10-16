@@ -86,3 +86,5 @@ jobs:
       - run: tsx --test lib/__tests__/owned-meta-publisher.test.ts
       # Owned Meta tool route, Slack approval binding and processing continuation (all transports faked).
       - run: tsx --test lib/__tests__/owned-meta-tool.test.ts
+      # Owned Meta service entry for the shared Slack app: pilot identity and acting-person checks.
+      - run: tsx --test lib/__tests__/owned-meta-service.test.ts
