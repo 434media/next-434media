@@ -1,4 +1,3 @@
-import { createHash, timingSafeEqual } from "node:crypto"
 import { checkReviewedFormat } from "./owned-meta-formats"
 import type { MetaConnectionReport } from "./owned-meta-connection"
 import { assertApproved, MetaBlocked, type MetaBatch, type MetaDestination, type MetaManifest, type MetaRecord } from "./owned-meta-publisher"
@@ -82,13 +81,6 @@ export function slackText(title: string, batch: MetaBatch, notices: OwnedMetaNot
   const s = summarize(batch)
   const line = (r: OwnedMetaResult) => `• ${r.destination === "instagram" ? "Instagram" : "Facebook"}: ${r.status}${r.evidence === "api_verified" ? " (API verified)" : r.evidence === "owner_reported" ? " (owner-reported)" : ""}${r.remoteId ? ` — ID ${r.remoteId}` : ""}${r.permalink ? ` — ${r.permalink}` : ""}${r.blocker ? ` — ${r.blocker}` : ""}${r.doNotRepeat && r.evidence === "none" ? " — do not repeat" : ""}`
   return [`${title} — revision ${s.revision}, hash ${s.hash.slice(0, 12)}`, ...s.results.map(line), ...notices.map(n => `• Not done: ${n.feature.replace(/_/g, " ")} — ${n.detail}`)].join("\n")
-}
-
-/** Constant-time bearer check. A missing secret disables the tool. */
-export function toolAuthorized(header: string | null, secret: string | undefined): boolean {
-  if (!secret || secret.length < 32 || !header?.startsWith("Bearer ")) return false
-  const a = createHash("sha256").update(header.slice(7)).digest(), b = createHash("sha256").update(secret).digest()
-  return timingSafeEqual(a, b)
 }
 
 /** "U123:person@434media.com,U456:other@434media.com" → Slack user → reviewer email. */

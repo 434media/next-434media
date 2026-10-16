@@ -367,6 +367,8 @@ export interface ContentPost {
   owned_meta_history?: boolean
   // Owner-reported publication outside the publisher; server-owned, blocks every publish path.
   owned_meta_external?: { by: string; at: string; evidence: string; links: string[] } | null
+  // Set when the publisher's connector created the post; requestId makes creation idempotent.
+  intake?: { requestId: string; metaBrand: string; requestedBy: string; at: string }
   archived?: boolean
 
   id: string

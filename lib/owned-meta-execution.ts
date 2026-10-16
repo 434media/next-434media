@@ -1,5 +1,5 @@
 import { createOwnedMetaDraft, getContentPostById, ownedMetaStore, blockOwnedMetaPermission, ownedMetaPermissionBlocked, ownedMetaRuntimeEnabled } from "@/lib/firestore-crm"
-import { runOwnedMeta, guardFacebookRetryDispatch, validateMetaMutationBoundary, MetaBlocked, MetaPermissionError, type MetaBatch, type MetaBrand, type MetaManifest, type MetaAsset, type MetaRecord, type MetaStore, type MetaDestination, type FacebookRecovery } from "@/lib/owned-meta-publisher"
+import { runOwnedMeta, guardFacebookRetryDispatch, validateMetaMutationBoundary, isExcludedPostId, MetaBlocked, MetaPermissionError, type MetaBatch, type MetaBrand, type MetaManifest, type MetaAsset, type MetaRecord, type MetaStore, type MetaDestination, type FacebookRecovery } from "@/lib/owned-meta-publisher"
 import { readTrustedAsset, assertApprovedBlobUrl, assetDigest, verifyAssetBytes, measureExport } from "@/lib/owned-meta-assets"
 import { createMetaProvider } from "@/lib/instagram-publishing"
 import { recordCronRun } from "@/lib/cron-auth"
@@ -24,7 +24,7 @@ export async function prepareOwnedMetaBatch(id: string, c: PrepareChoices): Prom
   const post=await getContentPostById(id)
   if (!post || post.archived || !post.assets.length) throw new MetaBlocked("Save the approved export references on the content post first")
   // A post already published elsewhere is never prepared again (owner-reported or manual posting).
-  if (post.status==="posted" || post.published_url || post.owned_meta_external) throw new MetaBlocked("This post is already published or excluded from the publisher")
+  if (post.status==="posted" || post.published_url || post.owned_meta_external || isExcludedPostId(id)) throw new MetaBlocked("This post is already published or excluded from the publisher")
   const {getOwnedMetaIdentity}=await import("@/lib/instagram-config")
   const assets:MetaAsset[]=[]
   for (const [i,a] of post.assets.entries()) {
@@ -111,4 +111,49 @@ export async function ownedMetaHealth(id: string) {
   const report = await checkOwnedMetaConnection({ batch: record.batch, config, runtime: { globalEnabled: await ownedMetaDeploymentEnabled(), brandEnabled: await ownedMetaBrandEnabled(brand), permissionBlocked } })
   const { credentialState } = await import("@/lib/owned-meta-tool")
   return { brand, credential: credentialState(report), permissionBlocked, evidenceVerifiedAt: config.evidence.verifiedAt, report }
+}
+
+/** Production dependencies for the connector operations. Constructed per request. */
+export async function ownedMetaConnectorDeps(): Promise<import("@/lib/owned-meta-tool-handler").ToolDeps> {
+  const crm = await import("@/lib/firestore-crm")
+  const { put } = await import("@vercel/blob")
+  const { isSafeRemoteUrl, fetchAllowingSafeRedirects } = await import("@/lib/safe-remote-fetch")
+  const { readSlackMessage } = await import("@/lib/owned-meta-slack")
+  const { MAX_SOURCE_BYTES } = await import("@/lib/owned-meta-assets")
+  const { randomUUID } = await import("node:crypto")
+  return {
+    env: { OWNED_META_APPROVER_SLACK_IDS: process.env.OWNED_META_APPROVER_SLACK_IDS },
+    store: crm.ownedMetaStore(),
+    intake: {
+      listPosts: crm.getContentPosts,
+      getPost: crm.getContentPostById,
+      findByRequestId: crm.findContentPostByIntakeRequest,
+      createPost: crm.createContentPost,
+      setAssets: (id, assets) => crm.updateContentPost(id, { assets }),
+      // Same SSRF guard as admin ingestion; https only; bounded by the publisher's memory limit.
+      fetchExport: async url => {
+        const safe = url.startsWith("https://") ? await isSafeRemoteUrl(url) : null
+        if (!safe) throw new MetaBlocked("A public https export URL is required")
+        const res = await fetchAllowingSafeRedirects(safe.url, safe.addresses)
+        if (!res.ok || !res.body) throw new MetaBlocked("Export source did not return the file")
+        if (Number(res.headers.get("content-length") || 0) > MAX_SOURCE_BYTES) throw new MetaBlocked("Export exceeds the 64 MiB server safety bound")
+        const chunks: Uint8Array[] = []; let size = 0
+        for await (const chunk of res.body as unknown as AsyncIterable<Uint8Array>) { size += chunk.byteLength; if (size > MAX_SOURCE_BYTES) throw new MetaBlocked("Export exceeds the 64 MiB server safety bound"); chunks.push(chunk) }
+        return { bytes: Buffer.concat(chunks), contentType: (res.headers.get("content-type") || "").split(";")[0].trim() }
+      },
+      // Existing convention: public, UUID-named, no overwrite (assertApprovedBlobUrl accepts exactly this path).
+      storeExport: async (bytes, filename, contentType) => (await put(filename, Buffer.from(bytes), { access: "public", addRandomSuffix: false, contentType })).url,
+      now: () => new Date().toISOString(),
+    },
+    brandEnabled: ownedMetaBrandEnabled,
+    prepare: prepareOwnedMetaBatch,
+    decide: (id, revision, hash, email, note) => crm.decideOwnedMeta(id, revision, hash, "approved", { email, name: email }, note),
+    execute: executeOwnedMeta,
+    recordFailure: recordOwnedMetaFailure,
+    exclude: crm.excludeOwnedMetaPost,
+    health: ownedMetaHealth,
+    readSlackMessage: (channel, ts) => readSlackMessage(channel, ts, process.env.OWNED_META_SLACK_BOT_TOKEN),
+    randomId: randomUUID,
+    now: () => new Date().toISOString(),
+  }
 }

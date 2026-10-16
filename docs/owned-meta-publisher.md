@@ -228,35 +228,49 @@ Canon reviewed read-only through the GitHub connector under founder approval:
 434-context commit `068cd39f1fb41ed6290ba432a13af68ec799383d`, master 2.0.30.
 No governing artifacts were changed. Base: next-434media `b47a20e` (PR #176).
 
-## Slack tool route, continuation and AI-gate correction (draft, offline verified only)
+## Publisher connector for Smartie, continuation and AI-gate correction (draft, offline verified only)
 
-`POST /api/owned-meta/tool` is the narrowly authorized machine surface for the Slack
-executor. It is production-only, then bearer-checked against `OWNED_META_TOOL_SECRET`
-(at least 32 characters; unset disables the tool), then input-validated, before any read.
-Verbs: `status`, `health` (GET-only connection check plus credential classification),
-`prepare`, `approve`, `execute`, `record-external`, `exclude`. There is no reset, claim
-release, stopped-run confirmation or Facebook recovery verb; those stay in the admin drawer.
+**Transport.** Smartie is a ChatGPT agent installed in Slack (its confirmations link to
+chatgpt.com). It reaches outside tools through ChatGPT connectors, which are MCP servers
+authenticated by OAuth 2.1 or not at all. They cannot send a static API key or bearer
+header ([OpenAI, Authentication](https://developers.openai.com/plugins/build/auth), read
+2026-10-16). A shared-secret route would be uncallable, so the publisher is exposed as
+an MCP server at `/api/owned-meta/mcp`, built on `mcp-handler` as `/api/sor/mcp` is.
 
+- **Authorization reuses admin sign-in.** Google is the authorization server, the same
+  provider admins sign in with. A presented Google access token is checked at Google's
+  tokeninfo endpoint (in a POST body). It must be issued to a client ID in
+  `OWNED_META_CONNECTOR_GOOGLE_CLIENT_IDS`, have a verified email, be unexpired and carry
+  the email scope. The email then passes `authorizeAdminSignIn` and must hold a
+  send-capable role (or be a super-admin), the same gate as the admin publisher route.
+  401 responses point at `/api/owned-meta/oauth-protected-resource` (RFC 9728), which
+  names `https://accounts.google.com`. Previews return 423 before authentication.
+- **Tools:** `find_posts`, `create_post` (idempotent on `requestId`), `attach_exports`,
+  `prepare`, `approve`, `execute`, `status`, `health`, `record_external`, `exclude`. No
+  reset, claim release, stopped-run confirmation or Facebook recovery tool exists; those
+  stay in the admin drawer. `find_posts`, `status` and `health` are annotated read-only.
+- **Export attachment** fetches public https export links (for example Canva JPG export
+  URLs) through the same SSRF guard as admin ingestion (`lib/safe-remote-fetch.ts`),
+  bounded at 64 MiB. It measures each file from bytes and stores it under the existing
+  `content-posts/<uuid>-NN-label.ext` convention. It then replaces the post's assets in
+  order through the guarded update, which invalidates any unstarted draft. Nothing is
+  stored if any item fails. PNG and mixed-aspect sets are reported as Instagram holds.
 - **Approval is read, not relayed.** `approve` takes a Slack channel and message ts. The
   server reads that exact message with `OWNED_META_SLACK_BOT_TOKEN` (GET
   `conversations.replies`) and accepts it only if a person in
   `OWNED_META_APPROVER_SLACK_IDS` (`U…:name@434media.com`, comma-separated) wrote it,
-  it says "approve", and it quotes the first 12 characters of the manifest hash. It then
-  calls the existing `decideOwnedMeta` with the expected revision and hash.
-- **Prepare before approval.** `prepare`/`status` return per-destination preflight, so an
-  Instagram PNG hold is visible before approval binds the files. The fix is a Canva JPG
-  export saved to the post; the app does not convert images (that would need `sharp`
-  as a direct dependency, which is not approved).
-- **Owner-reported publications.** `record-external` marks one untouched destination
-  `operator_confirmed` with the permalink, an optional numeric ID and the observation, so
-  no run publishes it. A destination with any final intent must use reconcile or
-  manual-confirm instead. `exclude` sets `owned_meta_external` on a post with no batch;
-  prepare, new drafts and `assertApproved` all refuse an excluded post.
+  it says "approve", and it quotes the first 12 characters of the manifest hash. Then the
+  existing `decideOwnedMeta` runs with the expected revision and hash.
+- **Owner-reported publications.** `record_external` marks one untouched destination
+  `operator_confirmed`. `exclude` sets `owned_meta_external`. `OWNED_META_EXCLUDED_POST_IDS`
+  holds the MilCityUSA Army carousel record `Opb3LOHpfZPFoxdQ720F` in code, so it is
+  excluded from the first deployment, before the Firestore marker is written. Store reads,
+  store updates, new drafts, prepare and export attachment all refuse an excluded post.
 - **Continuation.** `/api/cron/owned-meta-continue` (every 5 minutes, `CRON_SECRET`) resumes
   only destinations whose status is `processing` with no final intent, using the same
-  claim. Preparation failures (`manual_required`) and uncertain finals are never touched.
-  A permission failure stops the tick and sets the existing brand block. Results post to
-  `OWNED_META_SLACK_WEBHOOK_URL` if set (only `hooks.slack.com/services/…` is accepted).
+  claim. Preparation failures and uncertain finals are never touched. A permission
+  failure stops the tick and sets the existing brand block. Results post to
+  `OWNED_META_SLACK_WEBHOOK_URL` if set.
 - **Unsupported optional features are notices, not blockers:** native account tagging,
   Story resharing, and (for AI stills) a Facebook label, since Meta documents no
   self-disclosure parameter for Page photos/feed.
@@ -264,10 +278,12 @@ release, stopped-run confirmation or Facebook recovery verb; those stay in the a
   and is removed. Meta's organic disclosure requirement covers photorealistic video and
   realistic audio. Instagram carries `is_ai_generated` on the container (carousel parent
   only) and is read back. Facebook Reels carry it on finish. AI video on ordinary
-  `/videos` stays held, because no label parameter is documented there. The label is read
-  back only where it was sent.
+  `/videos` stays held. The label is read back only where it was sent.
 
-Not verified until an authorized live run: Slack approval read against the real
-workspace, real container processing times under the cron, and Graph readback of
-`is_ai_generated`. The same applies to credential classification against a real
-expired token and to Facebook verification of an AI still with no label.
+Not verified until an authorized live run:
+- ChatGPT completing OAuth against Google: Google's handling of ChatGPT's `resource`
+  parameter, and whether the workspace plan allows custom connectors.
+- The Slack approval read against the real workspace.
+- Real container processing times under the cron.
+- Graph readback of `is_ai_generated`.
+- A Canva export URL fetched through the SSRF guard.

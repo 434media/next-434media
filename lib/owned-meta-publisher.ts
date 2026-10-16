@@ -68,6 +68,16 @@ export interface MetaProvider {
   publish(manifest: MetaManifest, destination: MetaDestination, urls: string[], preparation: Record<string, string>): Promise<string>
   verify(manifest: MetaManifest, destination: MetaDestination, remoteId: string): Promise<{ verified: boolean; permalink?: string; blocker?: string }>
 }
+/**
+ * Posts published outside the publisher and verified by the owner. Holding them in code
+ * keeps them excluded from the first deployment, before the Firestore marker
+ * (owned_meta_external) is written. Remove an ID only with the founder's approval.
+ * Opb3LOHpfZPFoxdQ720F — MilCityUSA Army NGC2 carousel, manually published 2026-10-16:
+ *   https://www.instagram.com/milcityusa/p/DejVYUvFYIj/
+ *   https://www.facebook.com/milcityusa/posts/pfbid02AGQKTX783QEUkV1RhVzjQFnN6ticZTKSne8vftuFeRvVuNZkUfeEx6hpGZwHpxKql
+ */
+export const OWNED_META_EXCLUDED_POST_IDS: readonly string[] = ["Opb3LOHpfZPFoxdQ720F"]
+export function isExcludedPostId(id: string): boolean { return OWNED_META_EXCLUDED_POST_IDS.includes(id) }
 export class MetaBlocked extends Error { constructor(message: string, public readonly detail?: SafeMetaError) { super(message); this.name = "MetaBlocked" } }
 export class MetaPermissionError extends Error { constructor(public readonly detail?: SafeMetaError) { super("Publishing permission failed; this brand needs a new permission check"); this.name = "MetaPermissionError" } }
 export function canonicalJson(value: unknown): string {

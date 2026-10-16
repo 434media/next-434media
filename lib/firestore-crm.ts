@@ -1,4 +1,4 @@
-import { runtimePublishingEnabled, guardedContentUpdate, draftBatch, manifestHash, MetaBlocked, type MetaManifest, type MetaBatch, type MetaStore, type MetaRecord, type MetaBrand } from "./owned-meta-publisher"
+import { runtimePublishingEnabled, guardedContentUpdate, draftBatch, manifestHash, isExcludedPostId, MetaBlocked, type MetaManifest, type MetaBatch, type MetaStore, type MetaRecord, type MetaBrand } from "./owned-meta-publisher"
 import { getDb, admin } from "./firebase-admin"
 import { normalizeAssigneeName } from "../components/crm/types"
 import type {
@@ -1682,7 +1682,7 @@ export async function createOwnedMetaDraft(id: string, input: Omit<MetaManifest,
     const snap = await tx.get(ref)
     if (!snap.exists || snap.data()!.archived) throw new MetaBlocked("Content unavailable")
     const data = snap.data()!
-    if (data.owned_meta_external) throw new MetaBlocked("This post was published outside the publisher and is excluded")
+    if (data.owned_meta_external || isExcludedPostId(id)) throw new MetaBlocked("This post was published outside the publisher and is excluded")
     if (data.owned_meta?.batchId) {
       const previous = await tx.get(ref.collection(META_BATCHES).doc(data.owned_meta.batchId))
       const old = previous.data() as MetaBatch | undefined
@@ -1723,7 +1723,7 @@ export function ownedMetaStore(): MetaStore {
       if (!data?.owned_meta) throw new MetaBlocked("No active publisher batch")
       const batch=(await ref.collection(META_BATCHES).doc(data.owned_meta.batchId).get()).data() as MetaBatch
       if (!batch) throw new MetaBlocked("Batch history missing")
-      return { archived:data.archived === true,revision:data.owned_meta_revision,batch,...(data.owned_meta_external?{excluded:true}:{}) }
+      return { archived:data.archived === true,revision:data.owned_meta_revision,batch,...(data.owned_meta_external || isExcludedPostId(id)?{excluded:true}:{}) }
     },
     async update(id,fn) {
       const db=getDb(),ref=refFor(id)
@@ -1733,7 +1733,7 @@ export function ownedMetaStore(): MetaStore {
         const bRef=ref.collection(META_BATCHES).doc(data.owned_meta.batchId),batch=(await tx.get(bRef)).data() as MetaBatch
         if (!batch) throw new MetaBlocked("Batch history missing")
         const oldHash=batch.hash,oldManifest=manifestHash(batch.manifest),oldApproval=JSON.stringify(batch.approval)
-        const current:MetaRecord={archived:data.archived===true,revision:data.owned_meta_revision,batch:structuredClone(batch),...(data.owned_meta_external?{excluded:true}:{})}
+        const current:MetaRecord={archived:data.archived===true,revision:data.owned_meta_revision,batch:structuredClone(batch),...(data.owned_meta_external || isExcludedPostId(id)?{excluded:true}:{})}
         const {next,result}=fn(current)
         if (next) {
           if (next.batch.hash!==oldHash || manifestHash(next.batch.manifest)!==oldManifest || JSON.stringify(next.batch.approval)!==oldApproval) throw new MetaBlocked("Immutable batch changed")
@@ -1766,6 +1766,13 @@ export async function excludeOwnedMetaPost(id: string, input: { by: string; evid
     tx.update(ref, { owned_meta_external: { by: input.by, at: new Date().toISOString(), evidence: input.evidence, links: input.links }, updated_at: admin.firestore.FieldValue.serverTimestamp() })
   })
   invalidateCache(CRM_COLLECTIONS.CONTENT_POSTS)
+}
+/** The post an intake request already created, if any (idempotency for repeated requests). */
+export async function findContentPostByIntakeRequest(requestId: string): Promise<ContentPost | null> {
+  const snap = await getDb().collection(CRM_COLLECTIONS.CONTENT_POSTS).where("intake.requestId", "==", requestId).limit(1).get()
+  if (snap.empty) return null
+  const doc = snap.docs[0], data = doc.data()
+  return { ...data, id: doc.id, assets: normalizeAssets(data.assets), created_at: convertTimestamp(data.created_at), updated_at: convertTimestamp(data.updated_at) } as ContentPost
 }
 /** Approved batches that have started; the cron filters them to Meta-processing jobs. */
 export async function listStartedOwnedMetaPostIds(limit = 50): Promise<string[]> {
