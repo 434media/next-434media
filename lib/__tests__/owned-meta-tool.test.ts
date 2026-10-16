@@ -237,7 +237,7 @@ import { isExcludedPostId, OWNED_META_EXCLUDED_POST_IDS } from "../owned-meta-pu
 import { verifyConnectorToken, loadConnectorConfig, remoteJwks, type OAuthDeps } from "../owned-meta-oauth"
 import { CONNECTOR_TOOLS, principalOf, TOOL_SCOPE } from "../owned-meta-connector"
 import { canvaAccessToken, completeConnect, exportDesignJpg, seal, unseal, type CanvaDeps, type CanvaTokenRecord, type CanvaTokenStore } from "../canva-export"
-import { startCanvaConnect, finishCanvaConnect, type ConnectDeps } from "../canva-connect"
+import { startCanvaConnect, finishCanvaConnect, connectFailureCode, type ConnectDeps } from "../canva-connect"
 import { generateKeyPairSync, sign as rsaSign, createHash as sha256 } from "node:crypto"
 import { toolInput } from "../owned-meta-tool-handler"
 
@@ -609,4 +609,22 @@ test("Canva design binding, export fingerprint and identical re-attach reuse", a
   assert.deepEqual((await findPosts(i.deps, { canvaDesignId: "DAGabc123" })).map(p => p.id), ["post-1234567"])
   const created = await createPost(i.deps, PRINCIPAL, { requestId: "req-design-0001", title: "Anything", brand: "milcity", caption: "x", canvaDesignId: "DAGabc123" })
   assert.equal(created.created, false); assert.equal(created.post.id, "post-1234567"); assert.equal(i.created.length, 0) // one design, one record
+})
+
+test("a failed Canva connect logs only Canva's short error code or the failing stage, never secrets", async () => {
+  const c = canva(() => Response.json({ code: "invalid_client", message: "client secret csecret is wrong" }, { status: 401 }))
+  const states = new Map<string, { verifier: string; by: string }>()
+  const d: ConnectDeps = { canva: c.deps, session: async () => ({ email: "marcos@434media.com" }), isSuperAdmin: async () => true,
+    saveState: async (h, verifier, by) => { states.set(h, { verifier, by }) }, takeState: async h => { const s = states.get(h); states.delete(h); return s ?? null } }
+  const state = new URL((await startCanvaConnect(d)).location!).searchParams.get("state")!
+  const logged: unknown[][] = [], original = console.error
+  console.error = (...a: unknown[]) => { logged.push(a) }
+  try { assert.equal((await finishCanvaConnect(d, new URLSearchParams({ state, code: "secret-code" }))).status, 502) } finally { console.error = original }
+  assert.deepEqual(logged, [["[canva] connect failed:", "token:invalid_client"]])
+  assert.ok(!JSON.stringify(logged).includes("csecret") && !JSON.stringify(logged).includes("secret-code"))
+  const canvaError = (await import("../canva-export")).CanvaError
+  assert.equal(connectFailureCode(new canvaError("x", "http_400")), "token:http_400")
+  assert.equal(connectFailureCode(new canvaError("x", "has spaces and a secret")), "token:unrecognized")
+  assert.equal(connectFailureCode(new canvaError("concurrent")), "store_conflict")
+  assert.equal(connectFailureCode(Object.assign(new Error("firestore"), { name: "FirebaseError" })), "store:FirebaseError")
 })

@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto"
-import { authorizeUrl, completeConnect, pkce, type CanvaDeps } from "./canva-export"
+import { authorizeUrl, completeConnect, pkce, CanvaError, type CanvaDeps } from "./canva-export"
 
 /**
  * One-time Canva connection by a CRM super-admin, on the existing admin session (no new login system).
@@ -34,6 +34,21 @@ export async function finishCanvaConnect(deps: ConnectDeps, query: URLSearchPara
   const pending = await deps.takeState(hash(state), deps.canva.nowMs())
   if (!pending || pending.by !== s.email) return { status: 400, error: "Canva connection expired or was started by someone else; start again" }
   try { await completeConnect(deps.canva, { code, verifier: pending.verifier, by: s.email }) }
-  catch { return { status: 502, error: "Canva sign-in failed; start again" } }
+  catch (err) {
+    console.error("[canva] connect failed:", connectFailureCode(err))
+    return { status: 502, error: "Canva sign-in failed; start again" }
+  }
   return { status: 302, location: "/admin/content?canva=connected" }
+}
+
+/**
+ * What to log when the connect fails: Canva's short error code (for example invalid_client or http_401) for a token
+ * refusal, or the stage that failed. Never Canva's message, a token, the code or the client secret.
+ */
+export function connectFailureCode(err: unknown): string {
+  if (err instanceof CanvaError) {
+    if (!err.code) return "store_conflict"
+    return /^[A-Za-z0-9_.:-]{1,64}$/.test(err.code) ? `token:${err.code}` : "token:unrecognized"
+  }
+  return `store:${err instanceof Error && /^[A-Za-z]{1,40}$/.test(err.name) ? err.name : "error"}`
 }
