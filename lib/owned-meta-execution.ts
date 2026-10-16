@@ -160,6 +160,29 @@ export async function ownedMetaConnectorDeps(): Promise<import("@/lib/owned-meta
       if (!deps) throw new CanvaError("Canva integration is not configured")
       return exportDesignJpg(deps, { designId, ...(pages ? { pages } : {}) })
     },
+    canvaCreate: async input => {
+      const { createFromTemplate, MCU_BRAND_TEMPLATES } = await import("@/lib/canva-create")
+      const { CanvaError } = await import("@/lib/canva-export")
+      const { deps } = await canvaDeps()
+      if (!deps) throw new CanvaError("Canva integration is not configured")
+      return createFromTemplate({ canva: deps, ledger: crm.canvaCreateLedger(), allowedTemplates: MCU_BRAND_TEMPLATES, fetchImage: async url => {
+        const safe = url.startsWith("https://") ? await isSafeRemoteUrl(url) : null
+        if (!safe) throw new CanvaError("Image must be a public https URL", "image_url")
+        // Wikimedia and similar archives refuse anonymous clients; identify the fetcher honestly.
+        const res = await fetchAllowingSafeRedirects(safe.url, safe.addresses, 5, { "user-agent": "434MEDIA-content-bot/1.0 (+https://www.434media.com)", accept: "image/jpeg,image/png" })
+        if (!res.ok || !res.body) throw new CanvaError("The image source did not return the file", `http_${res.status}`)
+        const chunks: Uint8Array[] = []; let size = 0
+        for await (const chunk of res.body as unknown as AsyncIterable<Uint8Array>) { size += chunk.byteLength; if (size > 25 * 1024 * 1024) throw new CanvaError("Image exceeds 25 MB", "image_size"); chunks.push(chunk) }
+        return Buffer.concat(chunks)
+      } }, input)
+    },
+    canvaFields: async templateId => {
+      const { templateFields, MCU_BRAND_TEMPLATES } = await import("@/lib/canva-create")
+      const { CanvaError } = await import("@/lib/canva-export")
+      const { deps } = await canvaDeps()
+      if (!deps) throw new CanvaError("Canva integration is not configured")
+      return templateFields({ canva: deps, allowedTemplates: MCU_BRAND_TEMPLATES }, templateId)
+    },
     randomId: randomUUID,
     now: () => new Date().toISOString(),
   }

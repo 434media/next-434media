@@ -91,6 +91,7 @@ export async function fetchAllowingSafeRedirects(
   startUrl: URL,
   startAddresses: LookupAddress[],
   maxHops = 5,
+  headers?: Record<string, string>,
 ): Promise<Response> {
   let current = startUrl
   let addresses = startAddresses
@@ -98,6 +99,7 @@ export async function fetchAllowingSafeRedirects(
     const res = (await pinnedFetch(current.toString(), {
       redirect: "manual",
       dispatcher: pinnedAgent(addresses),
+      ...(headers ? { headers } : {}),
     })) as unknown as Response
     if (res.status < 300 || res.status >= 400) return res
     const location = res.headers.get("location")

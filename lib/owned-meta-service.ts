@@ -21,7 +21,7 @@ export const CONTENT_SCOPES = ["content:read", "content:prepare", "content:appro
 export type ContentScope = typeof CONTENT_SCOPES[number]
 export const SERVICE_TOOL_SCOPE: Record<ToolName, ContentScope> = {
   find_posts: "content:read", status: "content:read", health: "content:read",
-  create_post: "content:prepare", attach_exports: "content:prepare", attach_canva_design: "content:prepare", prepare: "content:prepare", record_external: "content:prepare", exclude: "content:prepare",
+  create_post: "content:prepare", attach_exports: "content:prepare", attach_canva_design: "content:prepare", canva_template_fields: "content:prepare", canva_create_design: "content:prepare", canva_preview: "content:prepare", prepare: "content:prepare", record_external: "content:prepare", exclude: "content:prepare",
   approve: "content:approve", execute: "content:publish",
 }
 export interface ServiceConfig { issuer: string; audience: string; subject: string; teamId: string; projectId: string; people: { email: string; scopes: ContentScope[] }[] }

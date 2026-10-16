@@ -1,5 +1,6 @@
 import { runtimePublishingEnabled, guardedContentUpdate, draftBatch, manifestHash, isExcludedPostId, MetaBlocked, type MetaManifest, type MetaBatch, type MetaStore, type MetaRecord, type MetaBrand } from "./owned-meta-publisher"
 import { getDb, admin } from "./firebase-admin"
+import { createHash } from "node:crypto"
 import { normalizeAssigneeName } from "../components/crm/types"
 import type {
   ClientRecord,
@@ -1786,6 +1787,15 @@ export function canvaTokenStore(): import("./canva-export").CanvaTokenStore {
   }
 }
 /** One-time connect state (PKCE verifier) keyed by a hash of `state`; consumed on read, valid 10 minutes. */
+/** Designs created from brand templates, keyed by the caller's requestId (a retry returns the same design). */
+export function canvaCreateLedger(): import("./canva-create").CreateLedger {
+  const col = () => getDb().collection("crm_meta").doc("owned_meta_canva").collection("created")
+  const key = (requestId: string) => createHash("sha256").update(requestId).digest("hex")
+  return {
+    async get(requestId) { const d = (await col().doc(key(requestId)).get()).data(); return d && d.requestId === requestId ? d.design as import("./canva-create").CreatedDesign : null },
+    async put(requestId, design) { await col().doc(key(requestId)).set({ requestId, design, at: new Date().toISOString() }) },
+  }
+}
 export async function saveCanvaConnectState(stateHash: string, verifier: string, by: string, expiresAtMs: number): Promise<void> {
   await getDb().collection("crm_meta").doc("owned_meta_canva_pending").collection("states").doc(stateHash).create({ verifier, by, expiresAtMs })
 }

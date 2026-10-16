@@ -27,11 +27,11 @@ export interface IntakeDeps {
 // carried in intake.metaBrand. Identifiers are never renamed to match display names.
 const CRM_BRAND: Partial<Record<MetaBrand, Brand>> = { txmx: "TXMX Boxing", vemos: "Vemos Vamos" }
 
-export interface PostSummary { id: string; title: string; status: string; brand: string; dateToPost?: string; assets: number; publisher: "none" | "draft" | "approved" | "started"; excluded: boolean; publishedUrl?: string; canvaDesignId?: string; exportFingerprint?: string }
+export interface PostSummary { id: string; title: string; status: string; brand: string; dateToPost?: string; caption?: string; assets: number; publisher: "none" | "draft" | "approved" | "started"; excluded: boolean; publishedUrl?: string; canvaDesignId?: string; exportFingerprint?: string }
 export function summarizePost(p: ContentPost): PostSummary {
   return {
     id: p.id, title: p.title, status: p.status, brand: p.platform || p.intake?.metaBrand || "",
-    ...(p.date_to_post ? { dateToPost: p.date_to_post } : {}), assets: p.assets?.length || 0,
+    ...(p.date_to_post ? { dateToPost: p.date_to_post } : {}), ...(p.social_copy ? { caption: p.social_copy.slice(0, 800) } : {}), assets: p.assets?.length || 0,
     publisher: !p.owned_meta ? "none" : p.owned_meta.started ? "started" : p.status === "approved" ? "approved" : "draft",
     excluded: excluded(p), ...(p.published_url ? { publishedUrl: p.published_url } : {}),
     ...(p.canva_design_id ? { canvaDesignId: p.canva_design_id } : {}), ...(p.export_fingerprint ? { exportFingerprint: p.export_fingerprint } : {}),
