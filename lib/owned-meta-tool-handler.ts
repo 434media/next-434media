@@ -26,6 +26,9 @@ export interface ToolDeps {
   readSlackMessage(channel: string, ts: string): Promise<SlackMessage | undefined>
   /** Canva Connect export (JPG, page order). Throws when Canva is not connected. */
   canvaExport(designId: string, pages?: number[]): Promise<string[]>
+  /** Brand-template autofill into a NEW working design (lib/canva-create.ts). Throws CanvaError. */
+  canvaCreate(input: import("./canva-create").CreateInput): Promise<{ design: import("./canva-create").CreatedDesign; reused: boolean }>
+  canvaFields(templateId: string): Promise<Record<string, string>>
   randomId(): string
   now(): string
 }
@@ -37,6 +40,11 @@ export const toolInput = {
   create_post: z.object({ requestId: z.string(), title: z.string().max(200), brand: brandEnum, caption: z.string().max(2200), dateToPost: z.string().optional(), notes: z.string().max(4000).optional(), canvaDesignId: z.string().regex(/^[A-Za-z0-9_-]{6,64}$/).optional() }),
   attach_exports: z.object({ postId, items: z.array(z.object({ url: z.string().url().max(2000), label: z.string().max(60).optional() })).min(1).max(10) }),
   attach_canva_design: z.object({ postId, designId: z.string().regex(/^[A-Za-z0-9_-]{6,64}$/), pages: z.array(z.number().int().min(1)).min(1).max(10).optional() }),
+  canva_template_fields: z.object({ templateId: z.string().regex(/^[A-Za-z0-9_-]{6,64}$/) }),
+  canva_create_design: z.object({ requestId: z.string(), templateId: z.string().regex(/^[A-Za-z0-9_-]{6,64}$/), title: z.string().min(1).max(255),
+    text: z.record(z.string().regex(/^[a-z][a-z0-9_]{0,63}$/), z.string().max(2000)),
+    image: z.object({ field: z.string().regex(/^[a-z][a-z0-9_]{0,63}$/), url: z.string().url().max(2000), name: z.string().max(50) }).optional() }),
+  canva_preview: z.object({ designId: z.string().regex(/^[A-Za-z0-9_-]{6,64}$/) }),
   status: z.object({ postId }),
   health: z.object({ postId }),
   prepare: z.object({ postId, brand: brandEnum, format: z.enum(["still", "carousel", "video"]),
@@ -54,6 +62,12 @@ export type ToolResult = { status: number; body: Record<string, unknown> }
 function view(batch: MetaBatch, title: string) {
   const notices = noticesFor(batch.manifest)
   return { ...summarize(batch), preflight: preflightFor(batch.manifest), notices, approvalPhrase: `approve ${batch.hash.slice(0, 12)}`, slackText: slackText(title, batch, notices) }
+}
+
+/** Canva's plain message (never its vendor text) plus its short code, as a guarded refusal. */
+function canvaBlocked(error: unknown): MetaBlocked {
+  if (error instanceof Error && error.name === "CanvaError") return new MetaBlocked(`${error.message}${(error as { code?: string }).code ? ` (${(error as { code?: string }).code})` : ""}`)
+  return new MetaBlocked("Canva request failed")
 }
 
 export async function runOwnedMetaTool(name: ToolName, rawInput: unknown, principal: Principal, deps: ToolDeps): Promise<ToolResult> {
@@ -74,6 +88,19 @@ export async function runOwnedMetaTool(name: ToolName, rawInput: unknown, princi
         try { urls = await deps.canvaExport(i.designId, i.pages) } catch (error) { throw new MetaBlocked(error instanceof Error && error.name === "CanvaError" ? error.message : "Canva export failed") }
         const items = urls.map((url, n) => ({ url, label: `page-${i.pages?.[n] ?? n + 1}` }))
         return { status: 200, body: { ...await attachExports(deps.intake, { postId: i.postId, items, randomId: deps.randomId, canva: { designId: i.designId, ...(i.pages ? { pages: i.pages } : {}) } }), canva: { designId: i.designId, pages: items.length }, next: "Prepare a new draft; any earlier unstarted draft for this post was invalidated by the new files." } }
+      }
+      case "canva_template_fields": {
+        const i = parsed.data as z.infer<typeof toolInput.canva_template_fields>
+        try { return { status: 200, body: { templateId: i.templateId, fields: await deps.canvaFields(i.templateId) } } } catch (error) { throw canvaBlocked(error) }
+      }
+      case "canva_create_design": {
+        const i = parsed.data as z.infer<typeof toolInput.canva_create_design>
+        // Creates a private working design only: nothing is attached, prepared or published here.
+        try { const r = await deps.canvaCreate(i); return { status: 200, body: { ...r.design, reused: r.reused } } } catch (error) { throw canvaBlocked(error) }
+      }
+      case "canva_preview": {
+        const i = parsed.data as z.infer<typeof toolInput.canva_preview>
+        try { return { status: 200, body: { designId: i.designId, previewUrls: await deps.canvaExport(i.designId) } } } catch (error) { throw canvaBlocked(error) }
       }
       case "prepare": {
         const i = parsed.data as z.infer<typeof toolInput.prepare>

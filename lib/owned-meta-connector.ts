@@ -19,8 +19,11 @@ export const CONNECTOR_TOOLS: { name: ToolName; title: string; description: stri
 ]
 export function toolSchema(name: ToolName) { return toolInput[name] }
 
-/** Least privilege per tool, as Polí's pilot does: no scope implies another. */
-export const TOOL_SCOPE: Record<ToolName, ConnectorScope> = {
+/**
+ * Least privilege per tool, as Polí's pilot does: no scope implies another. The Canva design-creation tools are
+ * deliberately absent: they serve only the shared Slack app (owned-meta-service), never this connector.
+ */
+export const TOOL_SCOPE: Partial<Record<ToolName, ConnectorScope>> = {
   find_posts: "owned-meta:read", status: "owned-meta:read", health: "owned-meta:read",
   create_post: "owned-meta:write", attach_exports: "owned-meta:write", attach_canva_design: "owned-meta:write", prepare: "owned-meta:write",
   approve: "owned-meta:write", record_external: "owned-meta:write", exclude: "owned-meta:write",
@@ -29,6 +32,7 @@ export const TOOL_SCOPE: Record<ToolName, ConnectorScope> = {
 
 export function principalOf(info: AuthInfo | undefined, tool: ToolName): Principal | undefined {
   const extra = info?.extra as { email?: unknown; name?: unknown } | undefined
-  if (typeof extra?.email !== "string" || !info?.scopes?.includes(TOOL_SCOPE[tool])) return undefined
+  const need = TOOL_SCOPE[tool]
+  if (typeof extra?.email !== "string" || !need || !info?.scopes?.includes(need)) return undefined
   return { email: extra.email, ...(typeof extra.name === "string" ? { name: extra.name } : {}) }
 }

@@ -43,7 +43,7 @@ function deps(store: Store, p: MetaProvider, over: Partial<ToolDeps> = {}): Tool
     exclude: async (id, input) => { assert.equal(input.by, "marcos@434media.com"); excluded.push(id) },
     health: async () => ({ ok: true }),
     readSlackMessage: async () => undefined,
-    canvaExport: async () => { throw new Error("not used") },
+    canvaExport: async () => { throw new Error("not used") }, canvaCreate: async () => { throw new Error("not used") }, canvaFields: async () => ({}),
     randomId: () => `run-${++n}`, now: () => NOW, ...over }
 }
 const PRINCIPAL = { email: "marcos@434media.com" }
@@ -379,6 +379,8 @@ test("connector tokens follow Polí's Auth0 rules, map identity by subject only,
   assert.equal(await verifyConnectorToken(jwt(good), oauth({ jwks: async () => { throw new Error("down") } }).deps), undefined)
 })
 
+// Design creation from brand templates serves only the shared Slack app (owned-meta-service), not this connector.
+const SLACK_ONLY = ["canva_template_fields", "canva_create_design", "canva_preview"]
 test("per-tool scopes: read cannot write, write cannot publish", async () => {
   const read = await verifyConnectorToken(jwt({ ...good, scope: "owned-meta:read" }), oauth().deps)
   assert.ok(principalOf(read, "status")); assert.equal(principalOf(read, "create_post"), undefined); assert.equal(principalOf(read, "execute"), undefined)
@@ -386,7 +388,7 @@ test("per-tool scopes: read cannot write, write cannot publish", async () => {
   assert.ok(principalOf(write, "attach_canva_design")); assert.equal(principalOf(write, "execute"), undefined)
   const publish = await verifyConnectorToken(jwt({ ...good, scope: "owned-meta:publish" }), oauth().deps)
   assert.ok(principalOf(publish, "execute")); assert.equal(principalOf(publish, "status"), undefined)
-  assert.deepEqual(Object.keys(TOOL_SCOPE).sort(), Object.keys(toolInput).sort())
+  assert.deepEqual(Object.keys(TOOL_SCOPE).sort(), Object.keys(toolInput).filter(t => !SLACK_ONLY.includes(t)).sort())
 })
 
 test("connector configuration fails closed and names problems without values", () => {
@@ -407,7 +409,7 @@ test("JWKS is cached for ten minutes; an unknown kid refetches at most every 30 
 })
 
 test("connector catalog exposes exactly the operations, with read-only ones annotated", () => {
-  assert.deepEqual(CONNECTOR_TOOLS.map(t => t.name).sort(), Object.keys(toolInput).sort())
+  assert.deepEqual(CONNECTOR_TOOLS.map(t => t.name).sort(), Object.keys(toolInput).filter(t => !SLACK_ONLY.includes(t)).sort())
   assert.deepEqual(CONNECTOR_TOOLS.filter(t => t.readOnly).map(t => t.name).sort(), ["find_posts", "health", "status"])
 })
 

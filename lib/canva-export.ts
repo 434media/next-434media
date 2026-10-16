@@ -16,7 +16,9 @@ import { createCipheriv, createDecipheriv, createHash, randomBytes } from "node:
 export const CANVA_AUTHORIZE_URL = "https://www.canva.com/api/oauth/authorize"
 export const CANVA_TOKEN_URL = "https://api.canva.com/rest/v1/oauth/token"
 export const CANVA_API = "https://api.canva.com/rest/v1"
-export const CANVA_SCOPES = "design:content:read design:meta:read"
+// Reading/exporting designs, plus creating working designs from brand templates (lib/canva-create.ts).
+// A new scope must also be enabled on the Canva integration, then a super-admin reconnects once.
+export const CANVA_SCOPES = "design:content:read design:meta:read design:content:write asset:read asset:write brandtemplate:meta:read brandtemplate:content:read"
 
 export interface CanvaClient { clientId: string; clientSecret: string; redirectUri: string; tokenKey: Buffer }
 export interface CanvaTokens { accessToken: string; refreshToken: string; expiresAt: number }

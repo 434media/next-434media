@@ -41,7 +41,7 @@ function toolDeps(store: Store, calls: string[], decided: string[]): ToolDeps {
     decide: async (_id, _rev, hash, email) => { decided.push(email); store.value.batch.approval = { by: email, at: "t", hash }; return store.value.batch },
     execute: a => runOwnedMeta({ id: a.id, runId: a.runId, store: a.store, provider, enabled: async () => true, resolveAssets: async b => b.manifest.assets.map(x => x.url) }),
     recordFailure: async a => ({ message: a.error instanceof Error ? a.error.message : "failed", status: 409 }),
-    exclude: async () => {}, health: async () => ({}), readSlackMessage: async () => undefined, canvaExport: async () => [],
+    exclude: async () => {}, health: async () => ({}), readSlackMessage: async () => undefined, canvaExport: async () => [], canvaCreate: async () => { throw new Error("not used") }, canvaFields: async () => ({}),
     randomId: () => "run-1", now: () => "2026-10-16T12:00:00Z",
   }
 }
