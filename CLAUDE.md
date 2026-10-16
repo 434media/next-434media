@@ -76,7 +76,7 @@ reversible proceeds; everything that lands or governs stops for a second reader.
 
 **One thread directs this agent at a time.** Only one conversation holds the writer role for Claude Code; a second thread issuing work at the same time is the two-writer failure 11.4 forbids, arriving through the front door. If another thread is mid-task, report the conflict rather than writing alongside it.
 
-**Work outside the build sequence waits.** The order of work is the build sequence in `434_Process_Log_and_SOP.md`. A task that is not in it waits until the founder adds it there — not because the idea is wrong, but because an order nobody can see is not an order. Raise it; do not start it.
+**Work outside the build sequence waits.** The order of work is the build sequence in `434_Process_Log_and_SOP.md`. A task that is not in it waits until the founder approves it, not because the idea is wrong, but because an order nobody can see is not an order. Raise it; do not start it. Once he approves, the executor writes the build-sequence entry itself, by pull request to 434-context (see "Context files" below).
 
 **Before any disable, delete, rotation or permission reduction, run the
 pre-change check.** This covers a credential, account or resource, and
@@ -277,7 +277,12 @@ Paths contain spaces. Quote them.
 
 ### Rules
 
-**Read-only. Never write to `docs/context/`.** It is the canonical governing store and is single-writer by policy — changes go through the founder, not through this repo. Do not create, edit, move, or delete anything under that path, including generated artifacts. Write generated output into the repo (`lib/`, `scripts/`) instead.
+**Write your task's records to 434-context yourself: through a branch, never through this symlink.** The executor doing a task is its designated writer, whichever agent it is. That includes Claude Code, and it includes the governing records of that work: the run log and the process-log or build-sequence entry. That is 434-context's own rule ("one designated writer per task … agent-neutral"; founder, 2026-10-16). Make the change in a separate worktree of `~/434-context` on a branch, commit as that repo's `CLAUDE.md` says, and open a pull request there. The founder's merge is the approval. Do not hand the logging to another thread or session.
+
+What stays the same:
+- `docs/context/` itself is a read path. It is the `~/434-context` main checkout, so never edit files through it. Leave it clean and on `main`.
+- Changes to the master, the register or a standard still need the founder's direction first (434-context `CLAUDE.md`, "Authority").
+- Generated website artifacts go into this repo (`lib/`, `scripts/`), not under `docs/context/`.
 
 **Report the version before relying on the master.** Read its header and state the version you are working from. If it is not the version you were told to expect, **stop and say so.** Do not search the filesystem for another copy, do not check Downloads or backup folders, and do not proceed against an older one. There is exactly one canonical source and it is reached through this symlink.
 
