@@ -394,10 +394,13 @@ test("connector configuration fails closed and names problems without values", (
   assert.deepEqual(loadConnectorConfig({}).problems, ["OWNED_META_CONNECTOR_ISSUER", "OWNED_META_CONNECTOR_AUDIENCE", "OWNED_META_CONNECTOR_CLIENT_ID", "OWNED_META_CONNECTOR_JWKS_URL", "OWNED_META_CONNECTOR_CALLERS"])
 })
 
-test("JWKS is cached for ten minutes", async () => {
+test("JWKS is cached for ten minutes; an unknown kid refetches at most every 30 seconds", async () => {
   let calls = 0, now = 0
   const get = remoteJwks(`${ISSUER}.well-known/jwks.json`, (async () => { calls++; return Response.json({ keys: [JWK] }) }) as typeof fetch, () => now)
-  await get(); now = 599_000; await get(); assert.equal(calls, 1); now = 600_001; await get(); assert.equal(calls, 2)
+  await get("k1"); now = 599_000; await get("k1"); assert.equal(calls, 1); now = 600_001; await get("k1"); assert.equal(calls, 2)
+  now += 10_000; await get("rotated"); assert.equal(calls, 2) // inside the cooldown: no refetch
+  now += 20_000; await get("rotated"); assert.equal(calls, 3) // after 30 s: one refetch for the new key
+  await get("rotated"); assert.equal(calls, 3)
 })
 
 test("connector catalog exposes exactly the operations, with read-only ones annotated", () => {

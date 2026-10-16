@@ -24,7 +24,7 @@ export interface ConnectorCaller { subject: string; email: string }
 export interface ConnectorConfig { issuer: string; audience: string; clientId: string; jwksUrl: string; callers: ConnectorCaller[] }
 export interface OAuthDeps {
   config: ConnectorConfig
-  jwks(): Promise<JsonWebKey[]>
+  jwks(kid?: string): Promise<JsonWebKey[]>
   authorize(email: string): Promise<{ authorized: true; role: AdminRole; name?: string } | { authorized: false; reason: string }>
   sendCapable(email: string, role: AdminRole): Promise<boolean>
   nowSeconds(): number
@@ -42,7 +42,7 @@ export async function verifyConnectorToken(token: string | undefined, deps: OAut
   if (!header || !payload) return refuse("malformed")
   if (header.alg !== "RS256" || typeof header.kid !== "string") return refuse("alg")
   let keys: JsonWebKey[]
-  try { keys = await deps.jwks() } catch { return refuse("jwks_unavailable") }
+  try { keys = await deps.jwks(header.kid) } catch { return refuse("jwks_unavailable") }
   const jwk = keys.find(k => k.kid === header.kid && k.kty === "RSA" && (!k.use || k.use === "sig") && (!k.alg || k.alg === "RS256"))
   if (!jwk) return refuse("kid")
   let valid = false
@@ -83,15 +83,22 @@ export function loadConnectorConfig(env: Record<string, string | undefined>): { 
   return problems.length ? { config: null, problems } : { config: { issuer: issuer!, audience: audience!, clientId: clientId!, jwksUrl: jwksUrl!, callers }, problems }
 }
 
-/** JWKS fetch with a 10-minute cache and a 5-second timeout (mirrors the pilot's jose remote JWKS settings). */
+/**
+ * JWKS fetch with a 10-minute cache and a 5-second timeout. An unknown `kid` (key rotation) refetches once,
+ * at most every 30 seconds — the pilot's jose cooldown — so a forged kid cannot hammer the issuer.
+ */
 export function remoteJwks(url: string, fetcher: typeof fetch = fetch, nowMs: () => number = Date.now) {
   let cached: { at: number; keys: JsonWebKey[] } | null = null
-  return async (): Promise<JsonWebKey[]> => {
-    if (cached && nowMs() - cached.at < 600_000) return cached.keys
+  const load = async () => {
     const response = await fetcher(new URL(url), { method: "GET", redirect: "error", cache: "no-store", signal: AbortSignal.timeout(5_000) })
     const body = await response.json() as { keys?: JsonWebKey[] }
     if (!response.ok || !Array.isArray(body.keys)) throw new Error("jwks")
     cached = { at: nowMs(), keys: body.keys }
     return body.keys
+  }
+  return async (kid?: string): Promise<JsonWebKey[]> => {
+    if (!cached || nowMs() - cached.at >= 600_000) return load()
+    if (kid && !cached.keys.some(k => k.kid === kid) && nowMs() - cached.at >= 30_000) return load()
+    return cached.keys
   }
 }
