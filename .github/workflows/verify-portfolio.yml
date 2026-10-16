@@ -84,3 +84,5 @@ jobs:
 
       # Owned Meta: offline state machine and fake-transport regression tests.
       - run: tsx --test lib/__tests__/owned-meta-publisher.test.ts
+      # Owned Meta tool route, Slack approval binding and processing continuation (all transports faked).
+      - run: tsx --test lib/__tests__/owned-meta-tool.test.ts

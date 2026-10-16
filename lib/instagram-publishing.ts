@@ -140,12 +140,14 @@ export function createMetaProvider(args: { accessToken: string; evidence: MetaPu
       const listing = await graph(`${d === "instagram" ? m.destinations.instagramId : m.destinations.pageId}/${d === "instagram" ? "media" : "published_posts"}`, { fields: d === "instagram" ? "id,permalink" : "id,permalink_url,attachments{target{id}}", limit: 100 })
       const published = (listing.data || []).find((item) => item.id === remoteId || d === "facebook" && item.attachments?.data?.some((a) => a.target?.id === remoteId))
       if (!published) return { verified:false,blocker:"Exact remote ID not found in the account's published collection; use operator evidence if needed" }
-      const r: GraphResponse = m.aiGenerated ? await graph(remoteId,{fields:"id,is_ai_generated"}) : {}
+      // Read the label back only where it was sent: IG media creation and FB Reels finish.
+      const labelSent = m.aiGenerated && (d === "instagram" || m.format === "video" && m.placements.facebook === "reels")
+      const r: GraphResponse = labelSent ? await graph(remoteId,{fields:"id,is_ai_generated"}) : {}
       const link = d === "instagram" ? published.permalink : published.permalink_url
       let u: URL; try { if (!link) throw new Error("missing permalink"); u = new URL(link) } catch { return { verified:false,blocker:"Published permalink unavailable" } }
       const host = d === "instagram" ? "instagram.com" : "facebook.com"
       if (u.protocol !== "https:" || !(u.hostname === host || u.hostname === `www.${host}`)) return { verified:false,blocker:"Untrusted permalink" }
-      if (m.aiGenerated && r.is_ai_generated !== true) return { verified:false,blocker:"AI disclosure needs a manual platform check/toggle; do not republish" }
+      if (labelSent && r.is_ai_generated !== true) return { verified:false,blocker:"AI disclosure needs a manual platform check/toggle; do not republish" }
       return { verified:true,permalink:u.toString() }
     },
   }

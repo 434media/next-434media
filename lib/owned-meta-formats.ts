@@ -57,7 +57,9 @@ export function checkReviewedFormat(m: MetaManifest, destination: MetaDestinatio
   if(m.format!=="video"){
     if(m.assets.some(a=>a.mime==="video/mp4"))return "Facebook organic multi-photo posts require stills; approve a different rendition"
     if(m.assets.some(a=>a.size>META_FORMAT_RULES.facebookPhoto.maxBytes))return "Facebook photos cannot exceed 10 MB"
-    if(m.aiGenerated)return "Facebook photo/feed AI labeling is unverified; use manual platform handling for this post"
+    // Reviewed 2026-10-16: Meta documents no AI self-disclosure parameter for Page photos/feed,
+    // and its organic disclosure requirement covers photorealistic video and realistic audio,
+    // not stills. Publish without a native label and report it (owned-meta-tool noticesFor).
     return null
   }
   if(m.placements.facebook==="reels") {
@@ -66,7 +68,7 @@ export function checkReviewedFormat(m: MetaManifest, destination: MetaDestinatio
     // Official guide Step 3 / Page Video Reels Quick Reference documents the AI flag on finish.
     return null
   }
-  // SDK exposes this on ordinary /videos, but the inspected endpoint reference did
-  // not confirm the disclosure behavior. This holds only that AI placement.
-  return m.aiGenerated ? "Ordinary Facebook video AI labeling needs manual handling; the reviewed automatic AI path is Reels" : null
+  // Meta requires disclosure of photorealistic AI video, and the /videos reference documents
+  // no label parameter. This holds only that placement; the Reels path carries the flag.
+  return m.aiGenerated ? "AI video on ordinary Facebook video has no documented label parameter; publish it as a Reel or label it natively" : null
 }

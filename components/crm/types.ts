@@ -365,6 +365,8 @@ export interface ContentPost {
   owned_meta?: { batchId: string; hash: string; started: boolean } | null
   owned_meta_revision?: number
   owned_meta_history?: boolean
+  // Owner-reported publication outside the publisher; server-owned, blocks every publish path.
+  owned_meta_external?: { by: string; at: string; evidence: string; links: string[] } | null
   archived?: boolean
 
   id: string

@@ -56,7 +56,7 @@ export interface MetaBatch {
   facebookAttempts?: { job: MetaJob; successorId: string; resolution: { outcome: "reconciled_not_found"; by: string; at: string; evidence: string; limitation: "Operator observation, not proof of absence" } }[]
   publicAssets: string[]
 }
-export interface MetaRecord { archived: boolean; revision: number; batch: MetaBatch }
+export interface MetaRecord { archived: boolean; revision: number; batch: MetaBatch; excluded?: boolean }
 export interface MetaStore {
   read(id: string): Promise<MetaRecord>
   update<T>(id: string, fn: (record: MetaRecord) => { next?: MetaRecord; result: T }): Promise<T>
@@ -98,6 +98,7 @@ export function draftBatch(id: string, manifest: MetaManifest): MetaBatch {
 }
 export function assertApproved(r: MetaRecord): void {
   validateManifest(r.batch.manifest)
+  if (r.excluded) throw new MetaBlocked("Post was published outside the publisher and is excluded")
   if (r.archived || r.batch.revoked || r.revision !== r.batch.manifest.revision || !r.batch.manifest.publicHostingApproved || !r.batch.approval || r.batch.approval.hash !== manifestHash(r.batch.manifest) || r.batch.hash !== r.batch.approval.hash) throw new MetaBlocked("Current immutable approval required")
 }
 /** Pure: no environment, token, storage or network access. */
@@ -122,6 +123,8 @@ export async function runOwnedMeta(args: {
   resolveAssets: (batch: MetaBatch) => Promise<string[]>
   now?: () => string
   facebookRecovery?: FacebookRecovery
+  /** Continuation: touch only these destinations (those still processing). */
+  only?: MetaDestination[]
 }): Promise<MetaBatch> {
   const { id, runId, store, provider } = args
   const now = args.now ?? (() => new Date().toISOString())
@@ -151,7 +154,7 @@ export async function runOwnedMeta(args: {
       const urls = await args.resolveAssets(r.batch)
       await mutate(current => { current.batch.publicAssets = urls })
     }
-    for (const destination of (args.facebookRecovery ? ["facebook"] : ["instagram", "facebook"]) as MetaDestination[]) {
+    for (const destination of ((args.facebookRecovery ? ["facebook"] : ["instagram", "facebook"]) as MetaDestination[]).filter(d => !args.only || args.only.includes(d))) {
       r = await store.read(id)
       if (r.batch.claim !== runId || r.batch.id !== initial.batch.id) throw new MetaBlocked("Stopped run cannot dispatch another destination")
       let job = r.batch.jobs[destination]
