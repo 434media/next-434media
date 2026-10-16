@@ -48,7 +48,9 @@ function deps(store: Store, p: MetaProvider, over: Partial<ToolDeps> = {}): Tool
 }
 const PRINCIPAL = { email: "marcos@434media.com" }
 // Same call shape the MCP route uses: tool name, arguments, authenticated principal.
-const call = async (d: ToolDeps, body: { action: string } & Record<string, unknown>) => { const { action, ...args } = body; const r = await runOwnedMetaTool(action.replace(/-/g, "_") as ToolName, args, PRINCIPAL, d); return { status: r.status, json: async () => r.body } }
+// The tool body as these tests read it (the operation returns Record<string, unknown>).
+interface ToolBody { error: string; slackText: string; results: { status: string; evidence: string; remoteId?: string; permalink?: string; doNotRepeat: boolean }[]; [k: string]: unknown }
+const call = async (d: ToolDeps, body: { action: string } & Record<string, unknown>) => { const { action, ...args } = body; const r = await runOwnedMetaTool(action.replace(/-/g, "_") as ToolName, args, PRINCIPAL, d); return { status: r.status, json: async () => r.body as ToolBody } }
 const exec = (s: Store) => ({ action: "execute", postId: "p", batchId: s.value.batch.id, hash: s.value.batch.hash })
 
 test("unknown or malformed operations are refused before any read; no reset, release or recovery verbs exist", async () => {
@@ -67,7 +69,7 @@ test("duplicate execute requests publish each destination once", async () => {
   const third = await call(d, exec(s)), body = await third.json()
   assert.equal(third.status, 200)
   assert.equal(p.calls.filter(c => c.startsWith("publish")).length, 2)
-  assert.deepEqual(body.results.map((r: { evidence: string; remoteId: string; permalink: string }) => [r.evidence, r.remoteId, r.permalink]), [["api_verified", "101", "https://www.instagram.com/p/verified"], ["api_verified", "2_202", "https://www.facebook.com/p/verified"]])
+  assert.deepEqual(body.results.map(r => [r.evidence, r.remoteId, r.permalink]), [["api_verified", "101", "https://www.instagram.com/p/verified"], ["api_verified", "2_202", "https://www.facebook.com/p/verified"]])
   assert.match(body.slackText, /API verified/)
 })
 
