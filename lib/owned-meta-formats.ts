@@ -33,6 +33,26 @@ export const META_FORMAT_RULES = {
  * there is deliberately no invented numeric limit for those cases. MP4/JPEG/PNG
  * are this adapter's measurable subset, not a claim that Meta rejects other types.
  */
+/**
+ * The only AI-disclosure requirement the publisher enforces, as Meta states it (read 2026-10-16):
+ * people must use Meta's AI-disclosure tool when posting organic content with photorealistic video or
+ * realistic-sounding audio that was digitally created or altered. Images carry no self-disclosure requirement;
+ * Meta labels them from industry-standard signals it detects. Captions are never changed for disclosure.
+ */
+export const META_AI_DISCLOSURE_RULE = {
+  appliesTo: "Organic photorealistic video or realistic-sounding audio, digitally created or altered",
+  sources: [
+    "https://transparency.meta.com/policies/community-standards/misinformation (change log entry Apr 7, 2025)",
+    "https://about.fb.com/news/2024/02/labeling-ai-generated-images-on-facebook-instagram-and-threads/ (updated Apr 1, 2025)",
+  ],
+} as const
+/** Meta's requirement applies only to a declared photorealistic/realistic-audio AI video. */
+export function aiDisclosureRequired(m: MetaManifest): boolean { return m.format === "video" && m.aiRealisticMedia === true }
+/** Where this adapter can set Meta's label through the API: IG containers and FB Reels finish. */
+export function apiLabelSupported(m: MetaManifest, destination: MetaDestination): boolean { return destination === "instagram" || m.format === "video" && m.placements.facebook === "reels" }
+/** Send the label when the post is marked AI (the creator's choice) or Meta requires it. */
+export function sendsAiLabel(m: MetaManifest, destination: MetaDestination): boolean { return (m.aiGenerated || aiDisclosureRequired(m)) && apiLabelSupported(m, destination) }
+
 export function checkReviewedFormat(m: MetaManifest, destination: MetaDestination): string | null {
   if(m.destinations.apiVersion!==OWNED_META_GRAPH_VERSION)return "Prepare a new review for the code-reviewed publishing API version"
   if(destination==="instagram") {
@@ -57,7 +77,9 @@ export function checkReviewedFormat(m: MetaManifest, destination: MetaDestinatio
   if(m.format!=="video"){
     if(m.assets.some(a=>a.mime==="video/mp4"))return "Facebook organic multi-photo posts require stills; approve a different rendition"
     if(m.assets.some(a=>a.size>META_FORMAT_RULES.facebookPhoto.maxBytes))return "Facebook photos cannot exceed 10 MB"
-    if(m.aiGenerated)return "Facebook photo/feed AI labeling is unverified; use manual platform handling for this post"
+    // Reviewed 2026-10-16: Meta documents no AI self-disclosure parameter for Page photos/feed,
+    // and its organic disclosure requirement covers photorealistic video and realistic audio,
+    // not stills. Publish without a native label and report it (owned-meta-tool noticesFor).
     return null
   }
   if(m.placements.facebook==="reels") {
@@ -66,7 +88,7 @@ export function checkReviewedFormat(m: MetaManifest, destination: MetaDestinatio
     // Official guide Step 3 / Page Video Reels Quick Reference documents the AI flag on finish.
     return null
   }
-  // SDK exposes this on ordinary /videos, but the inspected endpoint reference did
-  // not confirm the disclosure behavior. This holds only that AI placement.
-  return m.aiGenerated ? "Ordinary Facebook video AI labeling needs manual handling; the reviewed automatic AI path is Reels" : null
+  // Enforced only where Meta's rule applies AND this placement cannot apply the label (Page /videos documents
+  // no label parameter). Everything else publishes, with any unapplied label reported as a notice.
+  return aiDisclosureRequired(m) ? `Meta requires AI disclosure for photorealistic video or realistic audio (${META_AI_DISCLOSURE_RULE.sources[0]}); Facebook Page videos have no API label, so publish this as a Facebook Reel or post it natively with the label` : null
 }

@@ -1,19 +1,18 @@
 import { z } from "zod"
 import { NextResponse, type NextRequest } from "next/server"
 import { getSession, isAuthorizedAdmin, canSend, isCrmSuperAdmin } from "@/lib/auth"
-import { createOwnedMetaDraft, getContentPostById, ownedMetaStore, blockOwnedMetaPermission, ownedMetaPermissionBlocked, ownedMetaRuntimeEnabled } from "@/lib/firestore-crm"
-import { runOwnedMeta, guardFacebookRetryDispatch, validateMetaMutationBoundary, resetUnpublishedPreparation, assertOperatorSettlement, confirmStoppedRun, MetaBlocked, MetaPermissionError, META_BRANDS, type MetaBrand, type MetaManifest, type MetaAsset } from "@/lib/owned-meta-publisher"
-import { readTrustedAsset, assertApprovedBlobUrl, assetDigest, verifyAssetBytes, measureExport } from "@/lib/owned-meta-assets"
-import { createMetaProvider } from "@/lib/instagram-publishing"
+import { ownedMetaStore, ownedMetaPermissionBlocked } from "@/lib/firestore-crm"
+import { resetUnpublishedPreparation, assertOperatorSettlement, confirmStoppedRun, MetaBlocked, META_BRANDS, type MetaBrand } from "@/lib/owned-meta-publisher"
+import { readTrustedAsset, verifyAssetBytes } from "@/lib/owned-meta-assets"
 import { checkOwnedMetaConnection } from "@/lib/owned-meta-connection"
-import { recordCronRun } from "@/lib/cron-auth"
+import { ownedMetaDeploymentEnabled as deploymentEnabled, ownedMetaBrandEnabled as brandEnabled, ownedMetaSourceOrigins as sourceOrigins, prepareOwnedMetaBatch, ownedMetaProviderFor, executeOwnedMeta, recordOwnedMetaFailure } from "@/lib/owned-meta-execution"
 
 const actionBody = z.object({
   action: z.enum(["prepare", "execute", "reconcile", "manual-confirm", "confirm-stopped-run", "reset-preparation", "release-preparation", "recover-facebook"]),
   brand: z.enum(META_BRANDS).optional(), format: z.enum(["still", "carousel", "video"]).optional(),
   captions: z.object({ instagram: z.string(), facebook: z.string() }).optional(),
   placements: z.object({ instagram: z.enum(["feed", "reels"]), facebook: z.enum(["feed", "video", "reels"]) }).optional(),
-  instagramShareToFeed: z.boolean().optional(), aiGenerated: z.boolean().optional(), publicHostingApproved: z.boolean().optional(),
+  instagramShareToFeed: z.boolean().optional(), aiGenerated: z.boolean().optional(), aiRealisticMedia: z.boolean().optional(), publicHostingApproved: z.boolean().optional(),
   templateRevision: z.string().default("unknown"), batchId: z.string().default(""), hash: z.string().default(""),
   destination: z.enum(["instagram", "facebook"]).optional(), remoteId: z.string().default(""), permalink: z.string().default(""),
   expectedAttemptId: z.string().default(""), acceptDuplicateRisk: z.boolean().default(false),
@@ -21,10 +20,7 @@ const actionBody = z.object({
 })
 
 export const runtime = "nodejs"
-// This route is unusable on previews even if they share production Firestore.
-async function deploymentEnabled() { return process.env.VERCEL_ENV === "production" && await ownedMetaRuntimeEnabled() }
-async function brandEnabled(brand: MetaBrand) { return process.env.VERCEL_ENV === "production" && await ownedMetaRuntimeEnabled(brand) }
-function sourceOrigins() { return (process.env.OWNED_META_SOURCE_ORIGINS || "").split(",").map(s=>s.trim()).filter(Boolean) }
+// This route is unusable on previews even if they share production Firestore (see owned-meta-execution).
 async function authorize() {
   const session=await getSession()
   if (!session) return { error:"Unauthorized",status:401 as const }
@@ -69,8 +65,8 @@ export async function POST(req:NextRequest,ctx:{params:Promise<{id:string}>}) {
   const {id}=await ctx.params
   let body:z.infer<typeof actionBody>
   try { body=actionBody.parse(await req.json()) } catch { return NextResponse.json({error:"Invalid JSON"},{status:400}) }
-  if (!await deploymentEnabled() && !["reconcile","manual-confirm","confirm-stopped-run"].includes(body.action)) return NextResponse.json({error:"Publisher disabled"},{status:423})
   if(body.action==="recover-facebook" && auth.session.email.toLowerCase()!=="marcos@434media.com") return NextResponse.json({error:"Founder recovery required"},{status:403})
+  if (!await deploymentEnabled() && !["reconcile","manual-confirm","confirm-stopped-run"].includes(body.action)) return NextResponse.json({error:"Publisher disabled"},{status:423})
   const startedAt=new Date().toISOString(),runId=crypto.randomUUID()
   let brand:MetaBrand|undefined
   let batchId:string|undefined
@@ -79,18 +75,7 @@ export async function POST(req:NextRequest,ctx:{params:Promise<{id:string}>}) {
       brand=body.brand
       if (!brand || !META_BRANDS.includes(brand) || !await brandEnabled(brand)) throw new MetaBlocked("Brand is disabled")
       if (!body.format || !body.captions || !body.placements || typeof body.aiGenerated!=="boolean" || typeof body.instagramShareToFeed!=="boolean" || typeof body.publicHostingApproved!=="boolean") throw new MetaBlocked("Complete review choices required")
-      const post=await getContentPostById(id)
-      if (!post || post.archived || !post.assets.length) throw new MetaBlocked("Save the approved export references on the content post first")
-      const {getOwnedMetaIdentity}=await import("@/lib/instagram-config")
-      const assets:MetaAsset[]=[]
-      for (const [i,a] of post.assets.entries()) {
-        const bytes=await readTrustedAsset(a.url,sourceOrigins())
-        const measured=measureExport(bytes)
-        assets.push({name:`export-${i+1}`,url:assertApprovedBlobUrl(a.url,sourceOrigins()),sha256:assetDigest(bytes),size:bytes.byteLength,...measured,provenance:{source:a.source || "unknown",templateRevision:body.templateRevision || "unknown",generator:a.model || "unknown",metadata:"unverified"}})
-        verifyAssetBytes(assets[i],bytes)
-      }
-      const manifest:Omit<MetaManifest,"revision">={schema:1,brand,format:body.format,assets,captions:body.captions,destinations:getOwnedMetaIdentity(brand),placements:body.placements,instagramShareToFeed:body.instagramShareToFeed,aiGenerated:body.aiGenerated,publicHostingApproved:body.publicHostingApproved}
-      const batch=await createOwnedMetaDraft(id,manifest)
+      const batch=await prepareOwnedMetaBatch(id,{brand,format:body.format,captions:body.captions,placements:body.placements,instagramShareToFeed:body.instagramShareToFeed,aiGenerated:body.aiGenerated,...(body.aiRealisticMedia!==undefined?{aiRealisticMedia:body.aiRealisticMedia}:{}),publicHostingApproved:body.publicHostingApproved,templateRevision:body.templateRevision})
       return NextResponse.json({batch})
     }
     const store=ownedMetaStore(),record=await store.read(id)
@@ -126,22 +111,8 @@ export async function POST(req:NextRequest,ctx:{params:Promise<{id:string}>}) {
       await store.update(id,r=>{if(r.batch.id!==body.batchId)throw new MetaBlocked("Batch changed");resetUnpublishedPreparation(r,d);return{next:r,result:null}})
       return NextResponse.json({batch:(await store.read(id)).batch})
     }
-    const {getOwnedMetaPublishingConfig}=await import("@/lib/instagram-config")
     // Reconciliation can run with a disabled brand, but never in preview; use the existing credential only.
-    const config=getOwnedMetaPublishingConfig(brand)
-    const localEnabled=async () => await brandEnabled(brand!) && !await ownedMetaPermissionBlocked(brand!,config.evidence.verifiedAt)
-    const verifyUrls=async (urls: string[]) => {
-      for(const url of urls){const asset=record.batch.manifest.assets.find(a=>a.url===url);if(!asset)throw new MetaBlocked("URL is not bound to this approval");verifyAssetBytes(asset,await readTrustedAsset(url,sourceOrigins()))}
-    }
-    const provider:ReturnType<typeof createMetaProvider>=createMetaProvider({accessToken:config.accessToken,evidence:config.evidence,beforeMutation:async(urls=[])=>{
-      await validateMetaMutationBoundary({enabled:localEnabled,read:()=>store.read(id),batchId:record.batch.id,runId,
-        verify:()=>verifyUrls(urls.length?urls:record.batch.manifest.assets.map(a=>a.url))})
-    },beforeFinalDispatch:async(_m,d)=>{
-      const current=await store.read(id),job=current.batch.jobs[d]
-      if(!job.retry)return
-      if(body.action!=="recover-facebook" || d!=="facebook")throw new MetaBlocked("Owner recovery action required")
-      await guardFacebookRetryDispatch({id,batchId:record.batch.id,runId,store,enabled:localEnabled,check:(manifest,earliest)=>provider.checkFacebookRetry(manifest,earliest)})
-    }})
+    const {provider}=await ownedMetaProviderFor({id,record,runId,store,recovery:body.action==="recover-facebook"})
     if (body.action==="reconcile") {
       const d=body.destination
       if (d!=="instagram" && d!=="facebook") throw new MetaBlocked("Destination required")
@@ -160,36 +131,12 @@ export async function POST(req:NextRequest,ctx:{params:Promise<{id:string}>}) {
       return NextResponse.json({batch:(await store.read(id)).batch})
     }
     if (body.action!=="execute" && body.action!=="recover-facebook") throw new MetaBlocked("Unknown action")
-    const batch=await runOwnedMeta({id,runId,store,provider,enabled:localEnabled,
-      ...(body.action==="recover-facebook"?{facebookRecovery:{expectedAttemptId:body.expectedAttemptId,actor:auth.session.email,evidence:body.evidence,acceptDuplicateRisk:body.acceptDuplicateRisk}}:{}),resolveAssets:async b=>{
-      if (!await localEnabled()) throw new MetaBlocked("Brand disabled")
-      const urls=b.manifest.assets.map(a=>a.url)
-      await verifyUrls(urls)
-      if(!await localEnabled() || (await store.read(id)).archived)throw new MetaBlocked("Publishing stopped during asset validation")
-      return urls
-    }})
-    const finishedAt=new Date().toISOString(),complete=Object.values(batch.jobs).every(j=>j.status==="verified"||j.status==="operator_confirmed")
-    await recordCronRun({job:"owned-meta-publish",startedAt,finishedAt,durationMs:Date.parse(finishedAt)-Date.parse(startedAt),status:complete?"success":"partial",message:complete?"Both destinations complete; inspect per-job evidence type":"Operator continuation required",detail:{postId:id,batchId:batch.id,runId,evidence:{instagram:batch.jobs.instagram.status,facebook:batch.jobs.facebook.status}}})
+    const batch=await executeOwnedMeta({id,runId,record,store,trigger:"admin",
+      ...(body.action==="recover-facebook"?{facebookRecovery:{expectedAttemptId:body.expectedAttemptId,actor:auth.session.email,evidence:body.evidence,acceptDuplicateRisk:body.acceptDuplicateRisk}}:{})})
     return NextResponse.json({batch})
   } catch(error) {
-    const detail=error instanceof MetaBlocked || error instanceof MetaPermissionError ? error.detail : undefined
-    if (detail && batchId) {
-      // Evidence only: never take another run's claim or overwrite newer failure evidence.
-      await ownedMetaStore().update(id,r=>{
-        if(r.batch.id!==batchId || r.batch.claim && r.batch.claim!==runId) return {result:null}
-        const job=r.batch.jobs[detail.destination]
-        if(job.lastError && Date.parse(job.lastError.at)>Date.parse(detail.at)) return {result:null}
-        job.lastError=detail
-        return {next:r,result:null}
-      }).catch(()=>{})
-    }
-    if (body.action === "execute" || body.action === "recover-facebook") {
-      const finishedAt=new Date().toISOString()
-      await recordCronRun({job:"owned-meta-publish",startedAt,finishedAt,durationMs:Date.parse(finishedAt)-Date.parse(startedAt),status:"error",message:"Publisher stopped; inspect saved state before retrying",detail:{postId:id,runId,...(batchId?{batchId}:{}),...(detail?{providerError:detail}:{})}})
-    }
-    if(error instanceof MetaPermissionError && brand) await blockOwnedMetaPermission(brand)
-    const message=error instanceof MetaBlocked || error instanceof MetaPermissionError ? error.message : "Publisher failed; inspect saved state before retrying"
+    const failure=await recordOwnedMetaFailure({id,runId,batchId,brand,error,startedAt,run:body.action==="execute" || body.action==="recover-facebook",trigger:"admin"})
     const saved=batchId ? await ownedMetaStore().read(id).catch(()=>null) : null
-    return NextResponse.json({error:message,...(saved?.batch.id===batchId?{batch:saved?.batch}:{}),...(detail?{providerError:detail}:{})},{status:error instanceof MetaPermissionError?403:error instanceof MetaBlocked?409:500})
+    return NextResponse.json({error:failure.message,...(saved?.batch.id===batchId?{batch:saved?.batch}:{}),...(failure.detail?{providerError:failure.detail}:{})},{status:failure.status})
   }
 }

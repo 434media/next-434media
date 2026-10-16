@@ -1,5 +1,5 @@
 import { safeMetaError, type MetaOperation } from "./owned-meta-errors"
-import { checkReviewedFormat, OWNED_META_GRAPH_VERSION } from "./owned-meta-formats"
+import { aiDisclosureRequired, checkReviewedFormat, META_AI_DISCLOSURE_RULE, OWNED_META_GRAPH_VERSION, sendsAiLabel } from "./owned-meta-formats"
 import { MetaBlocked, MetaPermissionError, type MetaDestination, type MetaManifest, type MetaProvider, type FacebookRetryRead } from "./owned-meta-publisher"
 
 export interface MetaPublishingEvidence {
@@ -47,7 +47,7 @@ export function createMetaProvider(args: { accessToken: string; evidence: MetaPu
       const graph = graphFor(d,"prepare")
       const p = { ...saved }
       const keep = async (key: string, value: string) => { await checkpoint(key,value); p[key] = value }
-      const ai = m.aiGenerated ? { is_ai_generated: true } : {}
+      const ai = sendsAiLabel(m,d) ? { is_ai_generated: true } : {}
       if (d === "instagram") {
         if (m.format === "carousel") {
           for (let i=0;i<m.assets.length;i++) {
@@ -90,7 +90,7 @@ export function createMetaProvider(args: { accessToken: string; evidence: MetaPu
     },
     async publish(m,d,urls,p) {
       const graph = graphFor(d,"publish",()=>args.beforeFinalDispatch?.(m,d) ?? Promise.resolve())
-      const ai = m.aiGenerated ? { is_ai_generated: true } : {}
+      const ai = sendsAiLabel(m,d) ? { is_ai_generated: true } : {}
       if (d === "instagram") return id((await graph(`${m.destinations.instagramId}/media_publish`,{ creation_id:p.container },"POST")).id)
       if (m.format === "still") { const r = await graph(`${m.destinations.pageId}/photos`,{ url:urls[0], caption:m.captions.facebook,published:true },"POST"); return id(r.post_id || r.id) }
       if (m.format === "carousel") return id((await graph(`${m.destinations.pageId}/feed`,{ message:m.captions.facebook,attached_media:m.assets.map((_,i)=>({media_fbid:p[`photo_${i}`]})) },"POST")).id)
@@ -140,12 +140,18 @@ export function createMetaProvider(args: { accessToken: string; evidence: MetaPu
       const listing = await graph(`${d === "instagram" ? m.destinations.instagramId : m.destinations.pageId}/${d === "instagram" ? "media" : "published_posts"}`, { fields: d === "instagram" ? "id,permalink" : "id,permalink_url,attachments{target{id}}", limit: 100 })
       const published = (listing.data || []).find((item) => item.id === remoteId || d === "facebook" && item.attachments?.data?.some((a) => a.target?.id === remoteId))
       if (!published) return { verified:false,blocker:"Exact remote ID not found in the account's published collection; use operator evidence if needed" }
-      const r: GraphResponse = m.aiGenerated ? await graph(remoteId,{fields:"id,is_ai_generated"}) : {}
+      // Read the label back only where it was sent: IG media creation and FB Reels finish.
+      const labelSent = sendsAiLabel(m,d)
+      const r: GraphResponse = labelSent ? await graph(remoteId,{fields:"id,is_ai_generated"}) : {}
       const link = d === "instagram" ? published.permalink : published.permalink_url
       let u: URL; try { if (!link) throw new Error("missing permalink"); u = new URL(link) } catch { return { verified:false,blocker:"Published permalink unavailable" } }
       const host = d === "instagram" ? "instagram.com" : "facebook.com"
       if (u.protocol !== "https:" || !(u.hostname === host || u.hostname === `www.${host}`)) return { verified:false,blocker:"Untrusted permalink" }
-      if (m.aiGenerated && r.is_ai_generated !== true) return { verified:false,blocker:"AI disclosure needs a manual platform check/toggle; do not republish" }
+      if (labelSent && r.is_ai_generated !== true) {
+        // Published either way; never republish. Only Meta's own requirement makes a missing label a blocker.
+        if (aiDisclosureRequired(m)) return { verified:false,blocker:`Published, but the AI label did not read back; Meta requires it for photorealistic video (${META_AI_DISCLOSURE_RULE.sources[0]}). Add it natively; do not republish` }
+        return { verified:true,permalink:u.toString(),notice:"AI label was sent but did not read back; the post is live and unchanged" }
+      }
       return { verified:true,permalink:u.toString() }
     },
   }

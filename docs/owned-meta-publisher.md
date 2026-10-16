@@ -227,3 +227,87 @@ perform a separately authorized live test before activation:
 Canon reviewed read-only through the GitHub connector under founder approval:
 434-context commit `068cd39f1fb41ed6290ba432a13af68ec799383d`, master 2.0.30.
 No governing artifacts were changed. Base: next-434media `b47a20e` (PR #176).
+
+## Publisher connector for Smartie, continuation and AI disclosure (draft, offline verified only)
+
+Reconciled with draft #186 (`c82026b`, merged in history): its Canva design binding, export fingerprint,
+per-file hashes and identical re-attach reuse are carried into `lib/owned-meta-intake.ts`. Its separate
+`/api/content/mcp` route, email-claim sign-in, self-approval path and plain-text Canva token store are not kept.
+
+**Transport.** Smartie is a ChatGPT agent installed in Slack (its confirmations link to
+chatgpt.com). It reaches outside tools through ChatGPT connectors, which are MCP servers
+authenticated by OAuth 2.1 or not at all. They cannot send a static API key or bearer
+header ([OpenAI, Authentication](https://developers.openai.com/plugins/build/auth), read
+2026-10-16). A shared-secret route would be uncallable, so the publisher is exposed as
+an MCP server at `/api/owned-meta/mcp`, built on `mcp-handler` as `/api/sor/mcp` is.
+
+- **Sign-in reuses Polí's working setup** (Vercel project `cos-crm-pilot`,
+  `lib/cos-pilot/mcp-verifier.ts`, read from its deployment 2026-10-16). Auth0 is the
+  authorization server and ChatGPT is a registered public PKCE client. Each request must carry an RS256 JWT
+  from the configured JWKS (same origin as the issuer). Checks: exact `iss` and `aud`, `exp`/`nbf` with zero
+  clock tolerance, `sub` and `iat` present, and `azp` (and `client_id`) equal to the configured client.
+  Identity comes only from the exact `sub` in `OWNED_META_CONNECTOR_CALLERS`, never an email
+  claim. The mapped email then passes the existing `authorizeAdminSignIn` and send-capable role gate. Each tool
+  needs its own scope: `owned-meta:read` (find, status, health), `owned-meta:write` (create, attach,
+  prepare, approve, record, exclude) or `owned-meta:publish` (execute); none implies another. Implemented with
+  `node:crypto`, matching the pilot's `jose` 4.15.9 options, so no dependency is added. 401 responses point at
+  `/api/owned-meta/oauth-protected-resource`; missing configuration fails closed (503) and is logged by name.
+- **Canva export through the Canva Connect API.** `attach_canva_design` exports a design's pages as JPG
+  (`POST /rest/v1/exports`, polled at `GET /rest/v1/exports/{id}`; URLs last 24 h). It then attaches them through
+  the same guarded path as `attach_exports`; the post is checked before Canva is asked. A CRM super-admin
+  connects Canva once at `/api/admin/owned-meta/canva/connect` on the existing admin session (PKCE S256; the
+  state is single-use, expires in 10 minutes and is bound to that admin). Canva refresh tokens are single-use and
+  rotate. They are stored only as AES-256-GCM ciphertext in `crm_meta/owned_meta_canva`, with a version
+  compare-and-set. A lost rotation race re-reads the stored token instead of refreshing twice.
+- **Tools:** `find_posts`, `create_post` (idempotent on `requestId`), `attach_exports`, `attach_canva_design`,
+  `prepare`, `approve`, `execute`, `status`, `health`, `record_external`, `exclude`. No
+  reset, claim release, stopped-run confirmation or Facebook recovery tool exists; those
+  stay in the admin drawer. `find_posts`, `status` and `health` are annotated read-only.
+- **Export attachment** fetches public https export links (for example Canva JPG export
+  URLs) through the same SSRF guard as admin ingestion (`lib/safe-remote-fetch.ts`),
+  bounded at 64 MiB. It measures each file from bytes and stores it under the existing
+  `content-posts/<uuid>-NN-label.ext` convention. It then replaces the post's assets in
+  order through the guarded update, which invalidates any unstarted draft. Nothing is
+  stored if any item fails. PNG and mixed-aspect sets are reported as Instagram holds.
+- **Approval is read, not relayed.** `approve` takes a Slack channel and message ts. The
+  server reads that exact message with `OWNED_META_SLACK_BOT_TOKEN` (GET
+  `conversations.replies`) and accepts it only if a person in
+  `OWNED_META_APPROVER_SLACK_IDS` (`U…:name@434media.com`, comma-separated) wrote it,
+  it says "approve", and it quotes the first 12 characters of the manifest hash. Then the
+  existing `decideOwnedMeta` runs with the expected revision and hash.
+- **Owner-reported publications.** `record_external` marks one untouched destination
+  `operator_confirmed`. `exclude` sets `owned_meta_external`. `OWNED_META_EXCLUDED_POST_IDS`
+  holds the MilCityUSA Army carousel record `Opb3LOHpfZPFoxdQ720F` in code, so it is
+  excluded from the first deployment, before the Firestore marker is written. Store reads,
+  store updates, new drafts, prepare and export attachment all refuse an excluded post.
+- **Continuation.** `/api/cron/owned-meta-continue` (every 5 minutes, `CRON_SECRET`) resumes
+  only destinations whose status is `processing` with no final intent, using the same
+  claim. Preparation failures and uncertain finals are never touched. A permission
+  failure stops the tick and sets the existing brand block. Results post to
+  `OWNED_META_SLACK_WEBHOOK_URL` if set.
+- **Unsupported optional features are notices, not blockers:** native account tagging,
+  Story resharing, and (for AI stills) a Facebook label, since Meta documents no
+  self-disclosure parameter for Page photos/feed.
+- **AI disclosure (reviewed 2026-10-16).** The publisher enforces exactly one requirement, Meta's own:
+  people must use Meta's AI-disclosure tool when posting organic content with photorealistic video or
+  realistic-sounding audio that was digitally created or altered
+  ([Community Standards, Misinformation](https://transparency.meta.com/policies/community-standards/misinformation),
+  change log Apr 7, 2025; [Meta newsroom](https://about.fb.com/news/2024/02/labeling-ai-generated-images-on-facebook-instagram-and-threads/),
+  updated Apr 1, 2025). Images carry no self-disclosure requirement; Meta labels them from signals it detects.
+  - An AI video must declare `aiRealisticMedia` (true or false) at prepare. That is the only way to know whether
+    the rule applies.
+  - When it applies, the label is sent on Instagram and on Facebook Reels. A Facebook Page `/videos` placement,
+    which has no API label, is held for that destination only, with the source in the message.
+  - Everything else publishes. A label the API cannot apply is reported as a notice. A sent label that does not
+    read back is a notice, not a blocker, unless the rule applies.
+  - The approved caption is never modified. The caption-disclosure gate from draft #186 and the earlier
+    Facebook photo/feed block are both removed.
+
+Not verified until an authorized live run:
+- ChatGPT completing OAuth against the Auth0 API for this resource, and whether the workspace plan lets
+  Smartie use a custom connector.
+- Canva Connect access for the 434 team (integration approval/visibility) and a real export.
+- The Slack approval read against the real workspace.
+- Real container processing times under the cron.
+- Graph readback of `is_ai_generated`.
+- A Canva export URL fetched through the SSRF guard.
