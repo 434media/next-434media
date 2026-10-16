@@ -153,7 +153,28 @@ export async function ownedMetaConnectorDeps(): Promise<import("@/lib/owned-meta
     exclude: crm.excludeOwnedMetaPost,
     health: ownedMetaHealth,
     readSlackMessage: (channel, ts) => readSlackMessage(channel, ts, process.env.OWNED_META_SLACK_BOT_TOKEN),
+    canvaExport: async (designId, pages) => {
+      const { exportDesignJpg, CanvaError } = await import("@/lib/canva-export")
+      const { deps } = await canvaDeps()
+      if (!deps) throw new CanvaError("Canva integration is not configured")
+      return exportDesignJpg(deps, { designId, ...(pages ? { pages } : {}) })
+    },
     randomId: randomUUID,
     now: () => new Date().toISOString(),
   }
+}
+
+/** Production Canva dependencies, or the names of missing configuration. */
+export async function canvaDeps(): Promise<{ deps: import("@/lib/canva-export").CanvaDeps | null; problems: string[] }> {
+  const { loadCanvaClient } = await import("@/lib/canva-export")
+  const { canvaTokenStore } = await import("@/lib/firestore-crm")
+  const { client, problems } = loadCanvaClient(process.env)
+  return client ? { deps: { client, store: canvaTokenStore(), fetcher: fetch, nowMs: Date.now, sleep: ms => new Promise(r => setTimeout(r, ms)) }, problems } : { deps: null, problems }
+}
+export async function canvaConnectDeps(): Promise<import("@/lib/canva-connect").ConnectDeps | null> {
+  const { deps } = await canvaDeps()
+  if (!deps) return null
+  const crm = await import("@/lib/firestore-crm")
+  const auth = await import("@/lib/auth")
+  return { canva: deps, session: auth.getSession, isSuperAdmin: email => auth.isCrmSuperAdmin(email), saveState: crm.saveCanvaConnectState, takeState: crm.takeCanvaConnectState }
 }

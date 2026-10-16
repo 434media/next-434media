@@ -237,15 +237,25 @@ header ([OpenAI, Authentication](https://developers.openai.com/plugins/build/aut
 2026-10-16). A shared-secret route would be uncallable, so the publisher is exposed as
 an MCP server at `/api/owned-meta/mcp`, built on `mcp-handler` as `/api/sor/mcp` is.
 
-- **Authorization reuses admin sign-in.** Google is the authorization server, the same
-  provider admins sign in with. A presented Google access token is checked at Google's
-  tokeninfo endpoint (in a POST body). It must be issued to a client ID in
-  `OWNED_META_CONNECTOR_GOOGLE_CLIENT_IDS`, have a verified email, be unexpired and carry
-  the email scope. The email then passes `authorizeAdminSignIn` and must hold a
-  send-capable role (or be a super-admin), the same gate as the admin publisher route.
-  401 responses point at `/api/owned-meta/oauth-protected-resource` (RFC 9728), which
-  names `https://accounts.google.com`. Previews return 423 before authentication.
-- **Tools:** `find_posts`, `create_post` (idempotent on `requestId`), `attach_exports`,
+- **Sign-in reuses Polí's working setup** (Vercel project `cos-crm-pilot`,
+  `lib/cos-pilot/mcp-verifier.ts`, read from its deployment 2026-10-16). Auth0 is the
+  authorization server and ChatGPT is a registered public PKCE client. Each request must carry an RS256 JWT
+  from the configured JWKS (same origin as the issuer). Checks: exact `iss` and `aud`, `exp`/`nbf` with zero
+  clock tolerance, `sub` and `iat` present, and `azp` (and `client_id`) equal to the configured client.
+  Identity comes only from the exact `sub` in `OWNED_META_CONNECTOR_CALLERS`, never an email
+  claim. The mapped email then passes the existing `authorizeAdminSignIn` and send-capable role gate. Each tool
+  needs its own scope: `owned-meta:read` (find, status, health), `owned-meta:write` (create, attach,
+  prepare, approve, record, exclude) or `owned-meta:publish` (execute); none implies another. Implemented with
+  `node:crypto`, matching the pilot's `jose` 4.15.9 options, so no dependency is added. 401 responses point at
+  `/api/owned-meta/oauth-protected-resource`; missing configuration fails closed (503) and is logged by name.
+- **Canva export through the Canva Connect API.** `attach_canva_design` exports a design's pages as JPG
+  (`POST /rest/v1/exports`, polled at `GET /rest/v1/exports/{id}`; URLs last 24 h). It then attaches them through
+  the same guarded path as `attach_exports`; the post is checked before Canva is asked. A CRM super-admin
+  connects Canva once at `/api/admin/owned-meta/canva/connect` on the existing admin session (PKCE S256; the
+  state is single-use, expires in 10 minutes and is bound to that admin). Canva refresh tokens are single-use and
+  rotate. They are stored only as AES-256-GCM ciphertext in `crm_meta/owned_meta_canva`, with a version
+  compare-and-set. A lost rotation race re-reads the stored token instead of refreshing twice.
+- **Tools:** `find_posts`, `create_post` (idempotent on `requestId`), `attach_exports`, `attach_canva_design`,
   `prepare`, `approve`, `execute`, `status`, `health`, `record_external`, `exclude`. No
   reset, claim release, stopped-run confirmation or Facebook recovery tool exists; those
   stay in the admin drawer. `find_posts`, `status` and `health` are annotated read-only.
@@ -281,8 +291,9 @@ an MCP server at `/api/owned-meta/mcp`, built on `mcp-handler` as `/api/sor/mcp`
   `/videos` stays held. The label is read back only where it was sent.
 
 Not verified until an authorized live run:
-- ChatGPT completing OAuth against Google: Google's handling of ChatGPT's `resource`
-  parameter, and whether the workspace plan allows custom connectors.
+- ChatGPT completing OAuth against the Auth0 API for this resource, and whether the workspace plan lets
+  Smartie use a custom connector.
+- Canva Connect access for the 434 team (integration approval/visibility) and a real export.
 - The Slack approval read against the real workspace.
 - Real container processing times under the cron.
 - Graph readback of `is_ai_generated`.

@@ -43,6 +43,7 @@ function deps(store: Store, p: MetaProvider, over: Partial<ToolDeps> = {}): Tool
     exclude: async (id, input) => { assert.equal(input.by, "marcos@434media.com"); excluded.push(id) },
     health: async () => ({ ok: true }),
     readSlackMessage: async () => undefined,
+    canvaExport: async () => { throw new Error("not used") },
     randomId: () => `run-${++n}`, now: () => NOW, ...over }
 }
 const PRINCIPAL = { email: "marcos@434media.com" }
@@ -231,8 +232,11 @@ import type { Asset, ContentPost } from "../../components/crm/types"
 import { findPosts, createPost, attachExports, summarizePost } from "../owned-meta-intake"
 import { assertApprovedBlobUrl } from "../owned-meta-assets"
 import { isExcludedPostId, OWNED_META_EXCLUDED_POST_IDS } from "../owned-meta-publisher"
-import { verifyConnectorToken, connectorClientIds, type OAuthDeps } from "../owned-meta-oauth"
-import { CONNECTOR_TOOLS, principalOf } from "../owned-meta-connector"
+import { verifyConnectorToken, loadConnectorConfig, remoteJwks, type OAuthDeps } from "../owned-meta-oauth"
+import { CONNECTOR_TOOLS, principalOf, TOOL_SCOPE } from "../owned-meta-connector"
+import { canvaAccessToken, completeConnect, exportDesignJpg, seal, unseal, type CanvaDeps, type CanvaTokenRecord, type CanvaTokenStore } from "../canva-export"
+import { startCanvaConnect, finishCanvaConnect, type ConnectDeps } from "../canva-connect"
+import { generateKeyPairSync, sign as rsaSign, createHash as sha256 } from "node:crypto"
 import { toolInput } from "../owned-meta-tool-handler"
 
 const ARMY = "Opb3LOHpfZPFoxdQ720F"
@@ -321,40 +325,79 @@ test("the Army carousel record is excluded in code and by every path that could 
   assert.match(exe, /post\.owned_meta_external \|\| isExcludedPostId\(id\)/) // prepare
 })
 
-// ── Connector authorization (OAuth through Google, existing admin gate) ────────
-function oauth(info: Record<string, unknown> | null, over: Partial<OAuthDeps> = {}) {
-  const seen: { url: string; body: string }[] = []
-  const deps: OAuthDeps = {
-    clientIds: ["123-abc.apps.googleusercontent.com"],
-    fetcher: (async (u: URL, init?: RequestInit) => { seen.push({ url: u.toString(), body: String(init?.body) }); return info ? Response.json(info) : new Response("bad", { status: 400 }) }) as typeof fetch,
-    authorize: async email => email === "marcos@434media.com" ? { authorized: true, role: "crm_super_admin" } : email === "staff@434media.com" ? { authorized: true, role: "crm_only" } : { authorized: false, reason: "not_on_roster" },
-    sendCapable: async (_e, role) => role === "crm_super_admin" || role === "full_admin",
-    nowSeconds: () => 1_000, ...over,
-  }
-  return { deps, seen }
+// ── Connector authorization: Polí's Auth0 design + existing admin gate ─────────
+const ISSUER = "https://434media.us.auth0.com/", AUDIENCE = "https://www.434media.com/api/owned-meta/mcp", CLIENT = "chatgptClient01", SUB = "google-oauth2|1234567890"
+const { privateKey, publicKey } = generateKeyPairSync("rsa", { modulusLength: 2048 })
+const other = generateKeyPairSync("rsa", { modulusLength: 2048 })
+const JWK = { ...publicKey.export({ format: "jwk" }), kid: "k1", use: "sig", alg: "RS256" }
+function jwt(claims: Record<string, unknown>, header: Record<string, unknown> = { alg: "RS256", kid: "k1", typ: "JWT" }, key = privateKey) {
+  const enc = (o: unknown) => Buffer.from(JSON.stringify(o)).toString("base64url")
+  const data = `${enc(header)}.${enc(claims)}`
+  return `${data}.${rsaSign("RSA-SHA256", Buffer.from(data), key).toString("base64url")}`
 }
-const goodInfo = { aud: "123-abc.apps.googleusercontent.com", azp: "123-abc.apps.googleusercontent.com", email: "Marcos@434media.com", email_verified: "true", expires_in: "3599", scope: "openid https://www.googleapis.com/auth/userinfo.email" }
+const NOW_S = 2_000_000_000
+const good = { iss: ISSUER, aud: [AUDIENCE, "https://434media.us.auth0.com/userinfo"], azp: CLIENT, sub: SUB, iat: NOW_S - 10, exp: NOW_S + 600, scope: "openid owned-meta:read owned-meta:write" }
+function oauth(over: Partial<OAuthDeps> = {}) {
+  const refused: string[] = []
+  const deps: OAuthDeps = {
+    config: { issuer: ISSUER, audience: AUDIENCE, clientId: CLIENT, jwksUrl: `${ISSUER}.well-known/jwks.json`, callers: [{ subject: SUB, email: "marcos@434media.com" }, { subject: "auth0|staff", email: "staff@434media.com" }] },
+    jwks: async () => [JWK],
+    authorize: async email => email === "marcos@434media.com" ? { authorized: true, role: "crm_super_admin" } : { authorized: true, role: "crm_only" },
+    sendCapable: async (_e, role) => role === "crm_super_admin" || role === "full_admin",
+    nowSeconds: () => NOW_S, onRefuse: r => { refused.push(r) }, ...over,
+  }
+  return { deps, refused }
+}
 
-test("connector tokens must be Google-issued to our client, verified, unexpired, and pass the existing admin send gate", async () => {
-  const ok = oauth(goodInfo)
-  const info = await verifyConnectorToken("ya29.token", ok.deps)
-  assert.deepEqual(info?.extra, { email: "marcos@434media.com", role: "crm_super_admin" }); assert.equal(info?.expiresAt, 4599)
-  assert.equal(ok.seen[0].url, "https://oauth2.googleapis.com/tokeninfo"); assert.equal(ok.seen[0].body, "access_token=ya29.token") // token in POST body, never the URL
-  for (const [why, bad] of [
-    ["token for another app", { ...goodInfo, aud: "999-other.apps.googleusercontent.com", azp: "999-other.apps.googleusercontent.com" }],
-    ["azp mismatch", { ...goodInfo, azp: "999-other.apps.googleusercontent.com" }],
-    ["audience mismatch without azp", { ...goodInfo, aud: "999-other.apps.googleusercontent.com", azp: undefined }],
-    ["unverified email", { ...goodInfo, email_verified: "false" }],
-    ["expired", { ...goodInfo, expires_in: "0" }],
-    ["no email scope", { ...goodInfo, scope: "openid" }],
-    ["not on roster", { ...goodInfo, email: "someone@gmail.com" }],
-    ["draft-only role", { ...goodInfo, email: "staff@434media.com" }],
-  ] as const) assert.equal(await verifyConnectorToken("ya29.token", oauth(bad).deps), undefined, why)
-  assert.equal(await verifyConnectorToken("ya29.token", oauth(null).deps), undefined)
-  const none = oauth(goodInfo, { clientIds: [] }); assert.equal(await verifyConnectorToken("ya29.token", none.deps), undefined); assert.equal(none.seen.length, 0)
-  assert.equal(await verifyConnectorToken(undefined, ok.deps), undefined)
-  assert.deepEqual(connectorClientIds(" 123-abc.apps.googleusercontent.com, nonsense ,https://evil"), ["123-abc.apps.googleusercontent.com"])
-  assert.deepEqual(principalOf(info), { email: "marcos@434media.com" }); assert.equal(principalOf(undefined), undefined)
+test("connector tokens follow Polí's Auth0 rules, map identity by subject only, then pass the existing admin gate", async () => {
+  const ok = oauth()
+  const info = await verifyConnectorToken(jwt(good), ok.deps)
+  assert.deepEqual(info?.scopes, ["owned-meta:read", "owned-meta:write"]); assert.deepEqual(info?.extra, { email: "marcos@434media.com", role: "crm_super_admin", subject: SUB })
+  const cases: [string, string, string][] = [
+    ["wrong issuer", jwt({ ...good, iss: "https://evil.auth0.com/" }), "iss"],
+    ["wrong audience", jwt({ ...good, aud: "https://other.example/api" }), "aud"],
+    ["expired (zero tolerance)", jwt({ ...good, exp: NOW_S }), "exp"],
+    ["not yet valid", jwt({ ...good, nbf: NOW_S + 1 }), "nbf"],
+    ["missing iat", jwt({ ...good, iat: undefined }), "claims"],
+    ["other client", jwt({ ...good, azp: "someoneElse01" }), "client"],
+    ["client_id mismatch", jwt({ ...good, client_id: "someoneElse01" }), "client"],
+    ["no publisher scope", jwt({ ...good, scope: "openid profile email" }), "scope"],
+    ["unmapped subject even with our email", jwt({ ...good, sub: "auth0|attacker", email: "marcos@434media.com" }), "subject_not_mapped"],
+    ["draft-only role", jwt({ ...good, sub: "auth0|staff" }), "admin_gate"],
+    ["HS256 confusion", jwt(good, { alg: "HS256", kid: "k1" }), "alg"],
+    ["alg none", jwt(good, { alg: "none", kid: "k1" }), "alg"],
+    ["unknown kid", jwt(good, { alg: "RS256", kid: "k2" }), "kid"],
+    ["forged signature", jwt(good, undefined, other.privateKey), "signature"],
+  ]
+  for (const [why, token, reason] of cases) { const o = oauth(); assert.equal(await verifyConnectorToken(token, o.deps), undefined, why); assert.deepEqual(o.refused, [reason], why) }
+  const tampered = jwt(good).split("."); tampered[1] = Buffer.from(JSON.stringify({ ...good, scope: "owned-meta:publish" })).toString("base64url")
+  assert.equal(await verifyConnectorToken(tampered.join("."), oauth().deps), undefined)
+  assert.equal(await verifyConnectorToken(undefined, oauth().deps), undefined)
+  assert.equal(await verifyConnectorToken(jwt(good), oauth({ jwks: async () => { throw new Error("down") } }).deps), undefined)
+})
+
+test("per-tool scopes: read cannot write, write cannot publish", async () => {
+  const read = await verifyConnectorToken(jwt({ ...good, scope: "owned-meta:read" }), oauth().deps)
+  assert.ok(principalOf(read, "status")); assert.equal(principalOf(read, "create_post"), undefined); assert.equal(principalOf(read, "execute"), undefined)
+  const write = await verifyConnectorToken(jwt(good), oauth().deps)
+  assert.ok(principalOf(write, "attach_canva_design")); assert.equal(principalOf(write, "execute"), undefined)
+  const publish = await verifyConnectorToken(jwt({ ...good, scope: "owned-meta:publish" }), oauth().deps)
+  assert.ok(principalOf(publish, "execute")); assert.equal(principalOf(publish, "status"), undefined)
+  assert.deepEqual(Object.keys(TOOL_SCOPE).sort(), Object.keys(toolInput).sort())
+})
+
+test("connector configuration fails closed and names problems without values", () => {
+  const env = { OWNED_META_CONNECTOR_ISSUER: ISSUER, OWNED_META_CONNECTOR_AUDIENCE: AUDIENCE, OWNED_META_CONNECTOR_CLIENT_ID: CLIENT, OWNED_META_CONNECTOR_JWKS_URL: `${ISSUER}.well-known/jwks.json`, OWNED_META_CONNECTOR_CALLERS: JSON.stringify([{ subject: SUB, email: "Marcos@434media.com" }]) }
+  assert.deepEqual(loadConnectorConfig(env).config?.callers, [{ subject: SUB, email: "marcos@434media.com" }])
+  assert.deepEqual(loadConnectorConfig({ ...env, OWNED_META_CONNECTOR_JWKS_URL: "https://evil.example/jwks.json" }).problems, ["OWNED_META_CONNECTOR_JWKS_URL"])
+  assert.deepEqual(loadConnectorConfig({ ...env, OWNED_META_CONNECTOR_CALLERS: JSON.stringify([{ subject: SUB, email: "x@gmail.com" }]) }).problems, ["OWNED_META_CONNECTOR_CALLERS"])
+  assert.deepEqual(loadConnectorConfig({}).problems, ["OWNED_META_CONNECTOR_ISSUER", "OWNED_META_CONNECTOR_AUDIENCE", "OWNED_META_CONNECTOR_CLIENT_ID", "OWNED_META_CONNECTOR_JWKS_URL", "OWNED_META_CONNECTOR_CALLERS"])
+})
+
+test("JWKS is cached for ten minutes", async () => {
+  let calls = 0, now = 0
+  const get = remoteJwks(`${ISSUER}.well-known/jwks.json`, (async () => { calls++; return Response.json({ keys: [JWK] }) }) as typeof fetch, () => now)
+  await get(); now = 599_000; await get(); assert.equal(calls, 1); now = 600_001; await get(); assert.equal(calls, 2)
 })
 
 test("connector catalog exposes exactly the operations, with read-only ones annotated", () => {
@@ -362,19 +405,132 @@ test("connector catalog exposes exactly the operations, with read-only ones anno
   assert.deepEqual(CONNECTOR_TOOLS.filter(t => t.readOnly).map(t => t.name).sort(), ["find_posts", "health", "status"])
 })
 
-test("MCP route: previews refuse before auth; production without a token gets 401 pointing at resource metadata", async () => {
+test("MCP route: previews refuse; unconfigured fails closed; production without a token gets 401 to resource metadata", async () => {
   const previous = process.env
+  const env = { OWNED_META_CONNECTOR_ISSUER: ISSUER, OWNED_META_CONNECTOR_AUDIENCE: AUDIENCE, OWNED_META_CONNECTOR_CLIENT_ID: CLIENT, OWNED_META_CONNECTOR_JWKS_URL: `${ISSUER}.well-known/jwks.json`, OWNED_META_CONNECTOR_CALLERS: JSON.stringify([{ subject: SUB, email: "marcos@434media.com" }]) }
   try {
-    process.env = { ...previous, NODE_ENV: "test", VERCEL_ENV: "preview" }
     const route = await import("../../app/api/owned-meta/mcp/route")
+    const prm = await import("../../app/api/owned-meta/oauth-protected-resource/route")
     const init = { method: "POST", headers: { "content-type": "application/json", accept: "application/json, text/event-stream" }, body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/list" }) }
-    assert.equal((await route.POST(new Request("https://www.434media.com/api/owned-meta/mcp", init))).status, 423)
-    process.env = { ...previous, NODE_ENV: "test", VERCEL_ENV: "production", OWNED_META_CONNECTOR_GOOGLE_CLIENT_IDS: "123-abc.apps.googleusercontent.com" }
-    const r = await route.POST(new Request("https://www.434media.com/api/owned-meta/mcp", init))
+    const req = () => new Request("https://www.434media.com/api/owned-meta/mcp", init)
+    process.env = { ...previous, NODE_ENV: "test", VERCEL_ENV: "preview", ...env }
+    assert.equal((await route.POST(req())).status, 423)
+    process.env = { ...previous, NODE_ENV: "test", VERCEL_ENV: "production" }
+    assert.equal((await route.POST(req())).status, 503); assert.equal(prm.GET().status, 503)
+    process.env = { ...previous, NODE_ENV: "test", VERCEL_ENV: "production", ...env }
+    const r = await route.POST(req())
     assert.equal(r.status, 401)
     assert.match(r.headers.get("www-authenticate") || "", /resource_metadata="https:\/\/www\.434media\.com\/api\/owned-meta\/oauth-protected-resource"/)
-    const prm = await import("../../app/api/owned-meta/oauth-protected-resource/route")
-    const meta = await prm.GET(new Request("https://www.434media.com/api/owned-meta/oauth-protected-resource")).json()
-    assert.equal(meta.resource, "https://www.434media.com/api/owned-meta/mcp"); assert.deepEqual(meta.authorization_servers, ["https://accounts.google.com"])
+    const meta = await prm.GET().json()
+    assert.equal(meta.resource, AUDIENCE); assert.deepEqual(meta.authorization_servers, [ISSUER]); assert.deepEqual(meta.scopes_supported, ["owned-meta:read", "owned-meta:write", "owned-meta:publish"])
   } finally { process.env = previous }
+})
+
+// ── Canva Connect: one-time connect, rotating tokens, export ───────────────────
+const KEY = Buffer.alloc(32, 7)
+class TokenStore implements CanvaTokenStore {
+  record: CanvaTokenRecord | null = null; writes = 0
+  async read() { return this.record ? { ...this.record } : null }
+  async write(expected: number | null, record: CanvaTokenRecord) { if ((this.record?.version ?? null) !== expected) return false; this.record = { ...record }; this.writes++; return true }
+}
+function canva(handler: (url: string, init: RequestInit) => Response | Promise<Response>, store = new TokenStore(), now = { ms: 1_000_000 }) {
+  const calls: { url: string; init: RequestInit }[] = []
+  const deps: CanvaDeps = { client: { clientId: "cid", clientSecret: "csecret", redirectUri: "https://www.434media.com/api/admin/owned-meta/canva/callback", tokenKey: KEY }, store, fetcher: (async (u: URL, init: RequestInit) => { calls.push({ url: u.toString(), init }); return handler(u.toString(), init) }) as typeof fetch, nowMs: () => now.ms, sleep: async ms => { now.ms += ms } }
+  return { deps, store, calls, now }
+}
+const tokenResponse = (n: number) => Response.json({ access_token: `at-${n}`, refresh_token: `rt-${n}`, token_type: "Bearer", expires_in: 14400 })
+
+test("Canva tokens are sealed at rest and never stored or returned in plain text", async () => {
+  const c = canva(() => tokenResponse(1))
+  await completeConnect(c.deps, { code: "code-1", verifier: "v".repeat(64), by: "marcos@434media.com" })
+  assert.ok(!c.store.record!.sealed.includes("rt-1") && !c.store.record!.sealed.includes("at-1"))
+  assert.equal(unseal(KEY, c.store.record!.sealed).refreshToken, "rt-1")
+  assert.throws(() => unseal(Buffer.alloc(32, 8), c.store.record!.sealed))
+  const body = new URLSearchParams(String(c.calls[0].init.body))
+  assert.equal(body.get("grant_type"), "authorization_code"); assert.equal(body.get("code_verifier"), "v".repeat(64))
+  assert.equal((c.calls[0].init.headers as Record<string, string>).authorization, `Basic ${Buffer.from("cid:csecret").toString("base64")}`)
+})
+
+test("Canva refresh rotates the single-use token once, and a lost race reuses the winner instead of refreshing twice", async () => {
+  let n = 1
+  const c = canva(url => url.endsWith("/oauth/token") ? tokenResponse(++n) : new Response("", { status: 500 }))
+  c.store.record = { version: 1, sealed: seal(KEY, { accessToken: "at-1", refreshToken: "rt-1", expiresAt: c.now.ms + 3_600_000 }), connectedBy: "m", connectedAt: "t" }
+  assert.equal(await canvaAccessToken(c.deps), "at-1"); assert.equal(c.calls.length, 0) // still valid
+  c.now.ms += 3_600_000 - 30_000 // inside the 60 s refresh window
+  assert.equal(await canvaAccessToken(c.deps), "at-2")
+  assert.equal(new URLSearchParams(String(c.calls[0].init.body)).get("refresh_token"), "rt-1")
+  assert.equal(unseal(KEY, c.store.record.sealed).refreshToken, "rt-2"); assert.equal(c.store.record.version, 2)
+  // Race: our refresh is rejected because another instance already used rt-2 and stored rt-3.
+  const race = canva(() => { race.store.record = { version: 3, sealed: seal(KEY, { accessToken: "at-3", refreshToken: "rt-3", expiresAt: 99_000_000 }), connectedBy: "m", connectedAt: "t" }; return Response.json({ code: "invalid_grant" }, { status: 400 }) })
+  race.store.record = { version: 2, sealed: seal(KEY, { accessToken: "at-2", refreshToken: "rt-2", expiresAt: 0 }), connectedBy: "m", connectedAt: "t" }
+  assert.equal(await canvaAccessToken(race.deps), "at-3"); assert.equal(race.calls.length, 1)
+  // Not connected, or revoked with no newer token: clear errors, no secrets.
+  await assert.rejects(canvaAccessToken(canva(() => tokenResponse(9)).deps), /not connected/)
+  const revoked = canva(() => Response.json({ code: "invalid_grant", message: "rt-2 is revoked" }, { status: 400 }))
+  revoked.store.record = { version: 2, sealed: seal(KEY, { accessToken: "x", refreshToken: "rt-2", expiresAt: 0 }), connectedBy: "m", connectedAt: "t" }
+  await assert.rejects(canvaAccessToken(revoked.deps), (e: Error) => /reconnect Canva/.test(e.message) && !e.message.includes("rt-2"))
+})
+
+test("Canva export polls to success and returns page URLs in order; failures and timeouts are explicit", async () => {
+  const live = { version: 1, sealed: seal(KEY, { accessToken: "at-live", refreshToken: "rt", expiresAt: 99_000_000_000 }), connectedBy: "m", connectedAt: "t" }
+  let polls = 0
+  const c = canva((url, init) => {
+    assert.equal((init.headers as Record<string, string>).authorization, "Bearer at-live")
+    if (init.method === "POST") { assert.deepEqual(JSON.parse(String(init.body)), { design_id: "DAGabc123", format: { type: "jpg", quality: 95, pages: [2, 3] } }); return Response.json({ job: { id: "job-1", status: "in_progress" } }) }
+    return ++polls < 3 ? Response.json({ job: { id: "job-1", status: "in_progress" } }) : Response.json({ job: { id: "job-1", status: "success", urls: ["https://export-download.canva.com/p2.jpg", "https://export-download.canva.com/p3.jpg"] } })
+  }); c.store.record = live
+  assert.deepEqual(await exportDesignJpg(c.deps, { designId: "DAGabc123", pages: [2, 3] }), ["https://export-download.canva.com/p2.jpg", "https://export-download.canva.com/p3.jpg"])
+  assert.equal(c.calls[1].url, "https://api.canva.com/rest/v1/exports/job-1")
+  const failed = canva(url => Response.json({ job: { id: "j", status: url.endsWith("/exports") ? "in_progress" : "failed", error: { code: "license_required" } } })); failed.store.record = live
+  await assert.rejects(exportDesignJpg(failed.deps, { designId: "DAGabc123" }), (e: Error & { code?: string }) => e.code === "license_required")
+  const slow = canva(() => Response.json({ job: { id: "j", status: "in_progress" } })); slow.store.record = live
+  await assert.rejects(exportDesignJpg(slow.deps, { designId: "DAGabc123" }, { polls: 3, intervalMs: 1 }), /still running/)
+  const short = canva(url => Response.json({ job: { id: "j", status: url.endsWith("/exports") ? "in_progress" : "success", ...(url.endsWith("/exports") ? {} : { urls: ["https://export-download.canva.com/1.jpg"] }) } })); short.store.record = live
+  await assert.rejects(exportDesignJpg(short.deps, { designId: "DAGabc123", pages: [1, 2] }, { polls: 2, intervalMs: 1 }), /different number of pages/)
+  await assert.rejects(exportDesignJpg(c.deps, { designId: "../x" }), /Invalid Canva design id/)
+})
+
+test("Canva connect: super-admin only, state is single-use, unexpired and bound to the admin who started it", async () => {
+  const states = new Map<string, { verifier: string; by: string; expiresAtMs: number }>()
+  let email: string | null = "marcos@434media.com"
+  const c = canva(() => tokenResponse(1))
+  const d: ConnectDeps = { canva: c.deps, session: async () => email ? { email } : null, isSuperAdmin: async e => e === "marcos@434media.com" || e === "second-owner@434media.com",
+    saveState: async (h, verifier, by, expiresAtMs) => { states.set(h, { verifier, by, expiresAtMs }) },
+    takeState: async (h, now) => { const s = states.get(h); states.delete(h); return s && s.expiresAtMs > now ? s : null } }
+  email = null; assert.equal((await startCanvaConnect(d)).status, 401)
+  email = "staff@434media.com"; assert.equal((await startCanvaConnect(d)).status, 403)
+  email = "marcos@434media.com"
+  const start = await startCanvaConnect(d), u = new URL(start.location!)
+  assert.equal(u.origin + u.pathname, "https://www.canva.com/api/oauth/authorize"); assert.equal(u.searchParams.get("code_challenge_method"), "S256")
+  const state = u.searchParams.get("state")!, saved = [...states.values()][0]
+  assert.equal(u.searchParams.get("code_challenge"), sha256("sha256").update(saved.verifier).digest("base64url"))
+  assert.ok(!start.location!.includes(saved.verifier)) // verifier never leaves the server
+  email = "staff@434media.com"; assert.equal((await finishCanvaConnect(d, new URLSearchParams({ state, code: "c" }))).status, 403)
+  email = "marcos@434media.com"
+  const other = new URL((await startCanvaConnect(d)).location!).searchParams.get("state")!
+  email = "second-owner@434media.com"; assert.equal((await finishCanvaConnect(d, new URLSearchParams({ state: other, code: "c" }))).status, 400) // another super-admin cannot finish it
+  email = "marcos@434media.com"
+  assert.equal((await finishCanvaConnect(d, new URLSearchParams({ state, code: "c" }))).location, "/admin/content?canva=connected")
+  assert.equal((await finishCanvaConnect(d, new URLSearchParams({ state, code: "c" }))).status, 400) // replay refused
+  const again = new URL((await startCanvaConnect(d)).location!).searchParams.get("state")!
+  c.now.ms += 600_001
+  assert.equal((await finishCanvaConnect(d, new URLSearchParams({ state: again, code: "c" }))).status, 400) // expired
+  assert.equal((await finishCanvaConnect(d, new URLSearchParams({ error: "access_denied", state: again }))).status, 400)
+})
+
+test("attach_canva_design exports through Canva and attaches pages in order; Canva errors stop before anything is stored", async () => {
+  const urls = ["https://export-download.canva.com/p1.jpg", "https://export-download.canva.com/p2.jpg"]
+  const i = intake([post()], { [urls[0]]: jpg(1080, 1350), [urls[1]]: jpg(1080, 1350) })
+  const s = new Store()
+  const d = deps(s, provider(), { intake: i.deps, canvaExport: async (id, pages) => { assert.equal(id, "DAGabc123"); assert.deepEqual(pages, [1, 2]); return urls } })
+  const r = await runOwnedMetaTool("attach_canva_design", { postId: "post-1234567", designId: "DAGabc123", pages: [1, 2] }, PRINCIPAL, d)
+  assert.equal(r.status, 200); assert.deepEqual(i.fetched, urls); assert.match(i.stored[0].filename, /-01-page-1\.jpg$/); assert.match(i.stored[1].filename, /-02-page-2\.jpg$/)
+  const army = intake([post({ id: ARMY })])
+  let exported = 0
+  const blocked = await runOwnedMetaTool("attach_canva_design", { postId: ARMY, designId: "DAGabc123" }, PRINCIPAL, deps(s, provider(), { intake: army.deps, canvaExport: async () => { exported++; return urls } }))
+  assert.equal(blocked.status, 409); assert.deepEqual(army.stored, [])
+  const e = Object.assign(new Error("Canva is not connected; an admin must connect it once"), { name: "CanvaError" })
+  const none = await runOwnedMetaTool("attach_canva_design", { postId: "post-1234567", designId: "DAGabc123" }, PRINCIPAL, deps(s, provider(), { intake: intake([post()]).deps, canvaExport: async () => { throw e } }))
+  assert.equal(none.status, 409); assert.match(String(none.body.error), /not connected/)
+  assert.equal(exported, 0) // the Army record is refused before Canva is even asked to export
 })

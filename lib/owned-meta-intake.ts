@@ -65,6 +65,13 @@ export async function createPost(deps: IntakeDeps, principal: Principal, input: 
   return { created: true, post: summarizePost(post), similar }
 }
 
+/** Refuses missing, archived, posted or excluded posts — before any export or download is started. */
+export async function assertAttachable(deps: IntakeDeps, postId: string): Promise<ContentPost> {
+  const post = await deps.getPost(postId)
+  if (!post || post.archived) throw new MetaBlocked("Content post not found")
+  if (excluded(post) || post.status === "posted" || post.published_url) throw new MetaBlocked("This post is already published or excluded from the publisher; its media cannot be replaced")
+  return post
+}
 export interface ExportItem { url: string; label?: string }
 export interface AttachResult { post: PostSummary; assets: { url: string; mime: string; width: number; height: number; duration?: number; bytes: number }[]; holds: string[] }
 /**
@@ -74,9 +81,7 @@ export interface AttachResult { post: PostSummary; assets: { url: string; mime: 
  */
 export async function attachExports(deps: IntakeDeps, input: { postId: string; items: ExportItem[]; randomId: () => string }): Promise<AttachResult> {
   if (!input.items.length || input.items.length > META_FORMAT_RULES.instagramCarousel.maxItems) throw new MetaBlocked("Attach 1–10 exports in carousel order")
-  const post = await deps.getPost(input.postId)
-  if (!post || post.archived) throw new MetaBlocked("Content post not found")
-  if (excluded(post) || post.status === "posted" || post.published_url) throw new MetaBlocked("This post is already published or excluded from the publisher; its media cannot be replaced")
+  const post = await assertAttachable(deps, input.postId)
   const measured: { bytes: Uint8Array; mime: string; width: number; height: number; duration?: number; name: string }[] = []
   for (const [i, item] of input.items.entries()) {
     let fetched: { bytes: Uint8Array; contentType: string }

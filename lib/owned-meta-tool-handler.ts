@@ -1,7 +1,7 @@
 import { z } from "zod4"
 import { META_BRANDS, MetaBlocked, MetaPermissionError, type MetaBatch, type MetaBrand, type MetaDestination, type MetaRecord, type MetaStore } from "./owned-meta-publisher"
 import { needsContinuation, noticesFor, parseApprovers, preflightFor, recordExternalPublication, slackApprovalFrom, slackText, summarize, type SlackMessage } from "./owned-meta-tool"
-import { attachExports, createPost, findPosts, type IntakeDeps, type Principal } from "./owned-meta-intake"
+import { assertAttachable, attachExports, createPost, findPosts, type IntakeDeps, type Principal } from "./owned-meta-intake"
 import type { PrepareChoices } from "./owned-meta-execution"
 
 /**
@@ -24,6 +24,8 @@ export interface ToolDeps {
   exclude(id: string, input: { by: string; evidence: string; links: string[] }): Promise<void>
   health(id: string): Promise<unknown>
   readSlackMessage(channel: string, ts: string): Promise<SlackMessage | undefined>
+  /** Canva Connect export (JPG, page order). Throws when Canva is not connected. */
+  canvaExport(designId: string, pages?: number[]): Promise<string[]>
   randomId(): string
   now(): string
 }
@@ -34,6 +36,7 @@ export const toolInput = {
   find_posts: z.object({ query: z.string().min(1).max(200), includeArchived: z.boolean().optional(), limit: z.number().int().min(1).max(25).optional() }),
   create_post: z.object({ requestId: z.string(), title: z.string().max(200), brand: brandEnum, caption: z.string().max(2200), dateToPost: z.string().optional(), notes: z.string().max(4000).optional() }),
   attach_exports: z.object({ postId, items: z.array(z.object({ url: z.string().url().max(2000), label: z.string().max(60).optional() })).min(1).max(10) }),
+  attach_canva_design: z.object({ postId, designId: z.string().regex(/^[A-Za-z0-9_-]{6,64}$/), pages: z.array(z.number().int().min(1)).min(1).max(10).optional() }),
   status: z.object({ postId }),
   health: z.object({ postId }),
   prepare: z.object({ postId, brand: brandEnum, format: z.enum(["still", "carousel", "video"]),
@@ -64,6 +67,14 @@ export async function runOwnedMetaTool(name: ToolName, rawInput: unknown, princi
       case "find_posts": { const i = parsed.data as z.infer<typeof toolInput.find_posts>; return { status: 200, body: { posts: await findPosts(deps.intake, i) } } }
       case "create_post": { const i = parsed.data as z.infer<typeof toolInput.create_post>; return { status: 200, body: await createPost(deps.intake, principal, i) } }
       case "attach_exports": { const i = parsed.data as z.infer<typeof toolInput.attach_exports>; return { status: 200, body: { ...await attachExports(deps.intake, { ...i, randomId: deps.randomId }), next: "Prepare a new draft; any earlier unstarted draft for this post was invalidated by the new files." } } }
+      case "attach_canva_design": {
+        const i = parsed.data as z.infer<typeof toolInput.attach_canva_design>
+        await assertAttachable(deps.intake, i.postId) // never start a Canva export for a post that cannot take it
+        let urls: string[]
+        try { urls = await deps.canvaExport(i.designId, i.pages) } catch (error) { throw new MetaBlocked(error instanceof Error && error.name === "CanvaError" ? error.message : "Canva export failed") }
+        const items = urls.map((url, n) => ({ url, label: `page-${i.pages?.[n] ?? n + 1}` }))
+        return { status: 200, body: { ...await attachExports(deps.intake, { postId: i.postId, items, randomId: deps.randomId }), canva: { designId: i.designId, pages: items.length }, next: "Prepare a new draft; any earlier unstarted draft for this post was invalidated by the new files." } }
+      }
       case "prepare": {
         const i = parsed.data as z.infer<typeof toolInput.prepare>
         brand = i.brand

@@ -1767,6 +1767,37 @@ export async function excludeOwnedMetaPost(id: string, input: { by: string; evid
   })
   invalidateCache(CRM_COLLECTIONS.CONTENT_POSTS)
 }
+/**
+ * Canva connection for the publisher: one sealed token record (ciphertext only) with a version used as a
+ * compare-and-set, because Canva refresh tokens are single-use and rotate on every refresh.
+ */
+export function canvaTokenStore(): import("./canva-export").CanvaTokenStore {
+  const ref = () => getDb().collection("crm_meta").doc("owned_meta_canva")
+  return {
+    async read() { const d = (await ref().get()).data(); return d && typeof d.sealed === "string" && Number.isSafeInteger(d.version) ? { version: d.version, sealed: d.sealed, connectedBy: String(d.connectedBy || ""), connectedAt: String(d.connectedAt || "") } : null },
+    async write(expectedVersion, record) {
+      return getDb().runTransaction(async tx => {
+        const current = (await tx.get(ref())).data()
+        if ((current?.version ?? null) !== expectedVersion) return false
+        tx.set(ref(), record)
+        return true
+      })
+    },
+  }
+}
+/** One-time connect state (PKCE verifier) keyed by a hash of `state`; consumed on read, valid 10 minutes. */
+export async function saveCanvaConnectState(stateHash: string, verifier: string, by: string, expiresAtMs: number): Promise<void> {
+  await getDb().collection("crm_meta").doc("owned_meta_canva_pending").collection("states").doc(stateHash).create({ verifier, by, expiresAtMs })
+}
+export async function takeCanvaConnectState(stateHash: string, nowMs: number): Promise<{ verifier: string; by: string } | null> {
+  const ref = getDb().collection("crm_meta").doc("owned_meta_canva_pending").collection("states").doc(stateHash)
+  return getDb().runTransaction(async tx => {
+    const d = (await tx.get(ref)).data()
+    if (!d) return null
+    tx.delete(ref)
+    return typeof d.verifier === "string" && typeof d.expiresAtMs === "number" && d.expiresAtMs > nowMs ? { verifier: d.verifier, by: String(d.by) } : null
+  })
+}
 /** The post an intake request already created, if any (idempotency for repeated requests). */
 export async function findContentPostByIntakeRequest(requestId: string): Promise<ContentPost | null> {
   const snap = await getDb().collection(CRM_COLLECTIONS.CONTENT_POSTS).where("intake.requestId", "==", requestId).limit(1).get()
