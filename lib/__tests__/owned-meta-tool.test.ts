@@ -250,8 +250,9 @@ function intake(posts: ContentPost[], files: Record<string, Buffer> = {}) {
     listPosts: async () => [...posts, ...created],
     getPost: async id => [...posts, ...created].find(p => p.id === id) ?? null,
     findByRequestId: async rid => created.find(p => p.intake?.requestId === rid) ?? null,
+    findByCanvaDesignId: async id => [...posts, ...created].find(p => p.canva_design_id === id && !p.archived) ?? null,
     createPost: async data => { const p = { ...data, id: `new-${++n}xxxxxx`, created_at: NOW, updated_at: NOW } as ContentPost; created.push(p); return p },
-    setAssets: async (id, assets) => { assetsSet.push({ id, assets }); return { ...(posts.find(p => p.id === id) as ContentPost), assets } },
+    setAssets: async (id, assets, record) => { assetsSet.push({ id, assets }); const p = posts.find(x => x.id === id) as ContentPost; Object.assign(p, { assets, ...record }); return { ...p } },
     fetchExport: async url => { fetched.push(url); const f = files[url]; if (!f) throw new Error("404"); return { bytes: f, contentType: "application/octet-stream" } },
     storeExport: async (_b, filename, contentType) => { stored.push({ filename, contentType }); return `https://approved.public.blob.vercel-storage.com/${filename}` },
     now: () => NOW,
@@ -536,4 +537,74 @@ test("attach_canva_design exports through Canva and attaches pages in order; Can
   const none = await runOwnedMetaTool("attach_canva_design", { postId: "post-1234567", designId: "DAGabc123" }, PRINCIPAL, deps(s, provider(), { intake: intake([post()]).deps, canvaExport: async () => { throw e } }))
   assert.equal(none.status, 409); assert.match(String(none.body.error), /not connected/)
   assert.equal(exported, 0) // the Army record is refused before Canva is even asked to export
+})
+
+// ── AI disclosure: only Meta's cited requirement is enforced; captions are never changed ──
+import { META_AI_DISCLOSURE_RULE, aiDisclosureRequired } from "../owned-meta-formats"
+import { validateManifest } from "../owned-meta-publisher"
+
+function graphFake(m: MetaManifest, readback: boolean | undefined) {
+  const calls: { path: string; method?: string; body?: URLSearchParams }[] = []
+  const fetcher = (async (u: URL, init?: RequestInit) => {
+    const path = u.pathname.replace("/v26.0/", ""); calls.push({ path, method: init?.method, body: init?.body as URLSearchParams })
+    if (path === "3/media" && init?.method === "GET") return Response.json({ data: [{ id: "101", permalink: "https://www.instagram.com/p/x" }] })
+    if (path === "2/published_posts") return Response.json({ data: [{ id: "2_202", permalink_url: "https://www.facebook.com/p/y" }] })
+    if (path === "101") return Response.json({ id: "101", ...(readback === undefined ? {} : { is_ai_generated: readback }) })
+    return Response.json({ id: "2_202", post_id: "2_202" })
+  }) as typeof fetch
+  return { calls, p: createMetaProvider({ accessToken: "t", evidence: { verifiedAt: NOW, credentialKind: "system_user_page", appId: "1", pageId: "2", instagramId: "3" }, beforeMutation: async () => {}, fetcher }) }
+}
+
+test("Meta's AI requirement is identified by source and applies only to declared photorealistic video or realistic audio", () => {
+  assert.match(META_AI_DISCLOSURE_RULE.appliesTo, /photorealistic video or realistic-sounding audio/)
+  assert.ok(META_AI_DISCLOSURE_RULE.sources.every(u => /^https:\/\/(transparency\.meta\.com|about\.fb\.com)\//.test(u)))
+  assert.equal(aiDisclosureRequired(manifest("still", true)), false)
+  assert.equal(aiDisclosureRequired(manifest("carousel", true)), false)
+  const v = manifest("video", true)
+  assert.throws(() => validateManifest(v), /photorealistic/) // an AI video must say whether the rule applies
+  v.aiRealisticMedia = false; validateManifest(v); assert.equal(aiDisclosureRequired(v), false)
+  v.aiRealisticMedia = true; validateManifest(v); assert.equal(aiDisclosureRequired(v), true)
+  const still = manifest("still", true); still.aiRealisticMedia = true
+  assert.throws(() => validateManifest(still), /video only/)
+})
+
+test("AI stills publish on Facebook with the approved caption byte-for-byte and a notice, never a block", async () => {
+  const m = manifest("still", true); m.captions.facebook = "Nine named vendors. About $93.6 million."
+  const { p, calls } = graphFake(m, true)
+  assert.equal(p.preflight(m, "facebook"), null); assert.equal(p.preflight(m, "instagram"), null)
+  await p.publish(m, "facebook", [m.assets[0].url], {})
+  const sent = calls.find(c => c.path === "2/photos")!.body!
+  assert.equal(sent.get("caption"), "Nine named vendors. About $93.6 million."); assert.equal(sent.get("is_ai_generated"), null)
+  assert.deepEqual(noticesFor(m).filter(n => n.feature.endsWith("ai_label")).map(n => [n.feature, n.status]), [["facebook_ai_label", "not_applied"]])
+  const { readFileSync } = await import("node:fs")
+  for (const f of ["lib/owned-meta-formats.ts", "lib/instagram-publishing.ts", "lib/owned-meta-tool.ts", "lib/owned-meta-publisher.ts"]) assert.doesNotMatch(readFileSync(f, "utf8"), /hasAiCaptionDisclosure|AI_CAPTION_DISCLOSURE|Made with AI/) // no caption gate or caption addition exists
+})
+
+test("a label that does not read back is a notice unless Meta's rule applies; the post is never republished", async () => {
+  const still = manifest("still", true)
+  assert.deepEqual(await graphFake(still, false).p.verify(still, "instagram", "101"), { verified: true, permalink: "https://www.instagram.com/p/x", notice: "AI label was sent but did not read back; the post is live and unchanged" })
+  const real = manifest("video", true); real.aiRealisticMedia = true
+  const r = await graphFake(real, false).p.verify(real, "instagram", "101")
+  assert.equal(r.verified, false); assert.match(r.blocker!, /transparency\.meta\.com/); assert.match(r.blocker!, /do not republish/)
+  // Through the state machine: a non-blocking notice is kept on the job and the job is verified.
+  const s = new Store(record(still)), prov = provider(); prov.verify = async (_m, d) => ({ verified: true, permalink: `https://www.${d}.com/p/v`, ...(d === "instagram" ? { notice: "AI label was sent but did not read back; the post is live and unchanged" } : {}) })
+  await call(deps(s, prov), exec(s))
+  assert.equal(s.value.batch.jobs.instagram.status, "verified"); assert.match(s.value.batch.jobs.instagram.notice!, /did not read back/)
+  assert.equal(prov.calls.filter(c => c === "publish:instagram").length, 1)
+})
+
+// ── Carried over from draft #186: design binding, export fingerprint, idempotent re-attach ──
+test("Canva design binding, export fingerprint and identical re-attach reuse", async () => {
+  const urls = ["https://export-download.canva.com/p1.jpg", "https://export-download.canva.com/p2.jpg"]
+  const i = intake([post()], { [urls[0]]: jpg(1080, 1350), [urls[1]]: jpg(1080, 1350) })
+  const first = await attachExports(i.deps, { postId: "post-1234567", items: urls.map(url => ({ url })), randomId: uuid, canva: { designId: "DAGabc123" } })
+  assert.equal(first.reused, false); assert.match(first.fingerprint, /^[a-f0-9]{64}$/)
+  assert.deepEqual(i.assetsSet[0].assets.map(a => [a.source, a.canvaDesignId, a.page, a.sha256?.length]), [["canva", "DAGabc123", 1, 64], ["canva", "DAGabc123", 2, 64]])
+  assert.equal(first.post.canvaDesignId, "DAGabc123"); assert.equal(first.post.exportFingerprint, first.fingerprint)
+  const again = await attachExports(i.deps, { postId: "post-1234567", items: urls.map(url => ({ url })), randomId: uuid, canva: { designId: "DAGabc123" } })
+  assert.equal(again.reused, true); assert.equal(again.fingerprint, first.fingerprint); assert.equal(i.stored.length, 2); assert.equal(i.assetsSet.length, 1) // no new upload, draft untouched
+  await assert.rejects(attachExports(i.deps, { postId: "post-1234567", items: [{ url: urls[0] }], randomId: uuid, canva: { designId: "DAGother99" } }), /bound to Canva design DAGabc123/)
+  assert.deepEqual((await findPosts(i.deps, { canvaDesignId: "DAGabc123" })).map(p => p.id), ["post-1234567"])
+  const created = await createPost(i.deps, PRINCIPAL, { requestId: "req-design-0001", title: "Anything", brand: "milcity", caption: "x", canvaDesignId: "DAGabc123" })
+  assert.equal(created.created, false); assert.equal(created.post.id, "post-1234567"); assert.equal(i.created.length, 0) // one design, one record
 })

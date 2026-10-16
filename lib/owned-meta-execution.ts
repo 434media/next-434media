@@ -16,7 +16,7 @@ export function ownedMetaSourceOrigins() { return (process.env.OWNED_META_SOURCE
 
 export interface PrepareChoices {
   brand: MetaBrand; format: MetaManifest["format"]; captions: MetaManifest["captions"]; placements: MetaManifest["placements"]
-  instagramShareToFeed: boolean; aiGenerated: boolean; publicHostingApproved: boolean; templateRevision: string
+  instagramShareToFeed: boolean; aiGenerated: boolean; aiRealisticMedia?: boolean; publicHostingApproved: boolean; templateRevision: string
 }
 /** Measures the post's saved exports and creates an unapproved, immutable draft batch. */
 export async function prepareOwnedMetaBatch(id: string, c: PrepareChoices): Promise<MetaBatch> {
@@ -33,7 +33,7 @@ export async function prepareOwnedMetaBatch(id: string, c: PrepareChoices): Prom
     assets.push({name:`export-${i+1}`,url:assertApprovedBlobUrl(a.url,ownedMetaSourceOrigins()),sha256:assetDigest(bytes),size:bytes.byteLength,...measured,provenance:{source:a.source || "unknown",templateRevision:c.templateRevision || "unknown",generator:a.model || "unknown",metadata:"unverified"}})
     verifyAssetBytes(assets[i],bytes)
   }
-  const manifest:Omit<MetaManifest,"revision">={schema:1,brand:c.brand,format:c.format,assets,captions:c.captions,destinations:getOwnedMetaIdentity(c.brand),placements:c.placements,instagramShareToFeed:c.instagramShareToFeed,aiGenerated:c.aiGenerated,publicHostingApproved:c.publicHostingApproved}
+  const manifest:Omit<MetaManifest,"revision">={schema:1,brand:c.brand,format:c.format,assets,captions:c.captions,destinations:getOwnedMetaIdentity(c.brand),placements:c.placements,instagramShareToFeed:c.instagramShareToFeed,aiGenerated:c.aiGenerated,...(c.aiRealisticMedia!==undefined?{aiRealisticMedia:c.aiRealisticMedia}:{}),publicHostingApproved:c.publicHostingApproved}
   return createOwnedMetaDraft(id,manifest)
 }
 
@@ -128,8 +128,9 @@ export async function ownedMetaConnectorDeps(): Promise<import("@/lib/owned-meta
       listPosts: crm.getContentPosts,
       getPost: crm.getContentPostById,
       findByRequestId: crm.findContentPostByIntakeRequest,
+      findByCanvaDesignId: crm.findContentPostByCanvaDesignId,
       createPost: crm.createContentPost,
-      setAssets: (id, assets) => crm.updateContentPost(id, { assets }),
+      setAssets: (id, assets, record) => crm.updateContentPost(id, { assets, ...record }),
       // Same SSRF guard as admin ingestion; https only; bounded by the publisher's memory limit.
       fetchExport: async url => {
         const safe = url.startsWith("https://") ? await isSafeRemoteUrl(url) : null

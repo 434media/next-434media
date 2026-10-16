@@ -228,7 +228,11 @@ Canon reviewed read-only through the GitHub connector under founder approval:
 434-context commit `068cd39f1fb41ed6290ba432a13af68ec799383d`, master 2.0.30.
 No governing artifacts were changed. Base: next-434media `b47a20e` (PR #176).
 
-## Publisher connector for Smartie, continuation and AI-gate correction (draft, offline verified only)
+## Publisher connector for Smartie, continuation and AI disclosure (draft, offline verified only)
+
+Reconciled with draft #186 (`c82026b`, merged in history): its Canva design binding, export fingerprint,
+per-file hashes and identical re-attach reuse are carried into `lib/owned-meta-intake.ts`. Its separate
+`/api/content/mcp` route, email-claim sign-in, self-approval path and plain-text Canva token store are not kept.
 
 **Transport.** Smartie is a ChatGPT agent installed in Slack (its confirmations link to
 chatgpt.com). It reaches outside tools through ChatGPT connectors, which are MCP servers
@@ -284,11 +288,20 @@ an MCP server at `/api/owned-meta/mcp`, built on `mcp-handler` as `/api/sor/mcp`
 - **Unsupported optional features are notices, not blockers:** native account tagging,
   Story resharing, and (for AI stills) a Facebook label, since Meta documents no
   self-disclosure parameter for Page photos/feed.
-- **AI gate (reviewed 2026-10-16).** The Facebook photo/feed AI block was our own rule
-  and is removed. Meta's organic disclosure requirement covers photorealistic video and
-  realistic audio. Instagram carries `is_ai_generated` on the container (carousel parent
-  only) and is read back. Facebook Reels carry it on finish. AI video on ordinary
-  `/videos` stays held. The label is read back only where it was sent.
+- **AI disclosure (reviewed 2026-10-16).** The publisher enforces exactly one requirement, Meta's own:
+  people must use Meta's AI-disclosure tool when posting organic content with photorealistic video or
+  realistic-sounding audio that was digitally created or altered
+  ([Community Standards, Misinformation](https://transparency.meta.com/policies/community-standards/misinformation),
+  change log Apr 7, 2025; [Meta newsroom](https://about.fb.com/news/2024/02/labeling-ai-generated-images-on-facebook-instagram-and-threads/),
+  updated Apr 1, 2025). Images carry no self-disclosure requirement; Meta labels them from signals it detects.
+  - An AI video must declare `aiRealisticMedia` (true or false) at prepare. That is the only way to know whether
+    the rule applies.
+  - When it applies, the label is sent on Instagram and on Facebook Reels. A Facebook Page `/videos` placement,
+    which has no API label, is held for that destination only, with the source in the message.
+  - Everything else publishes. A label the API cannot apply is reported as a notice. A sent label that does not
+    read back is a notice, not a blocker, unless the rule applies.
+  - The approved caption is never modified. The caption-disclosure gate from draft #186 and the earlier
+    Facebook photo/feed block are both removed.
 
 Not verified until an authorized live run:
 - ChatGPT completing OAuth against the Auth0 API for this resource, and whether the workspace plan lets

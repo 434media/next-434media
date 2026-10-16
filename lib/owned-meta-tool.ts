@@ -1,4 +1,4 @@
-import { checkReviewedFormat } from "./owned-meta-formats"
+import { aiDisclosureRequired, apiLabelSupported, checkReviewedFormat, META_AI_DISCLOSURE_RULE } from "./owned-meta-formats"
 import type { MetaConnectionReport } from "./owned-meta-connection"
 import { assertApproved, MetaBlocked, type MetaBatch, type MetaDestination, type MetaManifest, type MetaRecord } from "./owned-meta-publisher"
 
@@ -15,7 +15,11 @@ export function noticesFor(m: MetaManifest): OwnedMetaNotice[] {
     { feature: "account_tagging", status: "unsupported", detail: "Native account/company tags are not applied by the API publisher; a caption @mention is not a tag. Add tags natively after publication if wanted." },
     { feature: "stories", status: "unsupported", detail: "Story resharing is not performed by the API publisher." },
   ]
-  if (m.aiGenerated && m.format !== "video") notices.push({ feature: "facebook_ai_label", status: "not_applied", detail: "Meta documents no AI self-disclosure parameter for Page photo/feed posts. The Facebook post publishes without a native label; Instagram receives is_ai_generated." })
+  // Unsupported labels are reported, never added to the approved caption and never blocking.
+  const wantsLabel = m.aiGenerated || aiDisclosureRequired(m)
+  for (const d of ["instagram", "facebook"] as const) {
+    if (wantsLabel && !apiLabelSupported(m, d) && !aiDisclosureRequired(m)) notices.push({ feature: `${d}_ai_label`, status: "not_applied", detail: `Meta documents no AI label parameter for this ${d === "facebook" ? "Facebook Page post type" : "placement"}; it publishes with the approved caption unchanged. Meta's self-disclosure requirement covers ${META_AI_DISCLOSURE_RULE.appliesTo.toLowerCase()}, which this post is not declared to be.` })
+  }
   return notices
 }
 

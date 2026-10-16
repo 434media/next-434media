@@ -33,8 +33,8 @@ export interface ToolDeps {
 const postId = z.string().regex(/^[A-Za-z0-9_-]{1,128}$/)
 const brandEnum = z.enum(META_BRANDS)
 export const toolInput = {
-  find_posts: z.object({ query: z.string().min(1).max(200), includeArchived: z.boolean().optional(), limit: z.number().int().min(1).max(25).optional() }),
-  create_post: z.object({ requestId: z.string(), title: z.string().max(200), brand: brandEnum, caption: z.string().max(2200), dateToPost: z.string().optional(), notes: z.string().max(4000).optional() }),
+  find_posts: z.object({ query: z.string().min(1).max(200).optional(), canvaDesignId: z.string().regex(/^[A-Za-z0-9_-]{6,64}$/).optional(), includeArchived: z.boolean().optional(), limit: z.number().int().min(1).max(25).optional() }),
+  create_post: z.object({ requestId: z.string(), title: z.string().max(200), brand: brandEnum, caption: z.string().max(2200), dateToPost: z.string().optional(), notes: z.string().max(4000).optional(), canvaDesignId: z.string().regex(/^[A-Za-z0-9_-]{6,64}$/).optional() }),
   attach_exports: z.object({ postId, items: z.array(z.object({ url: z.string().url().max(2000), label: z.string().max(60).optional() })).min(1).max(10) }),
   attach_canva_design: z.object({ postId, designId: z.string().regex(/^[A-Za-z0-9_-]{6,64}$/), pages: z.array(z.number().int().min(1)).min(1).max(10).optional() }),
   status: z.object({ postId }),
@@ -42,7 +42,7 @@ export const toolInput = {
   prepare: z.object({ postId, brand: brandEnum, format: z.enum(["still", "carousel", "video"]),
     captions: z.object({ instagram: z.string().max(2200), facebook: z.string().max(63206) }),
     placements: z.object({ instagram: z.enum(["feed", "reels"]), facebook: z.enum(["feed", "video", "reels"]) }),
-    instagramShareToFeed: z.boolean(), aiGenerated: z.boolean(), publicHostingApproved: z.boolean(), templateRevision: z.string().max(200).default("unknown") }),
+    instagramShareToFeed: z.boolean(), aiGenerated: z.boolean(), aiRealisticMedia: z.boolean().optional(), publicHostingApproved: z.boolean(), templateRevision: z.string().max(200).default("unknown") }),
   approve: z.object({ postId, revision: z.number().int().positive(), hash: z.string().regex(/^[a-f0-9]{64}$/), approval: z.object({ channel: z.string(), ts: z.string() }) }),
   execute: z.object({ postId, batchId: z.string(), hash: z.string() }),
   record_external: z.object({ postId, batchId: z.string(), hash: z.string(), destination: z.enum(["instagram", "facebook"]), permalink: z.string().max(500), remoteId: z.string().max(64).optional(), evidence: z.string().max(2000) }),
@@ -73,12 +73,12 @@ export async function runOwnedMetaTool(name: ToolName, rawInput: unknown, princi
         let urls: string[]
         try { urls = await deps.canvaExport(i.designId, i.pages) } catch (error) { throw new MetaBlocked(error instanceof Error && error.name === "CanvaError" ? error.message : "Canva export failed") }
         const items = urls.map((url, n) => ({ url, label: `page-${i.pages?.[n] ?? n + 1}` }))
-        return { status: 200, body: { ...await attachExports(deps.intake, { postId: i.postId, items, randomId: deps.randomId }), canva: { designId: i.designId, pages: items.length }, next: "Prepare a new draft; any earlier unstarted draft for this post was invalidated by the new files." } }
+        return { status: 200, body: { ...await attachExports(deps.intake, { postId: i.postId, items, randomId: deps.randomId, canva: { designId: i.designId, ...(i.pages ? { pages: i.pages } : {}) } }), canva: { designId: i.designId, pages: items.length }, next: "Prepare a new draft; any earlier unstarted draft for this post was invalidated by the new files." } }
       }
       case "prepare": {
         const i = parsed.data as z.infer<typeof toolInput.prepare>
         brand = i.brand
-        const choices: PrepareChoices = { brand: i.brand, format: i.format, captions: i.captions, placements: i.placements, instagramShareToFeed: i.instagramShareToFeed, aiGenerated: i.aiGenerated, publicHostingApproved: i.publicHostingApproved, templateRevision: i.templateRevision }
+        const choices: PrepareChoices = { brand: i.brand, format: i.format, captions: i.captions, placements: i.placements, instagramShareToFeed: i.instagramShareToFeed, aiGenerated: i.aiGenerated, ...(i.aiRealisticMedia !== undefined ? { aiRealisticMedia: i.aiRealisticMedia } : {}), publicHostingApproved: i.publicHostingApproved, templateRevision: i.templateRevision }
         return { status: 200, body: view(await deps.prepare(id, choices), "Prepared for approval") }
       }
       case "exclude": {

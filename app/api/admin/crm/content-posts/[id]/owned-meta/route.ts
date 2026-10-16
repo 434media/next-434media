@@ -12,7 +12,7 @@ const actionBody = z.object({
   brand: z.enum(META_BRANDS).optional(), format: z.enum(["still", "carousel", "video"]).optional(),
   captions: z.object({ instagram: z.string(), facebook: z.string() }).optional(),
   placements: z.object({ instagram: z.enum(["feed", "reels"]), facebook: z.enum(["feed", "video", "reels"]) }).optional(),
-  instagramShareToFeed: z.boolean().optional(), aiGenerated: z.boolean().optional(), publicHostingApproved: z.boolean().optional(),
+  instagramShareToFeed: z.boolean().optional(), aiGenerated: z.boolean().optional(), aiRealisticMedia: z.boolean().optional(), publicHostingApproved: z.boolean().optional(),
   templateRevision: z.string().default("unknown"), batchId: z.string().default(""), hash: z.string().default(""),
   destination: z.enum(["instagram", "facebook"]).optional(), remoteId: z.string().default(""), permalink: z.string().default(""),
   expectedAttemptId: z.string().default(""), acceptDuplicateRisk: z.boolean().default(false),
@@ -75,7 +75,7 @@ export async function POST(req:NextRequest,ctx:{params:Promise<{id:string}>}) {
       brand=body.brand
       if (!brand || !META_BRANDS.includes(brand) || !await brandEnabled(brand)) throw new MetaBlocked("Brand is disabled")
       if (!body.format || !body.captions || !body.placements || typeof body.aiGenerated!=="boolean" || typeof body.instagramShareToFeed!=="boolean" || typeof body.publicHostingApproved!=="boolean") throw new MetaBlocked("Complete review choices required")
-      const batch=await prepareOwnedMetaBatch(id,{brand,format:body.format,captions:body.captions,placements:body.placements,instagramShareToFeed:body.instagramShareToFeed,aiGenerated:body.aiGenerated,publicHostingApproved:body.publicHostingApproved,templateRevision:body.templateRevision})
+      const batch=await prepareOwnedMetaBatch(id,{brand,format:body.format,captions:body.captions,placements:body.placements,instagramShareToFeed:body.instagramShareToFeed,aiGenerated:body.aiGenerated,...(body.aiRealisticMedia!==undefined?{aiRealisticMedia:body.aiRealisticMedia}:{}),publicHostingApproved:body.publicHostingApproved,templateRevision:body.templateRevision})
       return NextResponse.json({batch})
     }
     const store=ownedMetaStore(),record=await store.read(id)

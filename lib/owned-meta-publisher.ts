@@ -27,6 +27,8 @@ export interface MetaManifest {
   placements: { instagram: "feed" | "reels"; facebook: "feed" | "video" | "reels" }
   instagramShareToFeed: boolean
   aiGenerated: boolean
+  /** Video only: AI-made or AI-altered photorealistic video or realistic-sounding audio (Meta's disclosure rule). */
+  aiRealisticMedia?: boolean
   publicHostingApproved: boolean
 }
 export interface MetaJob {
@@ -37,6 +39,8 @@ export interface MetaJob {
   permalink?: string
   verifiedAt?: string
   blocker?: string
+  /** Non-blocking report, e.g. an AI label that could not be applied or read back. */
+  notice?: string
   lastError?: SafeMetaError
   retry?: { id: string; priorIntentId: string; by: string; at: string; evidence: string; approvedHash: string; duplicateRiskAccepted: true }
   retryRead?: FacebookRetryRead
@@ -66,7 +70,7 @@ export interface MetaProvider {
   preflight(manifest: MetaManifest, destination: MetaDestination): string | null
   prepare(manifest: MetaManifest, destination: MetaDestination, urls: string[], saved: Record<string, string>, checkpoint: (key: string, value: string) => Promise<void>): Promise<{ ready: boolean; preparation: Record<string, string> }>
   publish(manifest: MetaManifest, destination: MetaDestination, urls: string[], preparation: Record<string, string>): Promise<string>
-  verify(manifest: MetaManifest, destination: MetaDestination, remoteId: string): Promise<{ verified: boolean; permalink?: string; blocker?: string }>
+  verify(manifest: MetaManifest, destination: MetaDestination, remoteId: string): Promise<{ verified: boolean; permalink?: string; blocker?: string; notice?: string }>
 }
 /**
  * Posts published outside the publisher and verified by the owner. Holding them in code
@@ -92,6 +96,9 @@ export function validateManifest(value: unknown): asserts value is MetaManifest 
   if (!["still", "carousel", "video"].includes(m.format) || !Array.isArray(m.assets) || !m.assets.length) throw new MetaBlocked("Invalid media format")
   if (m.format !== "carousel" && m.assets.length !== 1 || m.format === "carousel" && m.assets.length < 2) throw new MetaBlocked("Invalid asset count")
   if (typeof m.instagramShareToFeed !== "boolean" || typeof m.aiGenerated !== "boolean" || typeof m.publicHostingApproved !== "boolean") throw new MetaBlocked("Explicit AI and public hosting choices required")
+  // Meta's self-disclosure rule covers photorealistic video and realistic audio, so an AI video must say which it is.
+  if (m.aiRealisticMedia !== undefined && (typeof m.aiRealisticMedia !== "boolean" || m.format !== "video")) throw new MetaBlocked("The photorealistic-media declaration applies to video only")
+  if (m.format === "video" && m.aiGenerated && typeof m.aiRealisticMedia !== "boolean") throw new MetaBlocked("State whether this AI video is photorealistic or has realistic audio; Meta requires disclosure for those")
   for (const a of m.assets) {
     if (!a || typeof a.url !== "string" || !a.url.startsWith("https://") || typeof a.name !== "string" || !a.name || !/^[a-f0-9]{64}$/.test(a.sha256) || !Number.isSafeInteger(a.size) || a.size < 1 || !["image/jpeg", "image/png", "video/mp4"].includes(a.mime) || !Number.isFinite(a.width) || a.width <= 0 || !Number.isFinite(a.height) || a.height <= 0) throw new MetaBlocked("Invalid asset identity or metadata")
     if (a.mime === "video/mp4" && (!Number.isFinite(a.duration) || a.duration! <= 0)) throw new MetaBlocked("Video duration required")
@@ -178,7 +185,7 @@ export async function runOwnedMeta(args: {
         if (job.remoteId) {
           try {
             const v = await provider.verify(r.batch.manifest, destination, job.remoteId)
-            await mutate(current => { const j = current.batch.jobs[destination]; if (v.verified && v.permalink) { j.status = "verified"; j.permalink = v.permalink; j.verifiedAt = now(); delete j.blocker } else { j.status = "needs_reconciliation"; j.blocker = v.blocker || "Remote outcome unverified" } }, true)
+            await mutate(current => { const j = current.batch.jobs[destination]; if (v.notice) j.notice = v.notice; if (v.verified && v.permalink) { j.status = "verified"; j.permalink = v.permalink; j.verifiedAt = now(); delete j.blocker } else { j.status = "needs_reconciliation"; j.blocker = v.blocker || "Remote outcome unverified" } }, true)
           } catch (error) {
             if ((error instanceof MetaPermissionError || error instanceof MetaBlocked) && error.detail) await mutate(current => { current.batch.jobs[destination].lastError = error.detail }, true).catch(() => {})
             throw error
@@ -241,6 +248,7 @@ export async function runOwnedMeta(args: {
         const result = await provider.verify(r.batch.manifest, destination, remoteId)
         await mutate(current => {
           job = current.batch.jobs[destination]
+          if (result.notice) job.notice = result.notice
           if (result.verified && result.permalink) { job.status = "verified"; job.permalink = result.permalink; job.verifiedAt = now(); delete job.blocker }
           else { job.status = "needs_reconciliation"; job.blocker = result.blocker || "Published result needs review" }
         }, true)
