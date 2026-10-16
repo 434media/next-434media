@@ -341,9 +341,8 @@ export default function TravelItinerary({
           <h1>Your route, at a glance. Every time shows the clock at its airport.</h1>
         </section>
 
-        <section className={styles.nextCard} aria-label="Next up">
+        {nextEvent && <section className={styles.nextCard} aria-label="Next up">
           <span className={`${styles.nextLabel} ${styles.label}`}>Next up</span>
-          {nextEvent ? <>
             <div className={styles.nextTime}>{(() => {
               // The zone abbreviation sets smaller than the clock it belongs to.
               const stamp = time(eventStart(nextEvent), zoneSource(nextEvent))
@@ -357,10 +356,7 @@ export default function TravelItinerary({
               <a href={`#day-${nextEventDay?.date || eventStart(nextEvent).slice(0, 10)}`}>View day</a>
               <a className={styles.secondary} href={mapHref(nextEvent.kind === "shoot" ? nextEvent.location : nextEvent.kind === "hotel" ? nextEvent.address : `${nextEvent.origin} airport`)} target="_blank" rel="noreferrer">Open map</a>
             </div>
-          </> : <><div className={styles.nextTime}>Pending</div><div className={styles.nextTitle}>Final outbound routing</div></>}
-        </section>
-
-        <aside className={styles.alert}><span className={styles.label}>Open item</span><div><strong>ATOMS filming is not yet scheduled.</strong></div></aside>
+        </section>}
 
         <section className={styles.routeSection}>
           <div className={styles.sectionHead}><h2 className={styles.label}>Trip route</h2><p className={styles.label}>Swipe to scan</p></div>
