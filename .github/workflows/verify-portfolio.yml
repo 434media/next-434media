@@ -90,3 +90,6 @@ jobs:
       - run: tsx --test lib/__tests__/owned-meta-service.test.ts
       # Canva brand-template fill for the Slack app, including the photo crop (sharp runs for real here).
       - run: tsx --test lib/__tests__/canva-create.test.ts
+      # Content pipeline in the Admin (moved from the pilot's Slack MCU skill): research → copy → photo → Canva →
+      # artwork check → a Review post on the board, the lease rules and the zero-retention model routing. All faked.
+      - run: tsx --test lib/__tests__/content-pipeline.test.ts

@@ -573,6 +573,12 @@ export const CRM_COLLECTIONS = {
   BUILDERS: "crm_builders",
   COHORT_TASKS: "crm_cohort_tasks",
   PAINPOINTS: "crm_painpoints",
+  // Content pipeline (lib/content-pipeline/): one Generate request is a job; each story it opens is a draft that
+  // becomes a crm_content_posts record in Review. Working state under a lease, not content: the board reads posts.
+  CONTENT_PIPELINE_JOBS: "content_pipeline_jobs",
+  CONTENT_PIPELINE_DRAFTS: "content_pipeline_drafts",
+  // Settings the pipeline reads at run time; doc "mcu_seeds" holds the private Tracker seeds (not in this repo).
+  CONTENT_PIPELINE_CONFIG: "content_pipeline_config",
 } as const
 
 // ============================================
