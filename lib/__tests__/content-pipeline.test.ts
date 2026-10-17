@@ -14,6 +14,7 @@ import { assertPublicHttps, imageSize, pageImageCandidate, parsePage, usableLice
 import { servedBy, servedCall, type McuAi, type ModelCall } from "../content-pipeline/model"
 import { PIPELINE_MODELS, FALLBACK_MODELS, CALL_FALLBACK, callOptions, outputBudget } from "../content-pipeline/models"
 import { seedBrief, seedProblems, type McuSeeds } from "../content-pipeline/seeds"
+import { PIPELINE_PROPERTIES, PROPERTY_TEMPLATES, propertyCanGenerate } from "../content-pipeline/properties"
 
 // ── in-memory store with the Firestore store's lease semantics ──
 class MemStore implements McuStore {
@@ -386,6 +387,15 @@ test("a draft on its last attempt shows as failed with its error at once, not as
   const d = onlyDraft(w)
   assert.equal(d.status, "failed"); assert.match(d.error!, /the media step failed 4 times; last error: every provider at capacity/)
   assert.equal(w.alerts.length, 1); assert.equal(await runDue(w.deps, 1e9), 0)
+})
+
+test("properties: the roster's five, only MilCityUSA can generate, and only from templates the worker fills", () => {
+  assert.deepEqual(PIPELINE_PROPERTIES.map(p => p.label), ["MilCityUSA", "TXMX Boxing", "VemosVamos", "DEVSA", "Digital Canvas"])
+  assert.deepEqual(PIPELINE_PROPERTIES.filter(p => p.active).map(p => p.id), ["milcity"])
+  assert.ok(PIPELINE_PROPERTIES.filter(p => !p.active).every(p => p.reason === "No templates connected yet"))
+  assert.deepEqual(PROPERTY_TEMPLATES.milcity.map(t => t.kind), ["news", "breaking", "dt101", "icymi"])
+  assert.deepEqual(PROPERTY_TEMPLATES.milcity.find(t => t.kind === "dt101")!.templates, [SERIES.dt101.templates.feed])
+  assert.ok(propertyCanGenerate("milcity", "dt101")); assert.ok(!propertyCanGenerate("txmx", "news")); assert.ok(!propertyCanGenerate("milcity", "followon_text"))
 })
 
 test("seeds: the brief uses them when loaded and says so when not; a malformed set is refused", () => {

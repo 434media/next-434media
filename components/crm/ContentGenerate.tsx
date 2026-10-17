@@ -3,21 +3,18 @@
 import { useCallback, useEffect, useRef, useState } from "react"
 import Link from "next/link"
 import { Newspaper, X, Loader2, ArrowUpRight } from "lucide-react"
+import { DEFAULT_PROPERTY, PIPELINE_PROPERTIES, PROPERTY_TEMPLATES } from "@/lib/content-pipeline/properties"
+import type { RequestKind } from "@/lib/content-pipeline/series"
 
-// The board's Generate control (content pipeline, lib/content-pipeline/): starts a MilCityUSA batch by series and
-// count, then shows where each draft stands. Drafts land in the Review column as content posts with their rendered
+// The board's Generate control (content pipeline, lib/content-pipeline/): choose a property, then one of its
+// templates, then an optional instruction, and start a batch; then see where each draft stands. Only MilCityUSA has
+// templates connected (founder, 2026-10-17). Drafts land in the Review column as content posts with their rendered
 // Canva card; nothing here approves or publishes. Super-admin only (the API enforces it).
 
-const SERIES = [
-  { value: "news", label: "News" },
-  { value: "breaking", label: "Breaking" },
-  { value: "dt101", label: "DT101" },
-  { value: "icymi", label: "ICYMI" },
-] as const
-type Kind = typeof SERIES[number]["value"]
+type Kind = RequestKind
 
 interface DraftView { id: string; status: string; title: string; holdReason: string | null; error: string | null; postId: string | null; checks: number }
-interface JobView { id: string; kind: Kind; count: number; topic: string | null; status: string; note: string | null; createdAt: string; drafts: DraftView[] }
+interface JobView { id: string; property: string; kind: Kind; count: number; topic: string | null; status: string; note: string | null; createdAt: string; drafts: DraftView[] }
 interface RunsResponse { seeds: { loaded: boolean; snapshot?: string }; jobs: JobView[] }
 
 const STATUS_LABEL: Record<string, string> = {
@@ -25,10 +22,12 @@ const STATUS_LABEL: Record<string, string> = {
   queued: "Queued", writing: "Writing", media: "Finding a photo", designing: "Filling Canva", reviewing: "Checking artwork", posting: "Adding to board", in_review: "In Review",
 }
 const SETTLED = new Set(["done", "held", "failed", "in_review"])
-const kindLabel = (k: string) => SERIES.find(s => s.value === k)?.label ?? k
+const kindLabel = (k: string, property = DEFAULT_PROPERTY) => PROPERTY_TEMPLATES[property]?.find(t => t.kind === k)?.label ?? k
+const propertyLabel = (id: string) => PIPELINE_PROPERTIES.find(p => p.id === id)?.label ?? id
 
 export function ContentGenerate({ onDraftsReady }: { onDraftsReady?: () => void }) {
   const [open, setOpen] = useState(false)
+  const [property, setProperty] = useState(DEFAULT_PROPERTY)
   const [kind, setKind] = useState<Kind>("dt101")
   const [count, setCount] = useState(1)
   const [topic, setTopic] = useState("")
@@ -80,7 +79,7 @@ export function ContentGenerate({ onDraftsReady }: { onDraftsReady?: () => void 
     try {
       const r = await fetch("/api/admin/content-pipeline/generate", {
         method: "POST", headers: { "content-type": "application/json" },
-        body: JSON.stringify({ requestId: crypto.randomUUID().replace(/-/g, ""), kind, count: kind === "icymi" ? 1 : count, ...(topic.trim() ? { topic: topic.trim() } : {}) }),
+        body: JSON.stringify({ requestId: crypto.randomUUID().replace(/-/g, ""), property, kind, count: kind === "icymi" ? 1 : count, ...(topic.trim() ? { topic: topic.trim() } : {}) }),
       })
       const data = await r.json().catch(() => ({}))
       if (!r.ok) { setError(data.error || "Could not start the run"); return }
@@ -108,23 +107,37 @@ export function ContentGenerate({ onDraftsReady }: { onDraftsReady?: () => void 
         <div className="absolute right-0 z-30 mt-2 w-[min(92vw,380px)] rounded-lg bg-white shadow-lg ring-1 ring-neutral-200 p-4 space-y-4">
           <div className="flex items-start justify-between gap-3">
             <div>
-              <p className="text-sm font-semibold text-neutral-900">Generate MilCityUSA drafts</p>
+              <p className="text-sm font-semibold text-neutral-900">Generate drafts</p>
               <p className="text-xs text-neutral-500 mt-0.5">Researched, written, filled in Canva and checked. Drafts arrive in Review; nothing is published.</p>
             </div>
             <button type="button" onClick={() => setOpen(false)} aria-label="Close" className="p-1 rounded text-neutral-400 hover:text-neutral-700"><X className="w-4 h-4" /></button>
           </div>
 
           <div className="space-y-3">
-            <div className="inline-flex w-full rounded-md ring-1 ring-neutral-200 overflow-hidden divide-x divide-neutral-200" role="radiogroup" aria-label="Series">
-              {SERIES.map(s => (
-                <button key={s.value} type="button" role="radio" aria-checked={kind === s.value} onClick={() => setKind(s.value)}
-                  className={`flex-1 h-8 text-xs font-medium transition-colors ${kind === s.value ? "bg-neutral-900 text-white" : "text-neutral-700 hover:bg-neutral-50"}`}>
-                  {s.label}
-                </button>
-              ))}
+            <div className="space-y-1">
+              <label className="text-xs font-medium text-neutral-700" htmlFor="gen-property">Property</label>
+              <select id="gen-property" value={property} onChange={e => setProperty(e.target.value)} className="w-full h-8 rounded-md ring-1 ring-neutral-200 bg-white px-2 text-sm">
+                {PIPELINE_PROPERTIES.map(p => (
+                  <option key={p.id} value={p.id} disabled={!p.active}>{p.label}{p.active ? "" : ` — ${p.reason}`}</option>
+                ))}
+              </select>
             </div>
+            <fieldset className="space-y-1">
+              <legend className="text-xs font-medium text-neutral-700">Template</legend>
+              <div className="rounded-md ring-1 ring-neutral-200 divide-y divide-neutral-100" role="radiogroup" aria-label="Template">
+                {(PROPERTY_TEMPLATES[property] ?? []).map(t => (
+                  <label key={t.kind} className={`flex items-start gap-2 px-2.5 py-2 cursor-pointer ${kind === t.kind ? "bg-neutral-50" : "hover:bg-neutral-50"}`}>
+                    <input type="radio" name="gen-template" value={t.kind} checked={kind === t.kind} onChange={() => setKind(t.kind)} className="mt-0.5" />
+                    <span className="min-w-0">
+                      <span className="block text-sm text-neutral-900">{t.label}</span>
+                      <span className="block text-[11px] text-neutral-500">{t.detail} · Canva {t.templates.join(" + ")}</span>
+                    </span>
+                  </label>
+                ))}
+              </div>
+            </fieldset>
             <div className="flex items-center gap-3">
-              <label className="text-xs text-neutral-600" htmlFor="gen-count">Posts</label>
+              <label className="text-xs font-medium text-neutral-700" htmlFor="gen-count">Posts</label>
               {kind === "icymi" ? (
                 <span className="text-xs text-neutral-500">One roundup of five published stories</span>
               ) : (
@@ -134,8 +147,11 @@ export function ContentGenerate({ onDraftsReady }: { onDraftsReady?: () => void 
               )}
             </div>
             {kind !== "icymi" && (
-              <input value={topic} onChange={e => setTopic(e.target.value)} maxLength={300} placeholder="Topic or angle (optional)"
-                className="w-full h-8 rounded-md ring-1 ring-neutral-200 px-2.5 text-sm placeholder:text-neutral-400" />
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-neutral-700" htmlFor="gen-instruction">Instruction <span className="font-normal text-neutral-400">(optional)</span></label>
+                <textarea id="gen-instruction" value={topic} onChange={e => setTopic(e.target.value)} maxLength={1000} rows={2} placeholder="A subject, company or angle to steer research and writing"
+                  className="w-full rounded-md ring-1 ring-neutral-200 px-2.5 py-1.5 text-sm placeholder:text-neutral-400 resize-y" />
+              </div>
             )}
             {runs && !runs.seeds.loaded && (
               <p className="text-xs text-amber-700 bg-amber-50 ring-1 ring-amber-200 rounded px-2 py-1.5">Source seeds aren&apos;t loaded, so research runs on the editorial rules alone.</p>
@@ -144,7 +160,7 @@ export function ContentGenerate({ onDraftsReady }: { onDraftsReady?: () => void 
             <button type="button" onClick={start} disabled={starting}
               className="w-full inline-flex items-center justify-center gap-2 h-9 rounded-md bg-neutral-900 text-white text-sm font-medium hover:bg-neutral-800 disabled:opacity-50">
               {starting && <Loader2 className="w-4 h-4 animate-spin" />}
-              Start {kindLabel(kind)}{kind !== "icymi" && count > 1 ? ` × ${count}` : ""}
+              Start {kindLabel(kind, property)}{kind !== "icymi" && count > 1 ? ` × ${count}` : ""}
             </button>
           </div>
 
@@ -154,7 +170,7 @@ export function ContentGenerate({ onDraftsReady }: { onDraftsReady?: () => void 
               {runs.jobs.map(j => (
                 <div key={j.id} className="space-y-1">
                   <p className="text-xs text-neutral-700">
-                    <span className="font-medium">{kindLabel(j.kind)}{j.count > 1 ? ` × ${j.count}` : ""}</span>
+                    <span className="font-medium">{propertyLabel(j.property)} · {kindLabel(j.kind, j.property)}{j.count > 1 ? ` × ${j.count}` : ""}</span>
                     <span className="text-neutral-400"> · {STATUS_LABEL[j.status] ?? j.status} · {new Date(j.createdAt).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}</span>
                   </p>
                   {j.note && <p className="text-[11px] text-neutral-500">{j.note}</p>}

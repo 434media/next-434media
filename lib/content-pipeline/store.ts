@@ -16,6 +16,8 @@ export interface RequestRef { actorEmail: string; actorName: string }
 export type JobStatus = "researching" | "drafting" | "done" | "held" | "failed"
 export interface McuJob {
   id: string
+  /** The property generated for (properties.ts id, e.g. "milcity"). Older jobs have none and were MilCityUSA. */
+  property?: string
   kind: RequestKind
   count: number
   topic?: string
