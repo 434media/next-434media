@@ -195,6 +195,7 @@ test("sources: licenses, page dates, and only public https hosts", async () => {
   assert.ok(!usableLicense("Fair use") && !usableLicense("CC BY-NC 2.0") && !usableLicense(""))
   const p = parsePage("https://www.army.mil/a", `<html><head><title>T</title><meta property="article:published_time" content="2026-10-15T14:00:00Z"><meta property="og:image" content="https://x/y.jpg"></head><body><script>bad()</script><p>Hello &amp; welcome</p></body></html>`)
   assert.equal(p.publishedAt, "2026-10-15T14:00:00Z"); assert.equal(p.image, "https://x/y.jpg"); assert.equal(p.text, "Hello & welcome")
+  assert.equal(parsePage("https://x.example/a", "<p>&amp;lt;b&amp;gt; &#8212; &rsquo;&#99999999;</p>").text, "&lt;b&gt; — '&#99999999;") // one pass: no double unescaping
   const resolve = (ips: string[]) => async () => ips
   await assert.rejects(assertPublicHttps("http://www.army.mil/", resolve(["1.2.3.4"])), /https_only/)
   await assert.rejects(assertPublicHttps("https://169.254.169.254/", resolve([])), /not_public/)
@@ -226,7 +227,7 @@ test("DT101 research may add the maker's own page; its text follows the primary'
   assert.deepEqual(d.story.supporting, [{ url: "https://maker.example.com/bumblebee", title: "Bumblebee V2 — Perennial Autonomy" }])
   assert.match(d.story.sourceText, /--- SUPPORTING SOURCE: Bumblebee V2 — Perennial Autonomy \(https:\/\/maker\.example\.com\/bumblebee\) ---\nPerennial Autonomy, headquartered in Austin/)
   assert.match(w.posts[0].notes, /\nAlso: Bumblebee V2 — Perennial Autonomy — https:\/\/maker\.example\.com\/bumblebee/)
-  assert.ok(w.posts[0].links.includes("https://maker.example.com/bumblebee"))
+  assert.deepEqual(w.posts[0].links, ["https://www.army.mil/article/1", "https://maker.example.com/bumblebee", CANDIDATE.pageUrl])
 })
 
 test("a long photo phrase falls back to shorter Commons searches: trimmed phrase, subject, maker (live test, 2026-10-16)", async () => {

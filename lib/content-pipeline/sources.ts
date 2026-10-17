@@ -51,7 +51,9 @@ async function readBounded(res: Response, max: number): Promise<Uint8Array> {
 }
 
 export interface SourcePage { url: string; title: string; text: string; publishedAt?: string; image?: string; siteName?: string; description?: string }
-const decode = (s: string) => s.replace(/&nbsp;/g, " ").replace(/&amp;/g, "&").replace(/&quot;/g, "\"").replace(/&#39;|&#x27;|&rsquo;|&lsquo;/g, "'").replace(/&ldquo;|&rdquo;/g, "\"").replace(/&mdash;/g, "—").replace(/&ndash;/g, "–").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&#(\d+);/g, (_, n) => String.fromCodePoint(Number(n)))
+// One pass over the entities, so "&amp;lt;" becomes "&lt;" and never "<" (no double unescaping).
+const ENTITIES: Record<string, string> = { nbsp: " ", amp: "&", quot: "\"", "#39": "'", "#x27": "'", rsquo: "'", lsquo: "'", ldquo: "\"", rdquo: "\"", mdash: "—", ndash: "–", lt: "<", gt: ">" }
+const decode = (s: string) => s.replace(/&(#\d{1,7}|#x27|[a-z]+);/gi, (m, e: string) => /^#\d+$/.test(e) ? (Number(e.slice(1)) <= 0x10ffff ? String.fromCodePoint(Number(e.slice(1))) : m) : ENTITIES[e.toLowerCase()] ?? m)
 function meta(html: string, key: string): string | undefined {
   const re = new RegExp(`<meta[^>]+(?:property|name|itemprop)=["']${key}["'][^>]*>`, "i"), tag = re.exec(html)?.[0]
   const v = tag && /content=["']([^"']*)["']/i.exec(tag)?.[1]
