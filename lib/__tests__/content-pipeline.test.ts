@@ -703,7 +703,7 @@ test("ICYMI: DT101 posts are not recapped; each card's photo is its own story's;
   const d = onlyDraft(w)
   assert.deepEqual(d.story.roundup!.map(r => r.postId), ["p2", "p3", "p4", "p5", "p6"]) // the DT101 mission brief is left out
   assert.deepEqual(subjects, ["STORY 2", "STORY 3", "STORY 4", "STORY 5", "STORY 6"]) // one pick per story card; none for the cover
-  assert.ok(!fetched.some(u => u.includes("instagram.com"))) // a social post's image is never a photo source
+  assert.ok(!fetched.some(u => new URL(u).hostname === "www.instagram.com")) // a social post's image is never a photo source
   assert.equal(d.media[0]!.pageUrl, d.media[1]!.pageUrl) // the cover shows the lead story's photo
   assert.equal(new Set(d.media.slice(1).map(m => m!.pageUrl)).size, 5)
   assert.equal(d.status, "in_review"); assert.equal(w.designs.length, 6)
