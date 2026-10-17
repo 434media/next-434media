@@ -34,14 +34,21 @@ export async function assertPublicHttps(raw: string, resolve: (host: string) => 
 }
 
 export interface Fetcher { (url: URL, init: RequestInit): Promise<Response> }
-/** Follows up to 4 redirects, re-checking each hop. */
-async function guardedFetch(raw: string, fetcher: Fetcher, accept: string, check = assertPublicHttps): Promise<Response> {
+/**
+ * Follows up to 4 redirects, re-checking each hop. A hop to plain http is asked for over https instead (servers
+ * behind a TLS proxy often redirect to their own http:// address); the hop is then checked like any other, so
+ * nothing is ever fetched without TLS. Gate round 1 (2026-10-17) dropped a Breaking Defense article as "https_only"
+ * although its URL was https: the error named the first URL, not the hop that failed, which it now does.
+ */
+export async function guardedFetch(raw: string, fetcher: Fetcher, accept: string, check = assertPublicHttps): Promise<Response> {
   let url = await check(raw)
   for (let hop = 0; hop < 5; hop++) {
     const res = await fetcher(url, { headers: { "user-agent": USER_AGENT, accept, "accept-language": "en-US,en;q=0.8" }, redirect: "manual", cache: "no-store", signal: AbortSignal.timeout(15_000) })
     const loc = res.status >= 300 && res.status < 400 ? res.headers.get("location") : null
     if (!loc) return res
-    url = await check(new URL(loc, url).toString())
+    const next = new URL(loc, url)
+    if (next.protocol === "http:") { next.protocol = "https:"; if (next.port === "80") next.port = "" }
+    try { url = await check(next.toString()) } catch (err) { throw new Error(`${err instanceof Error ? err.message : "blocked"} (redirect to ${next.toString().slice(0, 160)})`) }
   }
   throw new Error("too_many_redirects")
 }

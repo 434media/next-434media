@@ -8,17 +8,24 @@
  *  - fallback: today's models, Claude Opus 5.5 for writing and Sonnet 5.5 for vision.
  * Every slug was checked against https://ai-gateway.vercel.sh/v1/models on 2026-10-17.
  */
+/** The fallback a step moves to when it fails the quality gate (Phase 1b records which, if any). */
+export const FALLBACK_MODELS = { text: "anthropic/claude-opus-5.5", vision: "anthropic/claude-sonnet-5.5" } as const
+/** The founder's vision default, kept for the record and for moving a step back once its provider can serve it. */
+export const SCOUT = "meta/llama-4-scout"
+/**
+ * Quality gate round 1 (production, 2026-10-17 18:40Z, seven runs): Scout answered 2 of 11 vision calls. Every other
+ * one failed over to bedrock, which refuses the single-tool "required" choice ("This model doesn't support the
+ * toolConfig.toolChoice.any field"), and went to the fallback. A step that falls short moves to its fallback (plan
+ * v5, Phase 1 step 4), so photoPick and artworkCheck run on Sonnet 5.5; the text steps stay on Nemotron.
+ */
 export const PIPELINE_MODELS = {
   research: "nvidia/nemotron-3.5-lightning",
   write: "nvidia/nemotron-3.5-lightning",
   photoSearch: "nvidia/nemotron-3.5-lightning",
-  photoPick: "meta/llama-4-scout",
-  artworkCheck: "meta/llama-4-scout",
+  photoPick: FALLBACK_MODELS.vision,
+  artworkCheck: FALLBACK_MODELS.vision,
 } as const
 export type PipelineStep = keyof typeof PIPELINE_MODELS
-
-/** The fallback a step moves to when it fails the quality gate (Phase 1b records which, if any). */
-export const FALLBACK_MODELS = { text: "anthropic/claude-opus-5.5", vision: "anthropic/claude-sonnet-5.5" } as const
 /**
  * Per call: when a vision step's model can't answer (every qualifying provider at capacity, a refused request, no
  * tool call), the same call goes once to the vision fallback, under the same zero-retention and no-training routing,

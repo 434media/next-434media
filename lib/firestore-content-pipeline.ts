@@ -62,6 +62,10 @@ export function firestorePipelineStore(db: FirebaseFirestore.Firestore = getDb()
       const ids = [...own.docs.map(d => d.id), ...posts.docs.map(d => String(d.get("intake.requestId") ?? "")), ...designs.docs.map(d => String(d.get("requestId") ?? ""))]
       return Math.max(0, ...ids.map(id => Number(/^\d{2,}/.exec(id.slice(prefix.length))?.[0] ?? 0)))
     },
+    recentStories: async sinceIso => {
+      const snap = await drafts.where("createdAt", ">=", sinceIso).limit(200).get()
+      return snap.docs.map(doc => doc.data().draft as McuDraft | undefined).filter((d): d is McuDraft => !!d?.story).map(d => ({ draftId: d.id, jobId: d.jobId, title: d.story.title, primaryUrl: d.story.primaryUrl }))
+    },
   }
 }
 

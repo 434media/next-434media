@@ -111,6 +111,11 @@ export interface McuStore {
    * (MCU-NEWS-20261016-01, -02, …) never repeat an id that already names a design or a post.
    */
   highestDraftNumber(prefix: string): Promise<number>
+  /**
+   * Stories of drafts opened since sinceIso, by any job: the repeat-story check before they reach the board. Gate
+   * round 1 (2026-10-17) drafted Anduril's Steelfin in two concurrent jobs and the Army's NGC2 awards twice in one.
+   */
+  recentStories(sinceIso: string): Promise<{ draftId: string; jobId: string; title: string; primaryUrl: string }[]>
 }
 
 export const WORKING: readonly DraftStatus[] = ["queued", "writing", "media", "designing", "reviewing", "posting"]

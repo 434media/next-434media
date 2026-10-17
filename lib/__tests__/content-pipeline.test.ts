@@ -8,9 +8,9 @@
 import { test } from "node:test"
 import assert from "node:assert/strict"
 import { SERIES, checkFields, clippedWords, ddmmmyy, lineCount, type SeriesKey } from "../content-pipeline/series"
-import { runDue, RETRY_MS, staleSource, makerOf, searchedPageUsable, unsourcedNumbers, withCredits, imageLabel, mediaQueries, cropFit, choosePhoto, zoomCrop, reviewNotes, DOD_NOTICE, LEASE_MS, type WorkerDeps, type DesignInput, type PostInput, type NoContentInput } from "../content-pipeline/worker"
+import { runDue, RETRY_MS, staleSource, allowsRepresentative, makerOf, searchedPageUsable, unsourcedNumbers, withCredits, imageLabel, mediaQueries, cropFit, choosePhoto, zoomCrop, reviewNotes, DOD_NOTICE, LEASE_MS, type WorkerDeps, type DesignInput, type PostInput, type NoContentInput } from "../content-pipeline/worker"
 import { MAX_ATTEMPTS, type McuDraft, type McuJob, type McuStore } from "../content-pipeline/store"
-import { archiveRelevant, assertPublicHttps, imageSize, pageImageCandidate, parsePage, searchNasa, searchOpenverse, usableLicense, type MediaCandidate } from "../content-pipeline/sources"
+import { archiveRelevant, assertPublicHttps, guardedFetch, imageSize, pageImageCandidate, parsePage, searchNasa, searchOpenverse, usableLicense, type MediaCandidate } from "../content-pipeline/sources"
 import { brandDirection, isPhotoDefect, readPick, searchResultUrls, servedBy, servedCall, type McuAi, type ModelCall } from "../content-pipeline/model"
 import { PIPELINE_MODELS, FALLBACK_MODELS, CALL_FALLBACK, callOptions, outputBudget } from "../content-pipeline/models"
 import { seedBrief, seedProblems, type McuSeeds } from "../content-pipeline/seeds"
@@ -34,6 +34,7 @@ class MemStore implements McuStore {
   pilotUsed: string[] = [] // ids the pilot already used, as the shared ledgers record them
   async highestDraftNumber(prefix: string) { return Math.max(0, ...[...this.drafts.keys(), ...this.pilotUsed].filter(k => k.startsWith(prefix)).map(k => Number(k.slice(prefix.length, prefix.length + 2)))) }
   async backoff(k: "job" | "draft", id: string, until: number) { this.col(k).get(id)!.leaseUntil = until }
+  async recentStories(since: string) { return [...this.drafts.values()].map(v => v.draft).filter(d => d.createdAt >= since && d.story).map(d => ({ draftId: d.id, jobId: d.jobId, title: d.story.title, primaryUrl: d.story.primaryUrl })) }
 }
 
 const NOW = Date.parse("2026-10-16T18:00:00Z")
@@ -434,7 +435,7 @@ test("DT101 image label reads like the approved cards", () => {
 })
 
 test("model settings: founder defaults, routing pinned to zero-retention no-training providers, Scout's output cap", () => {
-  assert.deepEqual(PIPELINE_MODELS, { research: "nvidia/nemotron-3.5-lightning", write: "nvidia/nemotron-3.5-lightning", photoSearch: "nvidia/nemotron-3.5-lightning", photoPick: "meta/llama-4-scout", artworkCheck: "meta/llama-4-scout" })
+  assert.deepEqual(PIPELINE_MODELS, { research: "nvidia/nemotron-3.5-lightning", write: "nvidia/nemotron-3.5-lightning", photoSearch: "nvidia/nemotron-3.5-lightning", photoPick: "anthropic/claude-sonnet-5.5", artworkCheck: "anthropic/claude-sonnet-5.5" }) // moved to the fallback, gate round 1
   assert.deepEqual(FALLBACK_MODELS, { text: "anthropic/claude-opus-5.5", vision: "anthropic/claude-sonnet-5.5" })
   // runinfra (no ZDR, may train) is never a route for Nemotron.
   assert.deepEqual(callOptions("nvidia/nemotron-3.5-lightning", "medium"), { gateway: { only: ["deepinfra", "fireworks"], zeroDataRetention: true, disallowPromptTraining: true } })
@@ -624,6 +625,96 @@ test("no photo of the subject fits: the subject is replaced, and its design gets
   await w.start({ kind: "dt101" })
   const d = onlyDraft(w)
   assert.equal(d.status, "in_review"); assert.equal(d.autoReplaced, 1); assert.equal(d.story.title, "Second story")
-  assert.ok(d.history.some(h => /couldn't be sourced \(no relevant, licensed photo was found for "Army command post": no photo of the subject fits the 4:5 card/.test(h.event)))
+  assert.ok(d.history.some(h => /couldn't be sourced \(no relevant, licensed photo was found \("Army command post"\): no photo of the subject fits the 4:5 card/.test(h.event)))
   assert.equal(w.designs.length, 1); assert.equal(w.designs[0].requestId, "admin:MCU-DT101-20261016-01:v1:f1:r1")
+})
+
+// ── Phase 1b, gate round 1 (production, 2026-10-17 18:40Z: seven runs, none reached Review) ──
+test("crop: a wide subject may lose its ends when its core stays in frame (the Steelfin render, the NGC2 soldiers)", () => {
+  const render = [{ ...CANDIDATE, width: 1200, height: 630 }]
+  const wide = { x0: 0.18, y0: 0.03, x1: 0.82, y1: 0.98 }
+  assert.equal(choosePhoto({ index: 0, ranked: [{ index: 0, box: wide, context: false }] }, render, "feed").index, null) // round 1: always cut off
+  const r = choosePhoto({ index: 0, ranked: [{ index: 0, box: wide, core: { x0: 0.38, y0: 0.15, x1: 0.62, y1: 0.85 }, context: false }] }, render, "feed")
+  assert.equal(r.index, 0)
+  const scene = [{ ...CANDIDATE, width: 2000, height: 1334 }]
+  const s = choosePhoto({ index: 0, ranked: [{ index: 0, box: { x0: 0.06, y0: 0.06, x1: 0.95, y1: 0.9 }, core: { x0: 0.3, y0: 0.1, x1: 0.62, y1: 0.6 } }] }, scene, "feed")
+  assert.equal(s.index, 0)
+  // The crop is centred on the core, not on the whole subject.
+  if (s.index !== null) assert.ok(s.crop.x <= 0.3 && s.crop.x + s.crop.width >= 0.62)
+  // A core that the crop still cuts is refused.
+  assert.equal(choosePhoto({ index: 0, ranked: [{ index: 0, box: wide, core: { x0: 0.18, y0: 0.15, x1: 0.82, y1: 0.85 }, context: false }] }, render, "feed").index, null)
+})
+
+test("photo pick: representative photos count only where the story allows them, after any exact match", () => {
+  const box = { x0: 0.2, y0: 0.1, x1: 0.8, y1: 0.6 }
+  const raw = { index: 0, reason: "r", ranked: [
+    { index: 0, shows: "soldiers testing NGC2 on laptops aboard a C-17", match: "representative", ...box, core: { x0: 0.3, y0: 0.2, x1: 2, y1: 0.5 } },
+    { index: 1, shows: "the NGC2 command post vehicle", match: "exact", ...box },
+  ] }
+  const news = readPick(raw, 2, true)
+  assert.deepEqual(news.ranked!.map(x => [x.index, !!x.representative]), [[1, false], [0, true]]); assert.equal(news.index, 1)
+  assert.deepEqual(news.ranked![1].core, { x0: 0.3, y0: 0.2, x1: 0.8, y1: 0.5 }) // clipped to the subject box
+  const dt = readPick(raw, 2, false)
+  assert.deepEqual(dt.ranked!.map(x => x.index), [1]); assert.match(dt.turnedDown![0], /^#0 representative:/)
+  assert.equal(allowsRepresentative({ series: "news", fields: {} }), true); assert.equal(allowsRepresentative({ series: "icymi_story", fields: {} }), true); assert.equal(allowsRepresentative({ series: "dt101", fields: {} }), false)
+})
+
+test("a News draft may go to Review on a representative photo, with a note for the reviewer; DT101 never asks for one", async () => {
+  const asked: boolean[] = []
+  const w = world({ ai: { pickMedia: async ({ representative }) => { asked.push(!!representative); return { index: 0, reason: "soldiers using it", ranked: [{ index: 0, box: HERO, representative: true, shows: "soldiers testing NGC2" }] } } } })
+  await w.start({ kind: "news" })
+  const d = onlyDraft(w)
+  assert.equal(d.status, "in_review"); assert.deepEqual(asked, [true])
+  assert.match(d.media[0]!.note!, /Representative photo \(soldiers testing NGC2\), not the event itself/)
+  assert.match(w.posts[0].notes, /Representative photo/)
+  const dt = world({ ai: { pickMedia: async ({ representative }) => { asked.push(!!representative); return { index: 0, reason: "ok", ranked: [{ index: 0, box: HERO }] } } } })
+  await dt.start({ kind: "dt101" })
+  assert.equal(asked.at(-1), false)
+})
+
+test("repeat stories: a story another draft is working on is refused, across jobs and within a job", async () => {
+  const w = world()
+  // Another job already opened the first story.
+  await w.store.createDraft({ ...structuredClone(onlyDraftShape()), id: "MCU-DT101-20261016-01", jobId: "job-other", story: { title: "Army picks nine C2 software vendors", primaryUrl: "https://www.army.mil/article/1/", publisher: "U.S. Army", sourceTitle: "t", sourceText: "x" } })
+  const drafting: string[][] = []
+  w.deps.ai = (inner => (onCall: (c: ModelCall) => void) => { const ai = inner(onCall); return { ...ai, research: async (i: Parameters<McuAi["research"]>[0]) => { drafting.push(i.drafting ?? []); return ai.research(i) } } })(w.deps.ai)
+  await w.start({ kind: "news" })
+  const mine = [...w.store.drafts.values()].map(v => v.draft).filter(d => d.jobId === "job-news-1")
+  assert.equal(mine.length, 1); assert.equal(mine[0].story.primaryUrl, "https://www.army.mil/article/2") // the second story, not the taken one
+  assert.deepEqual(drafting[0], ["Army picks nine C2 software vendors"])
+})
+function onlyDraftShape(): McuDraft {
+  return { id: "x", jobId: "x", kind: "news", placement: "feed", request: { actorEmail: "a@b.c", actorName: "A" }, status: "in_review", version: 1, story: { title: "", primaryUrl: "", publisher: "", sourceTitle: "", sourceText: "" }, frames: [], media: [], designs: [], qa: [], notices: [], history: [], createdAt: new Date(NOW).toISOString(), updatedAt: new Date(NOW).toISOString() }
+}
+
+test("ICYMI: DT101 posts are not recapped; each card's photo is its own story's; the cover reuses the lead story's photo", async () => {
+  const posted = (n: number, over: Partial<{ title: string; caption: string }> = {}) => ({ id: `p${n}`, title: over.title ?? `MCU-NEWS-2026101${n}-01 v1 — STORY ${n}`, status: "posted", publishedUrl: `https://www.instagram.com/milcityusa/p/${n}/`, caption: over.caption ?? `Story ${n} caption. Source: U.S. Army, 2026-10-1${n}` })
+  const subjects: string[] = []
+  const w = world({ ai: {
+    write: async () => ({ frames: [{ series: "icymi_cover" as SeriesKey, fields: { headline: "Week in defense", story_01: "One", story_02: "Two", story_03: "Three", story_04: "Four", story_05: "Five" } }, ...[1, 2, 3, 4, 5].map(n => ({ series: "icymi_story" as SeriesKey, fields: { headline: `Story ${n}`, deck: `Deck ${n}.` } }))], caption: "Roundup. Source: MilCityUSA" }),
+    pickMedia: async ({ story, candidates }) => { subjects.push(story.title); return { index: 0, reason: "ok", ranked: [{ index: 0, box: HERO }], ...(candidates.length ? {} : {}) } },
+  } })
+  w.deps.content.recentPosts = async () => [posted(1, { title: "ULTRA explainer", caption: "MISSION BRIEF // ULTRA\n\n//Overland AI" }), posted(2), posted(3), posted(4), posted(5), posted(6)]
+  const fetched: string[] = []
+  const fetchPage = w.deps.fetchPage
+  w.deps.fetchPage = async url => { fetched.push(url); return fetchPage(url) }
+  w.deps.searchCommons = async q => [{ ...CANDIDATE, url: `https://upload.wikimedia.org/${encodeURIComponent(q)}.jpg`, thumbUrl: `https://upload.wikimedia.org/t/${encodeURIComponent(q)}.jpg`, pageUrl: `https://commons.wikimedia.org/wiki/File:${encodeURIComponent(q)}` }]
+  await w.start({ kind: "icymi" })
+  const d = onlyDraft(w)
+  assert.deepEqual(d.story.roundup!.map(r => r.postId), ["p2", "p3", "p4", "p5", "p6"]) // the DT101 mission brief is left out
+  assert.deepEqual(subjects, ["STORY 2", "STORY 3", "STORY 4", "STORY 5", "STORY 6"]) // one pick per story card; none for the cover
+  assert.ok(!fetched.some(u => new URL(u).hostname === "www.instagram.com")) // a social post's image is never a photo source
+  assert.equal(d.media[0]!.pageUrl, d.media[1]!.pageUrl) // the cover shows the lead story's photo
+  assert.equal(new Set(d.media.slice(1).map(m => m!.pageUrl)).size, 5)
+  assert.equal(d.status, "in_review"); assert.equal(w.designs.length, 6)
+})
+
+test("a redirect to plain http is followed over https, and a blocked hop is named", async () => {
+  const check = (raw: string) => assertPublicHttps(raw, async () => ["93.184.216.34"])
+  const asked: string[] = []
+  const fetcher = async (u: URL) => { asked.push(u.toString()); return u.pathname === "/a" ? new Response(null, { status: 301, headers: { location: "http://breakingdefense.example/a/" } }) : new Response("ok", { status: 200 }) }
+  const res = await guardedFetch("https://breakingdefense.example/a", fetcher, "text/html", check)
+  assert.equal(res.status, 200); assert.deepEqual(asked, ["https://breakingdefense.example/a", "https://breakingdefense.example/a/"])
+  const toPrivate = async () => new Response(null, { status: 302, headers: { location: "https://localhost/x" } })
+  await assert.rejects(guardedFetch("https://breakingdefense.example/a", toPrivate, "text/html", check), /not_public \(redirect to https:\/\/localhost\/x\)/)
 })
