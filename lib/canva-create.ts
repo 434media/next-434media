@@ -132,7 +132,8 @@ export async function createFromTemplate(deps: CreateDeps, input: CreateInput, l
 export const MCU_BRAND_TEMPLATES: ReadonlySet<string> = new Set([
   "EAHXWo1LiF8", "EAHXZN4kp3Y", // News
   "EAHXZAbAA8s", "EAHXZAPPFLQ", // Breaking News
-  "EAHXZIadVzM", "EAHXZAunvYI", // Defense Tech 101
+  "EAHYOAJhC_8", // Defense Tech 101, benefit-led feed (founder-approved design, published 2026-10-16)
+  "EAHXZIadVzM", "EAHXZAunvYI", // Defense Tech 101, original MAKER/DOMAIN/STATUS masters (retired for new posts)
   "EAHXZPgjqSY", "EAHXZJnI-Nc", // ICYMI cover
   "EAHXZJnAT0o", "EAHXZMFmSh0", // ICYMI story
   "EAHXZOYmzQ8", "EAHXZHGriWI", // Follow-on graphic
