@@ -34,6 +34,8 @@ interface SocialCalendarViewProps {
   onMovePost?: (postId: string, newStatus: ContentPostStatus) => void
   // Bulk delete from the Board's select mode.
   onBulkDelete?: (ids: string[]) => void | Promise<void>
+  // Optional control beside "Add post" (the content pipeline's Generate, for super-admins).
+  headerAction?: React.ReactNode
 }
 
 type CalendarViewMode = "day" | "week" | "month"
@@ -265,7 +267,7 @@ function FilterSection({ title, options, selectedValues, onToggle, renderOption 
   )
 }
 
-export function SocialCalendarView({ contentPosts, onOpenPost, onAddPost, onMovePost, onBulkDelete }: SocialCalendarViewProps) {
+export function SocialCalendarView({ contentPosts, onOpenPost, onAddPost, onMovePost, onBulkDelete, headerAction }: SocialCalendarViewProps) {
   // Top-level surface: "board" is the pipeline kanban (where date-less drafts &
   // in-review work live), "calendar" is the date grid (scheduled/posted only).
   // The pipeline belongs on the board, not as a filter over a date grid — a
@@ -521,13 +523,16 @@ export function SocialCalendarView({ contentPosts, onOpenPost, onAddPost, onMove
             <span><span className="font-medium text-neutral-700">{statusSummary.posted}</span> posted</span>
           </div>
         </div>
-        <button
-          onClick={onAddPost}
-          className="inline-flex items-center gap-2 h-9 px-4 bg-neutral-900 text-white rounded-md hover:bg-neutral-800 transition-colors text-sm font-medium shrink-0"
-        >
-          <Plus className="w-4 h-4" />
-          Add post
-        </button>
+        <div className="flex items-center gap-2 shrink-0">
+          {headerAction}
+          <button
+            onClick={onAddPost}
+            className="inline-flex items-center gap-2 h-9 px-4 bg-neutral-900 text-white rounded-md hover:bg-neutral-800 transition-colors text-sm font-medium shrink-0"
+          >
+            <Plus className="w-4 h-4" />
+            Add post
+          </button>
+        </div>
       </div>
 
       {/* How it works — dismissible first-run intro */}

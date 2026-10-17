@@ -39,6 +39,10 @@
     {
       "path": "/api/cron/owned-meta-continue",
       "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/cron/content-pipeline",
+      "schedule": "* * * * *"
     }
   ]
 }

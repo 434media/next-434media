@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react"
 import { useSearchParams, useRouter, usePathname } from "next/navigation"
 import { AdminRoleGuard } from "@/components/AdminRoleGuard"
 import { Toast, SocialCalendarView, ContentDetailDrawer } from "@/components/crm"
+import { ContentGenerate } from "@/components/crm/ContentGenerate"
 import type { Toast as ToastType } from "@/components/crm/types"
 import { useContentPostHandlers } from "@/hooks/useContentPostHandlers"
 
@@ -216,6 +217,7 @@ export default function ContentPage() {
               onAddPost={handleAddContentPost}
               onMovePost={handleMoveContentPost}
               onBulkDelete={handleBulkDeleteContentPosts}
+              headerAction={canReview ? <ContentGenerate onDraftsReady={loadContentPosts} /> : undefined}
             />
           )}
         </div>

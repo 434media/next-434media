@@ -285,6 +285,27 @@ async function storeAssignmentNotificationInFirestore(data: AssignmentNotificati
 }
 
 /**
+ * The content pipeline's one "N drafts ready" alert per Generate run (lib/content-pipeline/run.ts): an in-app
+ * notification that opens the first draft in the board's Review column. Uses the existing "system" type, which
+ * the popover renders from `message`. Best-effort: a failure is logged, never thrown into the run.
+ */
+export async function sendDraftsReadyNotification(data: { recipients: string[]; message: string; postId: string; title: string }): Promise<void> {
+  const recipients = [...new Set(data.recipients.map(e => e.toLowerCase()).filter(e => e.endsWith('@434media.com')))]
+  if (!recipients.length) return
+  try {
+    const { getDb } = await import('./firebase-admin')
+    const collection = getDb().collection('crm_notifications')
+    const created_at = new Date().toISOString()
+    await Promise.all(recipients.map(recipient_email => collection.add({
+      recipient_email, type: 'system', message: data.message, task_id: data.postId, task_title: data.title,
+      is_content_post: true, created_at, read: false,
+    })))
+  } catch (error) {
+    console.error('Failed to store drafts-ready notification:', error)
+  }
+}
+
+/**
  * Get unread notifications for a user
  */
 export async function getUnreadNotifications(email: string): Promise<{
