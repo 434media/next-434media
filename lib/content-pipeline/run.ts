@@ -32,7 +32,7 @@ export async function pipelineDeps(): Promise<WorkerDeps> {
       // matches them (title, caption or tags), with when each went out for the ICYMI window. Newest first.
       recentPosts: async () => {
         const mcu = (await tools.intake.listPosts()).filter(p => !p.archived && [p.title, p.social_copy, p.tags, p.platform].some(v => typeof v === "string" && /milcity|\bmcu\b/i.test(v)))
-        const when = (p: (typeof mcu)[number]) => p.posted_at || (p.status === "posted" ? p.date_to_post : undefined)
+        const when = (p: (typeof mcu)[number]) => p.posted_at || (p.status === "posted" || p.published_url ? p.date_to_post : undefined)
         return mcu.map((p): PostRow => ({ id: p.id, title: p.title, status: p.status, ...(p.published_url ? { publishedUrl: p.published_url } : {}), ...(p.social_copy ? { caption: p.social_copy.slice(0, 800) } : {}), ...(when(p) ? { publishedAt: when(p) } : {}) }))
           .sort((a, b) => (b.publishedAt ?? "").localeCompare(a.publishedAt ?? "")).slice(0, 75)
       },
