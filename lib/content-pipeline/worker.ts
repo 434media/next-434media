@@ -2,7 +2,7 @@ import { SERIES, checkFields, ddmmmyy, normalizeFields, type Placement, type Req
 import { MCU_RULES_VERSION } from "./editorial"
 import { type McuAi, type ModelCall, type SubjectBox } from "./model"
 import type { McuSeeds } from "./seeds"
-import { MIN_SHORT_SIDE, imageSize, isDvidsImagePage, pageImageCandidate, type MediaCandidate, type SourcePage } from "./sources"
+import { MIN_SHORT_SIDE, archiveRelevant, imageSize, isDvidsImagePage, pageImageCandidate, type MediaCandidate, type SourcePage } from "./sources"
 import { MAX_ATTEMPTS, WORKING, type ChosenMedia, type CropBox, type FrameCopy, type FrameDesign, type McuDraft, type McuJob, type McuStore, type Story } from "./store"
 
 /**
@@ -36,6 +36,8 @@ export interface WorkerDeps {
   fetchPage(url: string): Promise<SourcePage>
   fetchImage(url: string): Promise<{ bytes: Uint8Array; mime: "image/jpeg" | "image/png" }>
   searchCommons(query: string): Promise<MediaCandidate[]>
+  /** Other open archives searched beside Commons (Openverse, NASA); each keeps only usable licenses. */
+  searchMore?(query: string): Promise<MediaCandidate[]>
   /** The one "N drafts ready" alert for a finished job. */
   notify(job: McuJob, drafts: McuDraft[]): Promise<void>
   nowMs(): number
@@ -54,7 +56,7 @@ const ICYMI_COUNT = 5
 const MAX_SUPPORTING = 2
 const MAX_AUTO_REPLACE = 2
 const MAX_MEDIA_RETRIES = 2
-const MAX_SHOWN = 6
+const MAX_SHOWN = 8
 const MAX_VISION_BYTES = 4_500_000
 
 const iso = (deps: Pick<WorkerDeps, "nowMs">) => new Date(deps.nowMs()).toISOString()
@@ -106,7 +108,7 @@ async function jobStep(deps: WorkerDeps, id: string, attempt: number): Promise<v
     for (const story of stories) {
       const draftId = `${prefix}${String(++n).padStart(2, "0")}`
       job.drafts.push(draftId)
-      await deps.store.createDraft({ id: draftId, jobId: id, kind: job.kind, placement: job.placement, request: job.request, status: "queued", version: 1, story, frames: [], media: [], designs: [], qa: [], notices: [], calls: calls.map(c => ({ ...c, at: now })), history: [{ at: now, event: `opened under ${MCU_RULES_VERSION}` }], createdAt: now, updatedAt: now })
+      await deps.store.createDraft({ id: draftId, jobId: id, kind: job.kind, placement: job.placement, request: job.request, status: "queued", version: 1, ...(job.topic ? { direction: job.topic } : {}), story, frames: [], media: [], designs: [], qa: [], notices: [], calls: calls.map(c => ({ ...c, at: now })), history: [{ at: now, event: `opened under ${MCU_RULES_VERSION}` }], createdAt: now, updatedAt: now })
     }
     job.status = "drafting"; job.updatedAt = now; job.note = undefined
     if (job.kind !== "icymi" && stories.length < job.count) job.note = `${stories.length} of ${job.count} qualified`
@@ -245,13 +247,14 @@ export function unsourcedNumbers(texts: string[], source: string): string[] {
 async function writeStep(deps: WorkerDeps, ai: McuAi, d: McuDraft): Promise<void> {
   const today = iso(deps).slice(0, 10)
   let problems: string[] = []
-  let out = await ai.write({ kind: d.kind, story: d.story, today, ...(d.frames.length ? { previous: { frames: d.frames, caption: d.caption ?? "" } } : {}) })
+  const seeds = await deps.seeds(), steer = { seeds, ...(d.direction ? { direction: d.direction } : {}) }
+  let out = await ai.write({ kind: d.kind, story: d.story, today, ...steer, ...(d.frames.length ? { previous: { frames: d.frames, caption: d.caption ?? "" } } : {}) })
   for (let round = 0; round < 2; round++) {
     if (out.hold) return sourceHold(deps, ai, d, out.hold)
     out.frames = out.frames.map((f, i) => fix(f, i, d, today))
     problems = validate(out.frames, out.caption, d.story)
     if (!problems.length) break
-    out = await ai.write({ kind: d.kind, story: d.story, today, previous: { frames: out.frames, caption: out.caption }, problems })
+    out = await ai.write({ kind: d.kind, story: d.story, today, ...steer, previous: { frames: out.frames, caption: out.caption }, problems })
   }
   if (out.hold) return sourceHold(deps, ai, d, out.hold)
   out.frames = out.frames.map((f, i) => fix(f, i, d, today))
@@ -280,10 +283,30 @@ function validate(frames: FrameCopy[], caption: string, story: Story): string[] 
   return problems
 }
 
+/** The maker named on the card ("ULTRA / OVERLAND AI" → "OVERLAND AI"), else the story's publisher. */
+export function makerOf(frame: FrameCopy, story: Pick<Story, "publisher">): string {
+  return (frame.fields.subject_identifier ?? "").split("/")[1]?.trim() || story.publisher
+}
+const GOV_PAGE = /(^|\.)(mil|gov)$|(^|\.)dvidshub\.net$/i
+/**
+ * A page the photo search found is used only when its photo's rights can be read from it: a U.S. government or DVIDS
+ * page (public domain unless marked courtesy), or the maker's own site (company media, flagged for the reviewer to
+ * confirm its terms). A news outlet's or anyone else's page is skipped: its photo is licensed to that outlet.
+ */
+export function searchedPageUsable(url: string, maker: string): boolean {
+  let host: string
+  try { host = new URL(url).hostname.toLowerCase() } catch { return false }
+  if (GOV_PAGE.test(host)) return true
+  const words = maker.toLowerCase().split(/[^a-z0-9]+/).filter(w => w.length >= 3 && !["inc", "corp", "the", "company", "technologies", "systems", "industries", "group", "defense", "defence"].includes(w))
+  const labels = host.replace(/^www\./, "").split(".").slice(0, -1).join(".")
+  return words.length > 0 && words.some(w => labels.includes(w))
+}
 /**
  * Photo candidates, in the editorial rules' order: the story's own pages first (official company or agency media),
- * then DVIDS image pages found by web search, then Wikimedia Commons. Each is fetched once, sized from its own header
- * and dropped below MIN_SHORT_SIDE; at most MAX_SHOWN go to the vision pick.
+ * then pages the photo search found (DVIDS, other U.S. government sites, the maker's newsroom or press kit), then the
+ * open archives (Wikimedia Commons, Openverse, NASA). Archive hits must tie themselves to the story (archiveRelevant).
+ * Each is fetched once, sized from its own header and dropped below MIN_SHORT_SIDE; at most MAX_SHOWN go to the
+ * vision pick. Sources that need a key or account (the DVIDS API) are not used until the founder adds one.
  */
 async function gatherMedia(deps: WorkerDeps, ai: McuAi, d: McuDraft, frame: FrameCopy, avoid: string[]): Promise<{ candidate: MediaCandidate; image: Uint8Array; mime: string }[]> {
   const out: { candidate: MediaCandidate; image: Uint8Array; mime: string }[] = [], seen = new Set<string>(avoid)
@@ -305,13 +328,16 @@ async function gatherMedia(deps: WorkerDeps, ai: McuAi, d: McuDraft, frame: Fram
   const pages: SourcePage[] = []
   for (const u of [d.story.primaryUrl, ...(d.story.supporting ?? []).map(x => x.url)]) { try { pages.push(await deps.fetchPage(u)) } catch { /* skipped */ } }
   for (const pg of pages) await add(pageImageCandidate(pg, isDvidsImagePage(pg.url) ? "dvids" : "source"))
+  const maker = makerOf(frame, d.story)
   for (const u of await ai.findPhotoPages({ story: d.story, frame }).catch(() => [])) {
     if (out.length >= MAX_SHOWN) break
-    try { const pg = await deps.fetchPage(u); await add(pageImageCandidate(pg, isDvidsImagePage(pg.url) ? "dvids" : "source")) } catch { /* skipped */ }
+    if (!searchedPageUsable(u, maker)) continue
+    try { const pg = await deps.fetchPage(u); if (searchedPageUsable(pg.url, maker)) await add(pageImageCandidate(pg, isDvidsImagePage(pg.url) ? "dvids" : "source")) } catch { /* skipped */ }
   }
   for (const q of mediaQueries(frame, d.story)) {
     if (out.length >= MAX_SHOWN) break
-    for (const c of await deps.searchCommons(q).catch(() => [])) await add(c)
+    const [commons, more] = await Promise.all([deps.searchCommons(q).catch(() => []), deps.searchMore ? deps.searchMore(q).catch(() => []) : Promise.resolve([])])
+    for (const c of [...commons, ...more]) if (archiveRelevant(c, maker)) await add(c)
   }
   return out
 }
@@ -421,7 +447,7 @@ export function mediaQueries(frame: FrameCopy, story: Pick<Story, "title">): str
   const words = (t: string, n: number) => t.split(/\s+/).filter(Boolean).slice(0, n).join(" ")
   const mq = frame.mediaQuery?.trim() ?? ""
   const [subject = "", maker = ""] = (frame.fields.subject_identifier ?? "").split("/").map(x => x.trim())
-  const out = [mq, words(mq.split(",")[0], 6), words(mq, 3), subject, maker, story.title.split(":")[0], story.title]
+  const out = [mq, words(mq.split(",")[0], 6), words(mq, 3), subject && maker ? `${subject} ${maker}` : "", subject, maker, story.title.split(":")[0], story.title]
   return [...new Set(out.map(q => q.replace(/[^\p{L}\p{N}\s.\-'&]/gu, " ").replace(/\s+/g, " ").trim()).filter(q => q.length > 2))]
 }
 // Wording as on the approved, published MCU posts (ULTRA, HIMARS).
@@ -526,6 +552,7 @@ async function postStep(deps: WorkerDeps, d: McuDraft): Promise<void> {
   const r = await deps.content.writePost({ requestId: `${KEY_PREFIX}${d.id}:v${d.version}`, title: `${d.id} v${d.version} — ${head.replace(/\n/g, " ")}`.slice(0, 200), caption: d.caption ?? "", notes: reviewNotes(d), links, designIds: d.designs.map(x => x.designId), requestedBy: { email: d.request.actorEmail, name: d.request.actorName } })
   d.postId = r.postId
   if (r.holds.length) d.qa = [...new Set([...d.qa, ...r.holds])]
+  console.info("[content-pipeline] posted", JSON.stringify({ draft: d.id, v: d.version, postId: r.postId, designs: d.designs.map(x => x.designId), holds: r.holds, calls: (d.calls ?? []).map(c => `${c.step}:${c.model}@${c.provider ?? "?"}${c.fallbackFrom ? ` (fallback from ${c.fallbackFrom})` : ""}`) }))
   d.status = "in_review"
   await save(deps, d, `on the board for review: post ${r.postId}`)
 }

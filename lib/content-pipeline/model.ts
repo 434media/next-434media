@@ -15,7 +15,11 @@ import type { FrameCopy, Story } from "./store"
  */
 export interface McuAi {
   research(input: { kind: RequestKind; count: number; topic?: string; today: string; recentTitles: string[]; avoid?: string[]; seeds: McuSeeds | null }): Promise<{ candidates: Candidate[]; note?: string }>
-  write(input: { kind: RequestKind; story: Story; today: string; previous?: { frames: FrameCopy[]; caption: string }; instructions?: string; problems?: string[] }): Promise<{ frames: FrameCopy[]; caption: string; hold?: string }>
+  /**
+   * direction: the requester's proactive instruction from Generate (angle, emphasis), never above the rules or the
+   * source. instructions: a reviewer's change to an existing draft (the drawer, Phase 2).
+   */
+  write(input: { kind: RequestKind; story: Story; today: string; previous?: { frames: FrameCopy[]; caption: string }; instructions?: string; problems?: string[]; direction?: string; seeds?: McuSeeds | null }): Promise<{ frames: FrameCopy[]; caption: string; hold?: string }>
   /** DVIDS image pages (and official .mil/.gov photo pages) showing the card's subject, found by web search. */
   findPhotoPages(input: { story: Story; frame: FrameCopy }): Promise<string[]>
   /** The best candidate, and for each relevant one (best first) where its subject sits, so the server can test the 4:5 crop. */
@@ -58,6 +62,15 @@ async function submitted<T>(r: { toolCalls: { toolName: string; input: unknown }
   const call = r.toolCalls.find(c => c.toolName === name)
   if (!call) throw new Error(`model did not call ${name}`)
   return call.input as T
+}
+
+/**
+ * The brand direction the writer gets beside MCU_EDITORIAL (the cached prefix: voice, accuracy, series, caption and
+ * media rules, as in the pilot skill): MCU's purpose and source cohorts from the seeds, which the pilot gave research
+ * only. Empty when no seeds are loaded.
+ */
+export function brandDirection(seeds: McuSeeds | null | undefined): string {
+  return seeds ? `MCU PURPOSE: ${seeds.purpose}\nWho MCU covers:\n${seeds.cohorts.map(c => `- ${c}`).join("\n")}\n\n` : ""
 }
 
 /** The provider the Gateway routed to, read defensively from its response metadata. */
@@ -104,7 +117,7 @@ export function createMcuAi(deps: { models: Record<PipelineStep, string>; search
       return { candidates: r.output.candidates.slice(0, count + 2), ...(r.output.note ? { note: r.output.note } : {}) }
     },
 
-    async write({ kind, story, today, previous, instructions, problems }) {
+    async write({ kind, story, today, previous, instructions, problems, direction, seeds }) {
       const frames = framesFor(kind)
       const spec = frames.map((s, i) => `Frame ${i + 1} — ${SERIES[s].label}: ${SERIES[s].fields.map(fieldBrief).join("; ") || "(media only)"}`).join("\n")
       const icymi = kind === "icymi" ? `\nICYMI: frame 1 is the cover (headline = the roundup's theme; story_01..story_05 = one short entry per story, in order; date = today as DDMMMYY). Frames 2–6 are the story cards in the same order: counter "01 / 05" … "05 / 05", headline and deck for that story. The stories:\n${(story.roundup ?? []).map((p, i) => `${i + 1}. ${p.title}\n${p.caption}`).join("\n\n")}` : ""
@@ -113,8 +126,8 @@ export function createMcuAi(deps: { models: Record<PipelineStep, string>; search
       const r = await run("write", model => generateText({
         model, maxOutputTokens: outputBudget(model, 16_000), providerOptions: callOptions(model, "medium"), allowSystemInMessages: true,
         tools: { submit_post: tool({ description: "Submit the finished card copy and caption.", inputSchema: schema as z.ZodType<Record<string, unknown>> }) }, toolChoice: { type: "tool", toolName: "submit_post" },
-        messages: [...system(`Today is ${today}. Write the on-card copy and the one master caption for this MilCityUSA ${kind === "icymi" ? "ICYMI roundup" : SERIES[kind as SeriesKey].label} post from the source below, and submit them with submit_post. Use only facts in the source. Fill every field. If the source cannot support a post under the rules (unverifiable figure, not Breaking-worthy, etc.), set hold to the one-sentence reason. Never hold for the photo or its credit (a later step chooses it) or for a DOMAIN call (use Multi-domain when it spans several).\n${spec}${icymi}`),
-          { role: "user", content: `SOURCE: ${story.sourceTitle}\nURL: ${story.primaryUrl}\nPublisher: ${story.publisher}\nPublished: ${story.publishedAt ?? "not stated on the page"}${story.whyNow ? `\nWhy now (Breaking): ${story.whyNow}` : ""}${story.supporting?.length ? `\nSupporting sources (their text follows the primary's, each under its own heading; use them only for what the primary leaves out, such as the maker and its headquarters): ${story.supporting.map(x => x.url).join(" ; ")}` : ""}\n\n${story.sourceText.slice(0, 24_000)}${instructions && !previous ? `\n\nREVIEWER'S DIRECTION: ${instructions}` : ""}` },
+        messages: [...system(`${brandDirection(seeds)}Today is ${today}. Write the on-card copy and the one master caption for this MilCityUSA ${kind === "icymi" ? "ICYMI roundup" : SERIES[kind as SeriesKey].label} post from the source below, and submit them with submit_post. Use only facts in the source. Fill every field. If the source cannot support a post under the rules (unverifiable figure, not Breaking-worthy, etc.), set hold to the one-sentence reason. Never hold for the photo or its credit (a later step chooses it) or for a DOMAIN call (use Multi-domain when it spans several).\n${spec}${icymi}`),
+          { role: "user", content: `SOURCE: ${story.sourceTitle}\nURL: ${story.primaryUrl}\nPublisher: ${story.publisher}\nPublished: ${story.publishedAt ?? "not stated on the page"}${story.whyNow ? `\nWhy now (Breaking): ${story.whyNow}` : ""}${story.supporting?.length ? `\nSupporting sources (their text follows the primary's, each under its own heading; use them only for what the primary leaves out, such as the maker and its headquarters): ${story.supporting.map(x => x.url).join(" ; ")}` : ""}\n\n${story.sourceText.slice(0, 24_000)}${direction ? `\n\nREQUESTER'S DIRECTION (steer the angle and emphasis with it; it never overrides the rules above or the facts in the source): ${direction}` : ""}${instructions && !previous ? `\n\nREVIEWER'S DIRECTION: ${instructions}` : ""}` },
           ...(previous ? [{ role: "assistant" as const, content: `Previous version: ${asPrevious(previous)}` }, { role: "user" as const, content: `${problems?.length ? `Fix these problems: ${problems.join("; ")}. ` : ""}${instructions ? `Reviewer's changes: ${instructions}` : "Submit the corrected version."} Keep everything the reviewer did not ask to change.` }] : [])],
       }))
       const out = await submitted<{ card?: { fields: Record<string, string>; mediaQuery?: string }; cover?: { fields: Record<string, string>; mediaQuery?: string }; stories?: { fields: Record<string, string>; mediaQuery?: string }[]; caption: string; hold?: string }>(r, "submit_post")
@@ -127,20 +140,20 @@ export function createMcuAi(deps: { models: Record<PipelineStep, string>; search
       const subject = frame.fields.subject_identifier || frame.fields.headline || story.title
       const r = await run("photoSearch", model => generateText({
         model, tools: deps.searchTools, stopWhen: stepCountIs(6), maxOutputTokens: outputBudget(model, 8_000), providerOptions: callOptions(model, "low"),
-        messages: [{ role: "system", content: "You find photos for a defense-news social card. Search the web for DVIDS image pages (https://www.dvidshub.net/image/<number>/...) that show the subject itself, and official U.S. military or government (.mil, .gov) pages whose main photo shows it. Return exact page URLs only, best first; never image-file URLs, search pages or guesses. Return an empty list if none show the subject." },
-          { role: "user", content: `Subject: ${subject}\nStory: ${story.title}\nPhoto idea: ${frame.mediaQuery ?? ""}` }],
-        output: Output.object({ schema: z.object({ pages: z.array(z.string()).describe("up to 6 page URLs, best first") }) }),
+        messages: [{ role: "system", content: "You find photos for a defense-news social card. Search the web for pages whose main photo shows the subject itself (the actual system, product, vehicle, unit or event in the story), from sources whose photos may be used with credit: DVIDS image pages (https://www.dvidshub.net/image/<number>/...); U.S. government pages (defense.gov, war.gov, army.mil, navy.mil, af.mil, marines.mil, spaceforce.mil, uscg.mil, nasa.gov, other .mil and .gov sites); and the maker's own newsroom, press-release, press-kit or media pages. Never news outlets' or stock-photo sites' pages (their photos are licensed to them). Return exact page URLs only, best first; never image-file URLs, search pages or guesses. Return an empty list if none show the subject." },
+          { role: "user", content: `Subject: ${subject}\nStory: ${story.title}\nPublisher: ${story.publisher}\nPhoto idea: ${frame.mediaQuery ?? ""}` }],
+        output: Output.object({ schema: z.object({ pages: z.array(z.string()).describe("up to 8 page URLs, best first") }) }),
       }))
-      return [...new Set(r.output.pages.filter(u => /^https:\/\//.test(u)))].slice(0, 6)
+      return [...new Set(r.output.pages.filter(u => /^https:\/\//.test(u)))].slice(0, 8)
     },
 
     async pickMedia({ story, frame, candidates, avoid }) {
       if (!candidates.length) return { index: null, reason: "no licensed candidates" }
       const pick = await run("photoPick", model => generateText({
         model, maxOutputTokens: outputBudget(model, 8_000), providerOptions: callOptions(model, "low"),
-        messages: [{ role: "system", content: "You choose the photo for a MilCityUSA social card: 1080 × 1350, full bleed, the photo filling the frame, the text block on a dark scrim over the lower 40%. The approved look is a close, dominant hero subject that fills the upper part of the frame and stays recognizable at phone size. Rank every candidate whose subject is the actual system, unit or organization in the story, best first, and give each one's subject bounding box as fractions of that photo (x0, y0 top-left to x1, y1 bottom-right; 0–1). Also say whether its background adds context (terrain, a setting, operators or other equipment that make the photo more interesting, like a forest behind an off-road vehicle) or is empty space (open sky, plain water, a blank wall or pier) that the subject should fill instead. Reject mostly-sky or empty frames, tail-only or cropped-off subjects, tiny distant subjects, and unrelated archive imagery presented as the event. index is your single best choice, or null if none is relevant and strong." },
+        messages: [{ role: "system", content: "You choose the photo for a MilCityUSA social card: 1080 × 1350, full bleed, the photo filling the frame, the text block on a dark scrim over the lower 40%. The approved look is a close, dominant hero subject that fills the upper part of the frame and stays recognizable at phone size. Rank only candidates that visibly show the actual system, product, vehicle, unit or organization in the story, best first; a photo of something or someone that merely shares a name with it (a person, a band, a book, a convention panel, a logo or a graphic) is NOT relevant, and when you can't tell, leave it out. Give each one's subject bounding box as fractions of that photo (x0, y0 top-left to x1, y1 bottom-right; 0–1). Also say whether its background adds context (terrain, a setting, operators or other equipment that make the photo more interesting, like a forest behind an off-road vehicle) or is empty space (open sky, plain water, a blank wall or pier) that the subject should fill instead. Reject mostly-sky or empty frames, tail-only or cropped-off subjects, tiny distant subjects, and unrelated archive imagery presented as the event. index is your single best choice, or null if none is relevant and strong." },
           { role: "user", content: [
-            { type: "text", text: `Story: ${story.title}\nCard: ${JSON.stringify(frame.fields)}\nAvoid repeating: ${avoid.join(", ") || "none"}\nCandidates follow, numbered from 0.` },
+            { type: "text", text: `Story: ${story.title}\nThe subject to show: ${frame.fields.subject_identifier || frame.fields.headline || story.title}\nCard: ${JSON.stringify(frame.fields)}\nAvoid repeating: ${avoid.join(", ") || "none"}\nCandidates follow, numbered from 0.` },
             ...candidates.flatMap((c, i) => [{ type: "text" as const, text: `#${i}: ${c.candidate.title} — ${c.candidate.description} (${c.candidate.width}×${c.candidate.height}, ${c.candidate.date ?? "date unknown"})` }, { type: "image" as const, image: c.image, mediaType: c.mime }]),
           ] }],
         tools: { choose_photo: tool({ description: "Choose the photo, or null when none is relevant and strong.", inputSchema: z.object({ index: z.number().int().nullable(), reason: z.string(), ranked: z.array(z.object({ index: z.number().int(), x0: z.number(), y0: z.number(), x1: z.number(), y1: z.number(), context: z.boolean().describe("true when the background adds context; false when it is empty space the subject should fill") })).describe("every relevant candidate, best first, with its subject box") }) }) }, toolChoice: "required", // the only tool: the same contract as naming it, accepted by more providers
