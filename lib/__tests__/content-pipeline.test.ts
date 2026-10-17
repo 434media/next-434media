@@ -11,7 +11,7 @@ import { SERIES, checkFields, ddmmmyy, lineCount, type SeriesKey } from "../cont
 import { runDue, RETRY_MS, makerOf, searchedPageUsable, unsourcedNumbers, withCredits, imageLabel, mediaQueries, cropFit, choosePhoto, zoomCrop, reviewNotes, DOD_NOTICE, LEASE_MS, type WorkerDeps, type DesignInput, type PostInput, type NoContentInput } from "../content-pipeline/worker"
 import { MAX_ATTEMPTS, type McuDraft, type McuJob, type McuStore } from "../content-pipeline/store"
 import { archiveRelevant, assertPublicHttps, imageSize, pageImageCandidate, parsePage, searchNasa, searchOpenverse, usableLicense, type MediaCandidate } from "../content-pipeline/sources"
-import { brandDirection, servedBy, servedCall, type McuAi, type ModelCall } from "../content-pipeline/model"
+import { brandDirection, searchResultUrls, servedBy, servedCall, type McuAi, type ModelCall } from "../content-pipeline/model"
 import { PIPELINE_MODELS, FALLBACK_MODELS, CALL_FALLBACK, callOptions, outputBudget } from "../content-pipeline/models"
 import { seedBrief, seedProblems, type McuSeeds } from "../content-pipeline/seeds"
 import { PIPELINE_PROPERTIES, PROPERTY_TEMPLATES, propertyCanGenerate } from "../content-pipeline/properties"
@@ -173,7 +173,7 @@ test("every candidate dropped: research runs once more, avoiding them, before th
   none.deps.fetchPage = async () => Promise.reject(new Error("http_403"))
   await none.start()
   const job = (await none.store.getJob("job-news-1"))!
-  assert.equal(job.status, "held"); assert.match(job.note!, /source page unreachable; then: .*already used or rejected|source page unreachable; then: .*unreachable/)
+  assert.equal(job.status, "held"); assert.match(job.note!, /^Blocked page story: source page unreachable or unreadable \(http_403 at https:\/\/blocked\.example\.com\/a\); then: Blocked page story: already tried$/)
   assert.equal(none.alerts.length, 1); assert.equal(none.store.drafts.size, 0)
 })
 
@@ -194,6 +194,41 @@ test("no new content: one thorough search, then a notice card in Review with the
   assert.equal(w.alerts.length, 1); assert.equal(w.alerts[0].job.noContentPostId, "notice-1") // the alert opens the card
   // Nothing searches again: the job is finished.
   assert.equal(await runDue(w.deps, 1e9), 0); assert.equal(research, 2)
+})
+
+test("research reads what the search returned: result URLs are collected from the tool output, whatever its shape", () => {
+  const steps = [{ toolResults: [{ output: { results: [{ url: "https://www.army.mil/article/1", title: "a" }, { url: "https://www.anduril.com/thunder", excerpts: ["see https://www.anduril.com/thunder."] }] } }] }, { toolResults: [] }, { toolResults: [{ output: "plain text with https://www.darpa.mil/x), and more" }] }]
+  assert.deepEqual(searchResultUrls(steps), ["https://www.army.mil/article/1", "https://www.anduril.com/thunder", "https://www.darpa.mil/x"])
+})
+
+test("a script-rendered page still gives its text (JSON-LD and meta description), so it isn't dropped as unreadable", () => {
+  const body = "Thunder is a Group 5 autonomous attack rotorcraft designed to multiply the combat power of crewed attack aircraft. ".repeat(4)
+  const html = `<html><head><title>Thunder | Anduril</title><meta name="description" content="Autonomous attack rotorcraft."><script type="application/ld+json">{"@type":"Product","description":${JSON.stringify(body)}}</script></head><body><div id="root"></div><script>window.__X=1</script></body></html>`
+  const p = parsePage("https://www.anduril.com/thunder", html)
+  assert.ok(p.text.length >= 400); assert.match(p.text, /^Thunder is a Group 5 autonomous attack rotorcraft/); assert.match(p.text, /Autonomous attack rotorcraft\./)
+})
+
+test("an unreadable primary page falls back to another primary page for the same subject; each miss keeps its reason", async () => {
+  const w = world({ ai: { research: async () => ({ candidates: [{ title: "Wraith Shield", primaryUrl: "https://www.l3harris.com/all-capabilities/wraith-shield", alternateUrls: ["https://www.army.mil/article/1"], publisher: "L3Harris", why: "dt101" }] }) } })
+  const fetchPage = w.deps.fetchPage
+  w.deps.fetchPage = async url => url.includes("l3harris") ? Promise.reject(new Error("http_404")) : fetchPage(url)
+  await w.start({ kind: "dt101" })
+  assert.equal(onlyDraft(w).story.primaryUrl, "https://www.army.mil/article/1")
+  const none = world({ ai: { research: async () => ({ candidates: [{ title: "Wraith Shield", primaryUrl: "https://www.l3harris.com/all-capabilities/wraith-shield", publisher: "L3Harris", why: "dt101" }] }) } })
+  none.deps.fetchPage = async () => Promise.reject(new Error("http_404"))
+  await none.start({ kind: "dt101" })
+  assert.match((await none.store.getJob("job-dt101-1"))!.note!, /Wraith Shield: source page unreachable or unreadable \(http_404 at https:\/\/www\.l3harris\.com\/all-capabilities\/wraith-shield\)/)
+})
+
+test("zero candidates gets the search's one retry too, then the notice card (production, 2026-10-17)", async () => {
+  let calls = 0
+  const w = world({ ai: { research: async () => { calls++; return calls === 1 ? { candidates: [], note: "nothing found" } : { candidates: [{ title: "Army picks nine C2 software vendors", primaryUrl: "https://www.army.mil/article/1", publisher: "U.S. Army", why: "news" }] } } } })
+  await w.start()
+  assert.equal(calls, 2); assert.equal(onlyDraft(w).status, "in_review")
+  let again = 0
+  const none = world({ ai: { research: async () => { again++; return { candidates: [], note: "nothing found" } } } })
+  await none.start()
+  assert.equal(again, 2); assert.equal(none.notices.length, 1); assert.equal(await runDue(none.deps, 1e9), 0); assert.equal(again, 2)
 })
 
 test("an unsourced figure is rewritten, and held if it persists — nothing reaches Canva or the board", async () => {

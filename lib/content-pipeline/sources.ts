@@ -7,7 +7,9 @@ import net from "node:net"
  * openly licensed photos on Wikimedia Commons with their license, creator and credit. Every fetch is https-only, refuses private and internal
  * addresses, is size- and time-bounded, and identifies itself honestly.
  */
-export const USER_AGENT = "434MEDIA-content-bot/1.0 (+https://www.434media.com)"
+// The standard form for a named crawler ("Mozilla/5.0 (compatible; <bot>; +<url>)", as Googlebot and Bingbot use):
+// still says plainly who is asking, and isn't rejected by servers that refuse anything not starting "Mozilla/".
+export const USER_AGENT = "Mozilla/5.0 (compatible; 434MEDIA-content-bot/1.0; +https://www.434media.com)"
 const MAX_PAGE_BYTES = 3 * 1024 * 1024
 export const MAX_IMAGE_BYTES = 20 * 1024 * 1024
 
@@ -36,7 +38,7 @@ export interface Fetcher { (url: URL, init: RequestInit): Promise<Response> }
 async function guardedFetch(raw: string, fetcher: Fetcher, accept: string, check = assertPublicHttps): Promise<Response> {
   let url = await check(raw)
   for (let hop = 0; hop < 5; hop++) {
-    const res = await fetcher(url, { headers: { "user-agent": USER_AGENT, accept }, redirect: "manual", cache: "no-store", signal: AbortSignal.timeout(15_000) })
+    const res = await fetcher(url, { headers: { "user-agent": USER_AGENT, accept, "accept-language": "en-US,en;q=0.8" }, redirect: "manual", cache: "no-store", signal: AbortSignal.timeout(15_000) })
     const loc = res.status >= 300 && res.status < 400 ? res.headers.get("location") : null
     if (!loc) return res
     url = await check(new URL(loc, url).toString())
@@ -64,11 +66,21 @@ export function pageText(html: string): string {
   return decode(html.replace(/<head[\s>][\s\S]*?<\/head>/i, " ").replace(/<(script|style|noscript|svg|nav|footer|header|form)[\s\S]*?<\/\1>/gi, " ").replace(/<br\s*\/?>|<\/(p|div|li|h[1-6]|tr)>/gi, "\n").replace(/<[^>]+>/g, " "))
     .replace(/[ \t]+/g, " ").replace(/\n\s*\n+/g, "\n").trim().slice(0, 40_000)
 }
+/**
+ * Text a script-rendered page carries outside its markup: JSON-LD articleBody and description strings, then the
+ * meta description. Used when the page's own markup has too little readable text (Anduril's Thunder page: 0
+ * characters of body text, 2026-10-17).
+ */
+function embeddedText(html: string): string {
+  const ld = [...html.matchAll(/"(?:articleBody|description)"\s*:\s*"((?:[^"\\]|\\.){40,})"/g)].map(m => { try { return JSON.parse(`"${m[1]}"`) as string } catch { return "" } })
+  return [...new Set([...ld, meta(html, "og:description") ?? "", meta(html, "description") ?? ""].map(t => decode(t).trim()).filter(Boolean))].join("\n").slice(0, 20_000)
+}
 export function parsePage(url: string, html: string): SourcePage {
   const ld = [...html.matchAll(/"datePublished"\s*:\s*"([^"]+)"/g)].map(m => m[1])[0]
   const publishedAt = meta(html, "article:published_time") || ld || meta(html, "datePublished") || meta(html, "date") || meta(html, "DC.date.issued")
   const title = meta(html, "og:title") || decode(/<title[^>]*>([\s\S]*?)<\/title>/i.exec(html)?.[1] || "").trim()
-  return { url, title, text: pageText(html), ...(publishedAt ? { publishedAt } : {}), ...(meta(html, "og:image") ? { image: meta(html, "og:image") } : {}), ...(meta(html, "og:site_name") ? { siteName: meta(html, "og:site_name") } : {}), ...(meta(html, "og:description") ? { description: meta(html, "og:description") } : {}) }
+  const body = pageText(html), text = body.length >= 400 ? body : [body, embeddedText(html)].filter(Boolean).join("\n").slice(0, 40_000)
+  return { url, title, text, ...(publishedAt ? { publishedAt } : {}), ...(meta(html, "og:image") ? { image: meta(html, "og:image") } : {}), ...(meta(html, "og:site_name") ? { siteName: meta(html, "og:site_name") } : {}), ...(meta(html, "og:description") ? { description: meta(html, "og:description") } : {}) }
 }
 export async function fetchSourcePage(url: string, fetcher: Fetcher = fetch as Fetcher, check = assertPublicHttps): Promise<SourcePage> {
   const res = await guardedFetch(url, fetcher, "text/html,application/xhtml+xml", check)

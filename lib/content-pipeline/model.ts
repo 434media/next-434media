@@ -1,4 +1,4 @@
-import { generateText, Output, stepCountIs, tool, type ToolSet } from "ai"
+import { generateText, stepCountIs, tool, type ToolSet } from "ai"
 import { z } from "zod4"
 import { MCU_EDITORIAL, NEVER_REVIVE } from "./editorial"
 import { CALL_FALLBACK, callOptions, outputBudget, type PipelineStep } from "./models"
@@ -29,7 +29,7 @@ export interface McuAi {
 }
 /** The main subject's bounding box as fractions of the photo (0–1, origin top left). */
 export interface SubjectBox { x0: number; y0: number; x1: number; y1: number }
-export interface Candidate { title: string; primaryUrl: string; publisher: string; publishedAt?: string; whyNow?: string; why: string; supportingUrls?: string[] }
+export interface Candidate { title: string; primaryUrl: string; publisher: string; publishedAt?: string; whyNow?: string; why: string; supportingUrls?: string[]; /** Other primary pages for the same subject, tried when the primary can't be read. */ alternateUrls?: string[] }
 /** One model call as served: which model and which provider answered (evidence for the routing check). */
 export interface ModelCall { step: PipelineStep; model: string; provider?: string; finishReason?: string; inputTokens?: number; outputTokens?: number; /** Set when this call is the fallback for a model that could not answer. */ fallbackFrom?: string; fallbackReason?: string }
 
@@ -42,7 +42,14 @@ export function framesFor(kind: RequestKind): SeriesKey[] {
   return kind === "icymi" ? ["icymi_cover", "icymi_story", "icymi_story", "icymi_story", "icymi_story", "icymi_story"] : [kind]
 }
 
-const candidateSchema = z.object({ candidates: z.array(z.object({ title: z.string(), primaryUrl: z.string(), publisher: z.string(), publishedAt: z.string().optional(), whyNow: z.string().optional(), why: z.string(), supportingUrls: z.array(z.string()).optional() })), note: z.string().optional() })
+const candidateSchema = z.object({ candidates: z.array(z.object({ title: z.string(), primaryUrl: z.string(), publisher: z.string(), publishedAt: z.string().optional(), whyNow: z.string().optional(), why: z.string(), supportingUrls: z.array(z.string()).optional(), alternateUrls: z.array(z.string()).optional().describe("other primary pages for the same subject: the maker's product page, a .mil or .gov page, a press release") })), note: z.string().optional() })
+/** Every https URL in the search tool's results, in order, de-duplicated (the tool's output shape is not relied on). */
+export function searchResultUrls(steps: readonly { toolResults: readonly { output?: unknown }[] }[]): string[] {
+  const out: string[] = []
+  for (const st of steps) for (const tr of st.toolResults) for (const m of JSON.stringify(tr.output ?? "").matchAll(/https:\/\/[^\s"'<>\\]+/g)) { const u = m[0].replace(/[),.;]+$/, ""); if (!out.includes(u)) out.push(u) }
+  return out
+}
+export const normalizeUrl = (u: string) => u.trim().replace(/#.*$/, "").replace(/\/+$/, "").toLowerCase()
 // Card fields are declared per series (explicit, required keys, fixed lists as enums) and the answer comes back as a
 // forced "submit" tool call, the pattern lib/ai-gateway-text.ts uses. An open record, and then name/value pairs
 // through structured output, both came back empty in the 2026-10-16 live test. Date and counter are filled by the
@@ -109,12 +116,27 @@ export function createMcuAi(deps: { models: Record<PipelineStep, string>; search
   return {
     async research({ kind, count, topic, today, recentTitles, avoid, seeds }) {
       const want = kind === "dt101" ? "defense technologies worth a Defense Tech 101 explainer (a specific, real product or system with a clear maker and a sourced status)" : kind === "breaking" ? "Breaking-qualified developments (primary-source announcement within the last 24 hours AND consequential enough to need immediate attention)" : "defense-industry news stories from the last 7 days"
-      const r = await run("research", model => generateText({
-        model, tools: deps.searchTools, stopWhen: stepCountIs(10), maxOutputTokens: outputBudget(model, 24_000), providerOptions: callOptions(model, "medium"), allowSystemInMessages: true, // the cached editorial prefix is ours, not user input
-        messages: [...system(`${seedBrief(kind, seeds)}\n\nToday is ${today}. Task: find up to ${count + 2} ${want}${topic ? `, about: ${topic}` : ""}. Search the web; for each, find the ORIGINAL primary-source page (the company, agency or service's own announcement, contract notice or official article) and give its exact URL. Skip anything MCU already covered (recent MCU titles below) and anything listed under NEVER. Prefer U.S. defense, national-security and defense-tech companies and programs. ${kind === "dt101" ? "A DT101 card needs the maker and its headquarters: when the primary page does not name them, give supportingUrls with up to two pages that do (the maker's own product or about page first). " : ""}${kind === "breaking" ? "For each, give whyNow: one sourced sentence on what is newly different, its material consequence, and why it needs attention now. If nothing qualifies, return no candidates and say why in note." : ""}\nNever revive: ${NEVER_REVIVE.map(n => `${n.id} — ${n.what}`).join("; ")}.${avoid?.length ? `\nThese subjects were turned down or could not be sourced; pick something clearly different: ${avoid.join("; ")}.` : ""}\nRecent MCU titles:\n${recentTitles.map(t => `- ${t}`).join("\n") || "- (none found)"}`), { role: "user", content: `Find the candidates now. Return publishedAt as YYYY-MM-DD when the source states it.` }],
-        output: Output.object({ schema: candidateSchema }),
-      }))
-      return { candidates: r.output.candidates.slice(0, count + 2), ...(r.output.note ? { note: r.output.note } : {}) }
+      const task = `${seedBrief(kind, seeds)}\n\nToday is ${today}. Task: find up to ${count + 2} ${want}${topic ? `, about: ${topic}` : ""}. Search the web; for each, find the ORIGINAL primary-source page (the company, agency or service's own announcement, contract notice or official article) and give its exact URL. Skip anything MCU already covered (recent MCU titles below) and anything listed under NEVER. Prefer U.S. defense, national-security and defense-tech companies and programs. ${kind === "dt101" ? "A DT101 card needs the maker and its headquarters: when the primary page does not name them, give supportingUrls with up to two pages that do (the maker's own product or about page first). " : ""}${kind === "breaking" ? "For each, give whyNow: one sourced sentence on what is newly different, its material consequence, and why it needs attention now. If nothing qualifies, return no candidates and say why in note." : ""}\nNever revive: ${NEVER_REVIVE.map(n => `${n.id} — ${n.what}`).join("; ")}.${avoid?.length ? `\nThese subjects were turned down or could not be sourced; pick something clearly different: ${avoid.join("; ")}.` : ""}\nRecent MCU titles:\n${recentTitles.map(t => `- ${t}`).join("\n") || "- (none found)"}`
+      // Two calls, because asking for structured output in the same call as the search tool makes the model answer
+      // at once from memory instead of searching (production, 2026-10-17: one step, no search, guessed URLs that
+      // 404'd, then zero candidates). 1) Search: only the search tool, required on the first step; the model writes
+      // its findings as notes. 2) Extract: the candidates come back through one required tool, from those notes and
+      // the URLs the search actually returned.
+      const searched = await run("research", model => generateText({
+        model, tools: deps.searchTools, stopWhen: stepCountIs(8), maxOutputTokens: outputBudget(model, 24_000), providerOptions: callOptions(model, "medium"), allowSystemInMessages: true, // the cached editorial prefix is ours, not user input
+        prepareStep: ({ stepNumber }) => stepNumber === 0 ? { toolChoice: "required" as const } : {},
+        messages: [...system(`${task}\nSearch first; never rely on memory for a URL. Then write your findings as plain notes: for each candidate, its title, publisher, publication date if stated, the exact primary-source URL as it appears in the search results, other primary pages for the same subject (the maker's product page, a .mil or .gov page, a press release) and why it fits.`), { role: "user", content: "Search now, then write the notes." }],
+      }), r => ({ text: r.text, urls: searchResultUrls(r.steps), searches: r.steps.reduce((n, st) => n + st.toolCalls.length, 0), steps: r.steps.length, finishReason: r.finishReason, providerMetadata: r.providerMetadata, usage: r.usage }))
+      const seen = new Set(searched.urls.map(normalizeUrl))
+      const extracted = await run("research", model => generateText({
+        model, maxOutputTokens: outputBudget(model, 8_000), providerOptions: callOptions(model, "low"),
+        tools: { submit_candidates: tool({ description: "Submit the candidates found, best first.", inputSchema: candidateSchema }) }, toolChoice: { type: "tool", toolName: "submit_candidates" },
+        messages: [{ role: "system", content: `From the research notes and the search-result URLs below, submit up to ${count + 2} candidates, best first. Use URLs exactly as they appear in the search results; prefer the original primary source as primaryUrl, and put other primary pages for the same subject in alternateUrls. Return no candidates, with the reason in note, only when the notes found none.` },
+          { role: "user", content: `NOTES:\n${searched.text.slice(0, 12_000) || "(none)"}\n\nSEARCH-RESULT URLS:\n${searched.urls.slice(0, 60).join("\n") || "(none)"}` }],
+      }), r => submitted<z.infer<typeof candidateSchema>>(r, "submit_candidates"))
+      const candidates = (extracted.candidates ?? []).slice(0, count + 2)
+      console.info("[content-pipeline] research", JSON.stringify({ kind, steps: searched.steps, searches: searched.searches, resultUrls: searched.urls.length, notesChars: searched.text.length, candidates: candidates.length, inResults: candidates.filter(c => seen.has(normalizeUrl(c.primaryUrl))).length, alternates: candidates.reduce((n, c) => n + (c.alternateUrls?.length ?? 0), 0), note: !!extracted.note }))
+      return { candidates, ...(extracted.note ? { note: extracted.note } : {}) }
     },
 
     async write({ kind, story, today, previous, instructions, problems, direction, seeds }) {
@@ -138,13 +160,22 @@ export function createMcuAi(deps: { models: Record<PipelineStep, string>; search
 
     async findPhotoPages({ story, frame }) {
       const subject = frame.fields.subject_identifier || frame.fields.headline || story.title
-      const r = await run("photoSearch", model => generateText({
+      // Search, then pick from what the search returned (the same two-call pattern as research, for the same reason).
+      const searched = await run("photoSearch", model => generateText({
         model, tools: deps.searchTools, stopWhen: stepCountIs(6), maxOutputTokens: outputBudget(model, 8_000), providerOptions: callOptions(model, "low"),
-        messages: [{ role: "system", content: "You find photos for a defense-news social card. Search the web for pages whose main photo shows the subject itself (the actual system, product, vehicle, unit or event in the story), from sources whose photos may be used with credit: DVIDS image pages (https://www.dvidshub.net/image/<number>/...); U.S. government pages (defense.gov, war.gov, army.mil, navy.mil, af.mil, marines.mil, spaceforce.mil, uscg.mil, nasa.gov, other .mil and .gov sites); and the maker's own newsroom, press-release, press-kit or media pages. Never news outlets' or stock-photo sites' pages (their photos are licensed to them). Return exact page URLs only, best first; never image-file URLs, search pages or guesses. Return an empty list if none show the subject." },
+        prepareStep: ({ stepNumber }) => stepNumber === 0 ? { toolChoice: "required" as const } : {},
+        messages: [{ role: "system", content: "You find photos for a defense-news social card. Search the web for pages whose main photo shows the subject itself (the actual system, product, vehicle, unit or event in the story), from sources whose photos may be used with credit: DVIDS image pages (https://www.dvidshub.net/image/<number>/...); U.S. government pages (defense.gov, war.gov, army.mil, navy.mil, af.mil, marines.mil, spaceforce.mil, uscg.mil, nasa.gov, other .mil and .gov sites); and the maker's own newsroom, press-release, press-kit or media pages. Never news outlets' or stock-photo sites' pages (their photos are licensed to them). Return exact page URLs only, best first; never image-file URLs, search pages or guesses. Return an empty list if none show the subject. Search first, then list the best page URLs you found with one line each on what their main photo shows." },
           { role: "user", content: `Subject: ${subject}\nStory: ${story.title}\nPublisher: ${story.publisher}\nPhoto idea: ${frame.mediaQuery ?? ""}` }],
-        output: Output.object({ schema: z.object({ pages: z.array(z.string()).describe("up to 8 page URLs, best first") }) }),
-      }))
-      return [...new Set(r.output.pages.filter(u => /^https:\/\//.test(u)))].slice(0, 8)
+      }), r => ({ text: r.text, urls: searchResultUrls(r.steps) }))
+      if (!searched.urls.length) return []
+      const picked = await run("photoSearch", model => generateText({
+        model, maxOutputTokens: outputBudget(model, 4_000), providerOptions: callOptions(model, "low"),
+        tools: { submit_pages: tool({ description: "Submit the page URLs whose main photo shows the subject, best first.", inputSchema: z.object({ pages: z.array(z.string()).describe("up to 8 page URLs from the list, best first") }) }) }, toolChoice: { type: "tool", toolName: "submit_pages" },
+        messages: [{ role: "system", content: "From the notes and the search-result URLs, submit the pages whose main photo shows the subject itself, best first, using URLs exactly as listed. Never image-file URLs, search pages, news outlets' or stock-photo sites' pages. Submit an empty list if none fit." },
+          { role: "user", content: `Subject: ${subject}\nNOTES:\n${searched.text.slice(0, 6_000) || "(none)"}\n\nSEARCH-RESULT URLS:\n${searched.urls.slice(0, 60).join("\n")}` }],
+      }), r => submitted<{ pages: string[] }>(r, "submit_pages"))
+      const listed = new Set(searched.urls.map(normalizeUrl))
+      return [...new Set((picked.pages ?? []).filter(u => /^https:\/\//.test(u) && listed.has(normalizeUrl(u))))].slice(0, 8)
     },
 
     async pickMedia({ story, frame, candidates, avoid }) {
