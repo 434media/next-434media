@@ -8,7 +8,7 @@
 import { test } from "node:test"
 import assert from "node:assert/strict"
 import { SERIES, checkFields, clippedWords, ddmmmyy, lineCount, type SeriesKey } from "../content-pipeline/series"
-import { runDue, RETRY_MS, staleSource, allowsRepresentative, sameSubject, makerOf, searchedPageUsable, unsourcedNumbers, withCredits, imageLabel, mediaQueries, cropFit, choosePhoto, zoomCrop, reviewNotes, DOD_NOTICE, LEASE_MS, type WorkerDeps, type DesignInput, type PostInput, type NoContentInput } from "../content-pipeline/worker"
+import { runDue, RETRY_MS, icymiStory, icymiWindow, staleSource, allowsRepresentative, sameSubject, makerOf, searchedPageUsable, unsourcedNumbers, withCredits, imageLabel, mediaQueries, cropFit, choosePhoto, zoomCrop, reviewNotes, DOD_NOTICE, LEASE_MS, type WorkerDeps, type DesignInput, type PostInput, type NoContentInput } from "../content-pipeline/worker"
 import { MAX_ATTEMPTS, type McuDraft, type McuJob, type McuStore } from "../content-pipeline/store"
 import { archiveRelevant, assertPublicHttps, guardedFetch, isOutlet, siteOrg, imageSize, pageImageCandidate, parsePage, searchNasa, searchOpenverse, usableLicense, type MediaCandidate } from "../content-pipeline/sources"
 import { brandDirection, isPhotoDefect, readPick, searchResultUrls, servedBy, servedCall, type McuAi, type ModelCall } from "../content-pipeline/model"
@@ -69,7 +69,7 @@ function world(over: { ai?: Partial<McuAi>; pagePublished?: string; newsFeedHasM
     seeds: async () => over.seeds === undefined ? SEEDS : over.seeds,
     content: {
       recentPosts: async () => [{ id: "p1", title: "Old story", status: "posted", caption: "c" }],
-      templateFields: async t => { const media = t !== SERIES.news.templates.feed || over.newsFeedHasMedia !== false; return { headline: "text", deck: "text", date: "text", source: "text", ...(media ? { media: "image" } : {}), benefit_headline: "text", subject_identifier: "text", image_context: "text" } },
+      templateFields: async t => { const media = t !== SERIES.news.templates.feed || over.newsFeedHasMedia !== false; return { headline: "text", deck: "text", date: "text", source: "text", ...(media ? { media: "image" } : {}), benefit_headline: "text", subject_identifier: "text", image_context: "text", counter: "text", story_01: "text", story_02: "text", story_03: "text", story_04: "text", story_05: "text" } },
       createDesign: async i => { over.createDesign?.(i); designs.push(structuredClone(i)); return { designId: `DAH${i.requestId.replace(/[^A-Za-z0-9]/g, "").slice(-8)}`, editUrl: "https://www.canva.com/d/edit", viewUrl: "https://www.canva.com/d/view", previewUrls: ["https://export.canva.com/1.jpg"] } },
       writePost: async p => { posts.push(structuredClone(p)); return { postId: `post-${posts.length}`, holds: [] } },
       writeNoContent: async p => { const at = notices.findIndex(n => n.requestId === p.requestId); if (at >= 0) return { postId: `notice-${at + 1}` }; notices.push(structuredClone(p)); return { postId: `notice-${notices.length}` } },
@@ -280,10 +280,10 @@ test("a template without a photo field gets the copy and a visible notice instea
   assert.match(w.posts[0].notes, /Not done\n- News feed template has no photo field/)
 })
 
-test("ICYMI needs five published stories; fewer holds for Marcos without creating anything", async () => {
+test("ICYMI with no story published in the previous week holds without creating anything", async () => {
   const w = world()
   await w.start({ kind: "icymi" })
-  assert.equal(w.store.drafts.size, 0); assert.match((await w.store.getJob("job-icymi-1"))!.note!, /ICYMI needs five/)
+  assert.equal(w.store.drafts.size, 0); assert.match((await w.store.getJob("job-icymi-1"))!.note!, /no MCU News or Breaking story was published in the week of 2026-10-05, so there is no ICYMI/)
 })
 
 test("sources: licenses, page dates, and only public https hosts", async () => {
@@ -690,7 +690,7 @@ function onlyDraftShape(): McuDraft {
 }
 
 test("ICYMI: DT101 posts are not recapped; each card's photo is its own story's; the cover reuses the lead story's photo", async () => {
-  const posted = (n: number, over: Partial<{ title: string; caption: string }> = {}) => ({ id: `p${n}`, title: over.title ?? `MCU-NEWS-2026101${n}-01 v1 — STORY ${n}`, status: "posted", publishedUrl: `https://www.instagram.com/milcityusa/p/${n}/`, caption: over.caption ?? `Story ${n} caption. Source: U.S. Army, 2026-10-1${n}` })
+  const posted = (n: number, over: Partial<{ title: string; caption: string }> = {}) => ({ id: `p${n}`, title: over.title ?? `MCU-NEWS-2026101${n}-01 v1 — STORY ${n}`, status: "posted", publishedUrl: `https://www.instagram.com/milcityusa/p/${n}/`, caption: over.caption ?? `Story ${n} caption. Source: U.S. Army, 2026-10-1${n}`, publishedAt: `2026-10-${String(12 - n).padStart(2, "0")}T15:00:00Z` }) // in the previous week, newest first
   const subjects: string[] = []
   const w = world({ ai: {
     write: async () => ({ frames: [{ series: "icymi_cover" as SeriesKey, fields: { headline: "Week in defense", story_01: "One", story_02: "Two", story_03: "Three", story_04: "Four", story_05: "Five" } }, ...[1, 2, 3, 4, 5].map(n => ({ series: "icymi_story" as SeriesKey, fields: { headline: `Story ${n}`, deck: `Deck ${n}.` } }))], caption: "Roundup.\n\nSource: MilCityUSA" }),
@@ -773,4 +773,35 @@ test("caption and deck rules: the DT101 mission brief, a source line of its own,
   const news = world({ ai: { write: async i => { seen.push(i.problems ?? []); m++; return { frames: [{ series: "news" as SeriesKey, fields: { headline: "KBR Firefly pilot", deck: m === 1 ? "KBR Firefly laser pilot for base defense, Xbox controller" : "KBR is testing its Firefly laser for base defense.", source: "ARMY.MIL" } }], caption: "KBR is testing a laser.\n\nSource: U.S. Army, 2026-10-15" } } } })
   await news.start({ kind: "news" })
   assert.equal(m, 2); assert.match(seen.at(-1)!.join(" | "), /the deck must be one complete sentence/)
+})
+
+// ── ICYMI, founder ruling (2026-10-17): up to five stories from the previous week, by recency for now ──
+test("ICYMI window: the previous Monday-to-Sunday week in Chicago, or the last N days when a super-admin widens it", () => {
+  const fri = Date.parse("2026-10-16T18:00:00Z")
+  const w = icymiWindow(fri, null)
+  assert.equal(new Date(w.startMs).toISOString(), "2026-10-05T05:00:00.000Z"); assert.equal(new Date(w.endMs).toISOString(), "2026-10-12T05:00:00.000Z") // CDT midnights
+  const mondayEarly = icymiWindow(Date.parse("2026-10-12T04:30:00Z"), null) // still Sunday night in Chicago
+  assert.equal(new Date(mondayEarly.endMs).toISOString(), "2026-10-05T05:00:00.000Z")
+  const winter = icymiWindow(Date.parse("2026-12-09T18:00:00Z"), null)
+  assert.equal(new Date(winter.startMs).toISOString(), "2026-11-30T06:00:00.000Z") // CST
+  const wide = icymiWindow(fri, 14)
+  assert.equal(wide.endMs - wide.startMs, 14 * 864e5); assert.equal(wide.label, "the last 14 days")
+})
+
+test("ICYMI: four stories make a cover and four cards, counted of four; the unused cover slot is blanked, with a notice", async () => {
+  const p = (n: number, at: string) => ({ id: `p${n}`, title: `MCU-NEWS-20261009-0${n} v1 — STORY ${n}`, status: "posted", publishedUrl: `https://www.instagram.com/milcityusa/p/${n}/`, caption: `Story ${n} caption.\n\nSource: U.S. Army, 2026-10-09`, publishedAt: at })
+  let fieldsAsked: string[] = []
+  const w = world({ ai: { write: async i => { fieldsAsked = [String(i.story.roundup?.length)]; return { frames: [{ series: "icymi_cover" as SeriesKey, fields: { headline: "Four defense developments", story_01: "One", story_02: "Two", story_03: "Three", story_04: "Four" } }, ...[1, 2, 3, 4].map(n => ({ series: "icymi_story" as SeriesKey, fields: { headline: `Story ${n}`, deck: `Deck ${n}.` } }))], caption: "Roundup.\n\nSource: MilCityUSA" } } } })
+  w.deps.content.recentPosts = async () => [p(1, "2026-10-10T15:00:00Z"), p(2, "2026-10-09T15:00:00Z"), p(3, "2026-10-09T14:00:00Z"), p(4, "2026-10-09T13:00:00Z"), { ...p(5, "2026-09-20T13:00:00Z"), title: "Too old" }, { ...p(6, "2026-10-08T13:00:00Z"), title: "MCU-NEWS-20261009-01 v1 — STORY 1" }]
+  w.deps.icymiWindow = async () => ({ lookbackDays: 14 })
+  w.deps.searchCommons = async q => [{ ...CANDIDATE, url: `https://upload.wikimedia.org/${encodeURIComponent(q)}.jpg`, thumbUrl: `https://upload.wikimedia.org/t/${encodeURIComponent(q)}.jpg`, pageUrl: `https://commons.wikimedia.org/wiki/File:${encodeURIComponent(q)}` }]
+  await w.start({ kind: "icymi" })
+  const d = onlyDraft(w)
+  assert.equal(fieldsAsked[0], "4"); assert.deepEqual(d.story.roundup!.map(r => r.postId), ["p1", "p2", "p3", "p4"]) // newest first; the old one and the repeat left out
+  assert.equal(d.status, "in_review"); assert.equal(d.frames.length, 5); assert.deepEqual(d.frames.slice(1).map(f => f.fields.counter), ["01 / 04", "02 / 04", "03 / 04", "04 / 04"])
+  assert.equal(w.designs.length, 5); assert.equal(w.designs[0].text.story_05, " "); assert.equal(w.designs[0].text.story_04, "Four")
+  assert.ok(d.notices.some(n => /ICYMI cover: 4 of 5 story slots used/.test(n)))
+  // Previous week only (the default): the same posts give nothing for a Friday in the week after next.
+  const none = icymiStory([p(1, "2026-10-10T15:00:00Z")], icymiWindow(Date.parse("2026-10-23T18:00:00Z"), null))
+  assert.ok("hold" in none)
 })

@@ -41,8 +41,10 @@ const system = (extra: string) => [{ role: "system" as const, content: MCU_EDITO
 function fieldBrief(f: FieldSpec): string {
   return `${f.name} (${f.label}${f.allowed ? `; exactly one of: ${f.allowed.join(" | ")}` : ""}${f.date ? "; DDMMMYY" : ""}${f.perLine && f.maxLines ? `; at most ${f.maxLines} line${f.maxLines > 1 ? "s" : ""} of ~${f.perLine} characters` : ""}${f.maxChars ? `; at most ${f.maxChars} characters` : ""}${f.uppercase ? "; UPPERCASE" : ""}${f.exactLines ? `; exactly ${f.exactLines} lines separated by a line break, each at most ${f.perLine} characters of whole words, never abbreviated` : ""})`
 }
-export function framesFor(kind: RequestKind): SeriesKey[] {
-  return kind === "icymi" ? ["icymi_cover", "icymi_story", "icymi_story", "icymi_story", "icymi_story", "icymi_story"] : [kind]
+/** An ICYMI roundup is the cover plus one card per story (1–5; founder, 2026-10-17). */
+export const icymiCount = (story: Pick<Story, "roundup">) => Math.min(5, Math.max(1, story.roundup?.length ?? 5))
+export function framesFor(kind: RequestKind, stories = 5): SeriesKey[] {
+  return kind === "icymi" ? ["icymi_cover", ...Array.from({ length: stories }, () => "icymi_story" as const)] : [kind]
 }
 
 const candidateSchema = z.object({ candidates: z.array(z.object({ title: z.string(), primaryUrl: z.string(), publisher: z.string(), publishedAt: z.string().optional(), whyNow: z.string().optional(), why: z.string(), supportingUrls: z.array(z.string()).optional(), alternateUrls: z.array(z.string()).optional().describe("other primary pages for the same subject: the maker's product page, a .mil or .gov page, a press release") })), note: z.string().optional() })
@@ -58,14 +60,16 @@ export const normalizeUrl = (u: string) => u.trim().replace(/#.*$/, "").replace(
 // through structured output, both came back empty in the 2026-10-16 live test. Date and counter are filled by the
 // server, so they are not asked for.
 const SERVER_FILLED = new Set(["date", "counter"])
-function fieldsSchema(series: SeriesKey) {
-  return z.object(Object.fromEntries(SERIES[series].fields.filter(f => !SERVER_FILLED.has(f.name) && !f.serverFilled).map(f => [f.name, f.allowed ? z.enum(f.allowed as [string, ...string[]]).describe(fieldBrief(f)) : z.string().describe(fieldBrief(f))])))
+/** The cover's story slots past the roundup's last story are not asked for (the server blanks them). */
+export const unusedStorySlot = (name: string, stories: number) => /^story_0[1-5]$/.test(name) && Number(name.slice(-1)) > stories
+function fieldsSchema(series: SeriesKey, stories = 5) {
+  return z.object(Object.fromEntries(SERIES[series].fields.filter(f => !SERVER_FILLED.has(f.name) && !f.serverFilled && !unusedStorySlot(f.name, stories)).map(f => [f.name, f.allowed ? z.enum(f.allowed as [string, ...string[]]).describe(fieldBrief(f)) : z.string().describe(fieldBrief(f))])))
 }
-const frameSchema = (series: SeriesKey) => z.object({ fields: fieldsSchema(series), mediaQuery: z.string().describe("3–6 words naming the actual subject, for finding a photo") })
-function writeSchema(kind: RequestKind) {
+const frameSchema = (series: SeriesKey, stories = 5) => z.object({ fields: fieldsSchema(series, stories), mediaQuery: z.string().describe("3–6 words naming the actual subject, for finding a photo") })
+function writeSchema(kind: RequestKind, stories = 5) {
   const base = { caption: z.string().describe("the one master caption"), hold: z.string().optional().describe("only if the source cannot support the post: the one-sentence reason") }
   return kind === "icymi"
-    ? z.object({ cover: frameSchema("icymi_cover"), stories: z.array(frameSchema("icymi_story")).describe("exactly five story cards, in the cover's order"), ...base })
+    ? z.object({ cover: frameSchema("icymi_cover", stories), stories: z.array(frameSchema("icymi_story")).describe(`exactly ${stories} story card${stories === 1 ? "" : "s"}, in the cover's order`), ...base })
     : z.object({ card: frameSchema(kind as SeriesKey), ...base })
 }
 async function submitted<T>(r: { toolCalls: { toolName: string; input: unknown }[] }, name: string): Promise<T> {
@@ -196,10 +200,11 @@ export function createMcuAi(deps: { models: Record<PipelineStep, string>; search
     },
 
     async write({ kind, story, today, previous, instructions, problems, direction, seeds }) {
-      const frames = framesFor(kind)
-      const spec = frames.map((s, i) => `Frame ${i + 1} — ${SERIES[s].label}: ${SERIES[s].fields.map(fieldBrief).join("; ") || "(media only)"}`).join("\n")
-      const icymi = kind === "icymi" ? `\nICYMI: frame 1 is the cover (headline = the roundup's theme; story_01..story_05 = one short entry per story, in order; date = today as DDMMMYY). Frames 2–6 are the story cards in the same order: counter "01 / 05" … "05 / 05", headline and deck for that story. The stories:\n${(story.roundup ?? []).map((p, i) => `${i + 1}. ${p.title}\n${p.caption}`).join("\n\n")}` : ""
-      const schema = writeSchema(kind)
+      const frames = framesFor(kind, icymiCount(story))
+      const spec = frames.map((s, i) => `Frame ${i + 1} — ${SERIES[s].label}: ${SERIES[s].fields.filter(f => !unusedStorySlot(f.name, icymiCount(story))).map(fieldBrief).join("; ") || "(media only)"}`).join("\n")
+      const n = icymiCount(story), nn = `0${n}`
+      const icymi = kind === "icymi" ? `\nICYMI: ${n} published ${n === 1 ? "story" : "stories"} this week. Frame 1 is the cover (headline = the roundup's theme, never a count other than ${n}; story_01${n > 1 ? `..story_${nn}` : ""} = one short entry per story, in order; date = today as DDMMMYY). Frames 2–${n + 1} are the story cards in the same order: counter "01 / ${nn}"${n > 1 ? ` … "${nn} / ${nn}"` : ""}, headline and deck for that story. The stories:\n${(story.roundup ?? []).map((p, i) => `${i + 1}. ${p.title}\n${p.caption}`).join("\n\n")}` : ""
+      const schema = writeSchema(kind, icymiCount(story))
       const asPrevious = (p: { frames: FrameCopy[]; caption: string }) => JSON.stringify(kind === "icymi" ? { cover: { fields: p.frames[0]?.fields }, stories: p.frames.slice(1).map(f => ({ fields: f.fields })), caption: p.caption } : { card: { fields: p.frames[0]?.fields }, caption: p.caption })
       const r = await run("write", model => generateText({
         model, maxOutputTokens: outputBudget(model, 16_000), providerOptions: callOptions(model, "medium"), allowSystemInMessages: true,
@@ -209,7 +214,7 @@ export function createMcuAi(deps: { models: Record<PipelineStep, string>; search
           ...(previous ? [{ role: "assistant" as const, content: `Previous version: ${asPrevious(previous)}` }, { role: "user" as const, content: `${problems?.length ? `Fix these problems: ${problems.join("; ")}. ` : ""}${instructions ? `Reviewer's changes: ${instructions}` : "Submit the corrected version."} Keep everything the reviewer did not ask to change.` }] : [])],
       }))
       const out = await submitted<{ card?: { fields: Record<string, string>; mediaQuery?: string }; cover?: { fields: Record<string, string>; mediaQuery?: string }; stories?: { fields: Record<string, string>; mediaQuery?: string }[]; caption: string; hold?: string }>(r, "submit_post")
-      const parts = kind === "icymi" ? [out.cover, ...(out.stories ?? []).slice(0, 5)] : [out.card]
+      const parts = kind === "icymi" ? [out.cover, ...(out.stories ?? []).slice(0, icymiCount(story))] : [out.card]
       console.info("[content-pipeline] write", JSON.stringify({ kind, frames: parts.filter(Boolean).length, fields: parts.map(p => Object.keys(p?.fields ?? {}).filter(k => (p?.fields[k] ?? "").trim())), hold: !!out.hold }))
       return { frames: frames.map((series, i) => ({ series, fields: { ...(parts[i]?.fields ?? {}) }, ...(parts[i]?.mediaQuery ? { mediaQuery: parts[i]!.mediaQuery } : {}) })), caption: (out.caption ?? "").trim(), ...(out.hold ? { hold: out.hold } : {}) }
     },

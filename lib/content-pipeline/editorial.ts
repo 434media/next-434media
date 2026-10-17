@@ -9,7 +9,7 @@
  * carousel's companies again in the caption; Canva Notes as the review surface (the API cannot write Notes — the CRM record
  * on the Admin board carries the review); browser workarounds of any kind.
  */
-export const MCU_RULES_VERSION = "mcu-rules-2026-10-17.2"
+export const MCU_RULES_VERSION = "mcu-rules-2026-10-17.3"
 
 /** Rejected Breaking item that must never come back under any ID (founder, 2026-10-10). */
 export const NEVER_REVIVE = [{ id: "MCU-BN-20261010-03", what: "Space Development Agency adding 21 satellites (routine fleet increment, rejected as Breaking)" }] as const
@@ -38,7 +38,7 @@ SERIES
   Traction: <named organization and the precise test, purchase or fielding status, with "per <company>" when it is the company's claim>
   The image credit and the endorsement notice are added after this by the server; do not write them.
   Example (HIMARS): "MISSION BRIEF // HIMARS" / "//Lockheed Martin" / "📍Bethesda, MD" / "Tech: Precision fires" / "Platform: Wheeled rocket launcher" / "Goal: Deliver precision fires with a mobile launcher." / "Why: Quick relocation helps crews reduce exposure after firing." / "Ticker: NYSE: LMT" / "Traction: 750th launcher delivered Nov. 5, 2025, per Lockheed Martin." — each on its own line with a blank line between.
-- ICYMI: a fixed-five roundup of MCU News or Breaking stories already published: one cover plus five story cards, in the same order. Never duplicate a story or invent filler; fewer than five eligible means hold for Marcos.
+- ICYMI: a weekly quick brief for readers who want a fast update: up to five MCU News or Breaking stories already published in the previous week (Monday to Sunday, America/Chicago), one cover plus one story card per story, in the same order. It posts on Monday at 7:00 AM CDT. Never duplicate a story or invent filler: with fewer than five, the roundup has fewer cards, and the cover's headline never states a count the roundup doesn't have. With none, there is no ICYMI that week. Stories are chosen by recency for now; choosing the best-performing ones waits for analytics to be mapped to this workflow (founder, 2026-10-17).
 
 CARD COPY
 - Headlines are UPPERCASE, short and concrete. They must fit the template at its largest size (the limits given); if not, choose shorter words — never rely on smaller type.
