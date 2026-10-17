@@ -102,7 +102,8 @@ async function jobStep(deps: WorkerDeps, id: string, attempt: number): Promise<v
     let stories: Story[] | { hold: string; tried?: string[]; triedUrls?: string[] } = job.kind === "icymi" ? icymiStory(posts) : await researchStories(deps, ai, job, titles, seeds)
     // Every candidate dropped (a blocked or script-only source page, no readable article, outside the Breaking window):
     // research once more, steering away from what was tried, before the job holds (production, 2026-10-17).
-    if ("hold" in stories && stories.tried?.length) {
+    // Zero candidates too: that pass found nothing to try, so the second pass is the search's one retry, not a loop.
+    if ("hold" in stories && "tried" in stories) {
       console.info("[content-pipeline] research again", JSON.stringify({ job: id, dropped: stories.hold.slice(0, 600) }))
       const first = stories
       const again = await researchStories(deps, ai, job, titles, seeds, first.tried ?? [], first.triedUrls ?? [])
@@ -164,9 +165,19 @@ async function researchStories(deps: WorkerDeps, ai: McuAi, job: Pick<McuJob, "k
   const stories: Story[] = [], dropped: string[] = []
   for (const c of r.candidates) {
     if (stories.length >= job.count) break
-    let page: SourcePage
-    try { page = await deps.fetchPage(c.primaryUrl) } catch { dropped.push(`${c.title}: source page unreachable`); continue }
-    if (page.text.length < 400) { dropped.push(`${c.title}: source page has no readable article`); continue }
+    // The primary page first, then other primary pages for the same subject (product page, .mil/.gov page, press
+    // release), so one unreadable page doesn't drop the subject. Each miss keeps its reason for the hold note.
+    if (avoidUrls.includes(c.primaryUrl)) { dropped.push(`${c.title}: already tried`); continue }
+    let page: SourcePage | null = null
+    const misses: string[] = []
+    for (const url of [...new Set([c.primaryUrl, ...(c.alternateUrls ?? [])])].slice(0, 4)) {
+      try {
+        const p = await deps.fetchPage(url)
+        if (p.text.length >= 400) { page = p; break }
+        misses.push(`no readable article at ${url}`)
+      } catch (err) { misses.push(`${err instanceof Error ? err.message : "unreachable"} at ${url}`) }
+    }
+    if (!page) { dropped.push(`${c.title}: source page unreachable or unreadable (${misses.join("; ").slice(0, 300)})`); continue }
     const publishedAt = normalizeDate(page.publishedAt) ?? normalizeDate(c.publishedAt)
     if (job.kind === "breaking") {
       // The 24-hour window is checked against the source's own stated date, not the model's reading.
