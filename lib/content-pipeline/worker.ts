@@ -1,10 +1,10 @@
 import { SERIES, checkFields, clippedWords, ddmmmyy, normalizeFields, type Placement, type RequestKind } from "./series"
 import { MCU_RULES_VERSION } from "./editorial"
-import { normalizeUrl, type McuAi, type ModelCall, type RankedPhoto, type SubjectBox } from "./model"
+import { icymiCount, normalizeUrl, unusedStorySlot, type McuAi, type ModelCall, type RankedPhoto, type SubjectBox } from "./model"
 import { contentPropertyOf } from "./properties"
 import type { ContentProperty } from "@/components/crm/types"
 import type { McuSeeds } from "./seeds"
-import { MIN_SHORT_SIDE, archiveRelevant, imageSize, isDvidsImagePage, pageImageCandidate, type MediaCandidate, type SourcePage } from "./sources"
+import { MIN_SHORT_SIDE, archiveRelevant, imageSize, isDvidsImagePage, isOutlet, pageImageCandidate, type MediaCandidate, type SourcePage } from "./sources"
 import { MAX_ATTEMPTS, WORKING, type ChosenMedia, type CropBox, type FrameCopy, type FrameDesign, type McuDraft, type McuJob, type McuStore, type Story } from "./store"
 
 /**
@@ -17,7 +17,8 @@ import { MAX_ATTEMPTS, WORKING, type ChosenMedia, type CropBox, type FrameCopy, 
  * Moved from the pilot's Slack MCU skill (lib/slack/mcu/worker.ts at b36e7be). Slack review messages are replaced by
  * the board; revision ("revise", "refresh", "ready") moves to the drawer in Phase 2 and is not carried here.
  */
-export interface PostRow { id: string; title: string; status: string; publishedUrl?: string; caption?: string }
+/** publishedAt: when the post went out (posted_at, else its post date), for the ICYMI window. */
+export interface PostRow { id: string; title: string; status: string; publishedUrl?: string; caption?: string; publishedAt?: string }
 export interface DesignInput { requestId: string; templateId: string; title: string; text: Record<string, string>; image?: { field: string; url: string; name: string; crop?: CropBox } }
 export interface ContentSide {
   /** MCU's content posts, for the repeat-story check and ICYMI. */
@@ -44,6 +45,8 @@ export interface WorkerDeps {
   searchCommons(query: string): Promise<MediaCandidate[]>
   /** Other open archives searched beside Commons (Openverse, NASA); each keeps only usable licenses. */
   searchMore?(query: string): Promise<MediaCandidate[]>
+  /** The ICYMI lookback (content_pipeline_config/icymi_window): null days = the previous Monday-to-Sunday week. */
+  icymiWindow?(): Promise<{ lookbackDays: number | null }>
   /** The one "N drafts ready" alert for a finished job. */
   notify(job: McuJob, drafts: McuDraft[]): Promise<void>
   nowMs(): number
@@ -60,6 +63,10 @@ export const KEY_PREFIX = "admin:"
 const BREAKING_WINDOW_MS = 24 * 3600_000
 /** Drafts opened this recently, by any job, count for the repeat-story check (store.recentStories). */
 const RECENT_STORY_MS = 3 * 864e5
+/** The seeds' outlet sites, beside sources.ts's own list. */
+async function outletSites(deps: Pick<WorkerDeps, "seeds">): Promise<string[]> {
+  return ((await deps.seeds().catch(() => null))?.orgs ?? []).filter(o => o.kind === "outlet").map(o => o.site)
+}
 /** Stories other drafts are working on: their titles steer research, their URLs are refused. */
 async function storiesInFlight(deps: WorkerDeps, exceptDraft?: string): Promise<{ titles: string[]; urls: Set<string> }> {
   const recent = (await deps.store.recentStories(new Date(deps.nowMs() - RECENT_STORY_MS).toISOString()).catch(() => [])).filter(s => s.draftId !== exceptDraft)
@@ -81,7 +88,7 @@ export function staleSource(kind: RequestKind, publishedAt: string | undefined, 
   const age = nowMs - Date.parse(`${publishedAt}T23:59:59Z`)
   return age > days * 864e5 ? `published ${publishedAt}, more than ${days} days ago` : null
 }
-const ICYMI_COUNT = 5
+const ICYMI_MAX = 5
 const MAX_SUPPORTING = 2
 const MAX_AUTO_REPLACE = 2
 const MAX_MEDIA_RETRIES = 2
@@ -126,7 +133,7 @@ async function jobStep(deps: WorkerDeps, id: string, attempt: number): Promise<v
     const calls: ModelCall[] = []
     const ai = deps.ai(c => calls.push(c)), titles = posts.map(p => p.title), seeds = job.kind === "icymi" ? null : await deps.seeds()
     const inFlight = job.kind === "icymi" ? { titles: [], urls: new Set<string>() } : await storiesInFlight(deps)
-    let stories: Story[] | { hold: string; tried?: string[]; triedUrls?: string[] } = job.kind === "icymi" ? icymiStory(posts) : await researchStories(deps, ai, job, titles, seeds, [], [], inFlight)
+    let stories: Story[] | { hold: string; tried?: string[]; triedUrls?: string[] } = job.kind === "icymi" ? icymiStory(posts, icymiWindow(deps.nowMs(), (await deps.icymiWindow?.().catch(() => null))?.lookbackDays ?? null)) : await researchStories(deps, ai, job, titles, seeds, [], [], inFlight)
     // Every candidate dropped (a blocked or script-only source page, no readable article, outside the Breaking window):
     // research once more, steering away from what was tried, before the job holds (production, 2026-10-17).
     // Zero candidates too: that pass found nothing to try, so the second pass is the search's one retry, not a loop.
@@ -193,19 +200,50 @@ async function jobStep(deps: WorkerDeps, id: string, attempt: number): Promise<v
   }
 }
 
-/** ICYMI: five published MCU News or Breaking stories from the CRM, newest first. */
-function icymiStory(posts: PostRow[]): Story[] | { hold: string } {
+/** Midnight in America/Chicago on a calendar day, as UTC milliseconds (CDT or CST, whichever applies that day). */
+function chicagoMidnight(y: number, m: number, d: number): number {
+  for (const offset of [5, 6]) {
+    const t = Date.UTC(y, m - 1, d, offset)
+    if (new Intl.DateTimeFormat("en-US", { timeZone: "America/Chicago", hour: "numeric", hourCycle: "h23" }).format(t).replace(/^0+(?=\d)/, "") === "0") return t
+  }
+  return Date.UTC(y, m - 1, d, 6)
+}
+/**
+ * The ICYMI window (founder, 2026-10-17): the previous week, Monday 00:00 to Monday 00:00 America/Chicago, so a
+ * roundup posted Monday 7:00 AM CDT recaps the week before it. A super-admin can widen it to the last N days
+ * (content_pipeline_config/icymi_window) for a test, without a deploy.
+ */
+export function icymiWindow(nowMs: number, lookbackDays: number | null): { startMs: number; endMs: number; label: string } {
+  if (lookbackDays && lookbackDays > 0) return { startMs: nowMs - lookbackDays * 864e5, endMs: nowMs, label: `the last ${lookbackDays} days` }
+  const [y, m, d] = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Chicago" }).format(nowMs).split("-").map(Number)
+  const dow = new Date(Date.UTC(y, m - 1, d)).getUTCDay(), sinceMonday = (dow + 6) % 7
+  const monday = new Date(Date.UTC(y, m - 1, d - sinceMonday)), prev = new Date(Date.UTC(y, m - 1, d - sinceMonday - 7))
+  const endMs = chicagoMidnight(monday.getUTCFullYear(), monday.getUTCMonth() + 1, monday.getUTCDate()), startMs = chicagoMidnight(prev.getUTCFullYear(), prev.getUTCMonth() + 1, prev.getUTCDate())
+  return { startMs, endMs, label: `the week of ${prev.toISOString().slice(0, 10)}` }
+}
+/**
+ * ICYMI: up to five published MCU News or Breaking stories from the window, newest first, no repeats; held only when
+ * none qualify (founder, 2026-10-17: "UP TO 5"). A post with no publication time can't be placed in a week, so it is
+ * left out.
+ * TODO(analytics): the founder's rule is the five best-performing stories; rank by performance once analytics are
+ * mapped to this workflow. Until then, recency.
+ */
+export function icymiStory(posts: PostRow[], window: { startMs: number; endMs: number; label: string }): Story[] | { hold: string } {
+  const at = (p: PostRow) => p.publishedAt ? Date.parse(p.publishedAt) : NaN
   // DT101 posts are told by their mission-brief caption too: older manual ones aren't titled DT101 (gate round 1, ULTRA).
-  const eligible = posts.filter(p => (p.status === "posted" || p.publishedUrl) && !/icymi|dt101|defense tech 101|salute to troops/i.test(p.title) && p.caption && !/MISSION BRIEF \/\//i.test(p.caption)).slice(0, ICYMI_COUNT)
-  if (eligible.length < ICYMI_COUNT) return { hold: `only ${eligible.length} published MCU News or Breaking stories were found in the CRM; ICYMI needs five (ask Marcos for an exception)` }
-  return [{ title: "ICYMI roundup", primaryUrl: eligible[0].publishedUrl || "https://www.instagram.com/milcityusa/", publisher: "MilCityUSA", sourceTitle: "Five published MCU stories", sourceText: eligible.map((p, i) => `${i + 1}. ${p.title}\n${p.caption}`).join("\n\n"), roundup: eligible.map(p => ({ postId: p.id, title: p.title, caption: (p.caption || "").slice(0, 800), ...(p.publishedUrl ? { publishedUrl: p.publishedUrl } : {}) })) }]
+  const eligible = posts.filter(p => (p.status === "posted" || p.publishedUrl) && !/icymi|dt101|defense tech 101|salute to troops/i.test(p.title) && p.caption && !/MISSION BRIEF \/\//i.test(p.caption) && at(p) >= window.startMs && at(p) < window.endMs)
+    .sort((a, b) => at(b) - at(a))
+    .filter((p, i, all) => all.findIndex(x => x.title.trim().toLowerCase() === p.title.trim().toLowerCase()) === i)
+    .slice(0, ICYMI_MAX)
+  if (!eligible.length) return { hold: `no MCU News or Breaking story was published in ${window.label}, so there is no ICYMI` }
+  return [{ title: "ICYMI roundup", primaryUrl: eligible[0].publishedUrl || "https://www.instagram.com/milcityusa/", publisher: "MilCityUSA", sourceTitle: `${eligible.length} published MCU ${eligible.length === 1 ? "story" : "stories"} from ${window.label}`, sourceText: eligible.map((p, i) => `${i + 1}. ${p.title}\n${p.caption}`).join("\n\n"), roundup: eligible.map(p => ({ postId: p.id, title: p.title, caption: (p.caption || "").slice(0, 800), ...(p.publishedUrl ? { publishedUrl: p.publishedUrl } : {}) })) }]
 }
 
 /** On a hold, `tried` and `triedUrls` name the candidates that were dropped, so a second pass can avoid them. */
 async function researchStories(deps: WorkerDeps, ai: McuAi, job: Pick<McuJob, "kind" | "count" | "topic">, recentTitles: string[], seeds: McuSeeds | null, avoid: string[] = [], avoidUrls: string[] = [], inFlight: { titles: string[]; urls: Set<string> } = { titles: [], urls: new Set() }): Promise<Story[] | { hold: string; tried?: string[]; triedUrls?: string[] }> {
   const today = iso(deps).slice(0, 10)
   const r = await ai.research({ kind: job.kind, count: job.count, ...(job.topic ? { topic: job.topic } : {}), today, recentTitles, seeds, ...(avoid.length ? { avoid } : {}), ...(inFlight.titles.length ? { drafting: inFlight.titles } : {}) })
-  const stories: Story[] = [], dropped: string[] = []
+  const stories: Story[] = [], dropped: string[] = [], outlets = (seeds?.orgs ?? []).filter(o => o.kind === "outlet").map(o => o.site)
   for (const c of r.candidates) {
     if (stories.length >= job.count) break
     // The primary page first, then other primary pages for the same subject (product page, .mil/.gov page, press
@@ -214,7 +252,10 @@ async function researchStories(deps: WorkerDeps, ai: McuAi, job: Pick<McuJob, "k
     if (inFlight.urls.has(normalizeUrl(c.primaryUrl))) { dropped.push(`${c.title}: already being drafted`); continue }
     let page: SourcePage | null = null, publishedAt: string | undefined
     const misses: string[] = []
-    for (const url of [...new Set([c.primaryUrl, ...(c.alternateUrls ?? [])])].slice(0, 4)) {
+    // The story is sourced from its primary page: an outlet's article only led to it (gate round 2: two DT101 cards
+    // sourced from Defense News). Outlet URLs are skipped; another primary page for the subject is tried instead.
+    for (const url of [...new Set([c.primaryUrl, ...(c.alternateUrls ?? [])])].slice(0, 5)) {
+      if (isOutlet(url, outlets)) { misses.push(`${url} is a news outlet's article, not the primary source`); continue }
       try {
         const p = await deps.fetchPage(url)
         if (p.text.length < 400) { misses.push(`no readable article at ${url}`); continue }
@@ -238,13 +279,28 @@ async function researchStories(deps: WorkerDeps, ai: McuAi, job: Pick<McuJob, "k
     // Army article often omits: live test, 2026-10-16). Unreachable ones are skipped; the primary still decides.
     const supporting: SourcePage[] = []
     for (const u of (c.supportingUrls ?? []).slice(0, MAX_SUPPORTING)) {
-      try { const sp = await deps.fetchPage(u); if (sp.text.length >= 200 && sp.url !== page.url) supporting.push(sp) } catch { /* skipped */ }
+      if (isOutlet(u, outlets)) continue
+      // A supporting page must be about the same subject (round 2 attached an unrelated Northrop Raid Hunter release).
+      try { const sp = await deps.fetchPage(u); if (sp.text.length >= 200 && sp.url !== page.url && (COMPANY_PAGE.test(new URL(sp.url).pathname) || sameSubject(c.title, `${sp.title} ${sp.text.slice(0, 6000)}`))) supporting.push(sp) } catch { /* skipped */ }
     }
     const sourceText = supporting.length ? [page.text.slice(0, 16_000), ...supporting.map(sp => `--- SUPPORTING SOURCE: ${sp.title || sp.url} (${sp.url}) ---\n${sp.text.slice(0, 4_000)}`)].join("\n\n") : page.text
     stories.push({ title: c.title, primaryUrl: page.url, publisher: c.publisher || page.siteName || new URL(page.url).hostname, ...(publishedAt ? { publishedAt } : {}), ...(job.kind === "breaking" && c.whyNow ? { whyNow: c.whyNow } : {}), sourceTitle: page.title || c.title, sourceText, ...(supporting.length ? { supporting: supporting.map(sp => ({ url: sp.url, title: sp.title || sp.url })) } : {}) })
   }
-  if (!stories.length) return { hold: [r.note, ...dropped].filter(Boolean).join("; ") || "no candidates found", tried: [...avoid, ...r.candidates.map(c => c.title)], triedUrls: [...avoidUrls, ...r.candidates.map(c => c.primaryUrl)] }
+  // The model's note is chatter about how it chose ("Candidates selected based on relevance…", round 2) unless it is
+  // the only explanation, when nothing was found.
+  if (!stories.length) return { hold: [r.candidates.length ? "" : r.note, ...dropped].filter(Boolean).join("; ") || "no candidates found", tried: [...avoid, ...r.candidates.map(c => c.title)], triedUrls: [...avoidUrls, ...r.candidates.map(c => c.primaryUrl)] }
   return stories
+}
+/** A maker's own about page: kept as a supporting source for the headquarters even though it doesn't name the product. */
+const COMPANY_PAGE = /\/(about|about-us|who-we-are|company|our-company|contact|contact-us|locations|leadership|overview)(\/|$)/i
+const COMMON = new Set(["the", "and", "for", "with", "from", "into", "first", "new", "army", "navy", "air", "force", "space", "marine", "corps", "defense", "system", "systems", "contract", "awarded", "awards", "wins", "test", "tests", "flight", "company", "program", "announces", "unveils", "completes", "fully", "next", "generation", "u.s", "us"])
+/** Whether a page is about the story's subject: it names a model designation from the title or two of its distinctive words. */
+export function sameSubject(title: string, text: string): boolean {
+  const hay = text.toLowerCase()
+  const words = [...new Set(title.toLowerCase().match(/[a-z0-9][a-z0-9.\-]*[a-z0-9]/g) ?? [])].filter(w => w.length >= 3 && !COMMON.has(w))
+  const designations = words.filter(w => /\d/.test(w) && /[a-z]/.test(w))
+  if (designations.some(w => hay.includes(w))) return true
+  return words.filter(w => !/\d/.test(w) && hay.includes(w)).length >= 2
 }
 export function normalizeDate(v: string | undefined): string | undefined {
   if (!v) return undefined
@@ -348,11 +404,14 @@ async function writeStep(deps: WorkerDeps, ai: McuAi, d: McuDraft): Promise<void
 function fix(f: FrameCopy, index: number, d: McuDraft, today: string): FrameCopy {
   const series = SERIES[f.series], fields = { ...f.fields }
   if (series.fields.some(x => x.name === "date")) fields.date = ddmmmyy(f.series === "icymi_cover" ? today : d.story.publishedAt ?? today)
-  if (f.series === "icymi_story") fields.counter = `0${index} / 05` // the cover is not counted
+  if (f.series === "icymi_story") fields.counter = `0${index} / 0${icymiCount(d.story)}` // the cover is not counted
+  if (f.series === "icymi_cover") for (const k of Object.keys(fields)) if (unusedStorySlot(k, icymiCount(d.story))) delete fields[k]
   return { ...f, fields: normalizeFields(series, fields) }
 }
 function validate(frames: FrameCopy[], caption: string, story: Story): string[] {
-  const problems = frames.flatMap((f, i) => checkFields(SERIES[f.series], f.fields).map(p => frames.length > 1 ? `frame ${i + 1}: ${p}` : p))
+  // The cover's slots past the roundup's last story are blank by design, not empty by mistake.
+  const n = icymiCount(story), unused = new Set(SERIES.icymi_cover.fields.filter(f => unusedStorySlot(f.name, n)).map(f => `${f.label} is empty`))
+  const problems = frames.flatMap((f, i) => checkFields(SERIES[f.series], f.fields).filter(p => f.series !== "icymi_cover" || !unused.has(p)).map(p => frames.length > 1 ? `frame ${i + 1}: ${p}` : p))
   if (!caption.trim()) problems.push("caption is empty")
   if (caption.length > 2100) problems.push("caption is longer than Instagram allows (2,200 characters with credits)")
   if (/@[A-Za-z0-9_.]{2,}/.test(caption)) problems.push("caption contains an @handle; use plain names (tags need verified accounts)")
@@ -360,6 +419,15 @@ function validate(frames: FrameCopy[], caption: string, story: Story): string[] 
   const body = caption.split("\n").filter(l => !/^(Archive image|Image|Photo): /.test(l) && l !== DOD_NOTICE).join("\n")
   const nums = unsourcedNumbers([body, ...frames.flatMap(f => Object.entries(f.fields).filter(([k]) => k !== "date" && k !== "counter").map(([, v]) => v))], story.sourceText)
   if (nums.length) problems.push(`these figures are not in the source: ${nums.join(", ")}`)
+  // The caption ends with its own "Source:" line, and a DT101 caption is the mission brief (gate round 2: a DT101 with
+  // a three-paragraph news caption, another with no source line, a News caption with "Source:" mid-paragraph).
+  if (!/^Source: \S/m.test(body)) problems.push('the caption needs its source on a line of its own: "Source: <organization>, <date>"')
+  if (frames[0]?.series === "dt101") {
+    const lines = body.split("\n").map(l => l.trim()).filter(Boolean)
+    if (!/^MISSION BRIEF \/\/ \S/.test(lines[0] ?? "") || !/^\/\/\S/.test(lines[1] ?? "")) problems.push('the DT101 caption must be the mission brief: "MISSION BRIEF // <SUBJECT>", then "//<Company>", then the labelled lines, each on its own line with a blank line between')
+    for (const label of ["Tech:", "Platform:", "Goal:"]) if (!lines.some(l => l.startsWith(label))) problems.push(`the mission brief has no "${label}" line`)
+  }
+  for (const f of frames) if (f.fields.deck && !/[.!?]["”’)]?$/.test(f.fields.deck.trim())) problems.push(`the deck must be one complete sentence ending with a period: "${f.fields.deck}"`)
   const clipped = [...new Set(frames.flatMap(f => clippedWords(f.fields, story.sourceText)))]
   if (clipped.length) problems.push(`abbreviated words on the card (${clipped.join(", ")}); use whole words, and shorter ones if it must fit`)
   return problems
@@ -375,10 +443,12 @@ const GOV_PAGE = /(^|\.)(mil|gov)$|(^|\.)dvidshub\.net$/i
  * page (public domain unless marked courtesy), or the maker's own site (company media, flagged for the reviewer to
  * confirm its terms). A news outlet's or anyone else's page is skipped: its photo is licensed to that outlet.
  */
-export function searchedPageUsable(url: string, maker: string): boolean {
+export function searchedPageUsable(url: string, maker: string, outlets: readonly string[] = []): boolean {
   let host: string
   try { host = new URL(url).hostname.toLowerCase() } catch { return false }
   if (GOV_PAGE.test(host)) return true
+  // An outlet is never the maker, even when the maker fallback is the story's publisher ("Defense News", round 2).
+  if (isOutlet(url, outlets)) return false
   const words = maker.toLowerCase().split(/[^a-z0-9]+/).filter(w => w.length >= 3 && !["inc", "corp", "the", "company", "technologies", "systems", "industries", "group", "defense", "defence"].includes(w))
   const labels = host.replace(/^www\./, "").split(".").slice(0, -1).join(".")
   return words.length > 0 && words.some(w => labels.includes(w))
@@ -407,15 +477,16 @@ async function gatherMedia(deps: WorkerDeps, ai: McuAi, story: Story, frame: Fra
       out.push({ candidate: c, image: im.bytes, mime: im.mime })
     } catch { /* unreadable: skipped */ }
   }
-  const pages: SourcePage[] = []
-  // A social post's share image is MCU's own rendered card (ICYMI's stories link to Instagram): never a photo source.
-  for (const u of [story.primaryUrl, ...(story.supporting ?? []).map(x => x.url)].filter(u => /^https:\/\//.test(u) && !SOCIAL_HOST.test(u))) { try { pages.push(await deps.fetchPage(u)) } catch { /* skipped */ } }
+  const pages: SourcePage[] = [], outlets = await outletSites(deps)
+  // A social post's share image is MCU's own rendered card (ICYMI's stories link to Instagram), and an outlet's photo
+  // is licensed to the outlet: neither is a photo source.
+  for (const u of [story.primaryUrl, ...(story.supporting ?? []).map(x => x.url)].filter(u => /^https:\/\//.test(u) && !SOCIAL_HOST.test(u) && !isOutlet(u, outlets))) { try { pages.push(await deps.fetchPage(u)) } catch { /* skipped */ } }
   for (const pg of pages) await add(pageImageCandidate(pg, isDvidsImagePage(pg.url) ? "dvids" : "source"))
   const maker = makerOf(frame, story)
   for (const u of await ai.findPhotoPages({ story, frame }).catch(() => [])) {
     if (out.length >= MAX_SHOWN) break
-    if (!searchedPageUsable(u, maker)) continue
-    try { const pg = await deps.fetchPage(u); if (searchedPageUsable(pg.url, maker)) await add(pageImageCandidate(pg, isDvidsImagePage(pg.url) ? "dvids" : "source")) } catch { /* skipped */ }
+    if (!searchedPageUsable(u, maker, outlets)) continue
+    try { const pg = await deps.fetchPage(u); if (searchedPageUsable(pg.url, maker, outlets)) await add(pageImageCandidate(pg, isDvidsImagePage(pg.url) ? "dvids" : "source")) } catch { /* skipped */ }
   }
   for (const q of mediaQueries(frame, story)) {
     if (out.length >= MAX_SHOWN) break
@@ -525,8 +596,16 @@ async function mediaStep(deps: WorkerDeps, ai: McuAi, d: McuDraft): Promise<void
   // The ICYMI cover is filled last, from the lead story's photo.
   const order = d.frames.map((f, i) => ({ f, i })).sort((a, b) => Number(a.f.series === "icymi_cover") - Number(b.f.series === "icymi_cover"))
   for (const { f: frame, i } of order) {
-    if (!SERIES[frame.series].media[d.placement]) { media[i] = null; continue }
+    const series = SERIES[frame.series], field = series.media[d.placement], templateId = series.templates[d.placement]
+    if (!field) { media[i] = null; continue }
     if (media[i]) { used.add(media[i]!.pageUrl); continue }
+    // A template whose photo frame isn't an autofill field can't take a photo, so none is searched for or required
+    // (gate round 2: the News feed template, EAHXWo1LiF8, held NEWS-03 for a photo it could never place).
+    if (templateId && (await deps.content.templateFields(templateId))[field] !== "image") {
+      media[i] = null
+      d.notices = [...new Set([...d.notices, `${series.label} ${d.placement} template has no photo field, so no photo was searched for frame ${i + 1}: connect its photo frame as a data field in Canva`])]
+      continue
+    }
     if (frame.series === "icymi_cover") {
       const lead = media.find((m, j) => !!m && d.frames[j].series === "icymi_story")
       if (lead) { media[i] = { ...lead }; continue }
@@ -600,7 +679,12 @@ async function designStep(deps: WorkerDeps, d: McuDraft): Promise<void> {
     const mediaField = series.media[d.placement], m = d.media[i]
     const image = m && mediaField && dataset[mediaField] === "image" ? { field: mediaField, url: m.url, name: m.title.slice(0, 50) || "MCU media", ...(m.crop ? { crop: m.crop } : {}) } : undefined
     if (m && !image) notices.add(`${series.label} ${d.placement} template has no photo field, so the photo was not placed on frame ${i + 1}`)
-    const text = Object.fromEntries(Object.entries(frame.fields).filter(([k]) => dataset[k] === "text"))
+    const text: Record<string, string> = Object.fromEntries(Object.entries(frame.fields).filter(([k]) => dataset[k] === "text"))
+    // A roundup of fewer than five blanks the cover's unused story slots, so none shows its sample text.
+    if (frame.series === "icymi_cover" && icymiCount(d.story) < ICYMI_MAX) {
+      for (const f of series.fields) if (unusedStorySlot(f.name, icymiCount(d.story)) && dataset[f.name] === "text") text[f.name] = " "
+      notices.add(`ICYMI cover: ${icymiCount(d.story)} of 5 story slots used. The template prints the numbers 01–05 itself, so the unused numbers still show; the cover needs a version for fewer stories in Canva`)
+    }
     const missing = Object.keys(frame.fields).filter(k => dataset[k] !== "text")
     if (missing.length) notices.add(`${series.label} template has no field for ${missing.join(", ")}`)
     const title = `${d.id} v${d.version}${d.frames.length > 1 ? ` · ${i + 1}/${d.frames.length}` : ""} — ${(frame.fields.headline || frame.fields.subject_identifier || frame.fields.counter || series.label).slice(0, 120)}`
@@ -622,7 +706,7 @@ async function reviewStep(deps: WorkerDeps, ai: McuAi, d: McuDraft): Promise<voi
   const qa: string[] = [], photoDefects: { frame: number; defect: string }[] = []
   for (const [i, frame] of d.frames.entries()) {
     if (!images[i]) continue
-    for (const p of await ai.checkArtwork({ frame, images: [images[i]] }).catch(() => [{ defect: "automatic artwork check did not run", photo: false }])) {
+    for (const p of await ai.checkArtwork({ frame, images: [images[i]], noPhoto: !d.media[i] }).catch(() => [{ defect: "automatic artwork check did not run", photo: false }])) {
       qa.push(d.frames.length > 1 ? `frame ${i + 1}: ${p.defect}` : p.defect)
       if (p.photo) photoDefects.push({ frame: i, defect: p.defect })
     }

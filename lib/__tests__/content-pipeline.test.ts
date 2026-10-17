@@ -8,9 +8,9 @@
 import { test } from "node:test"
 import assert from "node:assert/strict"
 import { SERIES, checkFields, clippedWords, ddmmmyy, lineCount, type SeriesKey } from "../content-pipeline/series"
-import { runDue, RETRY_MS, staleSource, allowsRepresentative, makerOf, searchedPageUsable, unsourcedNumbers, withCredits, imageLabel, mediaQueries, cropFit, choosePhoto, zoomCrop, reviewNotes, DOD_NOTICE, LEASE_MS, type WorkerDeps, type DesignInput, type PostInput, type NoContentInput } from "../content-pipeline/worker"
+import { runDue, RETRY_MS, icymiStory, icymiWindow, staleSource, allowsRepresentative, sameSubject, makerOf, searchedPageUsable, unsourcedNumbers, withCredits, imageLabel, mediaQueries, cropFit, choosePhoto, zoomCrop, reviewNotes, DOD_NOTICE, LEASE_MS, type WorkerDeps, type DesignInput, type PostInput, type NoContentInput } from "../content-pipeline/worker"
 import { MAX_ATTEMPTS, type McuDraft, type McuJob, type McuStore } from "../content-pipeline/store"
-import { archiveRelevant, assertPublicHttps, guardedFetch, imageSize, pageImageCandidate, parsePage, searchNasa, searchOpenverse, usableLicense, type MediaCandidate } from "../content-pipeline/sources"
+import { archiveRelevant, assertPublicHttps, guardedFetch, isOutlet, siteOrg, imageSize, pageImageCandidate, parsePage, searchNasa, searchOpenverse, usableLicense, type MediaCandidate } from "../content-pipeline/sources"
 import { brandDirection, isPhotoDefect, readPick, searchResultUrls, servedBy, servedCall, type McuAi, type ModelCall } from "../content-pipeline/model"
 import { PIPELINE_MODELS, FALLBACK_MODELS, CALL_FALLBACK, callOptions, outputBudget } from "../content-pipeline/models"
 import { seedBrief, seedProblems, type McuSeeds } from "../content-pipeline/seeds"
@@ -40,6 +40,8 @@ class MemStore implements McuStore {
 const NOW = Date.parse("2026-10-16T18:00:00Z")
 const ARMY_TEXT = "WASHINGTON — The U.S. Army awarded contracts worth $93.6 million to nine companies on Oct. 15, 2026 to deliver next-generation command and control software to I Corps. ".repeat(6)
 const CANDIDATE: MediaCandidate = { url: "https://upload.wikimedia.org/a.jpg", thumbUrl: "https://upload.wikimedia.org/thumb/a.jpg", pageUrl: "https://commons.wikimedia.org/wiki/File:A.jpg", title: "Soldiers at a command post", description: "U.S. Army photo", width: 3000, height: 2000, license: "Public domain", creator: "U.S. Army photo by Sgt. A", credit: "U.S. Army photo by Sgt. A / Public domain via Wikimedia Commons", usGovernment: true }
+/** The DT101 caption in the approved mission-brief shape (validate() checks it). */
+const BRIEF = "MISSION BRIEF // NEXT-GEN C2\n\n//Lockheed Martin\n\n📍Bethesda, MD\n\nTech: Command and control\n\nPlatform: Software\n\nGoal: Link sensors and shooters for I Corps.\n\nSource: U.S. Army, 2026-10-15"
 /** A subject box that zooms to a clean 4:5 crop of CANDIDATE (3000 × 2000). */
 const HERO = { x0: 0.3, y0: 0.15, x1: 0.7, y1: 0.65 }
 const JPEG = new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 0, 0, 0xff, 0xd9])
@@ -54,7 +56,7 @@ function world(over: { ai?: Partial<McuAi>; pagePublished?: string; newsFeedHasM
   let now = NOW
   const ai: McuAi = {
     research: async ({ count }) => ({ candidates: [{ title: "Army picks nine C2 software vendors", primaryUrl: "https://www.army.mil/article/1", publisher: "U.S. Army", publishedAt: "2026-10-15", whyNow: "The award starts fielding now.", why: "material" }, { title: "Second story", primaryUrl: "https://www.army.mil/article/2", publisher: "U.S. Army", why: "news" }].slice(0, count + 1) }),
-    write: async ({ kind }) => ({ frames: [{ series: (kind === "dt101" ? "dt101" : kind === "breaking" ? "breaking" : "news") as SeriesKey, fields: kind === "dt101" ? { benefit_headline: "Link the fight.\nDecide faster.", subject_identifier: "Next-gen C2 / Lockheed Martin" } : { headline: "Army backs 9 C2 software vendors", deck: "Awards worth $93.6 million fund I Corps command software.", source: "ARMY.MIL" } as Record<string, string>, mediaQuery: "Army command post" }], caption: "The Army awarded $93.6 million to nine companies for command and control software.\n\nSource: U.S. Army, 2026-10-15" }),
+    write: async ({ kind }) => ({ frames: [{ series: (kind === "dt101" ? "dt101" : kind === "breaking" ? "breaking" : "news") as SeriesKey, fields: kind === "dt101" ? { benefit_headline: "Link the fight.\nDecide faster.", subject_identifier: "Next-gen C2 / Lockheed Martin" } : { headline: "Army backs 9 C2 software vendors", deck: "Awards worth $93.6 million fund I Corps command software.", source: "ARMY.MIL" } as Record<string, string>, mediaQuery: "Army command post" }], caption: kind === "dt101" ? BRIEF : "The Army awarded $93.6 million to nine companies for command and control software.\n\nSource: U.S. Army, 2026-10-15" }),
     findPhotoPages: async () => [],
     pickMedia: async () => ({ index: 0, reason: "relevant", ranked: [{ index: 0, box: HERO }] }),
     checkArtwork: async () => [],
@@ -67,7 +69,7 @@ function world(over: { ai?: Partial<McuAi>; pagePublished?: string; newsFeedHasM
     seeds: async () => over.seeds === undefined ? SEEDS : over.seeds,
     content: {
       recentPosts: async () => [{ id: "p1", title: "Old story", status: "posted", caption: "c" }],
-      templateFields: async t => { const media = t !== SERIES.news.templates.feed || over.newsFeedHasMedia !== false; return { headline: "text", deck: "text", date: "text", source: "text", ...(media ? { media: "image" } : {}), benefit_headline: "text", subject_identifier: "text", image_context: "text" } },
+      templateFields: async t => { const media = t !== SERIES.news.templates.feed || over.newsFeedHasMedia !== false; return { headline: "text", deck: "text", date: "text", source: "text", ...(media ? { media: "image" } : {}), benefit_headline: "text", subject_identifier: "text", image_context: "text", counter: "text", story_01: "text", story_02: "text", story_03: "text", story_04: "text", story_05: "text" } },
       createDesign: async i => { over.createDesign?.(i); designs.push(structuredClone(i)); return { designId: `DAH${i.requestId.replace(/[^A-Za-z0-9]/g, "").slice(-8)}`, editUrl: "https://www.canva.com/d/edit", viewUrl: "https://www.canva.com/d/view", previewUrls: ["https://export.canva.com/1.jpg"] } },
       writePost: async p => { posts.push(structuredClone(p)); return { postId: `post-${posts.length}`, holds: [] } },
       writeNoContent: async p => { const at = notices.findIndex(n => n.requestId === p.requestId); if (at >= 0) return { postId: `notice-${at + 1}` }; notices.push(structuredClone(p)); return { postId: `notice-${notices.length}` } },
@@ -278,10 +280,10 @@ test("a template without a photo field gets the copy and a visible notice instea
   assert.match(w.posts[0].notes, /Not done\n- News feed template has no photo field/)
 })
 
-test("ICYMI needs five published stories; fewer holds for Marcos without creating anything", async () => {
+test("ICYMI with no story published in the previous week holds without creating anything", async () => {
   const w = world()
   await w.start({ kind: "icymi" })
-  assert.equal(w.store.drafts.size, 0); assert.match((await w.store.getJob("job-icymi-1"))!.note!, /ICYMI needs five/)
+  assert.equal(w.store.drafts.size, 0); assert.match((await w.store.getJob("job-icymi-1"))!.note!, /no MCU News or Breaking story was published in the week of 2026-10-05, so there is no ICYMI/)
 })
 
 test("sources: licenses, page dates, and only public https hosts", async () => {
@@ -303,7 +305,7 @@ test("a subject the source can't support is replaced by the pipeline itself, nev
     research: async input => { seen.push(input.avoid); return { candidates: [{ title: "Bumblebee V2 interceptor", primaryUrl: "https://www.army.mil/article/1", publisher: "U.S. Army", why: "dt101" }, { title: "Talon Blue", primaryUrl: "https://www.army.mil/article/2", publisher: "U.S. Army", why: "dt101" }] } },
     write: async ({ story }) => story.title === "Bumblebee V2 interceptor"
       ? { frames: [{ series: "dt101" as SeriesKey, fields: {} }], caption: "", hold: "The source never names the maker." }
-      : { frames: [{ series: "dt101" as SeriesKey, fields: { benefit_headline: "Fly itself.\nBuilt faster.", subject_identifier: "Talon Blue / Northrop Grumman" }, mediaQuery: "Talon Blue" }], caption: "Caption. Source: U.S. Army, 2026-10-15" },
+      : { frames: [{ series: "dt101" as SeriesKey, fields: { benefit_headline: "Fly itself.\nBuilt faster.", subject_identifier: "Talon Blue / Northrop Grumman" }, mediaQuery: "Talon Blue" }], caption: BRIEF },
   } })
   await w.start({ kind: "dt101" })
   const d = onlyDraft(w)
@@ -330,7 +332,7 @@ test("a long photo phrase falls back to shorter Commons searches: trimmed phrase
     "Saildrone Voyager unmanned surface vehicle at sea U.S. Navy 4th Fleet Caribbean", "Saildrone Voyager unmanned surface vehicle at", "Saildrone Voyager unmanned",
     "SAILDRONE VOYAGER SAILDRONE", "SAILDRONE VOYAGER", "SAILDRONE", "Saildrone Voyager", "Saildrone Voyager 10-meter uncrewed surface vehicle Saildrone"])
   const searched: string[] = []
-  const w = world({ ai: { write: async () => ({ frames: [{ ...frame, fields: { benefit_headline: "Watch the sea.\nNo crew aboard.", subject_identifier: "Saildrone Voyager / Saildrone" } }], caption: "Caption. Source: U.S. Army, 2026-10-15" }) } })
+  const w = world({ ai: { write: async () => ({ frames: [{ ...frame, fields: { benefit_headline: "Watch the sea.\nNo crew aboard.", subject_identifier: "Saildrone Voyager / Saildrone" } }], caption: BRIEF }) } })
   w.deps.searchCommons = async q => { searched.push(q); return /^SAILDRONE VOYAGER$/i.test(q) ? [CANDIDATE] : [] }
   await w.start({ kind: "dt101" })
   const d = onlyDraft(w)
@@ -492,7 +494,7 @@ test("photo relevance: archive hits must tie to the story — the Dragon Con 'Hi
   assert.equal(archiveRelevant(hit("U.S. Army insignia", { usGovernment: true }), "Lockheed Martin"), false) // a graphic, not a photo
   // End to end: only the tied hit is shown to the photo pick.
   let shown: string[] = []
-  const w = world({ ai: { write: async () => ({ frames: [{ series: "dt101" as SeriesKey, fields: { benefit_headline: "Fly the jet.\nNo pilot needed.", subject_identifier: "Hivemind / Shield AI" }, mediaQuery: "Hivemind" }], caption: "Caption. Source: U.S. Army, 2026-10-15" }), pickMedia: async ({ candidates }) => { shown = candidates.map(c => c.candidate.title); return { index: 0, reason: "only relevant one", ranked: [{ index: 0, box: HERO }] } } } })
+  const w = world({ ai: { write: async () => ({ frames: [{ series: "dt101" as SeriesKey, fields: { benefit_headline: "Fly the jet.\nNo pilot needed.", subject_identifier: "Hivemind / Shield AI" }, mediaQuery: "Hivemind" }], caption: BRIEF }), pickMedia: async ({ candidates }) => { shown = candidates.map(c => c.candidate.title); return { index: 0, reason: "only relevant one", ranked: [{ index: 0, box: HERO }] } } } })
   w.deps.fetchPage = async url => ({ url, title: "t", text: ARMY_TEXT, publishedAt: "2026-10-16T09:00:00Z" }) // no share image
   w.deps.searchCommons = async () => [hit("Collin Kelly, Hivemind Dragon Con September 6 2026 0052.jpg", { pageUrl: "p1", url: "u1" }), hit("Hivemind Logo.png", { pageUrl: "p2", url: "u2" })]
   w.deps.searchMore = async () => [hit("Shield AI Hivemind flies an F-16", { pageUrl: "p3", url: "u3", origin: "openverse" })]
@@ -576,7 +578,7 @@ test("card copy uses whole words: a clipped word is rewritten, and a word the so
   assert.deepEqual(clippedWords({ headline: "HIMARS FIRES. RELOCATES." }), [])
   assert.deepEqual(clippedWords({ headline: "PROD LINE OPENS" }, "The PROD line at the plant"), [])
   let rounds = 0, problems: string[] = []
-  const w = world({ ai: { write: async i => { rounds++; problems = i.problems ?? problems; return { frames: [{ series: "dt101" as SeriesKey, fields: { benefit_headline: rounds === 1 ? "Fast deployment\nLow cost prod" : "Fast deployment\nLow cost build", subject_identifier: "Barracuda / Anduril" }, mediaQuery: "Barracuda" }], caption: "Caption. Source: Anduril, 2026-10-15" } } } })
+  const w = world({ ai: { write: async i => { rounds++; problems = i.problems ?? problems; return { frames: [{ series: "dt101" as SeriesKey, fields: { benefit_headline: rounds === 1 ? "Fast deployment\nLow cost prod" : "Fast deployment\nLow cost build", subject_identifier: "Barracuda / Anduril" }, mediaQuery: "Barracuda" }], caption: BRIEF } } } })
   await w.start({ kind: "dt101" })
   assert.equal(rounds, 2); assert.match(problems.join(";"), /abbreviated words on the card \(PROD\)/)
   assert.equal(onlyDraft(w).frames[0].fields.benefit_headline, "FAST DEPLOYMENT\nLOW COST BUILD")
@@ -688,10 +690,10 @@ function onlyDraftShape(): McuDraft {
 }
 
 test("ICYMI: DT101 posts are not recapped; each card's photo is its own story's; the cover reuses the lead story's photo", async () => {
-  const posted = (n: number, over: Partial<{ title: string; caption: string }> = {}) => ({ id: `p${n}`, title: over.title ?? `MCU-NEWS-2026101${n}-01 v1 — STORY ${n}`, status: "posted", publishedUrl: `https://www.instagram.com/milcityusa/p/${n}/`, caption: over.caption ?? `Story ${n} caption. Source: U.S. Army, 2026-10-1${n}` })
+  const posted = (n: number, over: Partial<{ title: string; caption: string }> = {}) => ({ id: `p${n}`, title: over.title ?? `MCU-NEWS-2026101${n}-01 v1 — STORY ${n}`, status: "posted", publishedUrl: `https://www.instagram.com/milcityusa/p/${n}/`, caption: over.caption ?? `Story ${n} caption. Source: U.S. Army, 2026-10-1${n}`, publishedAt: `2026-10-${String(12 - n).padStart(2, "0")}T15:00:00Z` }) // in the previous week, newest first
   const subjects: string[] = []
   const w = world({ ai: {
-    write: async () => ({ frames: [{ series: "icymi_cover" as SeriesKey, fields: { headline: "Week in defense", story_01: "One", story_02: "Two", story_03: "Three", story_04: "Four", story_05: "Five" } }, ...[1, 2, 3, 4, 5].map(n => ({ series: "icymi_story" as SeriesKey, fields: { headline: `Story ${n}`, deck: `Deck ${n}.` } }))], caption: "Roundup. Source: MilCityUSA" }),
+    write: async () => ({ frames: [{ series: "icymi_cover" as SeriesKey, fields: { headline: "Week in defense", story_01: "One", story_02: "Two", story_03: "Three", story_04: "Four", story_05: "Five" } }, ...[1, 2, 3, 4, 5].map(n => ({ series: "icymi_story" as SeriesKey, fields: { headline: `Story ${n}`, deck: `Deck ${n}.` } }))], caption: "Roundup.\n\nSource: MilCityUSA" }),
     pickMedia: async ({ story, candidates }) => { subjects.push(story.title); return { index: 0, reason: "ok", ranked: [{ index: 0, box: HERO }], ...(candidates.length ? {} : {}) } },
   } })
   w.deps.content.recentPosts = async () => [posted(1, { title: "ULTRA explainer", caption: "MISSION BRIEF // ULTRA\n\n//Overland AI" }), posted(2), posted(3), posted(4), posted(5), posted(6)]
@@ -717,4 +719,89 @@ test("a redirect to plain http is followed over https, and a blocked hop is name
   assert.equal(res.status, 200); assert.deepEqual(asked, ["https://breakingdefense.example/a", "https://breakingdefense.example/a/"])
   const toPrivate = async () => new Response(null, { status: 302, headers: { location: "https://localhost/x" } })
   await assert.rejects(guardedFetch("https://breakingdefense.example/a", toPrivate, "text/html", check), /not_public \(redirect to https:\/\/localhost\/x\)/)
+})
+
+// ── Phase 1b, gate round 2 (production, 2026-10-17 19:20Z: four in Review, one News held, Breaking and ICYMI notice cards) ──
+test("outlets: never a primary source or a photo source; a site's slogan never becomes the credit", () => {
+  assert.equal(isOutlet("https://www.defensenews.com/land/2026/10/16/kbr-firefly/"), true)
+  assert.equal(isOutlet("https://news.example/a", ["news.example"]), true) // the seeds' outlets count too
+  assert.equal(isOutlet("https://www.l3harris.com/newsroom/press-release/2026/10/vampire"), false)
+  assert.equal(pageImageCandidate({ url: "https://www.defensenews.com/a", title: "KBR Firefly", text: "", image: "https://www.defensenews.com/a.jpg", siteName: "Defense News" }, "source"), null)
+  assert.equal(searchedPageUsable("https://www.defensenews.com/a", "Defense News"), false) // the publisher fallback can't admit an outlet
+  const l3 = pageImageCandidate({ url: "https://www.l3harris.com/newsroom/vampire", title: "VAMPIRE", text: "", image: "https://www.l3harris.com/v.jpg", siteName: "L3Harris® Fast. Forward." }, "source")!
+  assert.equal(l3.creator, "L3Harris"); assert.equal(l3.credit, "L3Harris (courtesy)"); assert.equal(imageLabel({ ...CHOSEN, creator: l3.creator, credit: l3.credit, usGovernment: false }), "IMAGE: L3HARRIS")
+  assert.equal(siteOrg("Lockheed Martin | Newsroom", "news.lockheedmartin.com"), "Lockheed Martin"); assert.equal(siteOrg(undefined, "www.anduril.com"), "anduril.com")
+})
+const CHOSEN = { url: "u", pageUrl: "p", title: "t", license: "Official company media", creator: "c", credit: "c", usGovernment: false }
+
+test("research: an outlet's article is skipped for the subject's own page, and a supporting page must be about the subject", async () => {
+  const OUTLET = "https://www.defensenews.com/air/2026/10/16/talon-blue/", OWN = "https://news.northropgrumman.com/news/releases/yfq-48a-talon-blue-first-autonomous-flight", RAID = "https://news.northropgrumman.com/news/releases/raid-hunter", HQ = "https://www.northropgrumman.com/who-we-are"
+  const w = world({ ai: { research: async () => ({ candidates: [{ title: "YFQ-48A Talon Blue completes first autonomous flight", primaryUrl: OUTLET, alternateUrls: [OWN], supportingUrls: [RAID, HQ], publisher: "Defense News", why: "dt101" }] }) } })
+  w.deps.fetchPage = async url => ({ url, title: url === RAID ? "Raid Hunter counter-drone kit" : url === HQ ? "Who we are: Northrop Grumman, Falls Church, Virginia" : "YFQ-48A Talon Blue flies itself", text: url === RAID ? ARMY_TEXT : url === HQ ? `${ARMY_TEXT} Northrop Grumman is headquartered in Falls Church.` : `${ARMY_TEXT} The YFQ-48A Talon Blue.`, publishedAt: "2026-10-16T09:00:00Z" })
+  await w.start({ kind: "dt101" })
+  const d = onlyDraft(w)
+  assert.equal(d.story.primaryUrl, OWN); assert.deepEqual(d.story.supporting?.map(x => x.url), [HQ])
+  // Only an outlet's article: the story is left out, and the reason says why.
+  const only = world({ ai: { research: async () => ({ candidates: [{ title: "KBR Firefly", primaryUrl: OUTLET, publisher: "Defense News", why: "news" }], note: "Candidates selected based on relevance and recency." }) } })
+  await only.start({ kind: "news" })
+  const note = (await only.store.getJob("job-news-1"))!.note!
+  assert.match(note, /news outlet's article, not the primary source/); assert.doesNotMatch(note, /Candidates selected/) // no model chatter
+  assert.equal(sameSubject("YFQ-48A Talon Blue completes first autonomous flight", "the raid hunter kit"), false)
+  assert.equal(sameSubject("L3Harris VAMPIRE Counter-UAS System", "VAMPIRE is a counter-UAS kit by L3Harris"), true)
+})
+
+test("a template without a photo field: no photo is searched or required, and the artwork check isn't asked to judge one", async () => {
+  let picks = 0, noPhoto: boolean | undefined
+  const w = world({ newsFeedHasMedia: false, ai: { pickMedia: async () => { picks++; return { index: null, reason: "none" } }, checkArtwork: async i => { noPhoto = i.noPhoto; return [] } } })
+  await w.start({ kind: "news" })
+  const d = onlyDraft(w)
+  assert.equal(d.status, "in_review"); assert.equal(picks, 0); assert.equal(noPhoto, true); assert.deepEqual(d.media, [null])
+  assert.ok(d.notices.some(n => /News feed template has no photo field, so no photo was searched for frame 1: connect its photo frame/.test(n)))
+  assert.equal(w.designs[0].image, undefined)
+})
+
+test("caption and deck rules: the DT101 mission brief, a source line of its own, a deck that is a sentence", async () => {
+  const seen: string[][] = []
+  let n = 0
+  const w = world({ ai: { write: async i => { seen.push(i.problems ?? []); n++; return n === 1
+    ? { frames: [{ series: "dt101" as SeriesKey, fields: { benefit_headline: "Stop the drone.\nGuard the base.", subject_identifier: "Next-gen C2 / Lockheed Martin" } }], caption: "The Army picked a laser.\n\nIt helps.\n\nMore soon. Source: U.S. Army, 2026-10-15" }
+    : { frames: [{ series: "dt101" as SeriesKey, fields: { benefit_headline: "Stop the drone.\nGuard the base.", subject_identifier: "Next-gen C2 / Lockheed Martin" } }], caption: BRIEF } } } })
+  await w.start({ kind: "dt101" })
+  assert.equal(onlyDraft(w).status, "in_review"); assert.equal(n, 2)
+  assert.match(seen[1].join(" | "), /source on a line of its own/); assert.match(seen[1].join(" | "), /must be the mission brief/); assert.match(seen[1].join(" | "), /no "Tech:" line/)
+  let m = 0
+  const news = world({ ai: { write: async i => { seen.push(i.problems ?? []); m++; return { frames: [{ series: "news" as SeriesKey, fields: { headline: "KBR Firefly pilot", deck: m === 1 ? "KBR Firefly laser pilot for base defense, Xbox controller" : "KBR is testing its Firefly laser for base defense.", source: "ARMY.MIL" } }], caption: "KBR is testing a laser.\n\nSource: U.S. Army, 2026-10-15" } } } })
+  await news.start({ kind: "news" })
+  assert.equal(m, 2); assert.match(seen.at(-1)!.join(" | "), /the deck must be one complete sentence/)
+})
+
+// ── ICYMI, founder ruling (2026-10-17): up to five stories from the previous week, by recency for now ──
+test("ICYMI window: the previous Monday-to-Sunday week in Chicago, or the last N days when a super-admin widens it", () => {
+  const fri = Date.parse("2026-10-16T18:00:00Z")
+  const w = icymiWindow(fri, null)
+  assert.equal(new Date(w.startMs).toISOString(), "2026-10-05T05:00:00.000Z"); assert.equal(new Date(w.endMs).toISOString(), "2026-10-12T05:00:00.000Z") // CDT midnights
+  const mondayEarly = icymiWindow(Date.parse("2026-10-12T04:30:00Z"), null) // still Sunday night in Chicago
+  assert.equal(new Date(mondayEarly.endMs).toISOString(), "2026-10-05T05:00:00.000Z")
+  const winter = icymiWindow(Date.parse("2026-12-09T18:00:00Z"), null)
+  assert.equal(new Date(winter.startMs).toISOString(), "2026-11-30T06:00:00.000Z") // CST
+  const wide = icymiWindow(fri, 14)
+  assert.equal(wide.endMs - wide.startMs, 14 * 864e5); assert.equal(wide.label, "the last 14 days")
+})
+
+test("ICYMI: four stories make a cover and four cards, counted of four; the unused cover slot is blanked, with a notice", async () => {
+  const p = (n: number, at: string) => ({ id: `p${n}`, title: `MCU-NEWS-20261009-0${n} v1 — STORY ${n}`, status: "posted", publishedUrl: `https://www.instagram.com/milcityusa/p/${n}/`, caption: `Story ${n} caption.\n\nSource: U.S. Army, 2026-10-09`, publishedAt: at })
+  let fieldsAsked: string[] = []
+  const w = world({ ai: { write: async i => { fieldsAsked = [String(i.story.roundup?.length)]; return { frames: [{ series: "icymi_cover" as SeriesKey, fields: { headline: "Four defense developments", story_01: "One", story_02: "Two", story_03: "Three", story_04: "Four" } }, ...[1, 2, 3, 4].map(n => ({ series: "icymi_story" as SeriesKey, fields: { headline: `Story ${n}`, deck: `Deck ${n}.` } }))], caption: "Roundup.\n\nSource: MilCityUSA" } } } })
+  w.deps.content.recentPosts = async () => [p(1, "2026-10-10T15:00:00Z"), p(2, "2026-10-09T15:00:00Z"), p(3, "2026-10-09T14:00:00Z"), p(4, "2026-10-09T13:00:00Z"), { ...p(5, "2026-09-20T13:00:00Z"), title: "Too old" }, { ...p(6, "2026-10-08T13:00:00Z"), title: "MCU-NEWS-20261009-01 v1 — STORY 1" }]
+  w.deps.icymiWindow = async () => ({ lookbackDays: 14 })
+  w.deps.searchCommons = async q => [{ ...CANDIDATE, url: `https://upload.wikimedia.org/${encodeURIComponent(q)}.jpg`, thumbUrl: `https://upload.wikimedia.org/t/${encodeURIComponent(q)}.jpg`, pageUrl: `https://commons.wikimedia.org/wiki/File:${encodeURIComponent(q)}` }]
+  await w.start({ kind: "icymi" })
+  const d = onlyDraft(w)
+  assert.equal(fieldsAsked[0], "4"); assert.deepEqual(d.story.roundup!.map(r => r.postId), ["p1", "p2", "p3", "p4"]) // newest first; the old one and the repeat left out
+  assert.equal(d.status, "in_review"); assert.equal(d.frames.length, 5); assert.deepEqual(d.frames.slice(1).map(f => f.fields.counter), ["01 / 04", "02 / 04", "03 / 04", "04 / 04"])
+  assert.equal(w.designs.length, 5); assert.equal(w.designs[0].text.story_05, " "); assert.equal(w.designs[0].text.story_04, "Four")
+  assert.ok(d.notices.some(n => /ICYMI cover: 4 of 5 story slots used/.test(n)))
+  // Previous week only (the default): the same posts give nothing for a Friday in the week after next.
+  const none = icymiStory([p(1, "2026-10-10T15:00:00Z")], icymiWindow(Date.parse("2026-10-23T18:00:00Z"), null))
+  assert.ok("hold" in none)
 })

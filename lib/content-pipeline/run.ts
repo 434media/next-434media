@@ -12,7 +12,7 @@ import type { McuDraft, McuJob } from "./store"
  * in Review; it never prepares, approves or publishes (those need the publisher, production and the approver).
  */
 export async function pipelineDeps(): Promise<WorkerDeps> {
-  const [{ ownedMetaConnectorDeps }, crm, { firestorePipelineStore, getMcuSeeds }, { findPosts, attachExports }, { sendDraftsReadyNotification }] = await Promise.all([
+  const [{ ownedMetaConnectorDeps }, crm, { firestorePipelineStore, getMcuSeeds, getIcymiWindow }, { attachExports }, { sendDraftsReadyNotification }] = await Promise.all([
     import("@/lib/owned-meta-execution"), import("@/lib/firestore-crm"), import("@/lib/firestore-content-pipeline"), import("@/lib/owned-meta-intake"), import("@/lib/notifications"),
   ])
   const tools = await ownedMetaConnectorDeps()
@@ -21,17 +21,20 @@ export async function pipelineDeps(): Promise<WorkerDeps> {
     store: firestorePipelineStore(),
     ai: onCall => createMcuAi({ models: PIPELINE_MODELS, searchTools, onCall }),
     seeds: getMcuSeeds,
+    icymiWindow: getIcymiWindow,
     fetchPage: url => fetchSourcePage(url),
     fetchImage: url => fetchImage(url),
     searchCommons: q => searchCommons(q),
     searchMore: async q => (await Promise.all([searchOpenverse(q).catch(() => []), searchNasa(q).catch(() => [])])).flat(),
     nowMs: Date.now,
     content: {
-      // MCU's posts under any of the names they carry (older records are not all tagged "milcity"), de-duplicated.
+      // MCU's posts under any of the names they carry (older records are not all tagged "milcity"), as findPosts
+      // matches them (title, caption or tags), with when each went out for the ICYMI window. Newest first.
       recentPosts: async () => {
-        const seen = new Map<string, PostRow>()
-        for (const query of ["milcity", "MCU", "MilCity"]) for (const p of await findPosts(tools.intake, { query, limit: 25 })) seen.set(p.id, { id: p.id, title: p.title, status: p.status, ...(p.publishedUrl ? { publishedUrl: p.publishedUrl } : {}), ...(p.caption ? { caption: p.caption } : {}) })
-        return [...seen.values()]
+        const mcu = (await tools.intake.listPosts()).filter(p => !p.archived && [p.title, p.social_copy, p.tags, p.platform].some(v => typeof v === "string" && /milcity|\bmcu\b/i.test(v)))
+        const when = (p: (typeof mcu)[number]) => p.posted_at || (p.status === "posted" || p.published_url ? p.date_to_post : undefined)
+        return mcu.map((p): PostRow => ({ id: p.id, title: p.title, status: p.status, ...(p.published_url ? { publishedUrl: p.published_url } : {}), ...(p.social_copy ? { caption: p.social_copy.slice(0, 800) } : {}), ...(when(p) ? { publishedAt: when(p) } : {}) }))
+          .sort((a, b) => (b.publishedAt ?? "").localeCompare(a.publishedAt ?? "")).slice(0, 75)
       },
       templateFields: templateId => tools.canvaFields(templateId),
       createDesign: async input => {

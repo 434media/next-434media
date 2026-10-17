@@ -13,6 +13,7 @@ const JOBS = CRM_COLLECTIONS.CONTENT_PIPELINE_JOBS
 const DRAFTS = CRM_COLLECTIONS.CONTENT_PIPELINE_DRAFTS
 const CONFIG = CRM_COLLECTIONS.CONTENT_PIPELINE_CONFIG
 const SEEDS_DOC = "mcu_seeds"
+const ICYMI_WINDOW_DOC = "icymi_window"
 
 // Firestore rejects undefined; a JSON round trip drops it and keeps the record plain.
 const clean = <T>(v: T): T => JSON.parse(JSON.stringify(v)) as T
@@ -94,4 +95,18 @@ export async function getMcuSeeds(): Promise<McuSeeds | null> {
 }
 export async function saveMcuSeeds(seeds: McuSeeds): Promise<void> {
   await getDb().collection(CONFIG).doc(SEEDS_DOC).set(clean(seeds))
+}
+
+/**
+ * The ICYMI lookback, a super-admin setting: null (the default, and when the document is missing) means the previous
+ * Monday-to-Sunday week in America/Chicago; a number means the last N days, for a test run. 1–60 days.
+ */
+export interface IcymiWindowSetting { lookbackDays: number | null; updatedAt?: string; updatedBy?: string }
+export async function getIcymiWindow(): Promise<IcymiWindowSetting> {
+  const d = (await getDb().collection(CONFIG).doc(ICYMI_WINDOW_DOC).get()).data()
+  const days = d?.lookbackDays
+  return { lookbackDays: typeof days === "number" && Number.isInteger(days) && days >= 1 && days <= 60 ? days : null, ...(typeof d?.updatedAt === "string" ? { updatedAt: d.updatedAt } : {}), ...(typeof d?.updatedBy === "string" ? { updatedBy: d.updatedBy } : {}) }
+}
+export async function saveIcymiWindow(setting: IcymiWindowSetting): Promise<void> {
+  await getDb().collection(CONFIG).doc(ICYMI_WINDOW_DOC).set(clean(setting))
 }
