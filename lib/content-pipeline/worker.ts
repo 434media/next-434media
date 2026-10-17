@@ -4,7 +4,7 @@ import { normalizeUrl, type McuAi, type ModelCall, type RankedPhoto, type Subjec
 import { contentPropertyOf } from "./properties"
 import type { ContentProperty } from "@/components/crm/types"
 import type { McuSeeds } from "./seeds"
-import { MIN_SHORT_SIDE, archiveRelevant, imageSize, isDvidsImagePage, pageImageCandidate, type MediaCandidate, type SourcePage } from "./sources"
+import { MIN_SHORT_SIDE, archiveRelevant, imageSize, isDvidsImagePage, isOutlet, pageImageCandidate, type MediaCandidate, type SourcePage } from "./sources"
 import { MAX_ATTEMPTS, WORKING, type ChosenMedia, type CropBox, type FrameCopy, type FrameDesign, type McuDraft, type McuJob, type McuStore, type Story } from "./store"
 
 /**
@@ -60,6 +60,10 @@ export const KEY_PREFIX = "admin:"
 const BREAKING_WINDOW_MS = 24 * 3600_000
 /** Drafts opened this recently, by any job, count for the repeat-story check (store.recentStories). */
 const RECENT_STORY_MS = 3 * 864e5
+/** The seeds' outlet sites, beside sources.ts's own list. */
+async function outletSites(deps: Pick<WorkerDeps, "seeds">): Promise<string[]> {
+  return ((await deps.seeds().catch(() => null))?.orgs ?? []).filter(o => o.kind === "outlet").map(o => o.site)
+}
 /** Stories other drafts are working on: their titles steer research, their URLs are refused. */
 async function storiesInFlight(deps: WorkerDeps, exceptDraft?: string): Promise<{ titles: string[]; urls: Set<string> }> {
   const recent = (await deps.store.recentStories(new Date(deps.nowMs() - RECENT_STORY_MS).toISOString()).catch(() => [])).filter(s => s.draftId !== exceptDraft)
@@ -205,7 +209,7 @@ function icymiStory(posts: PostRow[]): Story[] | { hold: string } {
 async function researchStories(deps: WorkerDeps, ai: McuAi, job: Pick<McuJob, "kind" | "count" | "topic">, recentTitles: string[], seeds: McuSeeds | null, avoid: string[] = [], avoidUrls: string[] = [], inFlight: { titles: string[]; urls: Set<string> } = { titles: [], urls: new Set() }): Promise<Story[] | { hold: string; tried?: string[]; triedUrls?: string[] }> {
   const today = iso(deps).slice(0, 10)
   const r = await ai.research({ kind: job.kind, count: job.count, ...(job.topic ? { topic: job.topic } : {}), today, recentTitles, seeds, ...(avoid.length ? { avoid } : {}), ...(inFlight.titles.length ? { drafting: inFlight.titles } : {}) })
-  const stories: Story[] = [], dropped: string[] = []
+  const stories: Story[] = [], dropped: string[] = [], outlets = (seeds?.orgs ?? []).filter(o => o.kind === "outlet").map(o => o.site)
   for (const c of r.candidates) {
     if (stories.length >= job.count) break
     // The primary page first, then other primary pages for the same subject (product page, .mil/.gov page, press
@@ -214,7 +218,10 @@ async function researchStories(deps: WorkerDeps, ai: McuAi, job: Pick<McuJob, "k
     if (inFlight.urls.has(normalizeUrl(c.primaryUrl))) { dropped.push(`${c.title}: already being drafted`); continue }
     let page: SourcePage | null = null, publishedAt: string | undefined
     const misses: string[] = []
-    for (const url of [...new Set([c.primaryUrl, ...(c.alternateUrls ?? [])])].slice(0, 4)) {
+    // The story is sourced from its primary page: an outlet's article only led to it (gate round 2: two DT101 cards
+    // sourced from Defense News). Outlet URLs are skipped; another primary page for the subject is tried instead.
+    for (const url of [...new Set([c.primaryUrl, ...(c.alternateUrls ?? [])])].slice(0, 5)) {
+      if (isOutlet(url, outlets)) { misses.push(`${url} is a news outlet's article, not the primary source`); continue }
       try {
         const p = await deps.fetchPage(url)
         if (p.text.length < 400) { misses.push(`no readable article at ${url}`); continue }
@@ -238,13 +245,28 @@ async function researchStories(deps: WorkerDeps, ai: McuAi, job: Pick<McuJob, "k
     // Army article often omits: live test, 2026-10-16). Unreachable ones are skipped; the primary still decides.
     const supporting: SourcePage[] = []
     for (const u of (c.supportingUrls ?? []).slice(0, MAX_SUPPORTING)) {
-      try { const sp = await deps.fetchPage(u); if (sp.text.length >= 200 && sp.url !== page.url) supporting.push(sp) } catch { /* skipped */ }
+      if (isOutlet(u, outlets)) continue
+      // A supporting page must be about the same subject (round 2 attached an unrelated Northrop Raid Hunter release).
+      try { const sp = await deps.fetchPage(u); if (sp.text.length >= 200 && sp.url !== page.url && (COMPANY_PAGE.test(new URL(sp.url).pathname) || sameSubject(c.title, `${sp.title} ${sp.text.slice(0, 6000)}`))) supporting.push(sp) } catch { /* skipped */ }
     }
     const sourceText = supporting.length ? [page.text.slice(0, 16_000), ...supporting.map(sp => `--- SUPPORTING SOURCE: ${sp.title || sp.url} (${sp.url}) ---\n${sp.text.slice(0, 4_000)}`)].join("\n\n") : page.text
     stories.push({ title: c.title, primaryUrl: page.url, publisher: c.publisher || page.siteName || new URL(page.url).hostname, ...(publishedAt ? { publishedAt } : {}), ...(job.kind === "breaking" && c.whyNow ? { whyNow: c.whyNow } : {}), sourceTitle: page.title || c.title, sourceText, ...(supporting.length ? { supporting: supporting.map(sp => ({ url: sp.url, title: sp.title || sp.url })) } : {}) })
   }
-  if (!stories.length) return { hold: [r.note, ...dropped].filter(Boolean).join("; ") || "no candidates found", tried: [...avoid, ...r.candidates.map(c => c.title)], triedUrls: [...avoidUrls, ...r.candidates.map(c => c.primaryUrl)] }
+  // The model's note is chatter about how it chose ("Candidates selected based on relevance…", round 2) unless it is
+  // the only explanation, when nothing was found.
+  if (!stories.length) return { hold: [r.candidates.length ? "" : r.note, ...dropped].filter(Boolean).join("; ") || "no candidates found", tried: [...avoid, ...r.candidates.map(c => c.title)], triedUrls: [...avoidUrls, ...r.candidates.map(c => c.primaryUrl)] }
   return stories
+}
+/** A maker's own about page: kept as a supporting source for the headquarters even though it doesn't name the product. */
+const COMPANY_PAGE = /\/(about|about-us|who-we-are|company|our-company|contact|contact-us|locations|leadership|overview)(\/|$)/i
+const COMMON = new Set(["the", "and", "for", "with", "from", "into", "first", "new", "army", "navy", "air", "force", "space", "marine", "corps", "defense", "system", "systems", "contract", "awarded", "awards", "wins", "test", "tests", "flight", "company", "program", "announces", "unveils", "completes", "fully", "next", "generation", "u.s", "us"])
+/** Whether a page is about the story's subject: it names a model designation from the title or two of its distinctive words. */
+export function sameSubject(title: string, text: string): boolean {
+  const hay = text.toLowerCase()
+  const words = [...new Set(title.toLowerCase().match(/[a-z0-9][a-z0-9.\-]*[a-z0-9]/g) ?? [])].filter(w => w.length >= 3 && !COMMON.has(w))
+  const designations = words.filter(w => /\d/.test(w) && /[a-z]/.test(w))
+  if (designations.some(w => hay.includes(w))) return true
+  return words.filter(w => !/\d/.test(w) && hay.includes(w)).length >= 2
 }
 export function normalizeDate(v: string | undefined): string | undefined {
   if (!v) return undefined
@@ -360,6 +382,15 @@ function validate(frames: FrameCopy[], caption: string, story: Story): string[] 
   const body = caption.split("\n").filter(l => !/^(Archive image|Image|Photo): /.test(l) && l !== DOD_NOTICE).join("\n")
   const nums = unsourcedNumbers([body, ...frames.flatMap(f => Object.entries(f.fields).filter(([k]) => k !== "date" && k !== "counter").map(([, v]) => v))], story.sourceText)
   if (nums.length) problems.push(`these figures are not in the source: ${nums.join(", ")}`)
+  // The caption ends with its own "Source:" line, and a DT101 caption is the mission brief (gate round 2: a DT101 with
+  // a three-paragraph news caption, another with no source line, a News caption with "Source:" mid-paragraph).
+  if (!/^Source: \S/m.test(body)) problems.push('the caption needs its source on a line of its own: "Source: <organization>, <date>"')
+  if (frames[0]?.series === "dt101") {
+    const lines = body.split("\n").map(l => l.trim()).filter(Boolean)
+    if (!/^MISSION BRIEF \/\/ \S/.test(lines[0] ?? "") || !/^\/\/\S/.test(lines[1] ?? "")) problems.push('the DT101 caption must be the mission brief: "MISSION BRIEF // <SUBJECT>", then "//<Company>", then the labelled lines, each on its own line with a blank line between')
+    for (const label of ["Tech:", "Platform:", "Goal:"]) if (!lines.some(l => l.startsWith(label))) problems.push(`the mission brief has no "${label}" line`)
+  }
+  for (const f of frames) if (f.fields.deck && !/[.!?]["”’)]?$/.test(f.fields.deck.trim())) problems.push(`the deck must be one complete sentence ending with a period: "${f.fields.deck}"`)
   const clipped = [...new Set(frames.flatMap(f => clippedWords(f.fields, story.sourceText)))]
   if (clipped.length) problems.push(`abbreviated words on the card (${clipped.join(", ")}); use whole words, and shorter ones if it must fit`)
   return problems
@@ -375,10 +406,12 @@ const GOV_PAGE = /(^|\.)(mil|gov)$|(^|\.)dvidshub\.net$/i
  * page (public domain unless marked courtesy), or the maker's own site (company media, flagged for the reviewer to
  * confirm its terms). A news outlet's or anyone else's page is skipped: its photo is licensed to that outlet.
  */
-export function searchedPageUsable(url: string, maker: string): boolean {
+export function searchedPageUsable(url: string, maker: string, outlets: readonly string[] = []): boolean {
   let host: string
   try { host = new URL(url).hostname.toLowerCase() } catch { return false }
   if (GOV_PAGE.test(host)) return true
+  // An outlet is never the maker, even when the maker fallback is the story's publisher ("Defense News", round 2).
+  if (isOutlet(url, outlets)) return false
   const words = maker.toLowerCase().split(/[^a-z0-9]+/).filter(w => w.length >= 3 && !["inc", "corp", "the", "company", "technologies", "systems", "industries", "group", "defense", "defence"].includes(w))
   const labels = host.replace(/^www\./, "").split(".").slice(0, -1).join(".")
   return words.length > 0 && words.some(w => labels.includes(w))
@@ -407,15 +440,16 @@ async function gatherMedia(deps: WorkerDeps, ai: McuAi, story: Story, frame: Fra
       out.push({ candidate: c, image: im.bytes, mime: im.mime })
     } catch { /* unreadable: skipped */ }
   }
-  const pages: SourcePage[] = []
-  // A social post's share image is MCU's own rendered card (ICYMI's stories link to Instagram): never a photo source.
-  for (const u of [story.primaryUrl, ...(story.supporting ?? []).map(x => x.url)].filter(u => /^https:\/\//.test(u) && !SOCIAL_HOST.test(u))) { try { pages.push(await deps.fetchPage(u)) } catch { /* skipped */ } }
+  const pages: SourcePage[] = [], outlets = await outletSites(deps)
+  // A social post's share image is MCU's own rendered card (ICYMI's stories link to Instagram), and an outlet's photo
+  // is licensed to the outlet: neither is a photo source.
+  for (const u of [story.primaryUrl, ...(story.supporting ?? []).map(x => x.url)].filter(u => /^https:\/\//.test(u) && !SOCIAL_HOST.test(u) && !isOutlet(u, outlets))) { try { pages.push(await deps.fetchPage(u)) } catch { /* skipped */ } }
   for (const pg of pages) await add(pageImageCandidate(pg, isDvidsImagePage(pg.url) ? "dvids" : "source"))
   const maker = makerOf(frame, story)
   for (const u of await ai.findPhotoPages({ story, frame }).catch(() => [])) {
     if (out.length >= MAX_SHOWN) break
-    if (!searchedPageUsable(u, maker)) continue
-    try { const pg = await deps.fetchPage(u); if (searchedPageUsable(pg.url, maker)) await add(pageImageCandidate(pg, isDvidsImagePage(pg.url) ? "dvids" : "source")) } catch { /* skipped */ }
+    if (!searchedPageUsable(u, maker, outlets)) continue
+    try { const pg = await deps.fetchPage(u); if (searchedPageUsable(pg.url, maker, outlets)) await add(pageImageCandidate(pg, isDvidsImagePage(pg.url) ? "dvids" : "source")) } catch { /* skipped */ }
   }
   for (const q of mediaQueries(frame, story)) {
     if (out.length >= MAX_SHOWN) break
@@ -525,8 +559,16 @@ async function mediaStep(deps: WorkerDeps, ai: McuAi, d: McuDraft): Promise<void
   // The ICYMI cover is filled last, from the lead story's photo.
   const order = d.frames.map((f, i) => ({ f, i })).sort((a, b) => Number(a.f.series === "icymi_cover") - Number(b.f.series === "icymi_cover"))
   for (const { f: frame, i } of order) {
-    if (!SERIES[frame.series].media[d.placement]) { media[i] = null; continue }
+    const series = SERIES[frame.series], field = series.media[d.placement], templateId = series.templates[d.placement]
+    if (!field) { media[i] = null; continue }
     if (media[i]) { used.add(media[i]!.pageUrl); continue }
+    // A template whose photo frame isn't an autofill field can't take a photo, so none is searched for or required
+    // (gate round 2: the News feed template, EAHXWo1LiF8, held NEWS-03 for a photo it could never place).
+    if (templateId && (await deps.content.templateFields(templateId))[field] !== "image") {
+      media[i] = null
+      d.notices = [...new Set([...d.notices, `${series.label} ${d.placement} template has no photo field, so no photo was searched for frame ${i + 1}: connect its photo frame as a data field in Canva`])]
+      continue
+    }
     if (frame.series === "icymi_cover") {
       const lead = media.find((m, j) => !!m && d.frames[j].series === "icymi_story")
       if (lead) { media[i] = { ...lead }; continue }
@@ -622,7 +664,7 @@ async function reviewStep(deps: WorkerDeps, ai: McuAi, d: McuDraft): Promise<voi
   const qa: string[] = [], photoDefects: { frame: number; defect: string }[] = []
   for (const [i, frame] of d.frames.entries()) {
     if (!images[i]) continue
-    for (const p of await ai.checkArtwork({ frame, images: [images[i]] }).catch(() => [{ defect: "automatic artwork check did not run", photo: false }])) {
+    for (const p of await ai.checkArtwork({ frame, images: [images[i]], noPhoto: !d.media[i] }).catch(() => [{ defect: "automatic artwork check did not run", photo: false }])) {
       qa.push(d.frames.length > 1 ? `frame ${i + 1}: ${p.defect}` : p.defect)
       if (p.photo) photoDefects.push({ frame: i, defect: p.defect })
     }

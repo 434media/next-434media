@@ -223,6 +223,27 @@ export function archiveRelevant(c: Pick<MediaCandidate, "title" | "description" 
   return (m.length > 2 && norm(`${text} ${c.creator}`).includes(m)) || CONTEXT_WORDS.test(text) || c.usGovernment
 }
 
+// ── News outlets: secondary sources, and never a photo source ──
+/**
+ * News outlets' hosts. Their pages lead to a story's primary source (MCU_EDITORIAL: "use secondary coverage only to
+ * find it") and their photos are licensed to them. Gate round 2 (2026-10-17) placed Defense News photos labelled
+ * "Official company media" and sourced two DT101 cards from Defense News articles. The seeds' outlet list adds to it.
+ */
+const OUTLETS = ["defensenews.com", "breakingdefense.com", "defenseone.com", "defensescoop.com", "c4isrnet.com", "militarytimes.com", "armytimes.com", "navytimes.com", "airforcetimes.com", "marinecorpstimes.com", "federaltimes.com", "airandspaceforces.com", "twz.com", "thedrive.com", "janes.com", "insidedefense.com", "nationaldefensemagazine.org", "flightglobal.com", "aviationweek.com", "spacenews.com", "military.com", "stripes.com", "navalnews.com", "defence-blog.com", "armyrecognition.com", "overtdefense.com", "sandboxx.us", "defensedaily.com", "executivegov.com", "govconwire.com", "washingtontechnology.com", "fedscoop.com", "nextgov.com", "reuters.com", "apnews.com", "bloomberg.com", "wsj.com", "nytimes.com", "washingtonpost.com", "politico.com", "axios.com", "cnn.com", "cnbc.com", "foxnews.com", "nbcnews.com", "cbsnews.com", "abcnews.go.com", "bbc.com", "bbc.co.uk", "theguardian.com", "newsweek.com", "forbes.com", "businessinsider.com", "yahoo.com", "msn.com", "techcrunch.com", "theverge.com", "wired.com", "popularmechanics.com", "interestingengineering.com", "newatlas.com", "thedefensepost.com", "defense-aerospace.com", "army-technology.com", "naval-technology.com", "airforce-technology.com", "globalmilitaryreview.com", "militaryaerospace.com", "satnews.com", "spacepolicyonline.com"]
+export function isOutlet(url: string, extra: readonly string[] = []): boolean {
+  let host: string
+  try { host = new URL(url).hostname.toLowerCase().replace(/^www\./, "") } catch { return false }
+  return [...OUTLETS, ...extra.map(e => e.toLowerCase().replace(/^https?:\/\//, "").replace(/^www\./, "").replace(/\/.*$/, ""))].some(o => o && (host === o || host.endsWith(`.${o}`)))
+}
+/**
+ * The organization a site names itself, without a trademark or slogan: og:site_name is sometimes a tagline
+ * ("L3Harris® Fast. Forward.", gate round 2), which then printed as the image credit.
+ */
+export function siteOrg(siteName: string | undefined, host: string): string {
+  const cut = (siteName ?? "").split(/[®™©|]| [-–—:] /)[0].trim()
+  return cut && cut.length <= 40 ? cut : host.replace(/^www\./, "")
+}
+
 // ── Photos on the story's own pages and on DVIDS ──
 /**
  * Smallest usable short side. The approved ULTRA card used a 1000 × 667 DVIDS rendition, cropped and upscaled, so the
@@ -250,12 +271,12 @@ const GOV_HOST = /(^|\.)(mil|gov)$|(^|\.)dvidshub\.net$/i
  * are company media, offered first by the editorial rules but flagged for the reviewer to confirm the terms.
  */
 export function pageImageCandidate(page: SourcePage, origin: "source" | "dvids"): MediaCandidate | null {
-  if (!page.image || !/^https:\/\//.test(page.image)) return null
+  if (!page.image || !/^https:\/\//.test(page.image) || isOutlet(page.url)) return null
   const host = new URL(page.url).hostname, about = `${page.description ?? ""} ${page.text.slice(0, 4000)}`
   const govCredit = /\(((?:U\.S\.|US) [A-Za-z .]+? (?:photo|illustration|graphic)(?: by [^)]{2,80})?)\)/.exec(about)?.[1]
   const courtesy = /\((?:[^)]*?)courtesy(?: of)? ([^)]{2,80})\)/i.exec(about)?.[1]
   const gov = GOV_HOST.test(host) && !courtesy
-  const creator = gov ? govCredit ?? `${page.siteName || host}` : courtesy ?? page.siteName ?? host
+  const creator = gov ? govCredit ?? siteOrg(page.siteName, host) : courtesy ?? siteOrg(page.siteName, host)
   const date = /\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec)[a-z]*\.? \d{1,2}, (20\d{2})\b/.exec(page.description ?? "")?.[0]
   const dated = date ? new Date(`${date.replace(/\.|Sept/g, m => m === "Sept" ? "Sep" : "")} UTC`) : null
   return {
