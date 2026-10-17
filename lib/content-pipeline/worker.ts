@@ -25,7 +25,10 @@ export interface ContentSide {
   createDesign(input: DesignInput): Promise<Omit<FrameDesign, "templateId">>
   /** Writes the draft to the board, idempotent per requestId; returns the post and any export holds. */
   writePost(input: PostInput): Promise<{ postId: string; holds: string[] }>
+  /** The "no new content" card in Review for a job that found nothing usable: idempotent per requestId; never a post. */
+  writeNoContent(input: NoContentInput): Promise<{ postId: string }>
 }
+export interface NoContentInput { requestId: string; jobId: string; title: string; reason: string; tried: { title: string; url: string }[]; requestedBy: { email: string; name: string } }
 export interface PostInput { requestId: string; title: string; caption: string; notes: string; links: string[]; designIds: string[]; requestedBy: { email: string; name: string } }
 export interface WorkerDeps {
   store: McuStore
@@ -103,13 +106,19 @@ async function jobStep(deps: WorkerDeps, id: string, attempt: number): Promise<v
       console.info("[content-pipeline] research again", JSON.stringify({ job: id, dropped: stories.hold.slice(0, 600) }))
       const first = stories
       const again = await researchStories(deps, ai, job, titles, seeds, first.tried ?? [], first.triedUrls ?? [])
-      stories = "hold" in again ? { hold: `${first.hold}; then: ${again.hold}` } : again
+      stories = "hold" in again ? { hold: `${first.hold}; then: ${again.hold}`, tried: again.tried, triedUrls: again.triedUrls } : again
     }
     if (calls.length) console.info("[content-pipeline] calls", JSON.stringify({ job: id, calls }))
     if ("hold" in stories || !stories.length) {
-      job.status = "held"; job.note = "hold" in stories ? stories.hold.slice(0, 1000) : "No qualifying stories found"; job.updatedAt = iso(deps); job.notifiedAt = job.updatedAt
+      // One thorough search found nothing usable: the request ends here with a "no new content" card in Review,
+      // which the requester closes; nothing searches again.
+      const reason = "hold" in stories ? stories.hold.slice(0, 1000) : "No qualifying stories found"
+      const titlesTried = "hold" in stories ? stories.tried ?? [] : [], urlsTried = "hold" in stories ? stories.triedUrls ?? [] : []
+      const tried = titlesTried.map((title, i) => ({ title: title.slice(0, 200), url: urlsTried[i] ?? "" })).filter((t, i, all) => /^https:\/\//.test(t.url) && all.findIndex(x => x.url === t.url) === i).slice(0, 12)
+      const card = await deps.content.writeNoContent({ requestId: `${KEY_PREFIX}${id}:no-content`, jobId: id, title: `No new ${label(job.kind)} content — ${iso(deps).slice(0, 10)}`, reason, tried, requestedBy: { email: job.request.actorEmail, name: job.request.actorName } })
+      job.status = "held"; job.note = reason; job.noContentPostId = card.postId; job.updatedAt = iso(deps); job.notifiedAt = job.updatedAt
       await deps.store.saveJob(job); await deps.store.release("job", id, false)
-      console.info("[content-pipeline] job held", JSON.stringify({ job: id, kind: job.kind, note: job.note }))
+      console.info("[content-pipeline] job held", JSON.stringify({ job: id, kind: job.kind, card: card.postId, tried: tried.length, note: reason.slice(0, 400) }))
       await deps.notify(job, []).catch(err => console.error("[content-pipeline] notify failed", id, err instanceof Error ? err.message : err))
       return
     }

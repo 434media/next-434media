@@ -28,6 +28,11 @@ export interface McuJob {
   note?: string
   /** Set when the "N drafts ready" alert went out, so it goes out once. */
   notifiedAt?: string
+  /** The "no new content" card in Review (a crm_content_posts id) when the job found nothing usable. */
+  noContentPostId?: string
+  /** Who confirmed "no new content", and when (the card's close action). */
+  closedAt?: string
+  closedBy?: string
   createdAt: string
   updatedAt?: string
 }

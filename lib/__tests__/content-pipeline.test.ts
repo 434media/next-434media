@@ -8,7 +8,7 @@
 import { test } from "node:test"
 import assert from "node:assert/strict"
 import { SERIES, checkFields, ddmmmyy, lineCount, type SeriesKey } from "../content-pipeline/series"
-import { runDue, RETRY_MS, makerOf, searchedPageUsable, unsourcedNumbers, withCredits, imageLabel, mediaQueries, cropFit, choosePhoto, zoomCrop, reviewNotes, DOD_NOTICE, LEASE_MS, type WorkerDeps, type DesignInput, type PostInput } from "../content-pipeline/worker"
+import { runDue, RETRY_MS, makerOf, searchedPageUsable, unsourcedNumbers, withCredits, imageLabel, mediaQueries, cropFit, choosePhoto, zoomCrop, reviewNotes, DOD_NOTICE, LEASE_MS, type WorkerDeps, type DesignInput, type PostInput, type NoContentInput } from "../content-pipeline/worker"
 import { MAX_ATTEMPTS, type McuDraft, type McuJob, type McuStore } from "../content-pipeline/store"
 import { archiveRelevant, assertPublicHttps, imageSize, pageImageCandidate, parsePage, searchNasa, searchOpenverse, usableLicense, type MediaCandidate } from "../content-pipeline/sources"
 import { brandDirection, servedBy, servedCall, type McuAi, type ModelCall } from "../content-pipeline/model"
@@ -46,7 +46,7 @@ function job(over: Partial<McuJob> = {}): McuJob {
 }
 
 function world(over: { ai?: Partial<McuAi>; pagePublished?: string; newsFeedHasMedia?: boolean; createDesign?: (i: DesignInput) => void; seeds?: McuSeeds | null } = {}) {
-  const store = new MemStore(), designs: DesignInput[] = [], posts: PostInput[] = [], alerts: { job: McuJob; drafts: McuDraft[] }[] = [], calls: ModelCall[] = []
+  const store = new MemStore(), designs: DesignInput[] = [], posts: PostInput[] = [], notices: NoContentInput[] = [], alerts: { job: McuJob; drafts: McuDraft[] }[] = [], calls: ModelCall[] = []
   let now = NOW
   const ai: McuAi = {
     research: async ({ count }) => ({ candidates: [{ title: "Army picks nine C2 software vendors", primaryUrl: "https://www.army.mil/article/1", publisher: "U.S. Army", publishedAt: "2026-10-15", whyNow: "The award starts fielding now.", why: "material" }, { title: "Second story", primaryUrl: "https://www.army.mil/article/2", publisher: "U.S. Army", why: "news" }].slice(0, count + 1) }),
@@ -66,6 +66,7 @@ function world(over: { ai?: Partial<McuAi>; pagePublished?: string; newsFeedHasM
       templateFields: async t => { const media = t !== SERIES.news.templates.feed || over.newsFeedHasMedia !== false; return { headline: "text", deck: "text", date: "text", source: "text", ...(media ? { media: "image" } : {}), benefit_headline: "text", subject_identifier: "text", image_context: "text" } },
       createDesign: async i => { over.createDesign?.(i); designs.push(structuredClone(i)); return { designId: `DAH${i.requestId.replace(/[^A-Za-z0-9]/g, "").slice(-8)}`, editUrl: "https://www.canva.com/d/edit", viewUrl: "https://www.canva.com/d/view", previewUrls: ["https://export.canva.com/1.jpg"] } },
       writePost: async p => { posts.push(structuredClone(p)); return { postId: `post-${posts.length}`, holds: [] } },
+      writeNoContent: async p => { const at = notices.findIndex(n => n.requestId === p.requestId); if (at >= 0) return { postId: `notice-${at + 1}` }; notices.push(structuredClone(p)); return { postId: `notice-${notices.length}` } },
     },
     fetchPage: async url => ({ url, title: "New contract awards support Army C2", text: ARMY_TEXT, ...(over.pagePublished !== "" ? { publishedAt: over.pagePublished ?? "2026-10-16T09:00:00Z" } : {}) }),
     fetchImage: async () => ({ bytes: JPEG, mime: "image/jpeg" }),
@@ -74,7 +75,7 @@ function world(over: { ai?: Partial<McuAi>; pagePublished?: string; newsFeedHasM
     nowMs: () => now,
   }
   const start = async (j: Partial<McuJob> = {}) => { await store.createJob(job(j)); return runDue(deps, 1e9) }
-  return { store, deps, designs, posts, alerts, calls, start, advance: (ms: number) => { now += ms } }
+  return { store, deps, designs, posts, notices, alerts, calls, start, advance: (ms: number) => { now += ms } }
 }
 const onlyDraft = (w: ReturnType<typeof world>) => [...w.store.drafts.values()][0].draft
 
@@ -174,6 +175,25 @@ test("every candidate dropped: research runs once more, avoiding them, before th
   const job = (await none.store.getJob("job-news-1"))!
   assert.equal(job.status, "held"); assert.match(job.note!, /source page unreachable; then: .*already used or rejected|source page unreachable; then: .*unreachable/)
   assert.equal(none.alerts.length, 1); assert.equal(none.store.drafts.size, 0)
+})
+
+test("no new content: one thorough search, then a notice card in Review with the reason and the sources tried — never a post", async () => {
+  const w = world({ ai: { research: async () => ({ candidates: [{ title: "Blocked page story", primaryUrl: "https://blocked.example.com/a", publisher: "X", why: "dt101" }] }) } })
+  w.deps.fetchPage = async () => Promise.reject(new Error("http_403"))
+  let research = 0
+  const r = w.deps.ai
+  w.deps.ai = onCall => { const a = r(onCall); return { ...a, research: async i => { research++; return a.research(i) } } }
+  await w.start({ kind: "dt101" })
+  assert.equal(research, 2) // the first pass, then one pass avoiding what was tried; never more
+  assert.equal(w.notices.length, 1); assert.equal(w.posts.length, 0); assert.equal(w.designs.length, 0); assert.equal(w.store.drafts.size, 0)
+  const n = w.notices[0]
+  assert.equal(n.requestId, "admin:job-dt101-1:no-content"); assert.equal(n.jobId, "job-dt101-1"); assert.match(n.title, /^No new Defense Tech 101 content — 2026-10-16$/)
+  assert.deepEqual(n.tried, [{ title: "Blocked page story", url: "https://blocked.example.com/a" }]); assert.match(n.reason, /source page unreachable/)
+  const job = (await w.store.getJob("job-dt101-1"))!
+  assert.equal(job.status, "held"); assert.equal(job.noContentPostId, "notice-1")
+  assert.equal(w.alerts.length, 1); assert.equal(w.alerts[0].job.noContentPostId, "notice-1") // the alert opens the card
+  // Nothing searches again: the job is finished.
+  assert.equal(await runDue(w.deps, 1e9), 0); assert.equal(research, 2)
 })
 
 test("an unsourced figure is rewritten, and held if it persists — nothing reaches Canva or the board", async () => {

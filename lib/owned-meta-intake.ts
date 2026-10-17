@@ -79,6 +79,7 @@ export async function createPost(deps: IntakeDeps, principal: Principal, input: 
 export async function assertAttachable(deps: IntakeDeps, postId: string): Promise<ContentPost> {
   const post = await deps.getPost(postId)
   if (!post || post.archived) throw new MetaBlocked("Content post not found")
+  if (post.pipeline_outcome) throw new MetaBlocked("This card records that no new content was found; it takes no media")
   if (excluded(post) || post.status === "posted" || post.published_url) throw new MetaBlocked("This post is already published or excluded from the publisher; its media cannot be replaced")
   return post
 }

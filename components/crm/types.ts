@@ -375,6 +375,10 @@ export interface ContentPost {
   owned_meta_history?: boolean
   // Owner-reported publication outside the publisher; server-owned, blocks every publish path.
   owned_meta_external?: { by: string; at: string; evidence: string; links: string[] } | null
+  // Set when the content pipeline found no usable story for a Generate request: a notice in Review, never a post.
+  // It has no assets and no Canva design; the publisher, the decision route and export attachment refuse it.
+  // Closing it ("Confirm no new content") records closed_at/closed_by and the board stops showing it; nothing is deleted.
+  pipeline_outcome?: PipelineOutcome | null
   // Set when the publisher's connector created the post; requestId makes creation idempotent.
   intake?: { requestId: string; metaBrand: string; requestedBy: string; at: string }
   archived?: boolean
@@ -417,6 +421,15 @@ export interface ContentPost {
   generation_prompt?: string
   created_at: string
   updated_at: string
+}
+
+export interface PipelineOutcome {
+  kind: "no_new_content"
+  job_id: string
+  reason: string
+  tried: { title: string; url: string }[]
+  closed_at?: string
+  closed_by?: string
 }
 
 // One reviewer decision on a content post. The latest entry reflects the

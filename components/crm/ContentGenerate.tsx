@@ -14,7 +14,7 @@ import type { RequestKind } from "@/lib/content-pipeline/series"
 type Kind = RequestKind
 
 interface DraftView { id: string; status: string; title: string; holdReason: string | null; error: string | null; postId: string | null; checks: number }
-interface JobView { id: string; property: string; kind: Kind; count: number; topic: string | null; status: string; note: string | null; createdAt: string; drafts: DraftView[] }
+interface JobView { id: string; property: string; noContentPostId: string | null; closedAt: string | null; kind: Kind; count: number; topic: string | null; status: string; note: string | null; createdAt: string; drafts: DraftView[] }
 interface RunsResponse { seeds: { loaded: boolean; snapshot?: string }; jobs: JobView[] }
 
 const STATUS_LABEL: Record<string, string> = {
@@ -176,6 +176,12 @@ export function ContentGenerate({ onDraftsReady }: { onDraftsReady?: () => void 
                     <span className="text-neutral-400"> · {STATUS_LABEL[j.status] ?? j.status} · {new Date(j.createdAt).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}</span>
                   </p>
                   {j.note && <p className="text-[11px] text-neutral-500">{j.note}</p>}
+                  {j.noContentPostId && (
+                    <p className="text-[11px] text-neutral-500">
+                      No new content{j.closedAt ? " · closed" : ""} ·{" "}
+                      <Link href={`/admin/content?openContent=${encodeURIComponent(j.noContentPostId)}`} onClick={() => setOpen(false)} className="font-medium text-neutral-700 hover:text-neutral-900 hover:underline underline-offset-2">Open card</Link>
+                    </p>
+                  )}
                   {j.drafts.map(d => (
                     <div key={d.id} className="flex items-start justify-between gap-2 text-[11px] pl-2 border-l border-neutral-200">
                       <div className="min-w-0">

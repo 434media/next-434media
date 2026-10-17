@@ -23,6 +23,8 @@ export async function prepareOwnedMetaBatch(id: string, c: PrepareChoices): Prom
   if (!await ownedMetaBrandEnabled(c.brand)) throw new MetaBlocked("Brand is disabled")
   const post=await getContentPostById(id)
   if (!post || post.archived || !post.assets.length) throw new MetaBlocked("Save the approved export references on the content post first")
+  // A content-pipeline "no new content" card is a notice, never a post.
+  if (post.pipeline_outcome) throw new MetaBlocked("This card records that no new content was found; it is not a post")
   // A post already published elsewhere is never prepared again (owner-reported or manual posting).
   if (post.status==="posted" || post.published_url || post.owned_meta_external || isExcludedPostId(id)) throw new MetaBlocked("This post is already published or excluded from the publisher")
   const {getOwnedMetaIdentity}=await import("@/lib/instagram-config")
