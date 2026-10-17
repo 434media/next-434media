@@ -81,3 +81,37 @@ test("a non-image file is refused; Canva's refusal becomes a reconnect message w
 test("the design-creation tools serve only the Slack app's service, never the ChatGPT connector", () => {
   for (const t of ["canva_template_fields", "canva_create_design", "canva_preview"] as const) { assert.equal(TOOL_SCOPE[t], undefined); assert.equal(SERVICE_TOOL_SCOPE[t], "content:prepare") }
 })
+
+test("a crop box zooms the photo before the upload: the cropped bytes are what Canva receives, and the box is recorded", async () => {
+  const s = setup(happy), CROPPED = new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 9, 9, 9, 0xff, 0xd9]), boxes: unknown[] = []
+  s.deps.cropImage = async (bytes, box) => { assert.deepEqual(bytes, JPEG); boxes.push(box); return CROPPED }
+  const crop = { x: 0.1, y: 0.2, width: 0.6, height: 0.5 }
+  const { design } = await createFromTemplate(s.deps, { ...INPUT, image: { ...INPUT.image, crop } }, { polls: 3, intervalMs: 1 })
+  assert.deepEqual(boxes, [crop]); assert.deepEqual(design.image?.crop, crop); assert.equal(design.image?.bytes, CROPPED.byteLength)
+  const upload = s.calls.find(c => c.url.endsWith("/asset-uploads") && c.init.method === "POST")!
+  assert.deepEqual(new Uint8Array(upload.init.body as Buffer), CROPPED)
+})
+
+test("a crop outside the photo, too small, or with no cropper is refused before anything is fetched", async () => {
+  const s = setup(happy)
+  s.deps.cropImage = async b => b
+  for (const crop of [{ x: 0.5, y: 0, width: 0.6, height: 0.5 }, { x: 0, y: 0, width: 0.05, height: 0.5 }, { x: -0.1, y: 0, width: 0.5, height: 0.5 }])
+    await assert.rejects(createFromTemplate(s.deps, { ...INPUT, image: { ...INPUT.image, crop } }), /Crop must be a box inside the photo/)
+  delete s.deps.cropImage
+  await assert.rejects(createFromTemplate(s.deps, { ...INPUT, image: { ...INPUT.image, crop: { x: 0, y: 0, width: 0.5, height: 0.5 } } }), /Cropping is not available/)
+  assert.equal(s.fetched.length, 0)
+})
+
+test("the real cropper (sharp) cuts the fractional box from the upright photo", async () => {
+  const sharp = (await import("sharp")).default
+  const { cropImage } = await import("../image-crop")
+  // 400 × 300: left half red, right half blue.
+  const raw = Buffer.alloc(400 * 300 * 3)
+  for (let y = 0; y < 300; y++) for (let x = 0; x < 400; x++) raw.set(x < 200 ? [255, 0, 0] : [0, 0, 255], (y * 400 + x) * 3)
+  const png = await sharp(raw, { raw: { width: 400, height: 300, channels: 3 } }).png().toBuffer()
+  const out = await cropImage(png, { x: 0.5, y: 0.25, width: 0.5, height: 0.5 })
+  const meta = await sharp(out).metadata()
+  assert.equal(meta.format, "jpeg"); assert.equal(meta.width, 200); assert.equal(meta.height, 150)
+  const { data } = await sharp(out).raw().toBuffer({ resolveWithObject: true })
+  assert.ok(data[2] > 200 && data[0] < 60, "the right (blue) half was kept")
+})

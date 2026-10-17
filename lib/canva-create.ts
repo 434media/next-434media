@@ -6,7 +6,9 @@ import { canvaAccessToken, CanvaError, exportDesignJpg, CANVA_API, type CanvaDep
  * MCU skill. Masters are never targeted: autofill from a brand template always creates a NEW design in the
  * connected account's root folder. Optional image: the caller's public URL is fetched here (SSRF-guarded by the
  * injected fetcher), checked by file signature, uploaded to Canva as an asset, then bound to the template's image
- * field. A preview JPG export follows so the reviewer sees the real artwork.
+ * field. An optional crop box (fractions of the photo) is applied before the upload: Canva's fill only centres a photo,
+ * so the caller zooms to keep the subject clear of the card's text. A preview JPG export follows so the reviewer sees
+ * the real artwork.
  *
  * Contract (canva.dev, read 2026-10-16):
  *  - GET  /brand-templates/{id}/dataset            scope brandtemplate:content:read
@@ -24,6 +26,8 @@ export interface CreateDeps {
   ledger: CreateLedger
   /** SSRF-guarded public https fetch; returns bytes. */
   fetchImage(url: string): Promise<Uint8Array>
+  /** Crops image bytes to a fractional box (lib/image-crop.ts); required only when a request carries a crop. */
+  cropImage?(bytes: Uint8Array, box: CropBox): Promise<Uint8Array>
   /** Brand templates the service may fill. Anything else is refused. */
   allowedTemplates: ReadonlySet<string>
 }
@@ -32,8 +36,10 @@ export interface CreateInput {
   templateId: string
   title: string
   text: Record<string, string>
-  image?: { field: string; url: string; name: string }
+  image?: { field: string; url: string; name: string; crop?: CropBox }
 }
+/** A crop as fractions (0–1) of the upright photo, from its top-left corner. */
+export interface CropBox { x: number; y: number; width: number; height: number }
 export interface CreatedDesign {
   designId: string
   title: string
@@ -41,7 +47,7 @@ export interface CreatedDesign {
   viewUrl: string
   templateId: string
   fields: string[]
-  image?: { field: string; url: string; sha256: string; bytes: number; assetId: string }
+  image?: { field: string; url: string; sha256: string; bytes: number; assetId: string; crop?: CropBox }
   previewUrls: string[]
   createdAt: string
 }
@@ -54,6 +60,11 @@ function kind(bytes: Uint8Array): "jpg" | "png" | null {
   if (bytes.length > 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) return "jpg"
   if (bytes.length > 8 && bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e && bytes[3] === 0x47) return "png"
   return null
+}
+
+export function validCrop(c: CropBox): boolean {
+  const n = [c.x, c.y, c.width, c.height]
+  return n.every(v => Number.isFinite(v) && v >= 0 && v <= 1) && c.width >= 0.1 && c.height >= 0.1 && c.x + c.width <= 1.0001 && c.y + c.height <= 1.0001
 }
 
 async function api(deps: CanvaDeps, token: string, path: string, init: RequestInit = {}): Promise<Record<string, unknown>> {
@@ -103,14 +114,18 @@ export async function createFromTemplate(deps: CreateDeps, input: CreateInput, l
   let image: CreatedDesign["image"]
   if (input.image) {
     if (!input.image.url.startsWith("https://")) throw new CanvaError("Image must be a public https URL", "image_url")
-    const bytes = await deps.fetchImage(input.image.url)
-    if (bytes.byteLength > MAX_IMAGE_BYTES) throw new CanvaError("Image exceeds 25 MB", "image_size")
-    if (!kind(bytes)) throw new CanvaError("Image must be a JPEG or PNG file", "image_type")
+    const crop = input.image.crop
+    if (crop && !validCrop(crop)) throw new CanvaError("Crop must be a box inside the photo, at least a tenth of each side", "image_crop")
+    if (crop && !deps.cropImage) throw new CanvaError("Cropping is not available here", "image_crop")
+    const fetched = await deps.fetchImage(input.image.url)
+    if (fetched.byteLength > MAX_IMAGE_BYTES) throw new CanvaError("Image exceeds 25 MB", "image_size")
+    if (!kind(fetched)) throw new CanvaError("Image must be a JPEG or PNG file", "image_type")
+    const bytes = crop ? await deps.cropImage!(fetched, crop) : fetched
     const name = (input.image.name.trim() || "MCU media").slice(0, 50)
     const started = await api(deps.canva, token, "/asset-uploads", { method: "POST", body: Buffer.from(bytes), headers: { "content-type": "application/octet-stream", "asset-upload-metadata": JSON.stringify({ name_base64: Buffer.from(name, "utf8").toString("base64") }) } })
     const job = await poll(deps.canva, token, "/asset-uploads", started.job as Job, limits)
     if (!job.asset?.id) throw new CanvaError("Canva did not return the uploaded asset", "asset")
-    image = { field: input.image.field, url: input.image.url, sha256: createHash("sha256").update(bytes).digest("hex"), bytes: bytes.byteLength, assetId: job.asset.id }
+    image = { field: input.image.field, url: input.image.url, sha256: createHash("sha256").update(bytes).digest("hex"), bytes: bytes.byteLength, assetId: job.asset.id, ...(crop ? { crop } : {}) }
   }
   const data: Record<string, unknown> = Object.fromEntries(entries.map(([k, v]) => [k, { type: "text", text: v }]))
   if (image) data[image.field] = { type: "image", asset_id: image.assetId }
