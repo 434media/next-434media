@@ -152,7 +152,28 @@ test("Breaking: an announcement older than 24 hours, or with no stated time, is 
   const undated = world({ pagePublished: "" })
   await undated.start({ kind: "breaking" })
   assert.equal(undated.store.drafts.size, 0); assert.match((await undated.store.getJob("job-breaking-1"))!.note!, /states no publication time/)
-  assert.equal(old.alerts.length + undated.alerts.length, 0)
+  // A job that opens no drafts still reports back once, with its reason.
+  assert.equal(old.alerts.length, 1); assert.deepEqual(old.alerts[0].drafts, []); assert.equal(undated.alerts.length, 1)
+})
+
+test("every candidate dropped: research runs once more, avoiding them, before the job holds (production, 2026-10-17)", async () => {
+  const seen: (string[] | undefined)[] = []
+  const w = world({ ai: { research: async input => { seen.push(input.avoid); return seen.length === 1
+    ? { candidates: [{ title: "Blocked page story", primaryUrl: "https://blocked.example.com/a", publisher: "X", why: "news" }] }
+    : { candidates: [{ title: "Army picks nine C2 software vendors", primaryUrl: "https://www.army.mil/article/1", publisher: "U.S. Army", why: "news" }] } } } })
+  const fetchPage = w.deps.fetchPage
+  w.deps.fetchPage = async url => url.includes("blocked.") ? Promise.reject(new Error("http_403")) : fetchPage(url)
+  await w.start()
+  assert.deepEqual(seen, [undefined, ["Blocked page story"]])
+  const d = onlyDraft(w)
+  assert.equal(d.story.primaryUrl, "https://www.army.mil/article/1"); assert.equal(d.status, "in_review")
+  // When the second pass finds nothing either, the job holds with both reasons and reports back.
+  const none = world({ ai: { research: async () => ({ candidates: [{ title: "Blocked page story", primaryUrl: "https://blocked.example.com/a", publisher: "X", why: "news" }] }) } })
+  none.deps.fetchPage = async () => Promise.reject(new Error("http_403"))
+  await none.start()
+  const job = (await none.store.getJob("job-news-1"))!
+  assert.equal(job.status, "held"); assert.match(job.note!, /source page unreachable; then: .*already used or rejected|source page unreachable; then: .*unreachable/)
+  assert.equal(none.alerts.length, 1); assert.equal(none.store.drafts.size, 0)
 })
 
 test("an unsourced figure is rewritten, and held if it persists — nothing reaches Canva or the board", async () => {

@@ -104,7 +104,9 @@ export function ContentGenerate({ onDraftsReady }: { onDraftsReady?: () => void 
         Generate
       </button>
       {open && (
-        <div className="absolute right-0 z-30 mt-2 w-[min(92vw,380px)] rounded-lg bg-white shadow-lg ring-1 ring-neutral-200 p-4 space-y-4">
+        // Phone: pinned to the viewport with a 16px gutter, full width, scrolling inside. From sm up: a 380px
+        // dropdown under the button.
+        <div className="fixed inset-x-4 top-4 max-h-[calc(100dvh-2rem)] z-50 overflow-y-auto overscroll-contain rounded-lg bg-white shadow-lg ring-1 ring-neutral-200 p-4 space-y-4 sm:absolute sm:inset-x-auto sm:top-auto sm:right-0 sm:z-30 sm:mt-2 sm:w-[380px] sm:max-h-[80vh]">
           <div className="flex items-start justify-between gap-3">
             <div>
               <p className="text-sm font-semibold text-neutral-900">Generate drafts</p>
@@ -165,7 +167,7 @@ export function ContentGenerate({ onDraftsReady }: { onDraftsReady?: () => void 
           </div>
 
           {!!runs?.jobs.length && (
-            <div className="border-t border-neutral-100 pt-3 space-y-3 max-h-72 overflow-y-auto">
+            <div className="border-t border-neutral-100 pt-3 space-y-3 sm:max-h-72 sm:overflow-y-auto">
               <p className="text-[11px] font-medium uppercase tracking-wide text-neutral-400">Recent runs</p>
               {runs.jobs.map(j => (
                 <div key={j.id} className="space-y-1">

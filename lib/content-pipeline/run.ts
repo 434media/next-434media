@@ -63,12 +63,11 @@ export async function pipelineDeps(): Promise<WorkerDeps> {
     notify: async (job: McuJob, drafts: McuDraft[]) => {
       const ready = drafts.filter(d => d.status === "in_review" && d.postId), held = drafts.filter(d => d.status !== "in_review")
       const kind = label(job.kind)
-      await sendDraftsReadyNotification({
-        recipients: [job.request.actorEmail],
-        message: `${ready.length} ${kind} draft${ready.length === 1 ? "" : "s"} ready for review${held.length ? ` (${held.length} held or failed: see Generate)` : ""}`,
-        postId: ready[0]?.postId ?? "",
-        title: ready[0] ? `${ready.length} drafts ready` : `${kind} drafts`,
-      })
+      // A job that opened no drafts (held at research) still reports back, with its reason.
+      const message = drafts.length
+        ? `${ready.length} ${kind} draft${ready.length === 1 ? "" : "s"} ready for review${held.length ? ` (${held.length} held or failed: see Generate)` : ""}`
+        : `No ${kind} draft: ${(job.note ?? "no qualifying story found").slice(0, 300)}`
+      await sendDraftsReadyNotification({ recipients: [job.request.actorEmail], message, postId: ready[0]?.postId ?? "", title: ready[0] ? `${ready.length} drafts ready` : `${kind} drafts` })
     },
   }
 }

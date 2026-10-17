@@ -95,11 +95,22 @@ async function jobStep(deps: WorkerDeps, id: string, attempt: number): Promise<v
   try {
     const posts = await deps.content.recentPosts()
     const calls: ModelCall[] = []
-    const stories = job.kind === "icymi" ? icymiStory(posts) : await researchStories(deps, deps.ai(c => calls.push(c)), job, posts.map(p => p.title), await deps.seeds())
+    const ai = deps.ai(c => calls.push(c)), titles = posts.map(p => p.title), seeds = job.kind === "icymi" ? null : await deps.seeds()
+    let stories: Story[] | { hold: string; tried?: string[]; triedUrls?: string[] } = job.kind === "icymi" ? icymiStory(posts) : await researchStories(deps, ai, job, titles, seeds)
+    // Every candidate dropped (a blocked or script-only source page, no readable article, outside the Breaking window):
+    // research once more, steering away from what was tried, before the job holds (production, 2026-10-17).
+    if ("hold" in stories && stories.tried?.length) {
+      console.info("[content-pipeline] research again", JSON.stringify({ job: id, dropped: stories.hold.slice(0, 600) }))
+      const first = stories
+      const again = await researchStories(deps, ai, job, titles, seeds, first.tried ?? [], first.triedUrls ?? [])
+      stories = "hold" in again ? { hold: `${first.hold}; then: ${again.hold}` } : again
+    }
     if (calls.length) console.info("[content-pipeline] calls", JSON.stringify({ job: id, calls }))
     if ("hold" in stories || !stories.length) {
-      job.status = "held"; job.note = "hold" in stories ? stories.hold : "No qualifying stories found"; job.updatedAt = iso(deps)
+      job.status = "held"; job.note = "hold" in stories ? stories.hold.slice(0, 1000) : "No qualifying stories found"; job.updatedAt = iso(deps); job.notifiedAt = job.updatedAt
       await deps.store.saveJob(job); await deps.store.release("job", id, false)
+      console.info("[content-pipeline] job held", JSON.stringify({ job: id, kind: job.kind, note: job.note }))
+      await deps.notify(job, []).catch(err => console.error("[content-pipeline] notify failed", id, err instanceof Error ? err.message : err))
       return
     }
     const day = iso(deps).slice(0, 10).replace(/-/g, ""), prefix = `MCU-${KIND_CODE[job.kind]}-${day}-`
@@ -113,6 +124,7 @@ async function jobStep(deps: WorkerDeps, id: string, attempt: number): Promise<v
     job.status = "drafting"; job.updatedAt = now; job.note = undefined
     if (job.kind !== "icymi" && stories.length < job.count) job.note = `${stories.length} of ${job.count} qualified`
     await deps.store.saveJob(job); await deps.store.release("job", id, false)
+    console.info("[content-pipeline] job drafting", JSON.stringify({ job: id, kind: job.kind, drafts: job.drafts, stories: stories.map(s => s.primaryUrl) }))
   } catch (err) {
     console.error("[content-pipeline] research failed", id, err instanceof Error ? err.message : err)
     const why = err instanceof Error ? err.message.slice(0, 200) : "error"
@@ -136,7 +148,8 @@ function icymiStory(posts: PostRow[]): Story[] | { hold: string } {
   return [{ title: "ICYMI roundup", primaryUrl: eligible[0].publishedUrl || "https://www.instagram.com/milcityusa/", publisher: "MilCityUSA", sourceTitle: "Five published MCU stories", sourceText: eligible.map((p, i) => `${i + 1}. ${p.title}\n${p.caption}`).join("\n\n"), roundup: eligible.map(p => ({ postId: p.id, title: p.title, caption: (p.caption || "").slice(0, 800), ...(p.publishedUrl ? { publishedUrl: p.publishedUrl } : {}) })) }]
 }
 
-async function researchStories(deps: WorkerDeps, ai: McuAi, job: Pick<McuJob, "kind" | "count" | "topic">, recentTitles: string[], seeds: McuSeeds | null, avoid: string[] = [], avoidUrls: string[] = []): Promise<Story[] | { hold: string }> {
+/** On a hold, `tried` and `triedUrls` name the candidates that were dropped, so a second pass can avoid them. */
+async function researchStories(deps: WorkerDeps, ai: McuAi, job: Pick<McuJob, "kind" | "count" | "topic">, recentTitles: string[], seeds: McuSeeds | null, avoid: string[] = [], avoidUrls: string[] = []): Promise<Story[] | { hold: string; tried?: string[]; triedUrls?: string[] }> {
   const today = iso(deps).slice(0, 10)
   const r = await ai.research({ kind: job.kind, count: job.count, ...(job.topic ? { topic: job.topic } : {}), today, recentTitles, seeds, ...(avoid.length ? { avoid } : {}) })
   const stories: Story[] = [], dropped: string[] = []
@@ -163,7 +176,7 @@ async function researchStories(deps: WorkerDeps, ai: McuAi, job: Pick<McuJob, "k
     const sourceText = supporting.length ? [page.text.slice(0, 16_000), ...supporting.map(sp => `--- SUPPORTING SOURCE: ${sp.title || sp.url} (${sp.url}) ---\n${sp.text.slice(0, 4_000)}`)].join("\n\n") : page.text
     stories.push({ title: c.title, primaryUrl: page.url, publisher: c.publisher || page.siteName || new URL(page.url).hostname, ...(publishedAt ? { publishedAt } : {}), ...(job.kind === "breaking" && c.whyNow ? { whyNow: c.whyNow } : {}), sourceTitle: page.title || c.title, sourceText, ...(supporting.length ? { supporting: supporting.map(sp => ({ url: sp.url, title: sp.title || sp.url })) } : {}) })
   }
-  if (!stories.length) return { hold: [r.note, ...dropped].filter(Boolean).join("; ") || "no candidates found" }
+  if (!stories.length) return { hold: [r.note, ...dropped].filter(Boolean).join("; ") || "no candidates found", tried: [...avoid, ...r.candidates.map(c => c.title)], triedUrls: [...avoidUrls, ...r.candidates.map(c => c.primaryUrl)] }
   return stories
 }
 export function normalizeDate(v: string | undefined): string | undefined {
