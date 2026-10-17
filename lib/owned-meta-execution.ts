@@ -165,7 +165,7 @@ export async function ownedMetaConnectorDeps(): Promise<import("@/lib/owned-meta
       const { CanvaError } = await import("@/lib/canva-export")
       const { deps } = await canvaDeps()
       if (!deps) throw new CanvaError("Canva integration is not configured")
-      return createFromTemplate({ canva: deps, ledger: crm.canvaCreateLedger(), allowedTemplates: MCU_BRAND_TEMPLATES, fetchImage: async url => {
+      return createFromTemplate({ canva: deps, ledger: crm.canvaCreateLedger(), allowedTemplates: MCU_BRAND_TEMPLATES, cropImage: async (bytes, box) => (await import("@/lib/image-crop")).cropImage(bytes, box), fetchImage: async url => {
         const safe = url.startsWith("https://") ? await isSafeRemoteUrl(url) : null
         if (!safe) throw new CanvaError("Image must be a public https URL", "image_url")
         // Wikimedia and similar archives refuse anonymous clients; identify the fetcher honestly.
