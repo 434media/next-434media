@@ -1,6 +1,6 @@
 import { SERIES, checkFields, clippedWords, ddmmmyy, normalizeFields, type Placement, type RequestKind } from "./series"
 import { MCU_RULES_VERSION } from "./editorial"
-import { icymiCount, normalizeUrl, unusedStorySlot, type McuAi, type ModelCall, type RankedPhoto, type SubjectBox } from "./model"
+import { icymiCount, meaningful, normalizeUrl, unusedStorySlot, type McuAi, type ModelCall, type RankedPhoto, type SubjectBox } from "./model"
 import { contentPropertyOf } from "./properties"
 import type { ContentProperty } from "@/components/crm/types"
 import type { McuSeeds } from "./seeds"
@@ -18,7 +18,7 @@ import { MAX_ATTEMPTS, WORKING, type ChosenMedia, type CropBox, type FrameCopy, 
  * the board; revision ("revise", "refresh", "ready") moves to the drawer in Phase 2 and is not carried here.
  */
 /** publishedAt: when the post went out (posted_at, else its post date), for the ICYMI window. */
-export interface PostRow { id: string; title: string; status: string; publishedUrl?: string; caption?: string; publishedAt?: string }
+export interface PostRow { id: string; title: string; status: string; publishedUrl?: string; caption?: string; publishedAt?: string; links?: string[] }
 export interface DesignInput { requestId: string; templateId: string; title: string; text: Record<string, string>; image?: { field: string; url: string; name: string; crop?: CropBox } }
 export interface ContentSide {
   /** MCU's content posts, for the repeat-story check and ICYMI. */
@@ -236,7 +236,10 @@ export function icymiStory(posts: PostRow[], window: { startMs: number; endMs: n
     .filter((p, i, all) => all.findIndex(x => x.title.trim().toLowerCase() === p.title.trim().toLowerCase()) === i)
     .slice(0, ICYMI_MAX)
   if (!eligible.length) return { hold: `no MCU News or Breaking story was published in ${window.label}, so there is no ICYMI` }
-  return [{ title: "ICYMI roundup", primaryUrl: eligible[0].publishedUrl || "https://www.instagram.com/milcityusa/", publisher: "MilCityUSA", sourceTitle: `${eligible.length} published MCU ${eligible.length === 1 ? "story" : "stories"} from ${window.label}`, sourceText: eligible.map((p, i) => `${i + 1}. ${p.title}\n${p.caption}`).join("\n\n"), roundup: eligible.map(p => ({ postId: p.id, title: p.title, caption: (p.caption || "").slice(0, 800), ...(p.publishedUrl ? { publishedUrl: p.publishedUrl } : {}) })) }]
+  return [{ title: "ICYMI roundup", primaryUrl: eligible[0].publishedUrl || "https://www.instagram.com/milcityusa/", publisher: "MilCityUSA", sourceTitle: `${eligible.length} published MCU ${eligible.length === 1 ? "story" : "stories"} from ${window.label}`, sourceText: eligible.map((p, i) => `${i + 1}. ${p.title}\n${p.caption}`).join("\n\n"), roundup: eligible.map(p => {
+    const credit = /^Image: (.+)$/m.exec(p.caption || "")?.[1]?.trim()
+    return { postId: p.id, title: p.title, caption: (p.caption || "").split("\n").filter(l => !/^Image: /.test(l) && l !== DOD_NOTICE).join("\n").trim().slice(0, 800), ...(p.publishedUrl ? { publishedUrl: p.publishedUrl } : {}), ...(p.links?.length ? { photoPages: p.links } : {}), ...(credit ? { imageCredit: credit.slice(0, 300) } : {}), ...((p.caption || "").includes(DOD_NOTICE) ? { usGovernment: true } : {}) }
+  }) }]
 }
 
 /** On a hold, `tried` and `triedUrls` name the candidates that were dropped, so a second pass can avoid them. */
@@ -297,9 +300,11 @@ const COMMON = new Set(["the", "and", "for", "with", "from", "into", "first", "n
 /** Whether a page is about the story's subject: it names a model designation from the title or two of its distinctive words. */
 export function sameSubject(title: string, text: string): boolean {
   const hay = text.toLowerCase()
-  const words = [...new Set(title.toLowerCase().match(/[a-z0-9][a-z0-9.\-]*[a-z0-9]/g) ?? [])].filter(w => w.length >= 3 && !COMMON.has(w))
-  const designations = words.filter(w => /\d/.test(w) && /[a-z]/.test(w))
-  if (designations.some(w => hay.includes(w))) return true
+  const tokens = [...new Set(title.toLowerCase().match(/[a-z0-9][a-z0-9.\-]*[a-z0-9]/g) ?? [])]
+  const words = tokens.filter(w => w.length >= 3 && !COMMON.has(w))
+  // A model designation names the subject however short it is (C2, F-35, YFQ-48A).
+  const designations = tokens.filter(w => /\d/.test(w) && /[a-z]/.test(w))
+  if (designations.some(w => new RegExp(`(^|[^a-z0-9])${w.replace(/[.\-]/g, "\\$&")}([^a-z0-9]|$)`).test(hay))) return true
   return words.filter(w => !/\d/.test(w) && hay.includes(w)).length >= 2
 }
 export function normalizeDate(v: string | undefined): string | undefined {
@@ -386,12 +391,14 @@ async function writeStep(deps: WorkerDeps, ai: McuAi, d: McuDraft): Promise<void
   const seeds = await deps.seeds(), steer = { seeds, ...(d.direction ? { direction: d.direction } : {}) }
   let out = await ai.write({ kind: d.kind, story: d.story, today, ...steer, ...(d.frames.length ? { previous: { frames: d.frames, caption: d.caption ?? "" } } : {}) })
   for (let round = 0; round < 2; round++) {
+    out.hold = meaningful(out.hold) // "None" is no hold (gate round 3: it replaced a subject)
     if (out.hold) return sourceHold(deps, ai, d, out.hold)
     out.frames = out.frames.map((f, i) => fix(f, i, d, today))
     problems = validate(out.frames, out.caption, d.story)
     if (!problems.length) break
     out = await ai.write({ kind: d.kind, story: d.story, today, ...steer, previous: { frames: out.frames, caption: out.caption }, problems })
   }
+  out.hold = meaningful(out.hold)
   if (out.hold) return sourceHold(deps, ai, d, out.hold)
   out.frames = out.frames.map((f, i) => fix(f, i, d, today))
   problems = validate(out.frames, out.caption, d.story)
@@ -427,6 +434,9 @@ function validate(frames: FrameCopy[], caption: string, story: Story): string[] 
     if (!/^MISSION BRIEF \/\/ \S/.test(lines[0] ?? "") || !/^\/\/\S/.test(lines[1] ?? "")) problems.push('the DT101 caption must be the mission brief: "MISSION BRIEF // <SUBJECT>", then "//<Company>", then the labelled lines, each on its own line with a blank line between')
     for (const label of ["Tech:", "Platform:", "Goal:"]) if (!lines.some(l => l.startsWith(label))) problems.push(`the mission brief has no "${label}" line`)
   }
+  // The copy must be about this draft's story (gate round 3: after a subject switch, DT101-10 and -12 carried the
+  // previous subject's mission brief). A roundup's copy is about five stories, so it is not checked here.
+  if (!story.roundup && !sameSubject(`${story.title} ${story.sourceTitle}`, [caption, ...frames.flatMap(f => Object.values(f.fields))].join(" "))) problems.push(`the copy is not about this story ("${story.title.slice(0, 100)}"): write it from the source below`)
   for (const f of frames) if (f.fields.deck && !/[.!?]["”’)]?$/.test(f.fields.deck.trim())) problems.push(`the deck must be one complete sentence ending with a period: "${f.fields.deck}"`)
   const clipped = [...new Set(frames.flatMap(f => clippedWords(f.fields, story.sourceText)))]
   if (clipped.length) problems.push(`abbreviated words on the card (${clipped.join(", ")}); use whole words, and shorter ones if it must fit`)
@@ -460,7 +470,7 @@ export function searchedPageUsable(url: string, maker: string, outlets: readonly
  * Each is fetched once, sized from its own header and dropped below MIN_SHORT_SIDE; at most MAX_SHOWN go to the
  * vision pick. Sources that need a key or account (the DVIDS API) are not used until the founder adds one.
  */
-async function gatherMedia(deps: WorkerDeps, ai: McuAi, story: Story, frame: FrameCopy, avoid: string[]): Promise<{ candidate: MediaCandidate; image: Uint8Array; mime: string }[]> {
+async function gatherMedia(deps: WorkerDeps, ai: McuAi, story: Story, frame: FrameCopy, avoid: string[], reuse?: MediaCandidate[]): Promise<{ candidate: MediaCandidate; image: Uint8Array; mime: string }[]> {
   const out: { candidate: MediaCandidate; image: Uint8Array; mime: string }[] = [], seen = new Set<string>(avoid)
   const add = async (c: MediaCandidate | null) => {
     if (!c || out.length >= MAX_SHOWN || seen.has(c.pageUrl) || seen.has(c.url)) return
@@ -477,6 +487,8 @@ async function gatherMedia(deps: WorkerDeps, ai: McuAi, story: Story, frame: Fra
       out.push({ candidate: c, image: im.bytes, mime: im.mime })
     } catch { /* unreadable: skipped */ }
   }
+  // An ICYMI story card shows the photo its published post used, when that can be recovered; nothing else is searched.
+  if (reuse) { for (const c of reuse) await add(c); return out }
   const pages: SourcePage[] = [], outlets = await outletSites(deps)
   // A social post's share image is MCU's own rendered card (ICYMI's stories link to Instagram), and an outlet's photo
   // is licensed to the outlet: neither is a photo source.
@@ -497,6 +509,26 @@ async function gatherMedia(deps: WorkerDeps, ai: McuAi, story: Story, frame: Fra
 }
 
 const SOCIAL_HOST = /^https:\/\/([a-z0-9-]+\.)*(instagram\.com|facebook\.com|fb\.com|threads\.net|x\.com|twitter\.com|linkedin\.com|tiktok\.com|youtube\.com)(\/|$)/i
+/**
+ * The photo an ICYMI story's published post used (founder, 2026-10-17: the roundup reuses the stories' approved
+ * images). The post's links hold its photo's page beside its sources: a DVIDS or government page, a Commons file
+ * page, or the maker's media page. Its credit is the one its caption printed. Social links and outlets are skipped.
+ * Empty when nothing can be recovered (an older post made by hand may not link its photo).
+ */
+export async function publishedPhoto(deps: Pick<WorkerDeps, "fetchPage" | "searchCommons">, item: NonNullable<Story["roundup"]>[number]): Promise<MediaCandidate[]> {
+  const out: MediaCandidate[] = []
+  for (const u of [...(item.photoPages ?? [])].reverse()) {
+    if (!/^https:\/\//.test(u) || SOCIAL_HOST.test(u) || isOutlet(u)) continue
+    try {
+      const file = /^https:\/\/commons\.wikimedia\.org\/wiki\/(File:[^?#]+)/.exec(u)?.[1]
+      const c = file ? (await deps.searchCommons(decodeURIComponent(file).replace(/^File:/, "").replace(/_/g, " ").replace(/\.[a-z]+$/i, ""))).find(x => x.pageUrl.replace(/ /g, "_") === u || decodeURIComponent(x.pageUrl) === decodeURIComponent(u)) ?? null
+        : await deps.fetchPage(u).then(pg => pageImageCandidate(pg, isDvidsImagePage(pg.url) ? "dvids" : "source"))
+      if (c) out.push({ ...c, ...(item.imageCredit ? { credit: item.imageCredit } : {}), ...(item.usGovernment ? { usGovernment: true } : {}), rightsNote: `Reused from the published post ${item.postId}` })
+    } catch { /* skipped */ }
+    if (out.length >= 2) break
+  }
+  return out
+}
 /**
  * The story a frame's photo is about. An ICYMI story card shows the published story it recaps (its title and caption),
  * not the roundup; the cover takes the lead story's photo (mediaStep). Gate round 1 (2026-10-17) searched for a cover
@@ -612,7 +644,12 @@ async function mediaStep(deps: WorkerDeps, ai: McuAi, d: McuDraft): Promise<void
     }
     const story = frameStory(d, frame, i), representative = allowsRepresentative(frame)
     const avoid = [...used, ...(d.avoidMedia ?? [])]
-    const shown = await gatherMedia(deps, ai, story, frame, avoid)
+    const item = frame.series === "icymi_story" ? d.story.roundup?.[i - 1] : undefined
+    const reuse = item ? await publishedPhoto(deps, item) : []
+    let shown = reuse.length ? await gatherMedia(deps, ai, story, frame, avoid, reuse) : []
+    // Nothing recoverable from the published post: search, and say so.
+    const searched = !shown.length
+    if (searched) shown = await gatherMedia(deps, ai, story, frame, avoid)
     const pick = await ai.pickMedia({ story, frame, candidates: shown, avoid: [...avoid], representative })
     const chosen = choosePhoto(pick, shown.map(x => x.candidate), d.placement)
     console.info("[content-pipeline] media", JSON.stringify({ draft: d.id, v: d.version, frame: i + 1, retry: d.mediaRetries ?? 0, representative, shown: shown.map(x => `${x.candidate.origin ?? "?"}:${x.candidate.width}x${x.candidate.height}:${x.candidate.title.slice(0, 60)}`), ranked: pick.ranked ?? null, turnedDown: pick.turnedDown ?? null, chosen: chosen.index, crop: chosen.index === null ? null : chosen.crop, why: chosen.index === null ? chosen.why : null }))
@@ -623,8 +660,9 @@ async function mediaStep(deps: WorkerDeps, ai: McuAi, d: McuDraft): Promise<void
     }
     const c = shown[chosen.index].candidate
     used.add(c.pageUrl)
+    const fresh = item && searched ? `The published post's photo could not be recovered from its links, so this one was searched for: check it against ${item.postId}` : ""
     const rep = chosen.ranked.representative ? `Representative photo${chosen.ranked.shows ? ` (${chosen.ranked.shows})` : ""}, not the event itself: check the caption doesn't present it as the event` : ""
-    media[i] = { url: c.url, pageUrl: c.pageUrl, title: c.title, license: c.license, creator: c.creator, credit: c.credit, usGovernment: c.usGovernment, ...(c.date ? { date: c.date } : {}), ...(c.rightsNote || rep ? { note: [c.rightsNote, rep].filter(Boolean).join(". ") } : {}), crop: chosen.crop }
+    media[i] = { url: c.url, pageUrl: c.pageUrl, title: c.title, license: c.license, creator: c.creator, credit: c.credit, usGovernment: c.usGovernment, ...(c.date ? { date: c.date } : {}), ...(c.rightsNote || rep || fresh ? { note: [c.rightsNote, rep, fresh].filter(Boolean).join(". ") } : {}), crop: chosen.crop }
   }
   d.media = media
   // Credits and the DoD non-endorsement line belong to the caption the reviewer approves.
@@ -773,6 +811,9 @@ async function sourceHold(deps: WorkerDeps, ai: McuAi, d: McuDraft, reason: stri
   // A new subject starts its photo search afresh; its designs get their own Canva request ids (":r<n>"), since a
   // photo hold can come after the first subject's design was created.
   d.frames = []; d.caption = undefined; d.media = []; d.designs = []; d.qa = []; d.holdReason = undefined; d.mediaRetries = undefined; d.avoidMedia = undefined
+  // The new subject starts at writing: if the write below fails, the retry writes again rather than resuming the
+  // photo step on nothing (gate round 3).
+  d.status = "writing"
   await save(deps, d, `"${was}" couldn't be sourced (${reason.replace(/\.$/, "")}); switched to ${d.story.title}`)
   return writeStep(deps, ai, d)
 }

@@ -9,9 +9,10 @@ import { test } from "node:test"
 import assert from "node:assert/strict"
 import { SERIES, checkFields, clippedWords, ddmmmyy, lineCount, type SeriesKey } from "../content-pipeline/series"
 import { runDue, RETRY_MS, icymiStory, icymiWindow, staleSource, allowsRepresentative, sameSubject, makerOf, searchedPageUsable, unsourcedNumbers, withCredits, imageLabel, mediaQueries, cropFit, choosePhoto, zoomCrop, reviewNotes, DOD_NOTICE, LEASE_MS, type WorkerDeps, type DesignInput, type PostInput, type NoContentInput } from "../content-pipeline/worker"
+import { firestorePipelineStore } from "../firestore-content-pipeline"
 import { MAX_ATTEMPTS, type McuDraft, type McuJob, type McuStore } from "../content-pipeline/store"
 import { archiveRelevant, assertPublicHttps, guardedFetch, isOutlet, siteOrg, imageSize, pageImageCandidate, parsePage, searchNasa, searchOpenverse, usableLicense, type MediaCandidate } from "../content-pipeline/sources"
-import { brandDirection, isPhotoDefect, readPick, searchResultUrls, servedBy, servedCall, type McuAi, type ModelCall } from "../content-pipeline/model"
+import { brandDirection, isPhotoDefect, meaningful, readPick, searchResultUrls, servedBy, servedCall, type McuAi, type ModelCall } from "../content-pipeline/model"
 import { PIPELINE_MODELS, FALLBACK_MODELS, CALL_FALLBACK, callOptions, outputBudget } from "../content-pipeline/models"
 import { seedBrief, seedProblems, type McuSeeds } from "../content-pipeline/seeds"
 import { PIPELINE_PROPERTIES, PROPERTY_TEMPLATES, contentPropertyOf, propertyCanGenerate } from "../content-pipeline/properties"
@@ -770,7 +771,7 @@ test("caption and deck rules: the DT101 mission brief, a source line of its own,
   assert.equal(onlyDraft(w).status, "in_review"); assert.equal(n, 2)
   assert.match(seen[1].join(" | "), /source on a line of its own/); assert.match(seen[1].join(" | "), /must be the mission brief/); assert.match(seen[1].join(" | "), /no "Tech:" line/)
   let m = 0
-  const news = world({ ai: { write: async i => { seen.push(i.problems ?? []); m++; return { frames: [{ series: "news" as SeriesKey, fields: { headline: "KBR Firefly pilot", deck: m === 1 ? "KBR Firefly laser pilot for base defense, Xbox controller" : "KBR is testing its Firefly laser for base defense.", source: "ARMY.MIL" } }], caption: "KBR is testing a laser.\n\nSource: U.S. Army, 2026-10-15" } } } })
+  const news = world({ ai: { write: async i => { seen.push(i.problems ?? []); m++; return { frames: [{ series: "news" as SeriesKey, fields: { headline: "Army backs C2 vendors", deck: m === 1 ? "Army C2 software pilot for I Corps, nine vendors" : "The Army picked nine vendors for C2 software.", source: "ARMY.MIL" } }], caption: "The Army picked nine C2 software vendors.\n\nSource: U.S. Army, 2026-10-15" } } } })
   await news.start({ kind: "news" })
   assert.equal(m, 2); assert.match(seen.at(-1)!.join(" | "), /the deck must be one complete sentence/)
 })
@@ -804,4 +805,61 @@ test("ICYMI: four stories make a cover and four cards, counted of four; the unus
   // Previous week only (the default): the same posts give nothing for a Friday in the week after next.
   const none = icymiStory([p(1, "2026-10-10T15:00:00Z")], icymiWindow(Date.parse("2026-10-23T18:00:00Z"), null))
   assert.ok("hold" in none)
+})
+
+// ── Phase 1b, gate round 3 (production, 2026-10-17 19:53Z: none reached Review) ──
+test("a subject switch rewrites everything: the old subject's copy never survives, and copy about another subject is rewritten", async () => {
+  let writes = 0
+  const RAID = "MISSION BRIEF // RAID HUNTER\n\n//Northrop Grumman\n\nTech: Counter-drone\n\nPlatform: Kit\n\nGoal: Stop drones.\n\nSource: Northrop Grumman, 11AUG26"
+  const w = world({ ai: {
+    research: async ({ avoid }) => ({ candidates: [avoid?.length ? { title: "Next-gen C2 software for I Corps", primaryUrl: "https://www.army.mil/article/2", publisher: "U.S. Army", why: "dt101" } : { title: "Raid Hunter counter-drone kit", primaryUrl: "https://www.army.mil/article/1", publisher: "U.S. Army", why: "dt101" }] }),
+    // First the writer holds the first subject; then, for the new one, it repeats the old mission brief once.
+    write: async ({ story }) => { writes++; return writes === 1 ? { frames: [{ series: "dt101" as SeriesKey, fields: { benefit_headline: "Stop the drone.\nGuard the base.", subject_identifier: "Raid Hunter / Northrop Grumman" } }], caption: RAID, hold: "the source gives no headquarters" } : { frames: [{ series: "dt101" as SeriesKey, fields: { benefit_headline: "Link the fight.\nDecide faster.", subject_identifier: writes === 2 ? "Raid Hunter / Northrop Grumman" : "Next-gen C2 / Lockheed Martin" } }], caption: writes === 2 ? RAID : BRIEF, ...(story ? {} : {}) } },
+  } })
+  w.deps.fetchPage = async url => ({ url, title: url.endsWith("/1") ? "Raid Hunter" : "Next-gen C2 software", text: url.endsWith("/1") ? `${ARMY_TEXT} Raid Hunter counter-drone kit.` : `${ARMY_TEXT} Next-gen C2 software for I Corps.`, publishedAt: "2026-10-16T09:00:00Z" })
+  await w.start({ kind: "dt101" })
+  const d = onlyDraft(w)
+  assert.equal(d.status, "in_review"); assert.equal(d.autoReplaced, 1); assert.equal(d.story.title, "Next-gen C2 software for I Corps")
+  assert.ok(d.caption!.startsWith("MISSION BRIEF // NEXT-GEN C2")); assert.doesNotMatch(d.caption!, /RAID HUNTER/)
+  assert.ok(d.history.some(h => /copy written/.test(h.event)))
+  assert.equal(writes, 3) // the repeat of the old brief was caught and rewritten
+})
+
+test("a writer hold of \"None\" is no hold, and model chatter never reaches a hold reason", async () => {
+  assert.equal(meaningful("None"), undefined); assert.equal(meaningful(" n/a. "), undefined); assert.equal(meaningful("null"), undefined)
+  assert.equal(meaningful("The source gives no figure for the award."), "The source gives no figure for the award.")
+  const w = world({ ai: { write: async () => ({ frames: [{ series: "dt101" as SeriesKey, fields: { benefit_headline: "Link the fight.\nDecide faster.", subject_identifier: "Next-gen C2 / Lockheed Martin" } }], caption: BRIEF, hold: "None" }) } })
+  await w.start({ kind: "dt101" })
+  const d = onlyDraft(w)
+  assert.equal(d.status, "in_review"); assert.equal(d.autoReplaced, undefined)
+})
+
+test("the store replaces a draft on save, so a cleared field is cleared in Firestore too", async () => {
+  const calls: { data: unknown; opts: unknown }[] = []
+  const fakeDb = { collection: () => ({ doc: () => ({ set: async (data: unknown, opts: unknown) => { calls.push({ data, opts }) } }) }) } as unknown as FirebaseFirestore.Firestore
+  const store = firestorePipelineStore(fakeDb)
+  await store.saveDraft({ ...onlyDraftShape(), caption: undefined })
+  await store.saveJob(job())
+  assert.deepEqual(calls.map(c => c.opts), [{ mergeFields: ["draft"] }, { mergeFields: ["job"] }])
+  assert.equal("caption" in ((calls[0].data as { draft: Record<string, unknown> }).draft), false)
+})
+
+test("ICYMI story cards reuse their published post's photo and credit; a post that doesn't link its photo is searched, with a note", async () => {
+  const DVIDS = (n: number) => `https://www.dvidshub.net/image/95000${n}/story-${n}`
+  const post = (n: number, linked: boolean) => ({ id: `p${n}`, title: `MCU-NEWS-20261009-0${n} v1 — STORY ${n}`, status: "posted", publishedUrl: `https://www.instagram.com/milcityusa/p/${n}/`, publishedAt: `2026-10-0${9 - n}T15:00:00Z`,
+    caption: `Story ${n} caption.\n\nSource: U.S. Army, 2026-10-09\n\nImage: U.S. Army photo by Spc. ${n}\n\n${DOD_NOTICE}`, links: [`https://www.army.mil/article/${n}`, ...(linked ? [DVIDS(n)] : [])] })
+  const searched: string[] = []
+  const w = world({ ai: { write: async () => ({ frames: [{ series: "icymi_cover" as SeriesKey, fields: { headline: "Two Army stories", story_01: "One", story_02: "Two" } }, ...[1, 2].map(n => ({ series: "icymi_story" as SeriesKey, fields: { headline: `Story ${n}`, deck: `Deck ${n}.` } }))], caption: "Roundup.\n\nSource: MilCityUSA" }) } })
+  w.deps.content.recentPosts = async () => [post(1, true), post(2, false)]
+  const big = new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x04, 0, 0, 0xff, 0xc0, 0x00, 0x11, 0x08, 0x07, 0xd0, 0x0b, 0xb8, 0x03, 0, 0, 0, 0]) // 3000 × 2000
+  w.deps.fetchImage = async () => ({ bytes: big, mime: "image/jpeg" })
+  w.deps.fetchPage = async url => url.startsWith("https://www.dvidshub.net/") ? { url, title: "Soldiers at Story 1", text: "", image: "https://d1ldvf68ux039x.cloudfront.net/x.jpg", description: "Story 1. (U.S. Army photo by Spc. 1)" } : { url, title: "t", text: ARMY_TEXT }
+  w.deps.searchCommons = async q => { searched.push(q); return [{ ...CANDIDATE, pageUrl: `https://commons.wikimedia.org/wiki/File:${encodeURIComponent(q)}`, url: `https://upload.wikimedia.org/${encodeURIComponent(q)}.jpg`, thumbUrl: `https://upload.wikimedia.org/t/${encodeURIComponent(q)}.jpg` }] }
+  await w.start({ kind: "icymi" })
+  const d = onlyDraft(w)
+  assert.equal(d.status, "in_review")
+  assert.equal(d.media[1]!.pageUrl, DVIDS(1)); assert.equal(d.media[1]!.credit, "U.S. Army photo by Spc. 1"); assert.match(d.media[1]!.note!, /Reused from the published post p1/)
+  assert.equal(d.media[0]!.pageUrl, DVIDS(1)) // the cover shows the lead story's photo
+  assert.match(d.media[2]!.note!, /could not be recovered from its links, so this one was searched for: check it against p2/)
+  assert.ok(searched.length > 0 && searched.every(q => !/Story 1\b/.test(q))) // only story 2 was searched for
 })

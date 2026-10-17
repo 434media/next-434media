@@ -98,6 +98,15 @@ export function isPhotoDefect(area: string, defect: string): boolean {
   return area === "photo" && !(TEXT_WORDS.test(defect) && !PHOTO_WORDS.test(defect))
 }
 
+/**
+ * A model's free-text field, or undefined when it says nothing: "None", "N/A", "null" (gate rounds 1 and 3). A writer
+ * hold of "None" was read as a hold and replaced the subject; a research note of "None" reached hold reasons.
+ */
+export function meaningful(v: string | undefined | null): string | undefined {
+  const t = (v ?? "").trim()
+  return t && !/^(none|n\/?a|null|nil|no|no hold|no notes?|not applicable|-+)\.?$/i.test(t) ? t : undefined
+}
+
 /** The provider the Gateway routed to, read defensively from its response metadata. */
 export function servedBy(meta: unknown): string | undefined {
   const g = (meta as { gateway?: { routing?: Record<string, unknown> } } | undefined)?.gateway?.routing
@@ -194,9 +203,8 @@ export function createMcuAi(deps: { models: Record<PipelineStep, string>; search
       }), r => submitted<z.infer<typeof candidateSchema>>(r, "submit_candidates"))
       const candidates = (extracted.candidates ?? []).slice(0, count + 2)
       console.info("[content-pipeline] research", JSON.stringify({ kind, steps: searched.steps, searches: searched.searches, resultUrls: searched.urls.length, notesChars: searched.text.length, candidates: candidates.length, inResults: candidates.filter(c => seen.has(normalizeUrl(c.primaryUrl))).length, alternates: candidates.reduce((n, c) => n + (c.alternateUrls?.length ?? 0), 0), note: extracted.note?.slice(0, 300) ?? null }))
-      // The model sometimes fills the note with "None" (gate round 1, 2026-10-17): that is no note.
-      const note = extracted.note?.trim()
-      return { candidates, ...(note && !/^(none|n\/a|null|no notes?)\.?$/i.test(note) ? { note } : {}) }
+      const note = meaningful(extracted.note)
+      return { candidates, ...(note ? { note } : {}) }
     },
 
     async write({ kind, story, today, previous, instructions, problems, direction, seeds }) {
@@ -215,8 +223,9 @@ export function createMcuAi(deps: { models: Record<PipelineStep, string>; search
       }))
       const out = await submitted<{ card?: { fields: Record<string, string>; mediaQuery?: string }; cover?: { fields: Record<string, string>; mediaQuery?: string }; stories?: { fields: Record<string, string>; mediaQuery?: string }[]; caption: string; hold?: string }>(r, "submit_post")
       const parts = kind === "icymi" ? [out.cover, ...(out.stories ?? []).slice(0, icymiCount(story))] : [out.card]
-      console.info("[content-pipeline] write", JSON.stringify({ kind, frames: parts.filter(Boolean).length, fields: parts.map(p => Object.keys(p?.fields ?? {}).filter(k => (p?.fields[k] ?? "").trim())), hold: !!out.hold }))
-      return { frames: frames.map((series, i) => ({ series, fields: { ...(parts[i]?.fields ?? {}) }, ...(parts[i]?.mediaQuery ? { mediaQuery: parts[i]!.mediaQuery } : {}) })), caption: (out.caption ?? "").trim(), ...(out.hold ? { hold: out.hold } : {}) }
+      console.info("[content-pipeline] write", JSON.stringify({ kind, frames: parts.filter(Boolean).length, fields: parts.map(p => Object.keys(p?.fields ?? {}).filter(k => (p?.fields[k] ?? "").trim())), hold: out.hold?.slice(0, 200) ?? null }))
+      const hold = meaningful(out.hold)
+      return { frames: frames.map((series, i) => ({ series, fields: { ...(parts[i]?.fields ?? {}) }, ...(parts[i]?.mediaQuery ? { mediaQuery: parts[i]!.mediaQuery } : {}) })), caption: (out.caption ?? "").trim(), ...(hold ? { hold } : {}) }
     },
 
     async findPhotoPages({ story, frame }) {

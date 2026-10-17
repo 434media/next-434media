@@ -49,7 +49,8 @@ export interface Story {
   /** Pages that fill what the primary source leaves out (for DT101, the maker and its headquarters); their text follows the primary's in sourceText. */
   supporting?: { url: string; title: string }[]
   /** For ICYMI: the published MCU posts this roundup covers. */
-  roundup?: { postId: string; title: string; caption: string; publishedUrl?: string }[]
+  /** photoPages: the post's own links, where its photo's page is; imageCredit: its caption's "Image:" line. */
+  roundup?: { postId: string; title: string; caption: string; publishedUrl?: string; photoPages?: string[]; imageCredit?: string; usGovernment?: boolean }[]
 }
 export interface FrameCopy { series: SeriesKey; fields: Record<string, string>; mediaQuery?: string }
 export interface ChosenMedia extends Pick<MediaCandidate, "url" | "pageUrl" | "license" | "creator" | "credit" | "usGovernment" | "date"> { title: string; note?: string; /** Zoom applied before the Canva fill, as fractions of the photo. */ crop?: CropBox }
