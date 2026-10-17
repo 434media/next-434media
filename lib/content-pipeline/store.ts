@@ -93,10 +93,15 @@ export interface McuStore {
   /** Take the lease on a due job or draft: the attempt number, or 0 when it is not due or another run holds it. */
   claim(kind: "job" | "draft", id: string, nowMs: number, leaseMs: number): Promise<number>
   release(kind: "job" | "draft", id: string, due: boolean): Promise<void>
+  /** After a failed step: keep the attempt count and hold the lease until untilMs, so the retry waits. */
+  backoff(kind: "job" | "draft", id: string, untilMs: number): Promise<void>
   /** Ids with work to do whose lease is free, oldest first. */
   due(nowMs: number, limit: number): Promise<{ kind: "job" | "draft"; id: string }[]>
-  /** Draft ids used today for a kind, to number new drafts (MCU-NEWS-20261016-01, -02, …). */
-  countDraftsOn(prefix: string): Promise<number>
+  /**
+   * The highest draft number already used under a prefix (MCU-NEWS-20261016-), here or by the pilot, so new drafts
+   * (MCU-NEWS-20261016-01, -02, …) never repeat an id that already names a design or a post.
+   */
+  highestDraftNumber(prefix: string): Promise<number>
 }
 
 export const WORKING: readonly DraftStatus[] = ["queued", "writing", "media", "designing", "reviewing", "posting"]

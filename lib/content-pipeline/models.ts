@@ -25,13 +25,15 @@ export const FALLBACK_MODELS = { text: "anthropic/claude-opus-5.5", vision: "ant
  * report zero data retention and no training, runinfra reports neither (endpoints listing, 2026-10-17). The Gateway's
  * own flags restrict routing to providers with those agreements and fail the request when none is available, and
  * `only` names the qualifying providers as well, so a provider added later never receives the prompts unreviewed.
- * Llama 4 Scout's two providers (bedrock, deepinfra) both report both. Anthropic fallbacks keep their default routing.
+ * Llama 4 Scout's two providers (bedrock, deepinfra) both report both, but Bedrock refuses a required tool call for
+ * this model ("doesn't support the toolConfig.toolChoice.tool field": preview live check, 2026-10-17), and the vision
+ * steps answer through one required tool, so Scout goes to deepinfra only. Anthropic fallbacks keep their default routing.
  */
 const ROUTING: Record<string, { only: string[]; zeroDataRetention: true; disallowPromptTraining: true }> = {
   "nvidia/nemotron-3.5-lightning": { only: ["deepinfra", "fireworks"], zeroDataRetention: true, disallowPromptTraining: true },
-  "meta/llama-4-scout": { only: ["bedrock", "deepinfra"], zeroDataRetention: true, disallowPromptTraining: true },
+  "meta/llama-4-scout": { only: ["deepinfra"], zeroDataRetention: true, disallowPromptTraining: true },
 }
-/** Output caps the provider enforces (Scout: 8,192 completion tokens on both providers). */
+/** Output caps the provider enforces (Scout: 8,192 completion tokens). */
 const MAX_OUTPUT: Record<string, number> = { "meta/llama-4-scout": 8_192 }
 
 /**

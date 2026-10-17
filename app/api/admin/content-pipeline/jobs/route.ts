@@ -16,7 +16,7 @@ export async function GET() {
       models: PIPELINE_MODELS,
       jobs: runs.map(({ job, drafts }) => ({
         id: job.id, kind: job.kind, count: job.count, topic: job.topic ?? null, status: job.status, note: job.note ?? null, createdAt: job.createdAt, requestedBy: job.request.actorEmail,
-        drafts: drafts.map(d => ({ id: d.id, status: d.status, title: d.story.title, holdReason: d.holdReason ?? null, error: d.status === "failed" ? d.error ?? null : null, postId: d.postId ?? null, checks: d.qa.length, calls: (d.calls ?? []).map(c => ({ step: c.step, model: c.model, provider: c.provider ?? null })) })),
+        drafts: drafts.map(d => ({ id: d.id, status: d.status, title: d.story.title, holdReason: d.holdReason ?? null, error: d.status === "held" || d.status === "in_review" ? null : d.error ?? null, postId: d.postId ?? null, checks: d.qa.length, calls: (d.calls ?? []).map(c => ({ step: c.step, model: c.model, provider: c.provider ?? null })) })),
       })),
     }, { headers: { "cache-control": "private, no-store" } })
   } catch (err) {

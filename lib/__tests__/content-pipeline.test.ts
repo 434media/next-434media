@@ -8,7 +8,7 @@
 import { test } from "node:test"
 import assert from "node:assert/strict"
 import { SERIES, checkFields, ddmmmyy, lineCount, type SeriesKey } from "../content-pipeline/series"
-import { runDue, unsourcedNumbers, withCredits, imageLabel, mediaQueries, cropFit, choosePhoto, zoomCrop, reviewNotes, DOD_NOTICE, LEASE_MS, type WorkerDeps, type DesignInput, type PostInput } from "../content-pipeline/worker"
+import { runDue, RETRY_MS, unsourcedNumbers, withCredits, imageLabel, mediaQueries, cropFit, choosePhoto, zoomCrop, reviewNotes, DOD_NOTICE, LEASE_MS, type WorkerDeps, type DesignInput, type PostInput } from "../content-pipeline/worker"
 import { MAX_ATTEMPTS, type McuDraft, type McuJob, type McuStore } from "../content-pipeline/store"
 import { assertPublicHttps, imageSize, pageImageCandidate, parsePage, usableLicense, type MediaCandidate } from "../content-pipeline/sources"
 import { servedBy, type McuAi, type ModelCall } from "../content-pipeline/model"
@@ -29,7 +29,9 @@ class MemStore implements McuStore {
   async claim(k: "job" | "draft", id: string, now: number, lease: number) { const r = this.col(k).get(id); if (!r || !r.due || r.leaseUntil > now) return 0; r.leaseUntil = now + lease; r.attempts++; return r.attempts }
   async release(k: "job" | "draft", id: string, due: boolean) { const r = this.col(k).get(id)!; r.leaseUntil = 0; r.due = due; r.attempts = 0 }
   async due(now: number, limit: number) { return [...[...this.jobs].filter(([, v]) => v.due && v.leaseUntil <= now).map(([id]) => ({ kind: "job" as const, id })), ...[...this.drafts].filter(([, v]) => v.due && v.leaseUntil <= now).map(([id]) => ({ kind: "draft" as const, id }))].slice(0, limit) }
-  async countDraftsOn(prefix: string) { return [...this.drafts.keys()].filter(k => k.startsWith(prefix)).length }
+  pilotUsed: string[] = [] // ids the pilot already used, as the shared ledgers record them
+  async highestDraftNumber(prefix: string) { return Math.max(0, ...[...this.drafts.keys(), ...this.pilotUsed].filter(k => k.startsWith(prefix)).map(k => Number(k.slice(prefix.length, prefix.length + 2)))) }
+  async backoff(k: "job" | "draft", id: string, until: number) { this.col(k).get(id)!.leaseUntil = until }
 }
 
 const NOW = Date.parse("2026-10-16T18:00:00Z")
@@ -99,13 +101,13 @@ test("one Generate run: research → copy → licensed photo → Canva template 
   const d = onlyDraft(w)
   assert.equal(d.id, "MCU-DT101-20261016-01"); assert.equal(d.status, "in_review"); assert.equal(d.postId, "post-1")
   const create = w.designs[0]
-  assert.equal(create.templateId, "EAHYOAJhC_8"); assert.equal(create.requestId, "MCU-DT101-20261016-01:v1:f1")
+  assert.equal(create.templateId, "EAHYOAJhC_8"); assert.equal(create.requestId, "admin:MCU-DT101-20261016-01:v1:f1")
   assert.deepEqual(create.text, { benefit_headline: "LINK THE FIGHT.\nDECIDE FASTER.", subject_identifier: "NEXT-GEN C2 / LOCKHEED MARTIN", image_context: "IMAGE: U.S. ARMY" })
   assert.equal(create.image?.url, CANDIDATE.url)
   // The board write carries the design, the caption with its credits, the sources and the photo rights.
   assert.equal(w.posts.length, 1)
   const p = w.posts[0]
-  assert.equal(p.requestId, "MCU-DT101-20261016-01:v1"); assert.deepEqual(p.designIds, [d.designs[0].designId]); assert.equal(p.caption, d.caption)
+  assert.equal(p.requestId, "admin:MCU-DT101-20261016-01:v1"); assert.deepEqual(p.designIds, [d.designs[0].designId]); assert.equal(p.caption, d.caption)
   assert.ok(p.caption.includes("Image: U.S. Army photo by Sgt. A") && p.caption.endsWith(DOD_NOTICE))
   assert.deepEqual(p.links, ["https://www.army.mil/article/1", CANDIDATE.pageUrl])
   assert.match(p.notes, /Photo rights\n- Soldiers at a command post — Public domain, U\.S\. Army photo by Sgt\. A\n {2}https:\/\/commons/)
@@ -119,6 +121,16 @@ test("one Generate run: research → copy → licensed photo → Canva template 
   assert.ok(d.calls!.every(c => c.provider === "test"))
   // A second run finds nothing due and writes nothing again.
   assert.equal(await runDue(w.deps, 1e9), 0); assert.equal(w.posts.length, 1); assert.equal(w.alerts.length, 1)
+})
+
+test("draft ids never repeat one the pilot already used today, and every shared-ledger key is prefixed", async () => {
+  const w = world()
+  // The pilot made MCU-DT101-20261016-01..03 today; its design and post keys are in the shared ledgers.
+  w.store.pilotUsed = ["MCU-DT101-20261016-01:v1:f1", "MCU-DT101-20261016-03:v1"]
+  await w.start({ kind: "dt101" })
+  const d = onlyDraft(w)
+  assert.equal(d.id, "MCU-DT101-20261016-04")
+  assert.ok(w.designs.every(x => x.requestId.startsWith("admin:")) && w.posts.every(x => x.requestId.startsWith("admin:")))
 })
 
 test("five stories: one research pass, one draft per story, no photo reused across the batch, one alert for all five", async () => {
@@ -163,11 +175,12 @@ test("an interrupted step resumes after its lease and reuses the same Canva requ
   const w = world({ createDesign: () => { if (fail-- > 0) throw new Error("network") } })
   await w.start()
   const id = [...w.store.drafts.keys()][0]
-  assert.equal((await w.store.getDraft(id))!.status, "designing")
-  assert.equal(await runDue(w.deps), 0) // lease still held
-  w.advance(LEASE_MS + 1); await runDue(w.deps, 1e9)
+  assert.equal((await w.store.getDraft(id))!.status, "designing"); assert.equal((await w.store.getDraft(id))!.error, "network")
+  assert.equal(await runDue(w.deps), 0) // waiting out the retry delay
+  w.advance(RETRY_MS + 1); await runDue(w.deps, 1e9)
   assert.equal((await w.store.getDraft(id))!.status, "in_review")
-  assert.deepEqual(w.designs.map(c => c.requestId), [`${id}:v1:f1`])
+  assert.deepEqual(w.designs.map(c => c.requestId), [`admin:${id}:v1:f1`])
+  assert.equal((await w.store.getDraft(id))!.error, undefined) // cleared once the retry went through
 
   const broken = world({ createDesign: () => { throw new Error("down") } })
   await broken.start()
@@ -342,7 +355,7 @@ test("model settings: founder defaults, routing pinned to zero-retention no-trai
   assert.deepEqual(FALLBACK_MODELS, { text: "anthropic/claude-opus-5.5", vision: "anthropic/claude-sonnet-5.5" })
   // runinfra (no ZDR, may train) is never a route for Nemotron.
   assert.deepEqual(callOptions("nvidia/nemotron-3.5-lightning", "medium"), { gateway: { only: ["deepinfra", "fireworks"], zeroDataRetention: true, disallowPromptTraining: true } })
-  assert.deepEqual(callOptions("meta/llama-4-scout", "low"), { gateway: { only: ["bedrock", "deepinfra"], zeroDataRetention: true, disallowPromptTraining: true } })
+  assert.deepEqual(callOptions("meta/llama-4-scout", "low"), { gateway: { only: ["deepinfra"], zeroDataRetention: true, disallowPromptTraining: true } }) // Bedrock refuses the required tool call
   // The fallback keeps the token-trap handling (effort, not disabled thinking) and its default routing.
   assert.deepEqual(callOptions("anthropic/claude-opus-5.5", "medium"), { anthropic: { output_config: { effort: "medium" } } })
   assert.equal(outputBudget("meta/llama-4-scout", 8_000), 8_000); assert.equal(outputBudget("meta/llama-4-scout", 24_000), 8_192); assert.equal(outputBudget("nvidia/nemotron-3.5-lightning", 24_000), 24_000)

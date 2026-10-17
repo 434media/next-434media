@@ -41,6 +41,14 @@ export interface WorkerDeps {
   nowMs(): number
 }
 export const LEASE_MS = 290_000
+/** A failed step is tried again after this long (its lease is shortened), within MAX_ATTEMPTS. */
+export const RETRY_MS = 60_000
+/**
+ * Prefix on every key this pipeline writes to shared ledgers (the Canva create ledger, content posts' intake
+ * requestId). The pilot keyed the same ledgers by bare draft id ("MCU-DT101-20261017-01:v1:f1"), so an unprefixed key
+ * here could return the pilot's design or bind the pilot's published post.
+ */
+export const KEY_PREFIX = "admin:"
 const BREAKING_WINDOW_MS = 24 * 3600_000
 const ICYMI_COUNT = 5
 const MAX_SUPPORTING = 2
@@ -93,19 +101,22 @@ async function jobStep(deps: WorkerDeps, id: string, attempt: number): Promise<v
       return
     }
     const day = iso(deps).slice(0, 10).replace(/-/g, ""), prefix = `MCU-${KIND_CODE[job.kind]}-${day}-`
-    let n = await deps.store.countDraftsOn(prefix)
+    let n = await deps.store.highestDraftNumber(prefix)
     const now = iso(deps)
     for (const story of stories) {
       const draftId = `${prefix}${String(++n).padStart(2, "0")}`
       job.drafts.push(draftId)
       await deps.store.createDraft({ id: draftId, jobId: id, kind: job.kind, placement: job.placement, request: job.request, status: "queued", version: 1, story, frames: [], media: [], designs: [], qa: [], notices: [], calls: calls.map(c => ({ ...c, at: now })), history: [{ at: now, event: `opened under ${MCU_RULES_VERSION}` }], createdAt: now, updatedAt: now })
     }
-    job.status = "drafting"; job.updatedAt = now
+    job.status = "drafting"; job.updatedAt = now; job.note = undefined
     if (job.kind !== "icymi" && stories.length < job.count) job.note = `${stories.length} of ${job.count} qualified`
     await deps.store.saveJob(job); await deps.store.release("job", id, false)
   } catch (err) {
     console.error("[content-pipeline] research failed", id, err instanceof Error ? err.message : err)
-    // Leave the lease to expire: the next run retries this step (bounded by MAX_ATTEMPTS).
+    job.note = `Research failed, retrying: ${err instanceof Error ? err.message.slice(0, 200) : "error"}`
+    await deps.store.saveJob(job).catch(() => {})
+    // Retried by a later run after RETRY_MS (bounded by MAX_ATTEMPTS).
+    await deps.store.backoff("job", id, deps.nowMs() + RETRY_MS).catch(() => {})
   }
 }
 
@@ -172,13 +183,16 @@ async function draftStep(deps: WorkerDeps, id: string, attempt: number): Promise
       case "reviewing": await reviewStep(deps, ai, d); break
       case "posting": await postStep(deps, d); break
     }
+    // The step went through, so an earlier failure is no longer the draft's state.
+    if (d.error) { d.error = undefined; await deps.store.saveDraft(d) }
     await deps.store.release("draft", id, WORKING.includes(d.status))
     if (!WORKING.includes(d.status)) await maybeNotify(deps, d.jobId)
   } catch (err) {
     d.error = err instanceof Error ? err.message.slice(0, 300) : "error"
     console.error("[content-pipeline] step failed", d.id, d.status, d.error)
     await save(deps, d, `step ${d.status} failed: ${d.error}`).catch(() => {})
-    // Lease left to expire: retried by the next run.
+    // Retried by a later run after RETRY_MS (bounded by MAX_ATTEMPTS).
+    await deps.store.backoff("draft", id, deps.nowMs() + RETRY_MS).catch(() => {})
   }
 }
 async function save(deps: WorkerDeps, d: McuDraft, event: string): Promise<void> {
@@ -433,7 +447,7 @@ async function designStep(deps: WorkerDeps, d: McuDraft): Promise<void> {
     const missing = Object.keys(frame.fields).filter(k => dataset[k] !== "text")
     if (missing.length) notices.add(`${series.label} template has no field for ${missing.join(", ")}`)
     const title = `${d.id} v${d.version}${d.frames.length > 1 ? ` · ${i + 1}/${d.frames.length}` : ""} — ${(frame.fields.headline || frame.fields.subject_identifier || frame.fields.counter || series.label).slice(0, 120)}`
-    const r = await deps.content.createDesign({ requestId: `${d.id}:v${d.version}:f${i + 1}${d.mediaRetries ? `:m${d.mediaRetries}` : ""}`, templateId, title, text, ...(image ? { image } : {}) })
+    const r = await deps.content.createDesign({ requestId: `${KEY_PREFIX}${d.id}:v${d.version}:f${i + 1}${d.mediaRetries ? `:m${d.mediaRetries}` : ""}`, templateId, title, text, ...(image ? { image } : {}) })
     designs.push({ templateId, ...r })
   }
   if (d.frames.some(f => f.series === "icymi_story")) notices.add("ICYMI story cards: the progress bar width can't be set through Canva's API, so each card keeps the template's bar")
@@ -494,7 +508,7 @@ async function postStep(deps: WorkerDeps, d: McuDraft): Promise<void> {
   if (d.postId) { d.status = "in_review"; return save(deps, d, "already on the board") }
   const head = d.frames[0]?.fields.headline || d.frames[0]?.fields.subject_identifier || d.story.title
   const links = [...new Set([d.story.primaryUrl, ...(d.story.supporting ?? []).map(x => x.url), ...d.media.filter((m): m is ChosenMedia => !!m).map(m => m.pageUrl)])]
-  const r = await deps.content.writePost({ requestId: `${d.id}:v${d.version}`, title: `${d.id} v${d.version} — ${head.replace(/\n/g, " ")}`.slice(0, 200), caption: d.caption ?? "", notes: reviewNotes(d), links, designIds: d.designs.map(x => x.designId), requestedBy: { email: d.request.actorEmail, name: d.request.actorName } })
+  const r = await deps.content.writePost({ requestId: `${KEY_PREFIX}${d.id}:v${d.version}`, title: `${d.id} v${d.version} — ${head.replace(/\n/g, " ")}`.slice(0, 200), caption: d.caption ?? "", notes: reviewNotes(d), links, designIds: d.designs.map(x => x.designId), requestedBy: { email: d.request.actorEmail, name: d.request.actorName } })
   d.postId = r.postId
   if (r.holds.length) d.qa = [...new Set([...d.qa, ...r.holds])]
   d.status = "in_review"

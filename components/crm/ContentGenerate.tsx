@@ -57,6 +57,16 @@ export function ContentGenerate({ onDraftsReady }: { onDraftsReady?: () => void 
     const t = setInterval(load, 8000)
     return () => clearInterval(t)
   }, [open, active, load])
+  // While this panel is open on an unfinished run, ask the server to resume due work: now, then about once a minute.
+  // Previews have no cron, and a failed step waits a minute before its retry. Only an open panel resumes work, so
+  // loading the board never restarts a run by itself; leases keep this apart from the production cron.
+  useEffect(() => {
+    if (!open || !active) return
+    const kick = () => { void fetch("/api/admin/content-pipeline/run", { method: "POST" }).catch(() => {}) }
+    kick()
+    const t = setInterval(kick, 60_000)
+    return () => clearInterval(t)
+  }, [open, active])
   useEffect(() => {
     if (!open) return
     const onDown = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false) }
@@ -154,7 +164,7 @@ export function ContentGenerate({ onDraftsReady }: { onDraftsReady?: () => void 
                         <p className="truncate text-neutral-800">{d.title}</p>
                         <p className={d.status === "held" || d.status === "failed" ? "text-amber-700" : "text-neutral-500"}>
                           {d.id} · {STATUS_LABEL[d.status] ?? d.status}{d.status === "in_review" && d.checks ? ` · ${d.checks} to check` : ""}
-                          {d.holdReason ? ` — ${d.holdReason}` : d.error ? ` — ${d.error}` : ""}
+                          {d.holdReason ? ` — ${d.holdReason}` : d.error ? (d.status === "failed" ? ` — ${d.error}` : ` — retrying after: ${d.error}`) : ""}
                         </p>
                       </div>
                       {d.postId && (

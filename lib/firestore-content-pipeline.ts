@@ -41,6 +41,7 @@ export function firestorePipelineStore(db: FirebaseFirestore.Firestore = getDb()
     }),
     // A step that finished cleanly resets the attempt count; only repeated failure of the same step closes the item.
     release: async (k, id, due) => { await col(k).doc(id).update({ leaseUntil: 0, due, attempts: 0 }) },
+    backoff: async (k, id, untilMs) => { await col(k).doc(id).update({ leaseUntil: untilMs }) },
     due: async (nowMs, limit) => {
       const out: { kind: "job" | "draft"; id: string; at: string }[] = []
       for (const k of ["job", "draft"] as const) {
@@ -49,8 +50,18 @@ export function firestorePipelineStore(db: FirebaseFirestore.Firestore = getDb()
       }
       return out.sort((a, b) => a.at.localeCompare(b.at)).slice(0, limit).map(({ kind, id }) => ({ kind, id }))
     },
-    // ids are MCU-<KIND>-<YYYYMMDD>-NN
-    countDraftsOn: async prefix => (await drafts.where(FieldPath.documentId(), ">=", prefix).where(FieldPath.documentId(), "<", `${prefix}`).get()).size,
+    // ids are MCU-<KIND>-<YYYYMMDD>-NN. The pilot's drafts live in its own database, but every design it made is in
+    // the Canva create ledger and every post it readied carries intake.requestId, both keyed by the bare draft id.
+    highestDraftNumber: async prefix => {
+      const end = `${prefix}\uf8ff`
+      const [own, posts, designs] = await Promise.all([
+        drafts.where(FieldPath.documentId(), ">=", prefix).where(FieldPath.documentId(), "<", end).select().get(),
+        db.collection(CRM_COLLECTIONS.CONTENT_POSTS).where("intake.requestId", ">=", prefix).where("intake.requestId", "<", end).select("intake.requestId").get(),
+        db.collection("crm_meta").doc("owned_meta_canva").collection("created").where("requestId", ">=", prefix).where("requestId", "<", end).select("requestId").get(),
+      ])
+      const ids = [...own.docs.map(d => d.id), ...posts.docs.map(d => String(d.get("intake.requestId") ?? "")), ...designs.docs.map(d => String(d.get("requestId") ?? ""))]
+      return Math.max(0, ...ids.map(id => Number(/^\d{2,}/.exec(id.slice(prefix.length))?.[0] ?? 0)))
+    },
   }
 }
 
