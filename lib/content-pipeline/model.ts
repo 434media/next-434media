@@ -1,7 +1,7 @@
 import { generateText, Output, stepCountIs, tool, type ToolSet } from "ai"
 import { z } from "zod4"
 import { MCU_EDITORIAL, NEVER_REVIVE } from "./editorial"
-import { callOptions, outputBudget, type PipelineStep } from "./models"
+import { CALL_FALLBACK, callOptions, outputBudget, type PipelineStep } from "./models"
 import { seedBrief, type McuSeeds } from "./seeds"
 import { SERIES, type FieldSpec, type RequestKind, type SeriesKey } from "./series"
 import type { MediaCandidate } from "./sources"
@@ -27,7 +27,7 @@ export interface McuAi {
 export interface SubjectBox { x0: number; y0: number; x1: number; y1: number }
 export interface Candidate { title: string; primaryUrl: string; publisher: string; publishedAt?: string; whyNow?: string; why: string; supportingUrls?: string[] }
 /** One model call as served: which model and which provider answered (evidence for the routing check). */
-export interface ModelCall { step: PipelineStep; model: string; provider?: string; finishReason?: string; inputTokens?: number; outputTokens?: number }
+export interface ModelCall { step: PipelineStep; model: string; provider?: string; finishReason?: string; inputTokens?: number; outputTokens?: number; /** Set when this call is the fallback for a model that could not answer. */ fallbackFrom?: string; fallbackReason?: string }
 
 const system = (extra: string) => [{ role: "system" as const, content: MCU_EDITORIAL, providerOptions: { anthropic: { cacheControl: { type: "ephemeral" as const } } } }, { role: "system" as const, content: extra }]
 
@@ -68,16 +68,31 @@ export function servedBy(meta: unknown): string | undefined {
   return undefined
 }
 
-export function createMcuAi(deps: { models: Record<PipelineStep, string>; searchTools: ToolSet; onCall?(call: ModelCall): void }): McuAi {
-  const m = deps.models
-  // Each call goes out with its step's routing, and its answer is reported with the provider that served it.
-  const run = async <R extends { finishReason?: string; providerMetadata?: unknown; usage?: { inputTokens?: number; outputTokens?: number } }>(step: PipelineStep, call: (model: string) => Promise<R>): Promise<R> => {
-    const r = await call(m[step])
+type Served = { finishReason?: string; providerMetadata?: unknown; usage?: { inputTokens?: number; outputTokens?: number } }
+/**
+ * One step's model call: out with its step's routing, its answer reported with the provider that served it. accept
+ * reads the answer (a forced tool call, say); when it throws, the call failed as much as a refused request did, and a
+ * step with a fallback (models.ts CALL_FALLBACK) makes the same call once on the fallback, reported as such.
+ */
+export async function servedCall<R extends Served, T>(step: PipelineStep, model: string, fallback: string | undefined, onCall: ((c: ModelCall) => void) | undefined, call: (model: string) => Promise<R>, accept: (r: R) => T | Promise<T>): Promise<T> {
+  const once = async (use: string, from?: { from: string; reason: string }) => {
+    const r = await call(use)
     const provider = servedBy(r.providerMetadata)
-    deps.onCall?.({ step, model: m[step], ...(provider ? { provider } : {}), ...(r.finishReason ? { finishReason: r.finishReason } : {}), ...(r.usage?.inputTokens !== undefined ? { inputTokens: r.usage.inputTokens } : {}), ...(r.usage?.outputTokens !== undefined ? { outputTokens: r.usage.outputTokens } : {}) })
-    if (r.finishReason === "length") throw new Error(`${step}: output truncated at the token cap (${m[step]})`)
-    return r
+    onCall?.({ step, model: use, ...(provider ? { provider } : {}), ...(r.finishReason ? { finishReason: r.finishReason } : {}), ...(r.usage?.inputTokens !== undefined ? { inputTokens: r.usage.inputTokens } : {}), ...(r.usage?.outputTokens !== undefined ? { outputTokens: r.usage.outputTokens } : {}), ...(from ? { fallbackFrom: from.from, fallbackReason: from.reason } : {}) })
+    if (r.finishReason === "length") throw new Error(`${step}: output truncated at the token cap (${use})`)
+    return accept(r)
   }
+  try { return await once(model) } catch (err) {
+    if (!fallback || fallback === model) throw err
+    const reason = (err instanceof Error ? err.message : String(err)).slice(0, 200)
+    console.warn("[content-pipeline] fallback", JSON.stringify({ step, from: model, to: fallback, reason }))
+    return once(fallback, { from: model, reason })
+  }
+}
+export function createMcuAi(deps: { models: Record<PipelineStep, string>; searchTools: ToolSet; onCall?(call: ModelCall): void; fallbacks?: Partial<Record<PipelineStep, string>> }): McuAi {
+  const m = deps.models, fallbacks = deps.fallbacks ?? CALL_FALLBACK
+  const run = <R extends Served, T = R>(step: PipelineStep, call: (model: string) => Promise<R>, accept: (r: R) => T | Promise<T> = r => r as unknown as T): Promise<T> =>
+    servedCall(step, m[step], fallbacks[step], deps.onCall, call, accept)
   return {
     async research({ kind, count, topic, today, recentTitles, avoid, seeds }) {
       const want = kind === "dt101" ? "defense technologies worth a Defense Tech 101 explainer (a specific, real product or system with a clear maker and a sourced status)" : kind === "breaking" ? "Breaking-qualified developments (primary-source announcement within the last 24 hours AND consequential enough to need immediate attention)" : "defense-industry news stories from the last 7 days"
@@ -121,7 +136,7 @@ export function createMcuAi(deps: { models: Record<PipelineStep, string>; search
 
     async pickMedia({ story, frame, candidates, avoid }) {
       if (!candidates.length) return { index: null, reason: "no licensed candidates" }
-      const r = await run("photoPick", model => generateText({
+      const pick = await run("photoPick", model => generateText({
         model, maxOutputTokens: outputBudget(model, 8_000), providerOptions: callOptions(model, "low"),
         messages: [{ role: "system", content: "You choose the photo for a MilCityUSA social card: 1080 × 1350, full bleed, the photo filling the frame, the text block on a dark scrim over the lower 40%. The approved look is a close, dominant hero subject that fills the upper part of the frame and stays recognizable at phone size. Rank every candidate whose subject is the actual system, unit or organization in the story, best first, and give each one's subject bounding box as fractions of that photo (x0, y0 top-left to x1, y1 bottom-right; 0–1). Also say whether its background adds context (terrain, a setting, operators or other equipment that make the photo more interesting, like a forest behind an off-road vehicle) or is empty space (open sky, plain water, a blank wall or pier) that the subject should fill instead. Reject mostly-sky or empty frames, tail-only or cropped-off subjects, tiny distant subjects, and unrelated archive imagery presented as the event. index is your single best choice, or null if none is relevant and strong." },
           { role: "user", content: [
@@ -129,8 +144,7 @@ export function createMcuAi(deps: { models: Record<PipelineStep, string>; search
             ...candidates.flatMap((c, i) => [{ type: "text" as const, text: `#${i}: ${c.candidate.title} — ${c.candidate.description} (${c.candidate.width}×${c.candidate.height}, ${c.candidate.date ?? "date unknown"})` }, { type: "image" as const, image: c.image, mediaType: c.mime }]),
           ] }],
         tools: { choose_photo: tool({ description: "Choose the photo, or null when none is relevant and strong.", inputSchema: z.object({ index: z.number().int().nullable(), reason: z.string(), ranked: z.array(z.object({ index: z.number().int(), x0: z.number(), y0: z.number(), x1: z.number(), y1: z.number(), context: z.boolean().describe("true when the background adds context; false when it is empty space the subject should fill") })).describe("every relevant candidate, best first, with its subject box") }) }) }, toolChoice: "required", // the only tool: the same contract as naming it, accepted by more providers
-      }))
-      const pick = await submitted<{ index: number | null; reason: string; ranked?: { index: number; x0: number; y0: number; x1: number; y1: number; context?: boolean }[] }>(r, "choose_photo")
+      }), r => submitted<{ index: number | null; reason: string; ranked?: { index: number; x0: number; y0: number; x1: number; y1: number; context?: boolean }[] }>(r, "choose_photo"))
       const i = pick.index, ok = (n: number) => Number.isInteger(n) && n >= 0 && n < candidates.length
       const clamp = (v: number) => Math.min(1, Math.max(0, Number(v) || 0))
       const ranked = (pick.ranked ?? []).filter(x => ok(x.index)).map(x => ({ index: x.index, box: { x0: clamp(Math.min(x.x0, x.x1)), y0: clamp(Math.min(x.y0, x.y1)), x1: clamp(Math.max(x.x0, x.x1)), y1: clamp(Math.max(x.y0, x.y1)) }, context: x.context !== false }))
@@ -138,13 +152,13 @@ export function createMcuAi(deps: { models: Record<PipelineStep, string>; search
     },
 
     async checkArtwork({ frame, images }) {
-      const r = await run("artworkCheck", model => generateText({
+      const out = await run("artworkCheck", model => generateText({
         model, maxOutputTokens: outputBudget(model, 6_000), providerOptions: callOptions(model, "low"),
         messages: [{ role: "system", content: "You check an exported social card at full size. Report only real defects: text clipped, overflowing or colliding; text over a face or the subject; placeholder or sample text; an empty slot showing; a wrong or unreadable value; the subject not recognizable at phone size, cut off, mostly sky or tail-only. Answer an empty list when there are none." },
           { role: "user", content: [{ type: "text", text: `Intended values: ${JSON.stringify(frame.fields)}` }, ...images.map(im => ({ type: "image" as const, image: im.bytes, mediaType: im.mime }))] }],
         tools: { report_defects: tool({ description: "Report the real defects, or an empty list.", inputSchema: z.object({ defects: z.array(z.object({ defect: z.string(), photo: z.boolean().describe("true when a different photo or crop would fix it (subject hidden, cut off, too small, under the text, mostly sky); false for text problems") })) }) }) }, toolChoice: "required",
-      }))
-      return (await submitted<{ defects: { defect: string; photo: boolean }[] }>(r, "report_defects")).defects.slice(0, 6)
+      }), r => submitted<{ defects: { defect: string; photo: boolean }[] }>(r, "report_defects"))
+      return out.defects.slice(0, 6)
     },
   }
 }

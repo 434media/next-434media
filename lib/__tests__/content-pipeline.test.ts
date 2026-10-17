@@ -11,8 +11,8 @@ import { SERIES, checkFields, ddmmmyy, lineCount, type SeriesKey } from "../cont
 import { runDue, RETRY_MS, unsourcedNumbers, withCredits, imageLabel, mediaQueries, cropFit, choosePhoto, zoomCrop, reviewNotes, DOD_NOTICE, LEASE_MS, type WorkerDeps, type DesignInput, type PostInput } from "../content-pipeline/worker"
 import { MAX_ATTEMPTS, type McuDraft, type McuJob, type McuStore } from "../content-pipeline/store"
 import { assertPublicHttps, imageSize, pageImageCandidate, parsePage, usableLicense, type MediaCandidate } from "../content-pipeline/sources"
-import { servedBy, type McuAi, type ModelCall } from "../content-pipeline/model"
-import { PIPELINE_MODELS, FALLBACK_MODELS, callOptions, outputBudget } from "../content-pipeline/models"
+import { servedBy, servedCall, type McuAi, type ModelCall } from "../content-pipeline/model"
+import { PIPELINE_MODELS, FALLBACK_MODELS, CALL_FALLBACK, callOptions, outputBudget } from "../content-pipeline/models"
 import { seedBrief, seedProblems, type McuSeeds } from "../content-pipeline/seeds"
 
 // ── in-memory store with the Firestore store's lease semantics ──
@@ -355,11 +355,37 @@ test("model settings: founder defaults, routing pinned to zero-retention no-trai
   assert.deepEqual(FALLBACK_MODELS, { text: "anthropic/claude-opus-5.5", vision: "anthropic/claude-sonnet-5.5" })
   // runinfra (no ZDR, may train) is never a route for Nemotron.
   assert.deepEqual(callOptions("nvidia/nemotron-3.5-lightning", "medium"), { gateway: { only: ["deepinfra", "fireworks"], zeroDataRetention: true, disallowPromptTraining: true } })
-  assert.deepEqual(callOptions("meta/llama-4-scout", "low"), { gateway: { only: ["deepinfra"], zeroDataRetention: true, disallowPromptTraining: true } }) // Bedrock refuses the required tool call
-  // The fallback keeps the token-trap handling (effort, not disabled thinking) and its default routing.
-  assert.deepEqual(callOptions("anthropic/claude-opus-5.5", "medium"), { anthropic: { output_config: { effort: "medium" } } })
+  // Both qualifying Scout providers, so one at capacity can't stop a run (preview, 2026-10-17).
+  assert.deepEqual(callOptions("meta/llama-4-scout", "low"), { gateway: { order: ["deepinfra", "bedrock"], only: ["deepinfra", "bedrock"], zeroDataRetention: true, disallowPromptTraining: true } })
+  // The fallbacks keep the token-trap handling (effort, not disabled thinking) and enforce the same retention terms.
+  const anthropicOnly = ["anthropic", "bedrock", "claudeaws", "vertexAnthropic"]
+  assert.deepEqual(callOptions("anthropic/claude-opus-5.5", "medium"), { anthropic: { output_config: { effort: "medium" } }, gateway: { only: anthropicOnly, zeroDataRetention: true, disallowPromptTraining: true } })
+  assert.deepEqual(callOptions("anthropic/claude-sonnet-5.5", "low"), { anthropic: { output_config: { effort: "low" } }, gateway: { only: anthropicOnly, zeroDataRetention: true, disallowPromptTraining: true } })
+  assert.deepEqual(CALL_FALLBACK, { photoPick: "anthropic/claude-sonnet-5.5", artworkCheck: "anthropic/claude-sonnet-5.5" })
   assert.equal(outputBudget("meta/llama-4-scout", 8_000), 8_000); assert.equal(outputBudget("meta/llama-4-scout", 24_000), 8_192); assert.equal(outputBudget("nvidia/nemotron-3.5-lightning", 24_000), 24_000)
   assert.equal(servedBy({ gateway: { routing: { finalProvider: "fireworks" } } }), "fireworks"); assert.equal(servedBy(undefined), undefined)
+})
+
+test("a vision call nobody qualifying can answer goes once to Sonnet 5.5, and the draft's calls record it", async () => {
+  const seen: ModelCall[] = [], tried: string[] = []
+  const capacity = new Error("The request limited providers for this model and they are currently at capacity")
+  const out = await servedCall("photoPick", "meta/llama-4-scout", CALL_FALLBACK.photoPick, c => seen.push(c), async model => { tried.push(model); if (model === "meta/llama-4-scout") throw capacity; return { finishReason: "tool-calls", providerMetadata: { gateway: { routing: { finalProvider: "bedrock" } } }, toolCalls: [{ toolName: "choose_photo", input: { index: 0 } }] } }, r => r.toolCalls[0].input)
+  assert.deepEqual(out, { index: 0 }); assert.deepEqual(tried, ["meta/llama-4-scout", "anthropic/claude-sonnet-5.5"])
+  assert.equal(seen.length, 1); assert.equal(seen[0].model, "anthropic/claude-sonnet-5.5"); assert.equal(seen[0].fallbackFrom, "meta/llama-4-scout"); assert.match(seen[0].fallbackReason!, /at capacity/)
+  // An answer without the required tool call counts as a failure too.
+  const noTool = await servedCall("artworkCheck", "meta/llama-4-scout", CALL_FALLBACK.artworkCheck, undefined, async model => ({ finishReason: "stop", model }), r => { if (r.model !== "anthropic/claude-sonnet-5.5") throw new Error("model did not call report_defects"); return "ok" })
+  assert.equal(noTool, "ok")
+  // A text step has no automatic fallback: the error stands and the step retries.
+  await assert.rejects(servedCall("write", "nvidia/nemotron-3.5-lightning", CALL_FALLBACK.write, undefined, async () => { throw capacity }, r => r), /at capacity/)
+})
+
+test("a draft on its last attempt shows as failed with its error at once, not as still working", async () => {
+  const w = world({ ai: { pickMedia: async () => { throw new Error("every provider at capacity") } } })
+  await w.start({ kind: "dt101" })
+  for (let i = 0; i < MAX_ATTEMPTS; i++) { w.advance(RETRY_MS + 1); await runDue(w.deps, 1e9) }
+  const d = onlyDraft(w)
+  assert.equal(d.status, "failed"); assert.match(d.error!, /the media step failed 4 times; last error: every provider at capacity/)
+  assert.equal(w.alerts.length, 1); assert.equal(await runDue(w.deps, 1e9), 0)
 })
 
 test("seeds: the brief uses them when loaded and says so when not; a malformed set is refused", () => {

@@ -113,7 +113,14 @@ async function jobStep(deps: WorkerDeps, id: string, attempt: number): Promise<v
     await deps.store.saveJob(job); await deps.store.release("job", id, false)
   } catch (err) {
     console.error("[content-pipeline] research failed", id, err instanceof Error ? err.message : err)
-    job.note = `Research failed, retrying: ${err instanceof Error ? err.message.slice(0, 200) : "error"}`
+    const why = err instanceof Error ? err.message.slice(0, 200) : "error"
+    if (attempt >= MAX_ATTEMPTS) {
+      // The last attempt: close the job now, with its reason, rather than leaving it looking busy.
+      job.status = "failed"; job.note = `Research failed after ${attempt} attempts: ${why}`; job.updatedAt = iso(deps)
+      await deps.store.saveJob(job).catch(() => {}); await deps.store.release("job", id, false).catch(() => {})
+      return
+    }
+    job.note = `Research failed, retrying: ${why}`
     await deps.store.saveJob(job).catch(() => {})
     // Retried by a later run after RETRY_MS (bounded by MAX_ATTEMPTS).
     await deps.store.backoff("job", id, deps.nowMs() + RETRY_MS).catch(() => {})
@@ -190,6 +197,14 @@ async function draftStep(deps: WorkerDeps, id: string, attempt: number): Promise
   } catch (err) {
     d.error = err instanceof Error ? err.message.slice(0, 300) : "error"
     console.error("[content-pipeline] step failed", d.id, d.status, d.error)
+    if (attempt >= MAX_ATTEMPTS) {
+      // The last attempt: the draft shows as failed with its error now, not as still working.
+      const step = d.status
+      d.status = "failed"; d.error = `the ${step} step failed ${attempt} times; last error: ${d.error}`.slice(0, 400)
+      await save(deps, d, `failed at ${step}`).catch(() => {}); await deps.store.release("draft", id, false).catch(() => {})
+      await maybeNotify(deps, d.jobId).catch(() => {})
+      return
+    }
     await save(deps, d, `step ${d.status} failed: ${d.error}`).catch(() => {})
     // Retried by a later run after RETRY_MS (bounded by MAX_ATTEMPTS).
     await deps.store.backoff("draft", id, deps.nowMs() + RETRY_MS).catch(() => {})

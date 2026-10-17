@@ -19,19 +19,31 @@ export type PipelineStep = keyof typeof PIPELINE_MODELS
 
 /** The fallback a step moves to when it fails the quality gate (Phase 1b records which, if any). */
 export const FALLBACK_MODELS = { text: "anthropic/claude-opus-5.5", vision: "anthropic/claude-sonnet-5.5" } as const
+/**
+ * Per call: when a vision step's model can't answer (every qualifying provider at capacity, a refused request, no
+ * tool call), the same call goes once to the vision fallback, under the same zero-retention and no-training routing,
+ * and the draft's `calls` record it. Text steps have two qualifying Nemotron providers and no automatic fallback.
+ */
+export const CALL_FALLBACK: Partial<Record<PipelineStep, string>> = { photoPick: FALLBACK_MODELS.vision, artworkCheck: FALLBACK_MODELS.vision }
 
 /**
  * Routing per model. Nemotron 3.5 Lightning is served by three providers on the Gateway; deepinfra and fireworks
  * report zero data retention and no training, runinfra reports neither (endpoints listing, 2026-10-17). The Gateway's
  * own flags restrict routing to providers with those agreements and fail the request when none is available, and
  * `only` names the qualifying providers as well, so a provider added later never receives the prompts unreviewed.
- * Llama 4 Scout's two providers (bedrock, deepinfra) both report both, but Bedrock refuses a required tool call for
- * this model ("doesn't support the toolConfig.toolChoice.tool field": preview live check, 2026-10-17), and the vision
- * steps answer through one required tool, so Scout goes to deepinfra only. Anthropic fallbacks keep their default routing.
+ * Llama 4 Scout's two providers (deepinfra, bedrock) both report both. Bedrock refused a NAMED tool for Scout
+ * ("doesn't support the toolConfig.toolChoice.tool field": preview, 2026-10-17); its API limits a named tool to
+ * Claude 3 and Nova and states no model limit on "any", which is what the vision steps' required single tool maps to.
+ * With deepinfra alone the run stopped when deepinfra was at capacity (preview, 2026-10-17), so both are allowed,
+ * deepinfra first, and CALL_FALLBACK covers the case where neither can answer. The Anthropic fallbacks are served by
+ * anthropic, bedrock, claudeaws and vertexAnthropic, all reporting zero retention and no training (2026-10-17), and
+ * get the same enforced flags.
  */
-const ROUTING: Record<string, { only: string[]; zeroDataRetention: true; disallowPromptTraining: true }> = {
+const ROUTING: Record<string, { order?: string[]; only: string[]; zeroDataRetention: true; disallowPromptTraining: true }> = {
   "nvidia/nemotron-3.5-lightning": { only: ["deepinfra", "fireworks"], zeroDataRetention: true, disallowPromptTraining: true },
-  "meta/llama-4-scout": { only: ["deepinfra"], zeroDataRetention: true, disallowPromptTraining: true },
+  "meta/llama-4-scout": { order: ["deepinfra", "bedrock"], only: ["deepinfra", "bedrock"], zeroDataRetention: true, disallowPromptTraining: true },
+  "anthropic/claude-sonnet-5.5": { only: ["anthropic", "bedrock", "claudeaws", "vertexAnthropic"], zeroDataRetention: true, disallowPromptTraining: true },
+  "anthropic/claude-opus-5.5": { only: ["anthropic", "bedrock", "claudeaws", "vertexAnthropic"], zeroDataRetention: true, disallowPromptTraining: true },
 }
 /** Output caps the provider enforces (Scout: 8,192 completion tokens). */
 const MAX_OUTPUT: Record<string, number> = { "meta/llama-4-scout": 8_192 }
@@ -39,7 +51,7 @@ const MAX_OUTPUT: Record<string, number> = { "meta/llama-4-scout": 8_192 }
 /**
  * Provider options for one call. Claude 5 models think by default and maxOutputTokens covers thinking plus output
  * (CLAUDE.md, "The token trap"), so Anthropic calls set effort rather than disabling thinking; other models ignore the
- * `anthropic` key.
+ * `anthropic` key. Models without an entry (a step moved to another model) keep the Gateway's default routing.
  */
 export function callOptions(model: string, effort: "low" | "medium" | "high") {
   const gateway = ROUTING[model]
