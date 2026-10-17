@@ -7,14 +7,15 @@
  */
 import { test } from "node:test"
 import assert from "node:assert/strict"
-import { SERIES, checkFields, ddmmmyy, lineCount, type SeriesKey } from "../content-pipeline/series"
-import { runDue, RETRY_MS, makerOf, searchedPageUsable, unsourcedNumbers, withCredits, imageLabel, mediaQueries, cropFit, choosePhoto, zoomCrop, reviewNotes, DOD_NOTICE, LEASE_MS, type WorkerDeps, type DesignInput, type PostInput, type NoContentInput } from "../content-pipeline/worker"
+import { SERIES, checkFields, clippedWords, ddmmmyy, lineCount, type SeriesKey } from "../content-pipeline/series"
+import { runDue, RETRY_MS, staleSource, makerOf, searchedPageUsable, unsourcedNumbers, withCredits, imageLabel, mediaQueries, cropFit, choosePhoto, zoomCrop, reviewNotes, DOD_NOTICE, LEASE_MS, type WorkerDeps, type DesignInput, type PostInput, type NoContentInput } from "../content-pipeline/worker"
 import { MAX_ATTEMPTS, type McuDraft, type McuJob, type McuStore } from "../content-pipeline/store"
 import { archiveRelevant, assertPublicHttps, imageSize, pageImageCandidate, parsePage, searchNasa, searchOpenverse, usableLicense, type MediaCandidate } from "../content-pipeline/sources"
-import { brandDirection, searchResultUrls, servedBy, servedCall, type McuAi, type ModelCall } from "../content-pipeline/model"
+import { brandDirection, isPhotoDefect, readPick, searchResultUrls, servedBy, servedCall, type McuAi, type ModelCall } from "../content-pipeline/model"
 import { PIPELINE_MODELS, FALLBACK_MODELS, CALL_FALLBACK, callOptions, outputBudget } from "../content-pipeline/models"
 import { seedBrief, seedProblems, type McuSeeds } from "../content-pipeline/seeds"
-import { PIPELINE_PROPERTIES, PROPERTY_TEMPLATES, propertyCanGenerate } from "../content-pipeline/properties"
+import { PIPELINE_PROPERTIES, PROPERTY_TEMPLATES, contentPropertyOf, propertyCanGenerate } from "../content-pipeline/properties"
+import { BRANDS, CONTENT_PROPERTIES } from "../../components/crm/types"
 
 // ── in-memory store with the Firestore store's lease semantics ──
 class MemStore implements McuStore {
@@ -38,6 +39,8 @@ class MemStore implements McuStore {
 const NOW = Date.parse("2026-10-16T18:00:00Z")
 const ARMY_TEXT = "WASHINGTON — The U.S. Army awarded contracts worth $93.6 million to nine companies on Oct. 15, 2026 to deliver next-generation command and control software to I Corps. ".repeat(6)
 const CANDIDATE: MediaCandidate = { url: "https://upload.wikimedia.org/a.jpg", thumbUrl: "https://upload.wikimedia.org/thumb/a.jpg", pageUrl: "https://commons.wikimedia.org/wiki/File:A.jpg", title: "Soldiers at a command post", description: "U.S. Army photo", width: 3000, height: 2000, license: "Public domain", creator: "U.S. Army photo by Sgt. A", credit: "U.S. Army photo by Sgt. A / Public domain via Wikimedia Commons", usGovernment: true }
+/** A subject box that zooms to a clean 4:5 crop of CANDIDATE (3000 × 2000). */
+const HERO = { x0: 0.3, y0: 0.15, x1: 0.7, y1: 0.65 }
 const JPEG = new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 0, 0, 0xff, 0xd9])
 const SEEDS: McuSeeds = { purpose: "Invented purpose for tests.", cohorts: ["Builders"], orgs: [{ name: "Example Robotics", site: "example.com", kind: "neo-prime" }, { name: "Example Prime", site: "prime.example", kind: "prime" }, { name: "Example Outlet", site: "news.example", kind: "outlet" }], dt101Backlog: [{ subject: "Widget 9", maker: "Example Robotics", url: "https://example.com/widget" }], dt101Covered: ["HIMARS"], snapshot: "test" }
 
@@ -52,7 +55,7 @@ function world(over: { ai?: Partial<McuAi>; pagePublished?: string; newsFeedHasM
     research: async ({ count }) => ({ candidates: [{ title: "Army picks nine C2 software vendors", primaryUrl: "https://www.army.mil/article/1", publisher: "U.S. Army", publishedAt: "2026-10-15", whyNow: "The award starts fielding now.", why: "material" }, { title: "Second story", primaryUrl: "https://www.army.mil/article/2", publisher: "U.S. Army", why: "news" }].slice(0, count + 1) }),
     write: async ({ kind }) => ({ frames: [{ series: (kind === "dt101" ? "dt101" : kind === "breaking" ? "breaking" : "news") as SeriesKey, fields: kind === "dt101" ? { benefit_headline: "Link the fight.\nDecide faster.", subject_identifier: "Next-gen C2 / Lockheed Martin" } : { headline: "Army backs 9 C2 software vendors", deck: "Awards worth $93.6 million fund I Corps command software.", source: "ARMY.MIL" } as Record<string, string>, mediaQuery: "Army command post" }], caption: "The Army awarded $93.6 million to nine companies for command and control software.\n\nSource: U.S. Army, 2026-10-15" }),
     findPhotoPages: async () => [],
-    pickMedia: async () => ({ index: 0, reason: "relevant" }),
+    pickMedia: async () => ({ index: 0, reason: "relevant", ranked: [{ index: 0, box: HERO }] }),
     checkArtwork: async () => [],
     ...over.ai,
   }
@@ -173,7 +176,7 @@ test("every candidate dropped: research runs once more, avoiding them, before th
   none.deps.fetchPage = async () => Promise.reject(new Error("http_403"))
   await none.start()
   const job = (await none.store.getJob("job-news-1"))!
-  assert.equal(job.status, "held"); assert.match(job.note!, /^Blocked page story: source page unreachable or unreadable \(http_403 at https:\/\/blocked\.example\.com\/a\); then: Blocked page story: already tried$/)
+  assert.equal(job.status, "held"); assert.match(job.note!, /^Blocked page story: source page unreachable, unreadable or out of date \(http_403 at https:\/\/blocked\.example\.com\/a\); then: Blocked page story: already tried$/)
   assert.equal(none.alerts.length, 1); assert.equal(none.store.drafts.size, 0)
 })
 
@@ -217,7 +220,7 @@ test("an unreadable primary page falls back to another primary page for the same
   const none = world({ ai: { research: async () => ({ candidates: [{ title: "Wraith Shield", primaryUrl: "https://www.l3harris.com/all-capabilities/wraith-shield", publisher: "L3Harris", why: "dt101" }] }) } })
   none.deps.fetchPage = async () => Promise.reject(new Error("http_404"))
   await none.start({ kind: "dt101" })
-  assert.match((await none.store.getJob("job-dt101-1"))!.note!, /Wraith Shield: source page unreachable or unreadable \(http_404 at https:\/\/www\.l3harris\.com\/all-capabilities\/wraith-shield\)/)
+  assert.match((await none.store.getJob("job-dt101-1"))!.note!, /Wraith Shield: source page unreachable, unreadable or out of date \(http_404 at https:\/\/www\.l3harris\.com\/all-capabilities\/wraith-shield\)/)
 })
 
 test("zero candidates gets the search's one retry too, then the notice card (production, 2026-10-17)", async () => {
@@ -362,11 +365,14 @@ test("the crop rule matches the approved card: subject whole, upper 60%, big eno
   assert.ok(cropFit(600, 400, { x0: 0.3, y0: 0.1, x1: 0.7, y1: 0.7 }, "feed").problems.includes("the cropped photo is under 500 px wide"))
   const cands = [{ ...CANDIDATE, width: 1000, height: 667 }, { ...CANDIDATE, pageUrl: "p2", width: 1000, height: 667 }]
   const tiny = { x0: 0.45, y0: 0.4, x1: 0.48, y1: 0.43 } // too small to zoom without going under 600 px of source
-  assert.equal(choosePhoto({ index: 0, ranked: [{ index: 0, box: tiny }, { index: 1, box: { x0: 0.25, y0: 0.05, x1: 0.75, y1: 0.75 } }] }, cands, "feed")!.index, 1)
-  assert.match(choosePhoto({ index: 0, ranked: [{ index: 0, box: tiny }] }, cands, "feed")!.note!, /fit the card cleanly \(the subject is small at phone size\)/)
-  assert.equal(choosePhoto({ index: 0, ranked: [{ index: 0, box: { x0: 0, y0: 0.2, x1: 0.3, y1: 0.7 } }] }, cands, "feed")!.note, undefined)
-  assert.deepEqual(choosePhoto({ index: 0 }, cands, "feed"), { index: 0 })
-  assert.equal(choosePhoto({ index: null }, cands, "feed"), null)
+  assert.equal(choosePhoto({ index: 0, ranked: [{ index: 0, box: tiny }, { index: 1, box: { x0: 0.25, y0: 0.05, x1: 0.75, y1: 0.75 } }] }, cands, "feed").index, 1)
+  // Phase 1b: a photo whose subject can't fit the card is not placed with a note; nothing is chosen.
+  const misfit = choosePhoto({ index: 0, ranked: [{ index: 0, box: tiny }] }, cands, "feed")
+  assert.equal(misfit.index, null); assert.match("why" in misfit ? misfit.why : "", /no photo of the subject fits the 4:5 card \(#0: the subject is small at phone size\)/)
+  assert.ok(choosePhoto({ index: 0, ranked: [{ index: 0, box: { x0: 0, y0: 0.2, x1: 0.3, y1: 0.7 } }] }, cands, "feed").index === 0)
+  // The model's bare index, without a subject box, is not a choice (the -05 draft's F-14, 2026-10-17).
+  assert.deepEqual(choosePhoto({ index: 0 }, cands, "feed"), { index: null, why: "no candidate shows the subject itself" })
+  assert.equal(choosePhoto({ index: null }, cands, "feed").index, null)
 })
 
 test("the zoom puts a distant subject into the open space: base at 60% of the card, about 45% tall (Saildrone, 2026-10-16)", () => {
@@ -485,7 +491,7 @@ test("photo relevance: archive hits must tie to the story — the Dragon Con 'Hi
   assert.equal(archiveRelevant(hit("U.S. Army insignia", { usGovernment: true }), "Lockheed Martin"), false) // a graphic, not a photo
   // End to end: only the tied hit is shown to the photo pick.
   let shown: string[] = []
-  const w = world({ ai: { write: async () => ({ frames: [{ series: "dt101" as SeriesKey, fields: { benefit_headline: "Fly the jet.\nNo pilot needed.", subject_identifier: "Hivemind / Shield AI" }, mediaQuery: "Hivemind" }], caption: "Caption. Source: U.S. Army, 2026-10-15" }), pickMedia: async ({ candidates }) => { shown = candidates.map(c => c.candidate.title); return { index: 0, reason: "only relevant one" } } } })
+  const w = world({ ai: { write: async () => ({ frames: [{ series: "dt101" as SeriesKey, fields: { benefit_headline: "Fly the jet.\nNo pilot needed.", subject_identifier: "Hivemind / Shield AI" }, mediaQuery: "Hivemind" }], caption: "Caption. Source: U.S. Army, 2026-10-15" }), pickMedia: async ({ candidates }) => { shown = candidates.map(c => c.candidate.title); return { index: 0, reason: "only relevant one", ranked: [{ index: 0, box: HERO }] } } } })
   w.deps.fetchPage = async url => ({ url, title: "t", text: ARMY_TEXT, publishedAt: "2026-10-16T09:00:00Z" }) // no share image
   w.deps.searchCommons = async () => [hit("Collin Kelly, Hivemind Dragon Con September 6 2026 0052.jpg", { pageUrl: "p1", url: "u1" }), hit("Hivemind Logo.png", { pageUrl: "p2", url: "u2" })]
   w.deps.searchMore = async () => [hit("Shield AI Hivemind flies an F-16", { pageUrl: "p3", url: "u3", origin: "openverse" })]
@@ -540,4 +546,84 @@ test("seeds: the brief uses them when loaded and says so when not; a malformed s
 test("review notes stay within the content post's 4,000-character notes field", () => {
   const long: McuDraft = { id: "MCU-NEWS-20261016-01", jobId: "j", kind: "news", placement: "feed", request: { actorEmail: "a@434media.com", actorName: "" }, status: "in_review", version: 1, story: { title: "t", primaryUrl: "https://x.example", publisher: "p", sourceTitle: "s", sourceText: "" }, frames: [], media: [], designs: [], qa: Array.from({ length: 200 }, (_, i) => `check ${i} `.repeat(5)), notices: [], history: [], createdAt: "", updatedAt: "" }
   assert.ok(reviewNotes(long).length <= 4000)
+})
+
+// ── Phase 1b: what blocks a fair quality gate (the -05 DT101 draft, production, 2026-10-17) ──
+test("recency: News within 7 days and dated; DT101 takes a product page as current but drops a stale article", async () => {
+  assert.equal(staleSource("news", "2026-10-10", NOW), null)
+  assert.match(staleSource("news", "2026-10-08", NOW)!, /more than 7 days ago/)
+  assert.equal(staleSource("news", undefined, NOW), "states no publication date")
+  assert.equal(staleSource("dt101", undefined, NOW), null) // the maker's product page
+  assert.match(staleSource("dt101", "2025-07-16", NOW)!, /published 2025-07-16, more than 90 days ago/)
+  assert.equal(staleSource("breaking", undefined, NOW), null) // Breaking keeps its own 24-hour rule
+  // A stale DT101 article falls back to the subject's undated product page.
+  const OLD = "https://www.anduril.com/article/anduril-unveils-barracuda-m", PRODUCT = "https://www.anduril.com/barracuda"
+  const w = world({ ai: { research: async () => ({ candidates: [{ title: "Barracuda-100M", primaryUrl: OLD, alternateUrls: [PRODUCT], publisher: "Anduril", why: "dt101" }] }) } })
+  w.deps.fetchPage = async url => ({ url, title: url === OLD ? "Anduril Unveils Barracuda-M" : "Barracuda", text: ARMY_TEXT, ...(url === OLD ? { publishedAt: "2025-07-16T12:00:00Z" } : {}) })
+  await w.start({ kind: "dt101" })
+  const d = onlyDraft(w)
+  assert.equal(d.story.primaryUrl, PRODUCT); assert.equal(d.story.publishedAt, undefined)
+  // News older than a week drops; with nothing else, the job ends on the notice card and says why.
+  const old = world({ pagePublished: "2026-10-01T09:00:00Z", ai: { research: async () => ({ candidates: [{ title: "Old award", primaryUrl: "https://www.army.mil/article/9", publisher: "U.S. Army", why: "news" }] }) } })
+  await old.start({ kind: "news" })
+  assert.match((await old.store.getJob("job-news-1"))!.note!, /Old award: source page unreachable, unreadable or out of date \(https:\/\/www\.army\.mil\/article\/9 published 2026-10-01, more than 7 days ago\)/)
+})
+
+test("card copy uses whole words: a clipped word is rewritten, and a word the source prints is allowed", async () => {
+  assert.deepEqual(clippedWords({ benefit_headline: "FAST DEPLOYMENT\nLOW COST PROD", subject_identifier: "BARRACUDA-100M / ANDURIL" }), ["PROD"])
+  assert.deepEqual(clippedWords({ headline: "GOV'T BACKS MFG SURGE", source: "DEPT OF WAR" }), ["GOV'T", "MFG"])
+  assert.deepEqual(clippedWords({ headline: "HIMARS FIRES. RELOCATES." }), [])
+  assert.deepEqual(clippedWords({ headline: "PROD LINE OPENS" }, "The PROD line at the plant"), [])
+  let rounds = 0, problems: string[] = []
+  const w = world({ ai: { write: async i => { rounds++; problems = i.problems ?? problems; return { frames: [{ series: "dt101" as SeriesKey, fields: { benefit_headline: rounds === 1 ? "Fast deployment\nLow cost prod" : "Fast deployment\nLow cost build", subject_identifier: "Barracuda / Anduril" }, mediaQuery: "Barracuda" }], caption: "Caption. Source: Anduril, 2026-10-15" } } } })
+  await w.start({ kind: "dt101" })
+  assert.equal(rounds, 2); assert.match(problems.join(";"), /abbreviated words on the card \(PROD\)/)
+  assert.equal(onlyDraft(w).frames[0].fields.benefit_headline, "FAST DEPLOYMENT\nLOW COST BUILD")
+})
+
+test("the post carries its Property: MilCityUSA on drafts and on the no-new-content card", async () => {
+  assert.equal(contentPropertyOf("milcity"), "MilCityUSA"); assert.equal(contentPropertyOf(undefined), "MilCityUSA")
+  assert.ok(CONTENT_PROPERTIES.includes("MilCityUSA")); assert.ok(BRANDS.every(b => CONTENT_PROPERTIES.includes(b)))
+  assert.ok(!(BRANDS as string[]).includes("MilCityUSA")) // Brand itself is unchanged
+  const w = world()
+  await w.start({ kind: "dt101", property: "milcity" })
+  assert.equal(w.posts[0].property, "MilCityUSA")
+  const none = world({ ai: { research: async () => ({ candidates: [], note: "nothing new" }) } })
+  await none.start({ kind: "news" })
+  assert.equal(none.notices[0].property, "MilCityUSA")
+})
+
+test("artwork check: a clipped headline is a text defect and never spends a photo retry; text over a face still does", () => {
+  assert.equal(isPhotoDefect("photo", "benefit headline text is clipped"), false) // the 2026-10-17 mislabel
+  assert.equal(isPhotoDefect("photo", "subject line text overflows"), false)
+  assert.equal(isPhotoDefect("photo", "text over a face"), true)
+  assert.equal(isPhotoDefect("photo", "the photo does not show the Barracuda-100M"), true)
+  assert.equal(isPhotoDefect("photo", "the 4:5 crop cuts off the subject"), true)
+  assert.equal(isPhotoDefect("text", "the subject is cut off"), false) // the area decides first
+  assert.equal(isPhotoDefect("layout", "an empty slot is showing"), false)
+})
+
+test("photo pick: only exact matches with a subject box count; what the others showed is kept (the -05 F-14)", () => {
+  const box = { x0: 0.2, y0: 0.1, x1: 0.8, y1: 0.6 }
+  const r = readPick({ index: 0, reason: "best available", ranked: [
+    { index: 0, shows: "a blurry F-14 in a hangar", match: "related", ...box },
+    { index: 1, shows: "Barracuda-100M on a launch rail", match: "exact", ...box },
+    { index: 2, shows: "the Barracuda-100M", ...box }, // no match given
+    { index: 3, shows: "Barracuda-100M", match: "exact", x0: 0.5, y0: 0.5, x1: 0.5, y1: 0.5 }, // no box
+    { index: 9, shows: "out of range", match: "exact", ...box },
+  ] }, 4)
+  assert.equal(r.index, 1); assert.deepEqual(r.ranked!.map(x => x.index), [1]); assert.equal(r.ranked![0].shows, "Barracuda-100M on a launch rail")
+  assert.deepEqual(r.turnedDown, ["#0 related: a blurry F-14 in a hangar", "#2 no match given: the Barracuda-100M", "#3 exact: Barracuda-100M"])
+  assert.deepEqual(readPick({ index: 0, reason: "none fit" }, 2), { index: null, reason: "none fit" })
+})
+
+test("no photo of the subject fits: the subject is replaced, and its design gets its own Canva request id", async () => {
+  let picks = 0
+  const w = world({ ai: { pickMedia: async () => ++picks === 1 ? { index: 0, reason: "only a tiny view", ranked: [{ index: 0, box: { x0: 0.45, y0: 0.4, x1: 0.47, y1: 0.42 } }] } : { index: 0, reason: "relevant", ranked: [{ index: 0, box: HERO }] } } })
+  w.deps.searchCommons = async () => [{ ...CANDIDATE, width: 1000, height: 667 }]
+  await w.start({ kind: "dt101" })
+  const d = onlyDraft(w)
+  assert.equal(d.status, "in_review"); assert.equal(d.autoReplaced, 1); assert.equal(d.story.title, "Second story")
+  assert.ok(d.history.some(h => /couldn't be sourced \(no relevant, licensed photo was found for "Army command post": no photo of the subject fits the 4:5 card/.test(h.event)))
+  assert.equal(w.designs.length, 1); assert.equal(w.designs[0].requestId, "admin:MCU-DT101-20261016-01:v1:f1:r1")
 })

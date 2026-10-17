@@ -21,7 +21,7 @@ import {
   Trash2,
 } from "lucide-react"
 import type { ContentPost, SocialPlatform, ContentPostStatus } from "./types"
-import { SOCIAL_PLATFORM_OPTIONS, CONTENT_POST_STATUS_OPTIONS, BRANDS } from "./types"
+import { SOCIAL_PLATFORM_OPTIONS, CONTENT_POST_STATUS_OPTIONS, CONTENT_PROPERTIES } from "./types"
 import { HowItWorks } from "@/components/admin/HowItWorks"
 import { useTeamMembers } from "@/hooks/useTeamMembers"
 import { LegendPopover } from "@/components/admin/LegendPopover"
@@ -298,7 +298,7 @@ export function SocialCalendarView({ contentPosts, onOpenPost, onAddPost, onMove
   const [viewMode, setViewMode] = useState<CalendarViewMode>("month")
   const [hoveredDay, setHoveredDay] = useState<string | null>(null)
   const [selectedUsers, setSelectedUsers] = useState<Set<string>>(new Set())
-  // Brand slicer (post.platform is the brand dropdown, typed Brand | "").
+  // Brand slicer (post.platform is the Property dropdown, typed ContentProperty | "").
   const [selectedBrands, setSelectedBrands] = useState<Set<string>>(new Set())
   // Social-platform slicer (post.social_platforms: IG / TikTok / …).
   const [selectedSocials, setSelectedSocials] = useState<Set<string>>(new Set())
@@ -496,7 +496,7 @@ export function SocialCalendarView({ contentPosts, onOpenPost, onAddPost, onMove
   }
 
   const weekDays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
-  const brandOptions = BRANDS.map(b => ({ value: b, label: b }))
+  const brandOptions = CONTENT_PROPERTIES.map(b => ({ value: b, label: b }))
   const socialOptions = SOCIAL_PLATFORM_OPTIONS.map(p => ({ value: p.value, label: p.label }))
 
   // Filter out specific users from the calendar filter list

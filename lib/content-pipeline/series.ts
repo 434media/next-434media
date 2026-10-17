@@ -127,6 +127,20 @@ export function checkFields(series: Series, values: Record<string, string>): str
   return problems
 }
 
+/**
+ * Clipped words a writer reaches for to squeeze copy into a line: "FAST DEPLOYMENT / LOW COST PROD" (the -05 DT101
+ * hook, 2026-10-17). Card copy uses whole words. Names and acronyms that are the subject's own (HIMARS, C2, UAS) are
+ * not on the list; the source field, dates and the subject line are not checked; and a word the source itself prints
+ * is allowed.
+ */
+const CLIPPED = new Set(["PROD", "PRODS", "PRODN", "MFG", "MFR", "MFRS", "MGMT", "MGT", "GOVT", "GOV'T", "DEPT", "DEPTS", "ASSY", "EQPT", "EQUIP", "MAINT", "SYS", "SVC", "SVCS", "TRANSP", "CAPAB", "DEV", "DEVS", "INTL", "INT'L", "NATL", "NAT'L", "APPROX", "ADV", "PERF", "RESP", "AVAIL", "ENGR", "VEH", "VEHS", "ACFT", "MSN", "MSNS", "TRNG", "TNG", "QTY", "AMT", "YR", "YRS", "ENVT", "DPLY", "OPNL", "OPER", "TECHS", "LOGI", "RECOG", "ID'D"])
+const NOT_CHECKED = new Set(["source", "date", "counter", "image_context", "subject_identifier", "kicker"])
+export function clippedWords(fields: Record<string, string>, source = ""): string[] {
+  const inSource = new Set((source.match(/[A-Za-z][A-Za-z']*/g) ?? []).map(w => w.toUpperCase()))
+  const words = Object.entries(fields).filter(([k]) => !NOT_CHECKED.has(k)).flatMap(([, v]) => v.toUpperCase().match(/[A-Z][A-Z']*/g) ?? [])
+  return [...new Set(words.map(w => w.replace(/'$/, "")).filter(w => CLIPPED.has(w) && !inSource.has(w)))]
+}
+
 /** Uppercase fields are typed uppercase so the card and the review text match. */
 export function normalizeFields(series: Series, values: Record<string, string>): Record<string, string> {
   const clean = (f: FieldSpec, v: string) => f.exactLines ? v.split("\n").map(l => l.trim().replace(/\s+/g, " ")).filter(Boolean).join("\n") : v.trim().replace(/\s+/g, " ")
