@@ -42,7 +42,7 @@ export async function pipelineDeps(): Promise<WorkerDeps> {
         const now = new Date().toISOString()
         // Idempotent on requestId: a resumed step finds the post it already created.
         const post = await tools.intake.findByRequestId(p.requestId) ?? await crm.createContentPost({
-          user: p.requestedBy.name, date_created: now.slice(0, 10), platform: "", status: "needs_approval", title: p.title,
+          user: p.requestedBy.name, date_created: now.slice(0, 10), platform: p.property, status: "needs_approval", title: p.title,
           notes: p.notes, social_copy: p.caption, links: p.links, assets: [], tags: "milcity", social_platforms: ["instagram", "facebook"],
           intake: { requestId: p.requestId, metaBrand: "milcity", requestedBy: p.requestedBy.email, at: now },
         })
@@ -65,7 +65,7 @@ export async function pipelineDeps(): Promise<WorkerDeps> {
         if (existing) return { postId: existing.id }
         // A notice, not a post: no assets, no platforms, no Canva design. pipeline_outcome marks it everywhere.
         const post = await crm.createContentPost({
-          user: p.requestedBy.name, date_created: now.slice(0, 10), platform: "", status: "needs_approval", title: p.title.slice(0, 200),
+          user: p.requestedBy.name, date_created: now.slice(0, 10), platform: p.property, status: "needs_approval", title: p.title.slice(0, 200),
           notes: `The content pipeline found no new content for this request, so nothing was drafted. Confirm to close it.\n\nWhy: ${p.reason}`.slice(0, 4000),
           links: p.tried.map(t => t.url), assets: [], tags: "milcity", social_platforms: [],
           intake: { requestId: p.requestId, metaBrand: "milcity", requestedBy: p.requestedBy.email, at: now },

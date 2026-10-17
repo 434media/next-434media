@@ -1,6 +1,8 @@
-import { SERIES, checkFields, ddmmmyy, normalizeFields, type Placement, type RequestKind } from "./series"
+import { SERIES, checkFields, clippedWords, ddmmmyy, normalizeFields, type Placement, type RequestKind } from "./series"
 import { MCU_RULES_VERSION } from "./editorial"
 import { type McuAi, type ModelCall, type SubjectBox } from "./model"
+import { contentPropertyOf } from "./properties"
+import type { ContentProperty } from "@/components/crm/types"
 import type { McuSeeds } from "./seeds"
 import { MIN_SHORT_SIDE, archiveRelevant, imageSize, isDvidsImagePage, pageImageCandidate, type MediaCandidate, type SourcePage } from "./sources"
 import { MAX_ATTEMPTS, WORKING, type ChosenMedia, type CropBox, type FrameCopy, type FrameDesign, type McuDraft, type McuJob, type McuStore, type Story } from "./store"
@@ -28,8 +30,9 @@ export interface ContentSide {
   /** The "no new content" card in Review for a job that found nothing usable: idempotent per requestId; never a post. */
   writeNoContent(input: NoContentInput): Promise<{ postId: string }>
 }
-export interface NoContentInput { requestId: string; jobId: string; title: string; reason: string; tried: { title: string; url: string }[]; requestedBy: { email: string; name: string } }
-export interface PostInput { requestId: string; title: string; caption: string; notes: string; links: string[]; designIds: string[]; requestedBy: { email: string; name: string } }
+/** property: the content post's Property (its `platform` field), e.g. "MilCityUSA". */
+export interface NoContentInput { requestId: string; jobId: string; property: ContentProperty; title: string; reason: string; tried: { title: string; url: string }[]; requestedBy: { email: string; name: string } }
+export interface PostInput { requestId: string; property: ContentProperty; title: string; caption: string; notes: string; links: string[]; designIds: string[]; requestedBy: { email: string; name: string } }
 export interface WorkerDeps {
   store: McuStore
   /** The model calls; each call is reported through onCall so the draft records which model and provider served it. */
@@ -55,6 +58,22 @@ export const RETRY_MS = 60_000
  */
 export const KEY_PREFIX = "admin:"
 const BREAKING_WINDOW_MS = 24 * 3600_000
+/**
+ * How recent a story's source must be (Phase 1b, 2026-10-17; the -05 DT101 draft was built on a 2025-07-16 article for
+ * a card dated 2026-10-17). Breaking: the page's own stated time, within 24 hours (below). News: published within the
+ * last 7 days, by the page's stated date or else the date the search reported; with no date at all it is dropped,
+ * since the card prints the source date. DT101 is an explainer, so an undated page describing the system (the maker's
+ * product page) counts as current; but a dated page is a news hook, and it must be from the last 90 days. A stale
+ * page is a miss like an unreadable one, so the subject's other primary pages are tried before it drops.
+ */
+export const RECENCY_DAYS: Partial<Record<RequestKind, number>> = { news: 7, dt101: 90 }
+export function staleSource(kind: RequestKind, publishedAt: string | undefined, nowMs: number): string | null {
+  const days = RECENCY_DAYS[kind]
+  if (!days) return null
+  if (!publishedAt) return kind === "news" ? "states no publication date" : null
+  const age = nowMs - Date.parse(`${publishedAt}T23:59:59Z`)
+  return age > days * 864e5 ? `published ${publishedAt}, more than ${days} days ago` : null
+}
 const ICYMI_COUNT = 5
 const MAX_SUPPORTING = 2
 const MAX_AUTO_REPLACE = 2
@@ -116,7 +135,7 @@ async function jobStep(deps: WorkerDeps, id: string, attempt: number): Promise<v
       const reason = "hold" in stories ? stories.hold.slice(0, 1000) : "No qualifying stories found"
       const titlesTried = "hold" in stories ? stories.tried ?? [] : [], urlsTried = "hold" in stories ? stories.triedUrls ?? [] : []
       const tried = titlesTried.map((title, i) => ({ title: title.slice(0, 200), url: urlsTried[i] ?? "" })).filter((t, i, all) => /^https:\/\//.test(t.url) && all.findIndex(x => x.url === t.url) === i).slice(0, 12)
-      const card = await deps.content.writeNoContent({ requestId: `${KEY_PREFIX}${id}:no-content`, jobId: id, title: `No new ${label(job.kind)} content — ${iso(deps).slice(0, 10)}`, reason, tried, requestedBy: { email: job.request.actorEmail, name: job.request.actorName } })
+      const card = await deps.content.writeNoContent({ requestId: `${KEY_PREFIX}${id}:no-content`, jobId: id, property: contentPropertyOf(job.property), title: `No new ${label(job.kind)} content — ${iso(deps).slice(0, 10)}`, reason, tried, requestedBy: { email: job.request.actorEmail, name: job.request.actorName } })
       job.status = "held"; job.note = reason; job.noContentPostId = card.postId; job.updatedAt = iso(deps); job.notifiedAt = job.updatedAt
       await deps.store.saveJob(job); await deps.store.release("job", id, false)
       console.info("[content-pipeline] job held", JSON.stringify({ job: id, kind: job.kind, card: card.postId, tried: tried.length, note: reason.slice(0, 400) }))
@@ -168,17 +187,20 @@ async function researchStories(deps: WorkerDeps, ai: McuAi, job: Pick<McuJob, "k
     // The primary page first, then other primary pages for the same subject (product page, .mil/.gov page, press
     // release), so one unreadable page doesn't drop the subject. Each miss keeps its reason for the hold note.
     if (avoidUrls.includes(c.primaryUrl)) { dropped.push(`${c.title}: already tried`); continue }
-    let page: SourcePage | null = null
+    let page: SourcePage | null = null, publishedAt: string | undefined
     const misses: string[] = []
     for (const url of [...new Set([c.primaryUrl, ...(c.alternateUrls ?? [])])].slice(0, 4)) {
       try {
         const p = await deps.fetchPage(url)
-        if (p.text.length >= 400) { page = p; break }
-        misses.push(`no readable article at ${url}`)
+        if (p.text.length < 400) { misses.push(`no readable article at ${url}`); continue }
+        // The search's date stands in only for the page it described, never for an alternate.
+        const date = normalizeDate(p.publishedAt) ?? (url === c.primaryUrl ? normalizeDate(c.publishedAt) : undefined)
+        const stale = staleSource(job.kind, date, deps.nowMs())
+        if (stale) { misses.push(`${url} ${stale}`); continue }
+        page = p; publishedAt = date; break
       } catch (err) { misses.push(`${err instanceof Error ? err.message : "unreachable"} at ${url}`) }
     }
-    if (!page) { dropped.push(`${c.title}: source page unreachable or unreadable (${misses.join("; ").slice(0, 300)})`); continue }
-    const publishedAt = normalizeDate(page.publishedAt) ?? normalizeDate(c.publishedAt)
+    if (!page) { dropped.push(`${c.title}: source page unreachable, unreadable or out of date (${misses.join("; ").slice(0, 300)})`); continue }
     if (job.kind === "breaking") {
       // The 24-hour window is checked against the source's own stated date, not the model's reading.
       const t = page.publishedAt ? Date.parse(page.publishedAt) : NaN
@@ -313,6 +335,8 @@ function validate(frames: FrameCopy[], caption: string, story: Story): string[] 
   const body = caption.split("\n").filter(l => !/^(Archive image|Image|Photo): /.test(l) && l !== DOD_NOTICE).join("\n")
   const nums = unsourcedNumbers([body, ...frames.flatMap(f => Object.entries(f.fields).filter(([k]) => k !== "date" && k !== "counter").map(([, v]) => v))], story.sourceText)
   if (nums.length) problems.push(`these figures are not in the source: ${nums.join(", ")}`)
+  const clipped = [...new Set(frames.flatMap(f => clippedWords(f.fields, story.sourceText)))]
+  if (clipped.length) problems.push(`abbreviated words on the card (${clipped.join(", ")}); use whole words, and shorter ones if it must fit`)
   return problems
 }
 
@@ -429,21 +453,23 @@ function boxInCrop(box: SubjectBox, c: CropBox): SubjectBox {
   return { x0: (box.x0 - c.x) / c.width, x1: (box.x1 - c.x) / c.width, y0: (box.y0 - c.y) / c.height, y1: (box.y1 - c.y) / c.height }
 }
 /**
- * The pick, zoomed and checked: the vision model's ranking, best first; each relevant photo is zoomed so its subject
- * fills the open space, and the first that then passes the crop rule wins. When none does, its best choice is kept,
- * zoomed, with a note for the reviewer (the artwork check then looks at the real export).
+ * The pick, zoomed and checked: the vision model's exact matches (model.ts readPick), best first; each is zoomed so
+ * its subject fills the open space, and the first that then passes the crop rule wins. When none passes, or there is
+ * no exact match with a subject box, nothing is chosen: a photo that misses the subject or the crop is not placed on
+ * the card with a note (the -05 DT101 draft, 2026-10-17, went to Review that way).
  */
-export function choosePhoto(pick: { index: number | null; ranked?: { index: number; box: SubjectBox; context?: boolean }[] }, candidates: MediaCandidate[], placement: Placement): { index: number; crop?: CropBox; note?: string } | null {
-  if (!pick.ranked?.length) return pick.index === null ? null : { index: pick.index }
-  const judge = (r: { index: number; box: SubjectBox; context?: boolean }) => {
+export function choosePhoto(pick: { index: number | null; ranked?: { index: number; box: SubjectBox; context?: boolean }[] }, candidates: MediaCandidate[], placement: Placement): { index: number; crop: CropBox } | { index: null; why: string } {
+  if (!pick.ranked?.length) return { index: null, why: "no candidate shows the subject itself" }
+  const misses: string[] = []
+  for (const r of pick.ranked) {
     const c = candidates[r.index]
-    if (!c) return null
+    if (!c) continue
     const crop = zoomCrop(c.width, c.height, r.box, placement, r.context !== false)
-    return { crop, fit: cropFit(crop.width * c.width, crop.height * c.height, boxInCrop(r.box, crop), placement) }
+    const fit = cropFit(crop.width * c.width, crop.height * c.height, boxInCrop(r.box, crop), placement)
+    if (fit.ok) return { index: r.index, crop }
+    misses.push(`#${r.index}: ${fit.problems.join("; ")}`)
   }
-  for (const r of pick.ranked) { const j = judge(r); if (j?.fit.ok) return { index: r.index, crop: j.crop } }
-  const best = pick.ranked.find(x => x.index === pick.index) ?? pick.ranked[0], j = judge(best)
-  return { index: best.index, ...(j ? { crop: j.crop } : {}), note: `No candidate photo fit the card cleanly${j?.fit.problems.length ? ` (${j.fit.problems.join("; ")})` : ""}; check the photo placement` }
+  return { index: null, why: `no photo of the subject fits the ${placement === "feed" ? "4:5" : "9:16"} card (${misses.join(" · ") || "no usable candidate"})` }
 }
 
 async function mediaStep(deps: WorkerDeps, ai: McuAi, d: McuDraft): Promise<void> {
@@ -458,11 +484,15 @@ async function mediaStep(deps: WorkerDeps, ai: McuAi, d: McuDraft): Promise<void
     const shown = await gatherMedia(deps, ai, d, frame, avoid)
     const pick = await ai.pickMedia({ story: d.story, frame, candidates: shown, avoid: [...avoid] })
     const chosen = choosePhoto(pick, shown.map(x => x.candidate), d.placement)
-    if (chosen === null) { d.media = media; return hold(deps, d, `no relevant, licensed photo was found${frame.mediaQuery ? ` for "${frame.mediaQuery}"` : ""} (${pick.reason})`) }
+    console.info("[content-pipeline] media", JSON.stringify({ draft: d.id, v: d.version, retry: d.mediaRetries ?? 0, shown: shown.map(x => `${x.candidate.origin ?? "?"}:${x.candidate.width}x${x.candidate.height}:${x.candidate.title.slice(0, 60)}`), ranked: pick.ranked ?? null, turnedDown: pick.turnedDown ?? null, chosen: chosen.index, crop: chosen.index === null ? null : chosen.crop, why: chosen.index === null ? chosen.why : null }))
+    if (chosen.index === null) {
+      d.media = media
+      // No photo of the subject: like a source that can't support the post, the subject is replaced (MAX_AUTO_REPLACE).
+      return sourceHold(deps, ai, d, `no relevant, licensed photo was found${frame.mediaQuery ? ` for "${frame.mediaQuery}"` : ""}: ${chosen.why} (${pick.reason}).`)
+    }
     const c = shown[chosen.index].candidate
     used.add(c.pageUrl)
-    console.info("[content-pipeline] media", JSON.stringify({ draft: d.id, v: d.version, retry: d.mediaRetries ?? 0, shown: shown.map(x => `${x.candidate.origin ?? "?"}:${x.candidate.width}x${x.candidate.height}:${x.candidate.title.slice(0, 60)}`), ranked: pick.ranked ?? null, chosen: chosen.index, crop: chosen.crop ?? null, note: chosen.note ?? null }))
-    media.push({ url: c.url, pageUrl: c.pageUrl, title: c.title, license: c.license, creator: c.creator, credit: c.credit, usGovernment: c.usGovernment, ...(c.date ? { date: c.date } : {}), ...(c.rightsNote || chosen.note ? { note: [c.rightsNote, chosen.note].filter(Boolean).join(". ") } : {}), ...(chosen.crop ? { crop: chosen.crop } : {}) })
+    media.push({ url: c.url, pageUrl: c.pageUrl, title: c.title, license: c.license, creator: c.creator, credit: c.credit, usGovernment: c.usGovernment, ...(c.date ? { date: c.date } : {}), ...(c.rightsNote ? { note: c.rightsNote } : {}), crop: chosen.crop })
   }
   d.media = media
   // Credits and the DoD non-endorsement line belong to the caption the reviewer approves.
@@ -521,7 +551,7 @@ async function designStep(deps: WorkerDeps, d: McuDraft): Promise<void> {
     const missing = Object.keys(frame.fields).filter(k => dataset[k] !== "text")
     if (missing.length) notices.add(`${series.label} template has no field for ${missing.join(", ")}`)
     const title = `${d.id} v${d.version}${d.frames.length > 1 ? ` · ${i + 1}/${d.frames.length}` : ""} — ${(frame.fields.headline || frame.fields.subject_identifier || frame.fields.counter || series.label).slice(0, 120)}`
-    const r = await deps.content.createDesign({ requestId: `${KEY_PREFIX}${d.id}:v${d.version}:f${i + 1}${d.mediaRetries ? `:m${d.mediaRetries}` : ""}`, templateId, title, text, ...(image ? { image } : {}) })
+    const r = await deps.content.createDesign({ requestId: `${KEY_PREFIX}${d.id}:v${d.version}:f${i + 1}${d.autoReplaced ? `:r${d.autoReplaced}` : ""}${d.mediaRetries ? `:m${d.mediaRetries}` : ""}`, templateId, title, text, ...(image ? { image } : {}) })
     designs.push({ templateId, ...r })
   }
   if (d.frames.some(f => f.series === "icymi_story")) notices.add("ICYMI story cards: the progress bar width can't be set through Canva's API, so each card keeps the template's bar")
@@ -582,7 +612,8 @@ async function postStep(deps: WorkerDeps, d: McuDraft): Promise<void> {
   if (d.postId) { d.status = "in_review"; return save(deps, d, "already on the board") }
   const head = d.frames[0]?.fields.headline || d.frames[0]?.fields.subject_identifier || d.story.title
   const links = [...new Set([d.story.primaryUrl, ...(d.story.supporting ?? []).map(x => x.url), ...d.media.filter((m): m is ChosenMedia => !!m).map(m => m.pageUrl)])]
-  const r = await deps.content.writePost({ requestId: `${KEY_PREFIX}${d.id}:v${d.version}`, title: `${d.id} v${d.version} — ${head.replace(/\n/g, " ")}`.slice(0, 200), caption: d.caption ?? "", notes: reviewNotes(d), links, designIds: d.designs.map(x => x.designId), requestedBy: { email: d.request.actorEmail, name: d.request.actorName } })
+  const job = await deps.store.getJob(d.jobId)
+  const r = await deps.content.writePost({ requestId: `${KEY_PREFIX}${d.id}:v${d.version}`, property: contentPropertyOf(job?.property), title: `${d.id} v${d.version} — ${head.replace(/\n/g, " ")}`.slice(0, 200), caption: d.caption ?? "", notes: reviewNotes(d), links, designIds: d.designs.map(x => x.designId), requestedBy: { email: d.request.actorEmail, name: d.request.actorName } })
   d.postId = r.postId
   if (r.holds.length) d.qa = [...new Set([...d.qa, ...r.holds])]
   console.info("[content-pipeline] posted", JSON.stringify({ draft: d.id, v: d.version, postId: r.postId, designs: d.designs.map(x => x.designId), holds: r.holds, calls: (d.calls ?? []).map(c => `${c.step}:${c.model}@${c.provider ?? "?"}${c.fallbackFrom ? ` (fallback from ${c.fallbackFrom})` : ""}`) }))
@@ -601,7 +632,9 @@ async function sourceHold(deps: WorkerDeps, ai: McuAi, d: McuDraft, reason: stri
   if ("hold" in found || !found.length) return hold(deps, d, `${reason} No replacement subject qualified: ${"hold" in found ? found.hold : "none found"}`)
   const was = d.story.title
   d.rejected = rejected; d.story = found[0]
-  d.frames = []; d.caption = undefined; d.media = []; d.designs = []; d.qa = []; d.holdReason = undefined
+  // A new subject starts its photo search afresh; its designs get their own Canva request ids (":r<n>"), since a
+  // photo hold can come after the first subject's design was created.
+  d.frames = []; d.caption = undefined; d.media = []; d.designs = []; d.qa = []; d.holdReason = undefined; d.mediaRetries = undefined; d.avoidMedia = undefined
   await save(deps, d, `"${was}" couldn't be sourced (${reason.replace(/\.$/, "")}); switched to ${d.story.title}`)
   return writeStep(deps, ai, d)
 }

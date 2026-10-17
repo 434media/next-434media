@@ -9,7 +9,7 @@
  * carousel's companies again in the caption; Canva Notes as the review surface (the API cannot write Notes — the CRM record
  * on the Admin board carries the review); browser workarounds of any kind.
  */
-export const MCU_RULES_VERSION = "mcu-rules-2026-10-16.1"
+export const MCU_RULES_VERSION = "mcu-rules-2026-10-17.1"
 
 /** Rejected Breaking item that must never come back under any ID (founder, 2026-10-10). */
 export const NEVER_REVIVE = [{ id: "MCU-BN-20261010-03", what: "Space Development Agency adding 21 satellites (routine fleet increment, rejected as Breaking)" }] as const
@@ -41,7 +41,8 @@ SERIES
 - ICYMI: a fixed-five roundup of MCU News or Breaking stories already published: one cover plus five story cards, in the same order. Never duplicate a story or invent filler; fewer than five eligible means hold for Marcos.
 
 CARD COPY
-- Headlines are UPPERCASE, short and concrete. They must fit the template at its largest size (the limits given); if not, shorten the words — never rely on smaller type.
+- Headlines are UPPERCASE, short and concrete. They must fit the template at its largest size (the limits given); if not, choose shorter words — never rely on smaller type.
+- Whole words only. Never clip or abbreviate a word to make it fit ("PROD", "MFG", "GOVT", "SYS", "DEV"): rephrase with shorter whole words instead. The subject's own name or acronym (HIMARS, C2, UAS) is not an abbreviation.
 - A headline that states a count must be supported by the post as a whole (the cards or the caption name the counted items).
 - Deck: sentence case, at most two lines, supports the headline.
 - Date fields: DDMMMYY, e.g. 14SEP26 (the source's publication date for news).

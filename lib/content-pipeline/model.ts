@@ -23,7 +23,7 @@ export interface McuAi {
   /** DVIDS image pages (and official .mil/.gov photo pages) showing the card's subject, found by web search. */
   findPhotoPages(input: { story: Story; frame: FrameCopy }): Promise<string[]>
   /** The best candidate, and for each relevant one (best first) where its subject sits, so the server can test the 4:5 crop. */
-  pickMedia(input: { story: Story; frame: FrameCopy; candidates: { candidate: MediaCandidate; image: Uint8Array; mime: string }[]; avoid: string[] }): Promise<{ index: number | null; reason: string; ranked?: { index: number; box: SubjectBox; context?: boolean }[] }>
+  pickMedia(input: { story: Story; frame: FrameCopy; candidates: { candidate: MediaCandidate; image: Uint8Array; mime: string }[]; avoid: string[] }): Promise<{ index: number | null; reason: string; ranked?: { index: number; box: SubjectBox; context?: boolean; shows?: string }[]; turnedDown?: string[] }>
   /** Real defects on the exported card; photo defects are ones a different photo would fix. */
   checkArtwork(input: { frame: FrameCopy; images: { bytes: Uint8Array; mime: string }[] }): Promise<{ defect: string; photo: boolean }[]>
 }
@@ -36,7 +36,7 @@ export interface ModelCall { step: PipelineStep; model: string; provider?: strin
 const system = (extra: string) => [{ role: "system" as const, content: MCU_EDITORIAL, providerOptions: { anthropic: { cacheControl: { type: "ephemeral" as const } } } }, { role: "system" as const, content: extra }]
 
 function fieldBrief(f: FieldSpec): string {
-  return `${f.name} (${f.label}${f.allowed ? `; exactly one of: ${f.allowed.join(" | ")}` : ""}${f.date ? "; DDMMMYY" : ""}${f.perLine && f.maxLines ? `; at most ${f.maxLines} line${f.maxLines > 1 ? "s" : ""} of ~${f.perLine} characters` : ""}${f.maxChars ? `; at most ${f.maxChars} characters` : ""}${f.uppercase ? "; UPPERCASE" : ""}${f.exactLines ? `; exactly ${f.exactLines} lines separated by a line break, each at most ${f.perLine} characters` : ""})`
+  return `${f.name} (${f.label}${f.allowed ? `; exactly one of: ${f.allowed.join(" | ")}` : ""}${f.date ? "; DDMMMYY" : ""}${f.perLine && f.maxLines ? `; at most ${f.maxLines} line${f.maxLines > 1 ? "s" : ""} of ~${f.perLine} characters` : ""}${f.maxChars ? `; at most ${f.maxChars} characters` : ""}${f.uppercase ? "; UPPERCASE" : ""}${f.exactLines ? `; exactly ${f.exactLines} lines separated by a line break, each at most ${f.perLine} characters of whole words, never abbreviated` : ""})`
 }
 export function framesFor(kind: RequestKind): SeriesKey[] {
   return kind === "icymi" ? ["icymi_cover", "icymi_story", "icymi_story", "icymi_story", "icymi_story", "icymi_story"] : [kind]
@@ -80,6 +80,17 @@ export function brandDirection(seeds: McuSeeds | null | undefined): string {
   return seeds ? `MCU PURPOSE: ${seeds.purpose}\nWho MCU covers:\n${seeds.cohorts.map(c => `- ${c}`).join("\n")}\n\n` : ""
 }
 
+const TEXT_WORDS = /\b(text|headline|hook|deck|caption|label|font|type|letters?|words?|typo|spell|misspell|abbreviat|truncat|line break|copy)/i
+const PHOTO_WORDS = /\b(photo|picture|subject(?![ _](line|identifier|text))|face|crop|sky|tail-only|background)/i
+/**
+ * Whether an artwork defect sends the draft back for another photo. Only a photo-area defect does, and not one that
+ * reads as a text problem with no photo cause: the 2026-10-17 check labelled "benefit headline text is clipped" a
+ * photo defect and spent a photo retry on it. "Text over a face" names a photo cause, so it still counts.
+ */
+export function isPhotoDefect(area: string, defect: string): boolean {
+  return area === "photo" && !(TEXT_WORDS.test(defect) && !PHOTO_WORDS.test(defect))
+}
+
 /** The provider the Gateway routed to, read defensively from its response metadata. */
 export function servedBy(meta: unknown): string | undefined {
   const g = (meta as { gateway?: { routing?: Record<string, unknown> } } | undefined)?.gateway?.routing
@@ -109,6 +120,22 @@ export async function servedCall<R extends Served, T>(step: PipelineStep, model:
     return once(fallback, { from: model, reason })
   }
 }
+/**
+ * The vision pick as the server accepts it: only candidates the model saw as the exact subject, each with its subject
+ * box, best first. The -05 DT101 draft (2026-10-17) placed a blurry F-14 from the Barracuda-M page because the model's
+ * single index was taken without a box or a statement of what the photo showed. A pick outside the exact matches is
+ * not a choice; what the others showed is kept for the log.
+ */
+export function readPick(pick: { index: number | null; reason: string; ranked?: { index: number; shows?: string; match?: string; x0: number; y0: number; x1: number; y1: number; context?: boolean }[] }, count: number): { index: number | null; reason: string; ranked?: { index: number; box: SubjectBox; context?: boolean; shows?: string }[]; turnedDown?: string[] } {
+  const ok = (n: number) => Number.isInteger(n) && n >= 0 && n < count
+  const clamp = (v: number) => Math.min(1, Math.max(0, Number(v) || 0))
+  const all = (pick.ranked ?? []).filter(x => ok(x.index))
+  const exact = all.filter(x => x.match === "exact" && x.x1 !== x.x0 && x.y1 !== x.y0)
+  const ranked = exact.map(x => ({ index: x.index, box: { x0: clamp(Math.min(x.x0, x.x1)), y0: clamp(Math.min(x.y0, x.y1)), x1: clamp(Math.max(x.x0, x.x1)), y1: clamp(Math.max(x.y0, x.y1)) }, context: x.context !== false, ...(x.shows ? { shows: x.shows.slice(0, 160) } : {}) }))
+  const turnedDown = all.filter(x => !exact.includes(x)).map(x => `#${x.index} ${x.match ?? "no match given"}: ${(x.shows ?? "").slice(0, 120)}`)
+  const index = pick.index !== null && ranked.some(x => x.index === pick.index) ? pick.index : ranked[0]?.index ?? null
+  return { index, reason: pick.reason, ...(ranked.length ? { ranked } : {}), ...(turnedDown.length ? { turnedDown } : {}) }
+}
 export function createMcuAi(deps: { models: Record<PipelineStep, string>; searchTools: ToolSet; onCall?(call: ModelCall): void; fallbacks?: Partial<Record<PipelineStep, string>> }): McuAi {
   const m = deps.models, fallbacks = deps.fallbacks ?? CALL_FALLBACK
   const run = <R extends Served, T = R>(step: PipelineStep, call: (model: string) => Promise<R>, accept: (r: R) => T | Promise<T> = r => r as unknown as T): Promise<T> =>
@@ -116,7 +143,7 @@ export function createMcuAi(deps: { models: Record<PipelineStep, string>; search
   return {
     async research({ kind, count, topic, today, recentTitles, avoid, seeds }) {
       const want = kind === "dt101" ? "defense technologies worth a Defense Tech 101 explainer (a specific, real product or system with a clear maker and a sourced status)" : kind === "breaking" ? "Breaking-qualified developments (primary-source announcement within the last 24 hours AND consequential enough to need immediate attention)" : "defense-industry news stories from the last 7 days"
-      const task = `${seedBrief(kind, seeds)}\n\nToday is ${today}. Task: find up to ${count + 2} ${want}${topic ? `, about: ${topic}` : ""}. Search the web; for each, find the ORIGINAL primary-source page (the company, agency or service's own announcement, contract notice or official article) and give its exact URL. Skip anything MCU already covered (recent MCU titles below) and anything listed under NEVER. Prefer U.S. defense, national-security and defense-tech companies and programs. ${kind === "dt101" ? "A DT101 card needs the maker and its headquarters: when the primary page does not name them, give supportingUrls with up to two pages that do (the maker's own product or about page first). " : ""}${kind === "breaking" ? "For each, give whyNow: one sourced sentence on what is newly different, its material consequence, and why it needs attention now. If nothing qualifies, return no candidates and say why in note." : ""}\nNever revive: ${NEVER_REVIVE.map(n => `${n.id} — ${n.what}`).join("; ")}.${avoid?.length ? `\nThese subjects were turned down or could not be sourced; pick something clearly different: ${avoid.join("; ")}.` : ""}\nRecent MCU titles:\n${recentTitles.map(t => `- ${t}`).join("\n") || "- (none found)"}`
+      const task = `${seedBrief(kind, seeds)}\n\nToday is ${today}. Task: find up to ${count + 2} ${want}${topic ? `, about: ${topic}` : ""}. Search the web; for each, find the ORIGINAL primary-source page (the company, agency or service's own announcement, contract notice or official article) and give its exact URL. Skip anything MCU already covered (recent MCU titles below) and anything listed under NEVER. Prefer U.S. defense, national-security and defense-tech companies and programs. ${kind === "dt101" ? "A DT101 card needs the maker and its headquarters: when the primary page does not name them, give supportingUrls with up to two pages that do (the maker's own product or about page first). The primary source must be current: a dated article or announcement from the last 90 days, or the maker's own product page; an older article is rejected, so give the product page or a recent announcement instead, with the older article only as a supporting source. " : kind === "news" ? "Give each story's publication date (publishedAt, YYYY-MM-DD) as the page states it; anything published more than 7 days ago is rejected. " : ""}${kind === "breaking" ? "For each, give whyNow: one sourced sentence on what is newly different, its material consequence, and why it needs attention now. If nothing qualifies, return no candidates and say why in note." : ""}\nNever revive: ${NEVER_REVIVE.map(n => `${n.id} — ${n.what}`).join("; ")}.${avoid?.length ? `\nThese subjects were turned down or could not be sourced; pick something clearly different: ${avoid.join("; ")}.` : ""}\nRecent MCU titles:\n${recentTitles.map(t => `- ${t}`).join("\n") || "- (none found)"}`
       // Two calls, because asking for structured output in the same call as the search tool makes the model answer
       // at once from memory instead of searching (production, 2026-10-17: one step, no search, guessed URLs that
       // 404'd, then zero candidates). 1) Search: only the search tool, required on the first step; the model writes
@@ -182,27 +209,24 @@ export function createMcuAi(deps: { models: Record<PipelineStep, string>; search
       if (!candidates.length) return { index: null, reason: "no licensed candidates" }
       const pick = await run("photoPick", model => generateText({
         model, maxOutputTokens: outputBudget(model, 8_000), providerOptions: callOptions(model, "low"),
-        messages: [{ role: "system", content: "You choose the photo for a MilCityUSA social card: 1080 × 1350, full bleed, the photo filling the frame, the text block on a dark scrim over the lower 40%. The approved look is a close, dominant hero subject that fills the upper part of the frame and stays recognizable at phone size. Rank only candidates that visibly show the actual system, product, vehicle, unit or organization in the story, best first; a photo of something or someone that merely shares a name with it (a person, a band, a book, a convention panel, a logo or a graphic) is NOT relevant, and when you can't tell, leave it out. Give each one's subject bounding box as fractions of that photo (x0, y0 top-left to x1, y1 bottom-right; 0–1). Also say whether its background adds context (terrain, a setting, operators or other equipment that make the photo more interesting, like a forest behind an off-road vehicle) or is empty space (open sky, plain water, a blank wall or pier) that the subject should fill instead. Reject mostly-sky or empty frames, tail-only or cropped-off subjects, tiny distant subjects, and unrelated archive imagery presented as the event. index is your single best choice, or null if none is relevant and strong." },
+        messages: [{ role: "system", content: "You choose the photo for a MilCityUSA social card: 1080 × 1350, full bleed, the photo filling the frame, the text block on a dark scrim over the lower 40%. The approved look is a close, dominant hero subject that fills the upper part of the frame and stays recognizable at phone size. Judge each candidate by what its pixels show, never by its title, page or description: a page about a product often carries an unrelated share image (another aircraft, a hangar, a logo, an event photo). For each candidate you rank, first say in a few words what the photo itself shows, then whether that is the exact subject named below (match: exact), something related but not it (another variant, another vehicle, a generic scene: related), or not it at all (unrelated). Rank only candidates that visibly show the actual system, product, vehicle, unit or organization in the story, best first; a photo of something or someone that merely shares a name with it (a person, a band, a book, a convention panel, a logo or a graphic) is NOT relevant, and when you can't tell, leave it out. A blurry, dark or partial view of the subject is not a match either. Give each one's subject bounding box as fractions of that photo (x0, y0 top-left to x1, y1 bottom-right; 0–1). Also say whether its background adds context (terrain, a setting, operators or other equipment that make the photo more interesting, like a forest behind an off-road vehicle) or is empty space (open sky, plain water, a blank wall or pier) that the subject should fill instead. Reject mostly-sky or empty frames, tail-only or cropped-off subjects, tiny distant subjects, and unrelated archive imagery presented as the event. index is your single best choice, or null if none is relevant and strong." },
           { role: "user", content: [
             { type: "text", text: `Story: ${story.title}\nThe subject to show: ${frame.fields.subject_identifier || frame.fields.headline || story.title}\nCard: ${JSON.stringify(frame.fields)}\nAvoid repeating: ${avoid.join(", ") || "none"}\nCandidates follow, numbered from 0.` },
             ...candidates.flatMap((c, i) => [{ type: "text" as const, text: `#${i}: ${c.candidate.title} — ${c.candidate.description} (${c.candidate.width}×${c.candidate.height}, ${c.candidate.date ?? "date unknown"})` }, { type: "image" as const, image: c.image, mediaType: c.mime }]),
           ] }],
-        tools: { choose_photo: tool({ description: "Choose the photo, or null when none is relevant and strong.", inputSchema: z.object({ index: z.number().int().nullable(), reason: z.string(), ranked: z.array(z.object({ index: z.number().int(), x0: z.number(), y0: z.number(), x1: z.number(), y1: z.number(), context: z.boolean().describe("true when the background adds context; false when it is empty space the subject should fill") })).describe("every relevant candidate, best first, with its subject box") }) }) }, toolChoice: "required", // the only tool: the same contract as naming it, accepted by more providers
-      }), r => submitted<{ index: number | null; reason: string; ranked?: { index: number; x0: number; y0: number; x1: number; y1: number; context?: boolean }[] }>(r, "choose_photo"))
-      const i = pick.index, ok = (n: number) => Number.isInteger(n) && n >= 0 && n < candidates.length
-      const clamp = (v: number) => Math.min(1, Math.max(0, Number(v) || 0))
-      const ranked = (pick.ranked ?? []).filter(x => ok(x.index)).map(x => ({ index: x.index, box: { x0: clamp(Math.min(x.x0, x.x1)), y0: clamp(Math.min(x.y0, x.y1)), x1: clamp(Math.max(x.x0, x.x1)), y1: clamp(Math.max(x.y0, x.y1)) }, context: x.context !== false }))
-      return { index: i !== null && ok(i) ? i : null, reason: pick.reason, ...(ranked.length ? { ranked } : {}) }
+        tools: { choose_photo: tool({ description: "Choose the photo, or null when none is relevant and strong.", inputSchema: z.object({ index: z.number().int().nullable(), reason: z.string(), ranked: z.array(z.object({ index: z.number().int(), shows: z.string().describe("what the photo itself shows, in a few words, read from the image"), match: z.enum(["exact", "related", "unrelated"]).describe("exact: it is the subject named on the card; related: similar but not it; unrelated: not it"), x0: z.number(), y0: z.number(), x1: z.number(), y1: z.number(), context: z.boolean().describe("true when the background adds context; false when it is empty space the subject should fill") })).describe("every candidate you judged, best first, with what it shows, its match and its subject box") }) }) }, toolChoice: "required", // the only tool: the same contract as naming it, accepted by more providers
+      }), r => submitted<{ index: number | null; reason: string; ranked?: { index: number; shows?: string; match?: string; x0: number; y0: number; x1: number; y1: number; context?: boolean }[] }>(r, "choose_photo"))
+      return readPick(pick, candidates.length)
     },
 
     async checkArtwork({ frame, images }) {
       const out = await run("artworkCheck", model => generateText({
         model, maxOutputTokens: outputBudget(model, 6_000), providerOptions: callOptions(model, "low"),
-        messages: [{ role: "system", content: "You check an exported social card at full size. Report only real defects: text clipped, overflowing or colliding; text over a face or the subject; placeholder or sample text; an empty slot showing; a wrong or unreadable value; the subject not recognizable at phone size, cut off, mostly sky or tail-only. Answer an empty list when there are none." },
+        messages: [{ role: "system", content: "You check an exported social card at full size. Report only real defects, each with its area. PHOTO defects are ones a different photo or crop would fix: the photo does not show the subject named on the card, or the subject is not recognizable at phone size, cut off, mostly sky, tail-only, or hidden under the text or a face. TEXT defects are in the words: text clipped, overflowing or colliding; placeholder or sample text; a wrong, misspelled, abbreviated or unreadable value. LAYOUT defects are neither: an empty slot showing, a misplaced element. A clipped or overflowing headline is a TEXT defect even though it sits over the photo. Answer an empty list when there are none." },
           { role: "user", content: [{ type: "text", text: `Intended values: ${JSON.stringify(frame.fields)}` }, ...images.map(im => ({ type: "image" as const, image: im.bytes, mediaType: im.mime }))] }],
-        tools: { report_defects: tool({ description: "Report the real defects, or an empty list.", inputSchema: z.object({ defects: z.array(z.object({ defect: z.string(), photo: z.boolean().describe("true when a different photo or crop would fix it (subject hidden, cut off, too small, under the text, mostly sky); false for text problems") })) }) }) }, toolChoice: "required",
-      }), r => submitted<{ defects: { defect: string; photo: boolean }[] }>(r, "report_defects"))
-      return out.defects.slice(0, 6)
+        tools: { report_defects: tool({ description: "Report the real defects, or an empty list.", inputSchema: z.object({ defects: z.array(z.object({ defect: z.string(), area: z.enum(["photo", "text", "layout"]).describe("photo: a different photo or crop would fix it; text: the words are wrong, clipped or overflowing; layout: anything else") })) }) }) }, toolChoice: "required",
+      }), r => submitted<{ defects: { defect: string; area?: string; photo?: boolean }[] }>(r, "report_defects"))
+      return out.defects.slice(0, 6).map(d => ({ defect: d.defect, photo: isPhotoDefect(d.area ?? (d.photo ? "photo" : "text"), d.defect) }))
     },
   }
 }
