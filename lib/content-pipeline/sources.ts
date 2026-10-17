@@ -101,8 +101,8 @@ export interface MediaCandidate {
   credit: string         // the line to print with the image
   date?: string
   usGovernment: boolean
-  /** Where it was found: the story's own pages, a DVIDS image page, or Wikimedia Commons. */
-  origin?: "source" | "dvids" | "commons"
+  /** Where it was found: the story's own pages (or a government or maker page found by search), a DVIDS image page, or an open archive. */
+  origin?: "source" | "dvids" | "commons" | "openverse" | "nasa"
   /** A rights point the reviewer must check before approving (company or courtesy media). */
   rightsNote?: string
 }
@@ -135,6 +135,73 @@ export async function searchCommons(query: string, fetcher: Fetcher = fetch as F
     out.push({ origin: "commons", rank: p.index ?? 99, url: scaled ?? ii.url, thumbUrl: thumb, pageUrl: ii.descriptionurl, title: (p.title || "").replace(/^File:/, ""), description: strip(m.ImageDescription?.value).slice(0, 400), width, height, license, creator: creator.slice(0, 200), credit: `${creator.slice(0, 120)}${license ? ` / ${license}` : ""} via Wikimedia Commons`, ...(m.DateTimeOriginal?.value ? { date: strip(m.DateTimeOriginal.value).slice(0, 40) } : {}), usGovernment })
   }
   return out.sort((a, b) => a.rank - b.rank).slice(0, limit).map(({ rank, ...c }) => (void rank, c))
+}
+
+const GOV_CREDIT = /u\.?s\.? (army|navy|air force|marine|space force|coast guard|department of (defense|war))|\bdod\b|dvids|\.mil\b|\bnasa\b|national guard/i
+const OPENVERSE_LICENSE: Record<string, string> = { pdm: "Public domain", cc0: "CC0", by: "CC BY", "by-sa": "CC BY-SA" }
+
+/**
+ * Openverse (WordPress.org's open-media index: Flickr, museums, government collections and more), anonymous: no
+ * key or account. Only public-domain, CC0, CC BY and CC BY-SA images are kept (its server-side license filter is not
+ * relied on), each with its creator, license and the item's own page.
+ */
+export async function searchOpenverse(query: string, fetcher: Fetcher = fetch as Fetcher, limit = 12): Promise<MediaCandidate[]> {
+  const u = new URL("https://api.openverse.org/v1/images/")
+  u.search = new URLSearchParams({ q: query, license: "pdm,cc0,by,by-sa", page_size: String(Math.min(limit * 2, 40)), mature: "false" }).toString()
+  const res = await fetcher(u, { headers: { "user-agent": USER_AGENT, accept: "application/json" }, cache: "no-store", signal: AbortSignal.timeout(15_000) })
+  if (!res.ok) throw new Error(`openverse_http_${res.status}`)
+  const data = await res.json() as { results?: { title?: string; foreign_landing_url?: string; url?: string; creator?: string; license?: string; license_version?: string; source?: string; width?: number; height?: number; filetype?: string | null }[] }
+  const out: MediaCandidate[] = []
+  for (const r of data.results ?? []) {
+    const short = OPENVERSE_LICENSE[String(r.license || "").toLowerCase()]
+    const license = short ? `${short}${r.license_version && short.startsWith("CC BY") ? ` ${r.license_version}` : ""}`.trim() : ""
+    if (!license || !usableLicense(license === "CC0" ? "cc0" : license) || !r.url || !r.foreign_landing_url || !/^https:\/\//.test(r.url) || !/^https:\/\//.test(r.foreign_landing_url)) continue
+    if (r.filetype && !/^(jpe?g|png)$/i.test(r.filetype)) continue
+    const width = r.width ?? 0, height = r.height ?? 0
+    if (width && height && Math.min(width, height) < MIN_SHORT_SIDE) continue
+    const creator = strip(r.creator) || "Unknown", from = r.source || "Openverse"
+    out.push({ origin: "openverse", url: r.url, thumbUrl: r.url, pageUrl: r.foreign_landing_url, title: strip(r.title).slice(0, 200) || "Untitled", description: "", width, height, license, creator: creator.slice(0, 200), credit: `${creator.slice(0, 120)} / ${license} via ${from}`, usGovernment: GOV_CREDIT.test(`${creator} ${from}`) })
+  }
+  return out.slice(0, limit)
+}
+
+/**
+ * NASA Image and Video Library, anonymous: NASA imagery is generally not copyrighted. Items whose description or
+ * credit names a copyright or courtesy holder are skipped, since their rights can't be established here.
+ */
+export async function searchNasa(query: string, fetcher: Fetcher = fetch as Fetcher, limit = 8): Promise<MediaCandidate[]> {
+  const u = new URL("https://images-api.nasa.gov/search")
+  u.search = new URLSearchParams({ q: query, media_type: "image", page_size: String(limit * 2) }).toString()
+  const res = await fetcher(u, { headers: { "user-agent": USER_AGENT, accept: "application/json" }, cache: "no-store", signal: AbortSignal.timeout(15_000) })
+  if (!res.ok) throw new Error(`nasa_http_${res.status}`)
+  const data = await res.json() as { collection?: { items?: { data?: { nasa_id?: string; title?: string; description?: string; photographer?: string; secondary_creator?: string; center?: string; date_created?: string }[] }[] } }
+  const out: MediaCandidate[] = []
+  for (const it of data.collection?.items ?? []) {
+    const m = it.data?.[0]
+    if (!m?.nasa_id || !/^[A-Za-z0-9_.-]{3,120}$/.test(m.nasa_id)) continue
+    const who = strip(m.photographer || m.secondary_creator || "") || `NASA${m.center ? ` ${m.center}` : ""}`
+    if (/©|copyright|courtesy/i.test(`${m.description ?? ""} ${who}`)) continue
+    const id = encodeURIComponent(m.nasa_id), creator = /nasa/i.test(who) ? who : `NASA / ${who}`
+    out.push({ origin: "nasa", url: `https://images-assets.nasa.gov/image/${id}/${id}~large.jpg`, thumbUrl: `https://images-assets.nasa.gov/image/${id}/${id}~large.jpg`, pageUrl: `https://images.nasa.gov/details/${id}`, title: strip(m.title).slice(0, 200) || m.nasa_id, description: strip(m.description).slice(0, 400), width: 0, height: 0, license: "Public domain (NASA)", creator: creator.slice(0, 200), credit: creator.slice(0, 160), ...(m.date_created ? { date: m.date_created.slice(0, 10) } : {}), usGovernment: true })
+    if (out.length >= limit) break
+  }
+  return out
+}
+
+const CONTEXT_WORDS = /\b(military|defen[cs]e|army|navy|naval|air ?force|marines?|space ?force|coast guard|soldiers?|sailors?|airmen|troops?|aircraft|jets?|fighters?|drones?|uas|unmanned|uncrewed|autonomous|missiles?|rockets?|launch(er|es)?|satellites?|spacecraft|vessels?|ships?|submarines?|vehicles?|tanks?|helicopters?|radar|weapons?|artillery|nasa|dod|dvids|exercise|test flight|prototype)\b/i
+const NOT_A_PHOTO = /\b(logo|logotype|wordmark|icon|emblem|seal|insignia|badge|coat of arms|diagram|chart|map|infographic|screenshot)\b/i
+/**
+ * An open-archive hit is offered to the photo pick only when its own text ties it to the story: it names the maker,
+ * or it is defense or space imagery (a context word, or a government creator), and it is not a logo or graphic. A
+ * search for "Hivemind" also finds a comic writers' Dragon Con panel and a logo of that name (preview, 2026-10-17);
+ * neither passes. The story's own pages and pages found by the photo search are not filtered here.
+ */
+export function archiveRelevant(c: Pick<MediaCandidate, "title" | "description" | "creator" | "usGovernment">, maker?: string): boolean {
+  const text = `${c.title} ${c.description}`
+  if (NOT_A_PHOTO.test(c.title)) return false
+  const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim()
+  const m = maker ? norm(maker) : ""
+  return (m.length > 2 && norm(`${text} ${c.creator}`).includes(m)) || CONTEXT_WORDS.test(text) || c.usGovernment
 }
 
 // ── Photos on the story's own pages and on DVIDS ──

@@ -1,7 +1,7 @@
 import { gateway } from "@ai-sdk/gateway"
 import { createMcuAi } from "./model"
 import { PIPELINE_MODELS } from "./models"
-import { fetchImage, fetchSourcePage, searchCommons } from "./sources"
+import { fetchImage, fetchSourcePage, searchCommons, searchNasa, searchOpenverse } from "./sources"
 import { runDue, label, type PostRow, type WorkerDeps } from "./worker"
 import type { McuDraft, McuJob } from "./store"
 
@@ -24,6 +24,7 @@ export async function pipelineDeps(): Promise<WorkerDeps> {
     fetchPage: url => fetchSourcePage(url),
     fetchImage: url => fetchImage(url),
     searchCommons: q => searchCommons(q),
+    searchMore: async q => (await Promise.all([searchOpenverse(q).catch(() => []), searchNasa(q).catch(() => [])])).flat(),
     nowMs: Date.now,
     content: {
       // MCU's posts under any of the names they carry (older records are not all tagged "milcity"), de-duplicated.

@@ -60,6 +60,8 @@ export interface McuDraft {
   request: RequestRef
   status: DraftStatus
   version: number
+  /** The requester's optional Generate instruction, copied from the job; the writer gets it as proactive direction. */
+  direction?: string
   story: Story
   frames: FrameCopy[]
   caption?: string

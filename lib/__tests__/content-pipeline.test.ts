@@ -8,10 +8,10 @@
 import { test } from "node:test"
 import assert from "node:assert/strict"
 import { SERIES, checkFields, ddmmmyy, lineCount, type SeriesKey } from "../content-pipeline/series"
-import { runDue, RETRY_MS, unsourcedNumbers, withCredits, imageLabel, mediaQueries, cropFit, choosePhoto, zoomCrop, reviewNotes, DOD_NOTICE, LEASE_MS, type WorkerDeps, type DesignInput, type PostInput } from "../content-pipeline/worker"
+import { runDue, RETRY_MS, makerOf, searchedPageUsable, unsourcedNumbers, withCredits, imageLabel, mediaQueries, cropFit, choosePhoto, zoomCrop, reviewNotes, DOD_NOTICE, LEASE_MS, type WorkerDeps, type DesignInput, type PostInput } from "../content-pipeline/worker"
 import { MAX_ATTEMPTS, type McuDraft, type McuJob, type McuStore } from "../content-pipeline/store"
-import { assertPublicHttps, imageSize, pageImageCandidate, parsePage, usableLicense, type MediaCandidate } from "../content-pipeline/sources"
-import { servedBy, servedCall, type McuAi, type ModelCall } from "../content-pipeline/model"
+import { archiveRelevant, assertPublicHttps, imageSize, pageImageCandidate, parsePage, searchNasa, searchOpenverse, usableLicense, type MediaCandidate } from "../content-pipeline/sources"
+import { brandDirection, servedBy, servedCall, type McuAi, type ModelCall } from "../content-pipeline/model"
 import { PIPELINE_MODELS, FALLBACK_MODELS, CALL_FALLBACK, callOptions, outputBudget } from "../content-pipeline/models"
 import { seedBrief, seedProblems, type McuSeeds } from "../content-pipeline/seeds"
 import { PIPELINE_PROPERTIES, PROPERTY_TEMPLATES, propertyCanGenerate } from "../content-pipeline/properties"
@@ -248,7 +248,7 @@ test("a long photo phrase falls back to shorter Commons searches: trimmed phrase
   const frame = { series: "dt101" as SeriesKey, fields: { subject_identifier: "SAILDRONE VOYAGER / SAILDRONE" }, mediaQuery: "Saildrone Voyager unmanned surface vehicle at sea, U.S. Navy 4th Fleet Caribbean" }
   assert.deepEqual(mediaQueries(frame, { title: "Saildrone Voyager: 10-meter uncrewed surface vehicle (Saildrone)" }), [
     "Saildrone Voyager unmanned surface vehicle at sea U.S. Navy 4th Fleet Caribbean", "Saildrone Voyager unmanned surface vehicle at", "Saildrone Voyager unmanned",
-    "SAILDRONE VOYAGER", "SAILDRONE", "Saildrone Voyager", "Saildrone Voyager 10-meter uncrewed surface vehicle Saildrone"])
+    "SAILDRONE VOYAGER SAILDRONE", "SAILDRONE VOYAGER", "SAILDRONE", "Saildrone Voyager", "Saildrone Voyager 10-meter uncrewed surface vehicle Saildrone"])
   const searched: string[] = []
   const w = world({ ai: { write: async () => ({ frames: [{ ...frame, fields: { benefit_headline: "Watch the sea.\nNo crew aboard.", subject_identifier: "Saildrone Voyager / Saildrone" } }], caption: "Caption. Source: U.S. Army, 2026-10-15" }) } })
   w.deps.searchCommons = async q => { searched.push(q); return /^SAILDRONE VOYAGER$/i.test(q) ? [CANDIDATE] : [] }
@@ -396,6 +396,59 @@ test("properties: the roster's five, only MilCityUSA can generate, and only from
   assert.deepEqual(PROPERTY_TEMPLATES.milcity.map(t => t.kind), ["news", "breaking", "dt101", "icymi"])
   assert.deepEqual(PROPERTY_TEMPLATES.milcity.find(t => t.kind === "dt101")!.templates, [SERIES.dt101.templates.feed])
   assert.ok(propertyCanGenerate("milcity", "dt101")); assert.ok(!propertyCanGenerate("txmx", "news")); assert.ok(!propertyCanGenerate("milcity", "followon_text"))
+})
+
+test("photo relevance: archive hits must tie to the story — the Dragon Con 'Hivemind' panel and a logo never reach the pick (production, 2026-10-17)", async () => {
+  const hit = (title: string, over: Partial<MediaCandidate> = {}) => ({ ...CANDIDATE, title, description: "", creator: "Someone", usGovernment: false, ...over })
+  assert.equal(archiveRelevant(hit("Collin Kelly and Jackson Lanzing, Hivemind Dragon Con September 6 2026 0051.jpg"), "Shield AI"), false)
+  assert.equal(archiveRelevant(hit("Hivemind Logo.png"), "Shield AI"), false)
+  assert.equal(archiveRelevant(hit("MJK34814 Tina Dalakishvili (Hostages, Berlinale 2017).jpg"), "Shield AI"), false)
+  assert.equal(archiveRelevant(hit("V-BAT on the flight line", { description: "Shield AI V-BAT before a demonstration" }), "Shield AI"), true) // names the maker
+  assert.equal(archiveRelevant(hit("Hivemind-piloted F-16 test flight"), "Shield AI"), true) // defense context
+  assert.equal(archiveRelevant(hit("Soldiers at a command post", { usGovernment: true }), "Lockheed Martin"), true)
+  assert.equal(archiveRelevant(hit("U.S. Army insignia", { usGovernment: true }), "Lockheed Martin"), false) // a graphic, not a photo
+  // End to end: only the tied hit is shown to the photo pick.
+  let shown: string[] = []
+  const w = world({ ai: { write: async () => ({ frames: [{ series: "dt101" as SeriesKey, fields: { benefit_headline: "Fly the jet.\nNo pilot needed.", subject_identifier: "Hivemind / Shield AI" }, mediaQuery: "Hivemind" }], caption: "Caption. Source: U.S. Army, 2026-10-15" }), pickMedia: async ({ candidates }) => { shown = candidates.map(c => c.candidate.title); return { index: 0, reason: "only relevant one" } } } })
+  w.deps.fetchPage = async url => ({ url, title: "t", text: ARMY_TEXT, publishedAt: "2026-10-16T09:00:00Z" }) // no share image
+  w.deps.searchCommons = async () => [hit("Collin Kelly, Hivemind Dragon Con September 6 2026 0052.jpg", { pageUrl: "p1", url: "u1" }), hit("Hivemind Logo.png", { pageUrl: "p2", url: "u2" })]
+  w.deps.searchMore = async () => [hit("Shield AI Hivemind flies an F-16", { pageUrl: "p3", url: "u3", origin: "openverse" })]
+  await w.start({ kind: "dt101" })
+  assert.deepEqual(shown, ["Shield AI Hivemind flies an F-16"])
+})
+
+test("photo search pages: government and the maker's own site only; news outlets' photos are skipped", () => {
+  assert.equal(makerOf({ series: "dt101", fields: { subject_identifier: "ULTRA / OVERLAND AI" } }, { publisher: "U.S. Army" }), "OVERLAND AI")
+  assert.equal(makerOf({ series: "news", fields: {} }, { publisher: "U.S. Army" }), "U.S. Army")
+  assert.ok(searchedPageUsable("https://www.army.mil/article/1", "Overland AI") && searchedPageUsable("https://www.dvidshub.net/image/1", "x") && searchedPageUsable("https://www.nasa.gov/image-detail/x", "x"))
+  assert.ok(searchedPageUsable("https://www.overland.ai/press", "OVERLAND AI") && searchedPageUsable("https://shield.ai/hivemind", "Shield AI"))
+  assert.ok(!searchedPageUsable("https://www.defensenews.com/2026/10/x", "Shield AI") && !searchedPageUsable("https://www.gettyimages.com/x", "Shield AI") && !searchedPageUsable("not a url", "x"))
+})
+
+test("open archives: Openverse keeps only usable licenses with credit; NASA skips courtesy and copyright items", async () => {
+  const json = (body: unknown) => (async () => new Response(JSON.stringify(body), { status: 200, headers: { "content-type": "application/json" } })) as never
+  const ov = await searchOpenverse("HIMARS", json({ results: [
+    { title: "HIMARS live fire", foreign_landing_url: "https://www.flickr.com/photos/a/1", url: "https://live.staticflickr.com/1_b.jpg", creator: "DVIDSHUB", license: "by", license_version: "2.0", source: "flickr", width: 1024, height: 683, filetype: "jpg" },
+    { title: "HIMARS parade", foreign_landing_url: "https://www.flickr.com/photos/b/2", url: "https://live.staticflickr.com/2_b.jpg", creator: "Latvijas armija", license: "by-nc-nd", license_version: "2.0", source: "flickr", width: 1024, height: 683 },
+    { title: "Tiny", foreign_landing_url: "https://x.example/3", url: "https://x.example/3.jpg", creator: "c", license: "cc0", width: 300, height: 200 },
+  ] }))
+  assert.equal(ov.length, 1)
+  assert.deepEqual({ license: ov[0].license, credit: ov[0].credit, page: ov[0].pageUrl, gov: ov[0].usGovernment, origin: ov[0].origin }, { license: "CC BY 2.0", credit: "DVIDSHUB / CC BY 2.0 via flickr", page: "https://www.flickr.com/photos/a/1", gov: true, origin: "openverse" })
+  const nasa = await searchNasa("Artemis", json({ collection: { items: [
+    { data: [{ nasa_id: "KSC-1", title: "Artemis I SLS", description: "SLS on the pad.", photographer: "NASA/Ben Smegelsky", date_created: "2022-06-14T00:00:00Z" }] },
+    { data: [{ nasa_id: "KSC-2", title: "Launch", description: "Photo courtesy of SpaceX" }] },
+  ] } }))
+  assert.equal(nasa.length, 1)
+  assert.deepEqual({ url: nasa[0].url, page: nasa[0].pageUrl, license: nasa[0].license, credit: nasa[0].credit, date: nasa[0].date }, { url: "https://images-assets.nasa.gov/image/KSC-1/KSC-1~large.jpg", page: "https://images.nasa.gov/details/KSC-1", license: "Public domain (NASA)", credit: "NASA/Ben Smegelsky", date: "2022-06-14" })
+})
+
+test("the writer gets MCU's brand direction and the requester's instruction as proactive direction, in every round", async () => {
+  const seen: { direction?: string; seeds?: McuSeeds | null }[] = []
+  const w = world({ ai: { write: async input => { seen.push({ direction: input.direction, seeds: input.seeds }); return { frames: [{ series: "news" as SeriesKey, fields: { headline: "Army backs 9 C2 software vendors", deck: "Awards worth $93.6 million fund I Corps command software.", source: "ARMY.MIL" } }], caption: "The Army awarded $93.6 million.\n\nSource: U.S. Army, 2026-10-15" } } } })
+  await w.start({ topic: "lead with what it means for I Corps soldiers" })
+  assert.equal(onlyDraft(w).direction, "lead with what it means for I Corps soldiers")
+  assert.ok(seen.length >= 1 && seen.every(s => s.direction === "lead with what it means for I Corps soldiers" && s.seeds?.purpose === SEEDS.purpose))
+  assert.match(brandDirection(SEEDS), /^MCU PURPOSE: Invented purpose for tests\.\nWho MCU covers:\n- Builders\n\n$/); assert.equal(brandDirection(null), "")
 })
 
 test("seeds: the brief uses them when loaded and says so when not; a malformed set is refused", () => {
