@@ -87,6 +87,10 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
   if (!post) {
     return NextResponse.json({ error: "Content post not found" }, { status: 404 })
   }
+  // A content-pipeline "no new content" card is closed with its own action, never approved or rejected.
+  if (post.pipeline_outcome) {
+    return NextResponse.json({ error: "This card records that no new content was found; close it with Confirm no new content" }, { status: 409 })
+  }
 
   if (post.owned_meta) {
     if (process.env.VERCEL_ENV !== "production" || !await ownedMetaRuntimeEnabled((await ownedMetaStore().read(id)).batch.manifest.brand)) return NextResponse.json({ error: "Publisher disabled" }, { status: 423 })

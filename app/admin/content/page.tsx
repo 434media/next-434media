@@ -167,6 +167,19 @@ export default function ContentPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [showContentPostForm, editingContentPost?.id])
 
+  // "Confirm no new content": closes a content-pipeline notice card (recorded who and when; nothing deleted).
+  const closeNoContent = useCallback(async (post: { id: string }) => {
+    try {
+      const res = await fetch(`/api/admin/content-pipeline/outcomes/${encodeURIComponent(post.id)}/close`, { method: "POST" })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data.error || "Could not close the card")
+      setToast({ message: "Closed: no new content", type: "success" })
+      loadContentPosts()
+    } catch (err) {
+      setToast({ message: err instanceof Error ? err.message : "Could not close the card", type: "error" })
+    }
+  }, [loadContentPosts])
+
   const closeContentDrawer = () => {
     cancelPendingContentPostOpen()
     dismissedContentIdRef.current = searchParams?.get("openContent") ?? null
@@ -212,12 +225,14 @@ export default function ContentPage() {
             </div>
           ) : (
             <SocialCalendarView
-              contentPosts={contentPosts}
+              // A closed "no new content" card has done its job; it stays in Firestore but leaves the board.
+              contentPosts={contentPosts.filter((p) => !p.pipeline_outcome?.closed_at)}
               onOpenPost={handleOpenContentPost}
               onAddPost={handleAddContentPost}
               onMovePost={handleMoveContentPost}
               onBulkDelete={handleBulkDeleteContentPosts}
               headerAction={canReview ? <ContentGenerate onDraftsReady={loadContentPosts} /> : undefined}
+              onCloseOutcome={canReview ? closeNoContent : undefined}
             />
           )}
         </div>

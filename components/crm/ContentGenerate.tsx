@@ -14,7 +14,7 @@ import type { RequestKind } from "@/lib/content-pipeline/series"
 type Kind = RequestKind
 
 interface DraftView { id: string; status: string; title: string; holdReason: string | null; error: string | null; postId: string | null; checks: number }
-interface JobView { id: string; property: string; kind: Kind; count: number; topic: string | null; status: string; note: string | null; createdAt: string; drafts: DraftView[] }
+interface JobView { id: string; property: string; noContentPostId: string | null; closedAt: string | null; kind: Kind; count: number; topic: string | null; status: string; note: string | null; createdAt: string; drafts: DraftView[] }
 interface RunsResponse { seeds: { loaded: boolean; snapshot?: string }; jobs: JobView[] }
 
 const STATUS_LABEL: Record<string, string> = {
@@ -104,7 +104,9 @@ export function ContentGenerate({ onDraftsReady }: { onDraftsReady?: () => void 
         Generate
       </button>
       {open && (
-        <div className="absolute right-0 z-30 mt-2 w-[min(92vw,380px)] rounded-lg bg-white shadow-lg ring-1 ring-neutral-200 p-4 space-y-4">
+        // Phone: pinned to the viewport with a 16px gutter, full width, scrolling inside. From sm up: a 380px
+        // dropdown under the button.
+        <div className="fixed inset-x-4 top-4 max-h-[calc(100dvh-2rem)] z-50 overflow-y-auto overscroll-contain rounded-lg bg-white shadow-lg ring-1 ring-neutral-200 p-4 space-y-4 sm:absolute sm:inset-x-auto sm:top-auto sm:right-0 sm:z-30 sm:mt-2 sm:w-[380px] sm:max-h-[80vh]">
           <div className="flex items-start justify-between gap-3">
             <div>
               <p className="text-sm font-semibold text-neutral-900">Generate drafts</p>
@@ -165,7 +167,7 @@ export function ContentGenerate({ onDraftsReady }: { onDraftsReady?: () => void 
           </div>
 
           {!!runs?.jobs.length && (
-            <div className="border-t border-neutral-100 pt-3 space-y-3 max-h-72 overflow-y-auto">
+            <div className="border-t border-neutral-100 pt-3 space-y-3 sm:max-h-72 sm:overflow-y-auto">
               <p className="text-[11px] font-medium uppercase tracking-wide text-neutral-400">Recent runs</p>
               {runs.jobs.map(j => (
                 <div key={j.id} className="space-y-1">
@@ -174,6 +176,12 @@ export function ContentGenerate({ onDraftsReady }: { onDraftsReady?: () => void 
                     <span className="text-neutral-400"> · {STATUS_LABEL[j.status] ?? j.status} · {new Date(j.createdAt).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}</span>
                   </p>
                   {j.note && <p className="text-[11px] text-neutral-500">{j.note}</p>}
+                  {j.noContentPostId && (
+                    <p className="text-[11px] text-neutral-500">
+                      No new content{j.closedAt ? " · closed" : ""} ·{" "}
+                      <Link href={`/admin/content?openContent=${encodeURIComponent(j.noContentPostId)}`} onClick={() => setOpen(false)} className="font-medium text-neutral-700 hover:text-neutral-900 hover:underline underline-offset-2">Open card</Link>
+                    </p>
+                  )}
                   {j.drafts.map(d => (
                     <div key={d.id} className="flex items-start justify-between gap-2 text-[11px] pl-2 border-l border-neutral-200">
                       <div className="min-w-0">

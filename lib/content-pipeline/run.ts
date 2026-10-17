@@ -59,16 +59,29 @@ export async function pipelineDeps(): Promise<WorkerDeps> {
         const attached = await attachExports(tools.intake, { postId: post.id, items, randomId: tools.randomId, ...(single ? { canva: { designId: p.designIds[0] } } : {}) })
         return { postId: post.id, holds: attached.holds }
       },
+      writeNoContent: async p => {
+        const now = new Date().toISOString()
+        const existing = await tools.intake.findByRequestId(p.requestId)
+        if (existing) return { postId: existing.id }
+        // A notice, not a post: no assets, no platforms, no Canva design. pipeline_outcome marks it everywhere.
+        const post = await crm.createContentPost({
+          user: p.requestedBy.name, date_created: now.slice(0, 10), platform: "", status: "needs_approval", title: p.title.slice(0, 200),
+          notes: `The content pipeline found no new content for this request, so nothing was drafted. Confirm to close it.\n\nWhy: ${p.reason}`.slice(0, 4000),
+          links: p.tried.map(t => t.url), assets: [], tags: "milcity", social_platforms: [],
+          intake: { requestId: p.requestId, metaBrand: "milcity", requestedBy: p.requestedBy.email, at: now },
+          pipeline_outcome: { kind: "no_new_content", job_id: p.jobId, reason: p.reason, tried: p.tried },
+        })
+        return { postId: post.id }
+      },
     },
     notify: async (job: McuJob, drafts: McuDraft[]) => {
       const ready = drafts.filter(d => d.status === "in_review" && d.postId), held = drafts.filter(d => d.status !== "in_review")
       const kind = label(job.kind)
-      await sendDraftsReadyNotification({
-        recipients: [job.request.actorEmail],
-        message: `${ready.length} ${kind} draft${ready.length === 1 ? "" : "s"} ready for review${held.length ? ` (${held.length} held or failed: see Generate)` : ""}`,
-        postId: ready[0]?.postId ?? "",
-        title: ready[0] ? `${ready.length} drafts ready` : `${kind} drafts`,
-      })
+      // A job that opened no drafts (held at research) still reports back, with its reason.
+      const message = drafts.length
+        ? `${ready.length} ${kind} draft${ready.length === 1 ? "" : "s"} ready for review${held.length ? ` (${held.length} held or failed: see Generate)` : ""}`
+        : `No ${kind} draft: ${(job.note ?? "no qualifying story found").slice(0, 300)}`
+      await sendDraftsReadyNotification({ recipients: [job.request.actorEmail], message, postId: ready[0]?.postId ?? job.noContentPostId ?? "", title: ready[0] ? `${ready.length} drafts ready` : drafts.length ? `${kind} drafts` : `No new ${kind} content` })
     },
   }
 }

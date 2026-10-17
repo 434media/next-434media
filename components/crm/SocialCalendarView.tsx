@@ -36,6 +36,8 @@ interface SocialCalendarViewProps {
   onBulkDelete?: (ids: string[]) => void | Promise<void>
   // Optional control beside "Add post" (the content pipeline's Generate, for super-admins).
   headerAction?: React.ReactNode
+  // Closes a content-pipeline "no new content" card ("Confirm no new content"), for super-admins.
+  onCloseOutcome?: (post: ContentPost) => void
 }
 
 type CalendarViewMode = "day" | "week" | "month"
@@ -164,6 +166,7 @@ function PostCard({
   onDragStart,
   selectMode = false,
   selected = false,
+  onCloseOutcome,
 }: {
   post: ContentPost
   onClick: () => void
@@ -172,6 +175,8 @@ function PostCard({
   onDragStart?: (e: React.DragEvent) => void
   selectMode?: boolean
   selected?: boolean
+  // A content-pipeline "no new content" card's one action (super-admins).
+  onCloseOutcome?: () => void
 }) {
   const dotColor = getStatusDot(post.status)
   // Native HTML5 drag lives on a plain wrapper — motion.div types onDragStart as
@@ -209,6 +214,22 @@ function PostCard({
         </div>
         <span className={`truncate leading-tight font-medium text-neutral-900 ${compact ? "text-[11px]" : "text-xs"}`}>{post.title}</span>
       </div>
+
+      {/* A "no new content" notice from the content pipeline: marked as not a post, closed with one action. */}
+      {!compact && post.pipeline_outcome && (
+        <div className="flex items-center gap-1.5 mt-1 pl-3">
+          <span className="text-[10px] font-medium text-amber-700">No new content · not a post</span>
+          {onCloseOutcome && !selectMode && (
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); onCloseOutcome() }}
+              className="ml-auto rounded px-1.5 py-0.5 text-[10px] font-medium text-neutral-700 ring-1 ring-neutral-200 hover:bg-neutral-50"
+            >
+              Confirm
+            </button>
+          )}
+        </div>
+      )}
 
       {/* Meta row — board cards only (compact calendar cells stay minimal).
           Shows the scheduled date + assignee so cards are scannable unopened. */}
@@ -267,7 +288,7 @@ function FilterSection({ title, options, selectedValues, onToggle, renderOption 
   )
 }
 
-export function SocialCalendarView({ contentPosts, onOpenPost, onAddPost, onMovePost, onBulkDelete, headerAction }: SocialCalendarViewProps) {
+export function SocialCalendarView({ contentPosts, onOpenPost, onAddPost, onMovePost, onBulkDelete, headerAction, onCloseOutcome }: SocialCalendarViewProps) {
   // Top-level surface: "board" is the pipeline kanban (where date-less drafts &
   // in-review work live), "calendar" is the date grid (scheduled/posted only).
   // The pipeline belongs on the board, not as a filter over a date grid — a
@@ -726,8 +747,9 @@ export function SocialCalendarView({ contentPosts, onOpenPost, onAddPost, onMove
                         <PostCard
                           key={post.id}
                           post={post}
-                          draggable={canDrag}
-                          onDragStart={canDrag ? (e) => {
+                          draggable={canDrag && !post.pipeline_outcome}
+                          onCloseOutcome={post.pipeline_outcome && onCloseOutcome ? () => onCloseOutcome(post) : undefined}
+                          onDragStart={canDrag && !post.pipeline_outcome ? (e) => {
                             draggedRef.current = { id: post.id, fromGroup: group.label }
                             e.dataTransfer.effectAllowed = "move"
                             e.dataTransfer.setData("text/plain", post.id)

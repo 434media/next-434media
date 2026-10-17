@@ -126,6 +126,7 @@ export function ContentDetailDrawer({
   const [showRejectNote, setShowRejectNote] = useState(false)
   const [rejectNote, setRejectNote] = useState("")
   const [decisionError, setDecisionError] = useState<string | null>(null)
+  const [closingOutcome, setClosingOutcome] = useState(false)
   // Mark-as-posted local state
   const [isPublishing, setIsPublishing] = useState(false)
   const [showPublishForm, setShowPublishForm] = useState(false)
@@ -371,6 +372,22 @@ export function ContentDetailDrawer({
       social_platforms: formData.social_platforms,
       comments: formData.comments,
     })
+  }
+
+  // "Confirm no new content" on a content-pipeline notice card: closes it (who and when recorded; nothing deleted).
+  const handleCloseOutcome = async () => {
+    if (!post) return
+    setClosingOutcome(true); setDecisionError(null)
+    try {
+      const res = await fetch(`/api/admin/content-pipeline/outcomes/${encodeURIComponent(post.id)}/close`, { method: "POST", credentials: "include" })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data.error || "Could not close the card")
+      onDecided?.()
+    } catch (err) {
+      setDecisionError(err instanceof Error ? err.message : "Could not close the card")
+    } finally {
+      setClosingOutcome(false)
+    }
   }
 
   // Approve / request-changes. Posts to the decision route (server enforces
@@ -807,8 +824,45 @@ export function ContentDetailDrawer({
                 </div>
               </div>
 
+              {/* A content-pipeline "no new content" notice: not a post, so no approval or publishing — one close action. */}
+              {post?.pipeline_outcome && (
+                <div className="pt-4 border-t border-gray-200 space-y-3">
+                  <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 text-sm space-y-2">
+                    <p className="font-medium text-amber-900">No new content found · this is not a post</p>
+                    <p className="text-amber-900/80 wrap-break-word">{post.pipeline_outcome.reason}</p>
+                    {post.pipeline_outcome.tried.length > 0 && (
+                      <div>
+                        <p className="text-xs font-medium text-amber-900">Sources tried</p>
+                        <ul className="mt-1 space-y-0.5 text-xs">
+                          {post.pipeline_outcome.tried.map((t) => (
+                            <li key={t.url} className="truncate">
+                              <a href={t.url} target="_blank" rel="noopener noreferrer" className="text-amber-900 underline underline-offset-2">{t.title}</a>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                    {post.pipeline_outcome.closed_at && (
+                      <p className="text-xs text-amber-900/80">Closed by {post.pipeline_outcome.closed_by} · {formatDate(post.pipeline_outcome.closed_at)}</p>
+                    )}
+                  </div>
+                  {decisionError && <p className="text-xs text-red-600">{decisionError}</p>}
+                  {canReview && !post.pipeline_outcome.closed_at && (
+                    <button
+                      type="button"
+                      onClick={handleCloseOutcome}
+                      disabled={closingOutcome}
+                      className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-neutral-900 hover:bg-neutral-800 rounded-lg transition-colors disabled:opacity-50"
+                    >
+                      {closingOutcome ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
+                      Confirm no new content
+                    </button>
+                  )}
+                </div>
+              )}
+
               {/* Approval — decision banner (everyone) + action bar (reviewers) */}
-              {post && (
+              {post && !post.pipeline_outcome && (
                 <div className="pt-4 border-t border-gray-200 space-y-3">
                   <label className="block text-sm font-medium text-gray-700">
                     Approval
@@ -944,7 +998,7 @@ export function ContentDetailDrawer({
                 </div>
               )}
 
-              {post && canReview && <OwnedMetaPanel key={post.id} post={post} onChanged={onDecided} />}
+              {post && canReview && !post.pipeline_outcome && <OwnedMetaPanel key={post.id} post={post} onChanged={onDecided} />}
 
               {/* Comments Section */}
               <div className="pt-4 border-t border-gray-200">
