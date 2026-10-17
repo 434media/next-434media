@@ -1,6 +1,6 @@
 import { SERIES, checkFields, clippedWords, ddmmmyy, normalizeFields, type Placement, type RequestKind } from "./series"
 import { MCU_RULES_VERSION } from "./editorial"
-import { type McuAi, type ModelCall, type SubjectBox } from "./model"
+import { normalizeUrl, type McuAi, type ModelCall, type RankedPhoto, type SubjectBox } from "./model"
 import { contentPropertyOf } from "./properties"
 import type { ContentProperty } from "@/components/crm/types"
 import type { McuSeeds } from "./seeds"
@@ -58,6 +58,13 @@ export const RETRY_MS = 60_000
  */
 export const KEY_PREFIX = "admin:"
 const BREAKING_WINDOW_MS = 24 * 3600_000
+/** Drafts opened this recently, by any job, count for the repeat-story check (store.recentStories). */
+const RECENT_STORY_MS = 3 * 864e5
+/** Stories other drafts are working on: their titles steer research, their URLs are refused. */
+async function storiesInFlight(deps: WorkerDeps, exceptDraft?: string): Promise<{ titles: string[]; urls: Set<string> }> {
+  const recent = (await deps.store.recentStories(new Date(deps.nowMs() - RECENT_STORY_MS).toISOString()).catch(() => [])).filter(s => s.draftId !== exceptDraft)
+  return { titles: [...new Set(recent.map(s => s.title))].slice(0, 30), urls: new Set(recent.map(s => normalizeUrl(s.primaryUrl))) }
+}
 /**
  * How recent a story's source must be (Phase 1b, 2026-10-17; the -05 DT101 draft was built on a 2025-07-16 article for
  * a card dated 2026-10-17). Breaking: the page's own stated time, within 24 hours (below). News: published within the
@@ -118,14 +125,15 @@ async function jobStep(deps: WorkerDeps, id: string, attempt: number): Promise<v
     const posts = await deps.content.recentPosts()
     const calls: ModelCall[] = []
     const ai = deps.ai(c => calls.push(c)), titles = posts.map(p => p.title), seeds = job.kind === "icymi" ? null : await deps.seeds()
-    let stories: Story[] | { hold: string; tried?: string[]; triedUrls?: string[] } = job.kind === "icymi" ? icymiStory(posts) : await researchStories(deps, ai, job, titles, seeds)
+    const inFlight = job.kind === "icymi" ? { titles: [], urls: new Set<string>() } : await storiesInFlight(deps)
+    let stories: Story[] | { hold: string; tried?: string[]; triedUrls?: string[] } = job.kind === "icymi" ? icymiStory(posts) : await researchStories(deps, ai, job, titles, seeds, [], [], inFlight)
     // Every candidate dropped (a blocked or script-only source page, no readable article, outside the Breaking window):
     // research once more, steering away from what was tried, before the job holds (production, 2026-10-17).
     // Zero candidates too: that pass found nothing to try, so the second pass is the search's one retry, not a loop.
     if ("hold" in stories && "tried" in stories) {
       console.info("[content-pipeline] research again", JSON.stringify({ job: id, dropped: stories.hold.slice(0, 600) }))
       const first = stories
-      const again = await researchStories(deps, ai, job, titles, seeds, first.tried ?? [], first.triedUrls ?? [])
+      const again = await researchStories(deps, ai, job, titles, seeds, first.tried ?? [], first.triedUrls ?? [], inFlight)
       stories = "hold" in again ? { hold: `${first.hold}; then: ${again.hold}`, tried: again.tried, triedUrls: again.triedUrls } : again
     }
     if (calls.length) console.info("[content-pipeline] calls", JSON.stringify({ job: id, calls }))
@@ -139,6 +147,21 @@ async function jobStep(deps: WorkerDeps, id: string, attempt: number): Promise<v
       job.status = "held"; job.note = reason; job.noContentPostId = card.postId; job.updatedAt = iso(deps); job.notifiedAt = job.updatedAt
       await deps.store.saveJob(job); await deps.store.release("job", id, false)
       console.info("[content-pipeline] job held", JSON.stringify({ job: id, kind: job.kind, card: card.postId, tried: tried.length, note: reason.slice(0, 400) }))
+      await deps.notify(job, []).catch(err => console.error("[content-pipeline] notify failed", id, err instanceof Error ? err.message : err))
+      return
+    }
+    // Read again just before opening drafts: a job running alongside may have opened the same story meanwhile.
+    if (job.kind !== "icymi") {
+      const now = await storiesInFlight(deps), before = stories.length
+      stories = stories.filter(st => !now.urls.has(normalizeUrl(st.primaryUrl)))
+      if (stories.length < before) console.info("[content-pipeline] repeat story dropped", JSON.stringify({ job: id, dropped: before - stories.length }))
+      if (!stories.length) stories = { hold: "every story found is already being drafted by another request" }
+    }
+    if ("hold" in stories) {
+      const reason = stories.hold
+      const card = await deps.content.writeNoContent({ requestId: `${KEY_PREFIX}${id}:no-content`, jobId: id, property: contentPropertyOf(job.property), title: `No new ${label(job.kind)} content — ${iso(deps).slice(0, 10)}`, reason, tried: [], requestedBy: { email: job.request.actorEmail, name: job.request.actorName } })
+      job.status = "held"; job.note = reason; job.noContentPostId = card.postId; job.updatedAt = iso(deps); job.notifiedAt = job.updatedAt
+      await deps.store.saveJob(job); await deps.store.release("job", id, false)
       await deps.notify(job, []).catch(err => console.error("[content-pipeline] notify failed", id, err instanceof Error ? err.message : err))
       return
     }
@@ -172,21 +195,23 @@ async function jobStep(deps: WorkerDeps, id: string, attempt: number): Promise<v
 
 /** ICYMI: five published MCU News or Breaking stories from the CRM, newest first. */
 function icymiStory(posts: PostRow[]): Story[] | { hold: string } {
-  const eligible = posts.filter(p => (p.status === "posted" || p.publishedUrl) && !/icymi|dt101|defense tech 101|salute to troops/i.test(p.title) && p.caption).slice(0, ICYMI_COUNT)
+  // DT101 posts are told by their mission-brief caption too: older manual ones aren't titled DT101 (gate round 1, ULTRA).
+  const eligible = posts.filter(p => (p.status === "posted" || p.publishedUrl) && !/icymi|dt101|defense tech 101|salute to troops/i.test(p.title) && p.caption && !/MISSION BRIEF \/\//i.test(p.caption)).slice(0, ICYMI_COUNT)
   if (eligible.length < ICYMI_COUNT) return { hold: `only ${eligible.length} published MCU News or Breaking stories were found in the CRM; ICYMI needs five (ask Marcos for an exception)` }
   return [{ title: "ICYMI roundup", primaryUrl: eligible[0].publishedUrl || "https://www.instagram.com/milcityusa/", publisher: "MilCityUSA", sourceTitle: "Five published MCU stories", sourceText: eligible.map((p, i) => `${i + 1}. ${p.title}\n${p.caption}`).join("\n\n"), roundup: eligible.map(p => ({ postId: p.id, title: p.title, caption: (p.caption || "").slice(0, 800), ...(p.publishedUrl ? { publishedUrl: p.publishedUrl } : {}) })) }]
 }
 
 /** On a hold, `tried` and `triedUrls` name the candidates that were dropped, so a second pass can avoid them. */
-async function researchStories(deps: WorkerDeps, ai: McuAi, job: Pick<McuJob, "kind" | "count" | "topic">, recentTitles: string[], seeds: McuSeeds | null, avoid: string[] = [], avoidUrls: string[] = []): Promise<Story[] | { hold: string; tried?: string[]; triedUrls?: string[] }> {
+async function researchStories(deps: WorkerDeps, ai: McuAi, job: Pick<McuJob, "kind" | "count" | "topic">, recentTitles: string[], seeds: McuSeeds | null, avoid: string[] = [], avoidUrls: string[] = [], inFlight: { titles: string[]; urls: Set<string> } = { titles: [], urls: new Set() }): Promise<Story[] | { hold: string; tried?: string[]; triedUrls?: string[] }> {
   const today = iso(deps).slice(0, 10)
-  const r = await ai.research({ kind: job.kind, count: job.count, ...(job.topic ? { topic: job.topic } : {}), today, recentTitles, seeds, ...(avoid.length ? { avoid } : {}) })
+  const r = await ai.research({ kind: job.kind, count: job.count, ...(job.topic ? { topic: job.topic } : {}), today, recentTitles, seeds, ...(avoid.length ? { avoid } : {}), ...(inFlight.titles.length ? { drafting: inFlight.titles } : {}) })
   const stories: Story[] = [], dropped: string[] = []
   for (const c of r.candidates) {
     if (stories.length >= job.count) break
     // The primary page first, then other primary pages for the same subject (product page, .mil/.gov page, press
     // release), so one unreadable page doesn't drop the subject. Each miss keeps its reason for the hold note.
     if (avoidUrls.includes(c.primaryUrl)) { dropped.push(`${c.title}: already tried`); continue }
+    if (inFlight.urls.has(normalizeUrl(c.primaryUrl))) { dropped.push(`${c.title}: already being drafted`); continue }
     let page: SourcePage | null = null, publishedAt: string | undefined
     const misses: string[] = []
     for (const url of [...new Set([c.primaryUrl, ...(c.alternateUrls ?? [])])].slice(0, 4)) {
@@ -208,7 +233,7 @@ async function researchStories(deps: WorkerDeps, ai: McuAi, job: Pick<McuJob, "k
       if (deps.nowMs() - t > BREAKING_WINDOW_MS) { dropped.push(`${c.title}: announced more than 24 hours ago (News at most)`); continue }
       if (!c.whyNow) { dropped.push(`${c.title}: no sourced why-now sentence`); continue }
     }
-    if (stories.some(s => s.primaryUrl === page.url) || avoidUrls.includes(page.url)) { dropped.push(`${c.title}: already used or rejected`); continue }
+    if (stories.some(s => normalizeUrl(s.primaryUrl) === normalizeUrl(page.url)) || avoidUrls.includes(page.url) || inFlight.urls.has(normalizeUrl(page.url))) { dropped.push(`${c.title}: already used, rejected or being drafted`); continue }
     // Supporting pages fill what the primary leaves out (a DT101 card needs the maker and its headquarters, which an
     // Army article often omits: live test, 2026-10-16). Unreachable ones are skipped; the primary still decides.
     const supporting: SourcePage[] = []
@@ -365,7 +390,7 @@ export function searchedPageUsable(url: string, maker: string): boolean {
  * Each is fetched once, sized from its own header and dropped below MIN_SHORT_SIDE; at most MAX_SHOWN go to the
  * vision pick. Sources that need a key or account (the DVIDS API) are not used until the founder adds one.
  */
-async function gatherMedia(deps: WorkerDeps, ai: McuAi, d: McuDraft, frame: FrameCopy, avoid: string[]): Promise<{ candidate: MediaCandidate; image: Uint8Array; mime: string }[]> {
+async function gatherMedia(deps: WorkerDeps, ai: McuAi, story: Story, frame: FrameCopy, avoid: string[]): Promise<{ candidate: MediaCandidate; image: Uint8Array; mime: string }[]> {
   const out: { candidate: MediaCandidate; image: Uint8Array; mime: string }[] = [], seen = new Set<string>(avoid)
   const add = async (c: MediaCandidate | null) => {
     if (!c || out.length >= MAX_SHOWN || seen.has(c.pageUrl) || seen.has(c.url)) return
@@ -383,15 +408,16 @@ async function gatherMedia(deps: WorkerDeps, ai: McuAi, d: McuDraft, frame: Fram
     } catch { /* unreadable: skipped */ }
   }
   const pages: SourcePage[] = []
-  for (const u of [d.story.primaryUrl, ...(d.story.supporting ?? []).map(x => x.url)]) { try { pages.push(await deps.fetchPage(u)) } catch { /* skipped */ } }
+  // A social post's share image is MCU's own rendered card (ICYMI's stories link to Instagram): never a photo source.
+  for (const u of [story.primaryUrl, ...(story.supporting ?? []).map(x => x.url)].filter(u => /^https:\/\//.test(u) && !SOCIAL_HOST.test(u))) { try { pages.push(await deps.fetchPage(u)) } catch { /* skipped */ } }
   for (const pg of pages) await add(pageImageCandidate(pg, isDvidsImagePage(pg.url) ? "dvids" : "source"))
-  const maker = makerOf(frame, d.story)
-  for (const u of await ai.findPhotoPages({ story: d.story, frame }).catch(() => [])) {
+  const maker = makerOf(frame, story)
+  for (const u of await ai.findPhotoPages({ story, frame }).catch(() => [])) {
     if (out.length >= MAX_SHOWN) break
     if (!searchedPageUsable(u, maker)) continue
     try { const pg = await deps.fetchPage(u); if (searchedPageUsable(pg.url, maker)) await add(pageImageCandidate(pg, isDvidsImagePage(pg.url) ? "dvids" : "source")) } catch { /* skipped */ }
   }
-  for (const q of mediaQueries(frame, d.story)) {
+  for (const q of mediaQueries(frame, story)) {
     if (out.length >= MAX_SHOWN) break
     const [commons, more] = await Promise.all([deps.searchCommons(q).catch(() => []), deps.searchMore ? deps.searchMore(q).catch(() => []) : Promise.resolve([])])
     for (const c of [...commons, ...more]) if (archiveRelevant(c, maker)) await add(c)
@@ -399,6 +425,19 @@ async function gatherMedia(deps: WorkerDeps, ai: McuAi, d: McuDraft, frame: Fram
   return out
 }
 
+const SOCIAL_HOST = /^https:\/\/([a-z0-9-]+\.)*(instagram\.com|facebook\.com|fb\.com|threads\.net|x\.com|twitter\.com|linkedin\.com|tiktok\.com|youtube\.com)(\/|$)/i
+/**
+ * The story a frame's photo is about. An ICYMI story card shows the published story it recaps (its title and caption),
+ * not the roundup; the cover takes the lead story's photo (mediaStep). Gate round 1 (2026-10-17) searched for a cover
+ * photo of the roundup's theme, "Multi-domain", and found nothing.
+ */
+export function frameStory(d: Pick<McuDraft, "story">, frame: FrameCopy, index: number): Story {
+  if (frame.series !== "icymi_story") return d.story
+  const p = d.story.roundup?.[index - 1]
+  return p ? { title: p.title.replace(/^MCU-[A-Z0-9]+-\d{8}-\d{2}\s+v\d+\s+—\s+/, ""), primaryUrl: p.publishedUrl ?? "", publisher: "MilCityUSA", sourceTitle: p.title, sourceText: p.caption } : d.story
+}
+/** News, Breaking and the ICYMI story cards may use a representative photo; DT101 always shows the system itself. */
+export const allowsRepresentative = (frame: FrameCopy) => frame.series === "news" || frame.series === "breaking" || frame.series === "icymi_story"
 const FRAME_ASPECT: Record<Placement, number> = { feed: 4 / 5, reels: 9 / 16 }
 /**
  * Where a photo's subject lands on the card. Canva fills the template's full-bleed frame like CSS "cover": scaled to
@@ -407,17 +446,21 @@ const FRAME_ASPECT: Record<Placement, number> = { feed: 4 / 5, reels: 9 / 16 }
  * recognizable at phone size, no sky-only or tail-only crops, change the crop or image rather than the layout.
  * Rules: the subject is not cut off by the crop, its centre sits above the text block (upper 60%), it spans at least
  * 30% of the card's height or 45% of its width, and the cropped photo is at least 500 px wide before upscaling.
+ * With a core box (the part that must stay in frame), "not cut off" and "above the text" are judged on the core, so
+ * a wide subject may lose its ends: gate round 1 (2026-10-17) rejected every landscape photo whose subject was wider
+ * than a 4:5 window can be (a 1200 × 630 missile render, soldiers across a 2000 × 1334 frame), exact matches included.
  */
-export function cropFit(width: number, height: number, box: SubjectBox, placement: Placement): { ok: boolean; problems: string[] } {
+export function cropFit(width: number, height: number, box: SubjectBox, placement: Placement, core?: SubjectBox): { ok: boolean; problems: string[] } {
   const f = FRAME_ASPECT[placement], a = width / height
   const win = a > f ? { x0: 0.5 - f / (2 * a), x1: 0.5 + f / (2 * a), y0: 0, y1: 1 } : { x0: 0, x1: 1, y0: 0.5 - a / (2 * f), y1: 0.5 + a / (2 * f) }
   const toCard = (v: number, lo: number, hi: number) => (v - lo) / (hi - lo)
-  const bx0 = toCard(box.x0, win.x0, win.x1), bx1 = toCard(box.x1, win.x0, win.x1), by0 = toCard(box.y0, win.y0, win.y1), by1 = toCard(box.y1, win.y0, win.y1)
-  const visible = (Math.min(bx1, 1) - Math.max(bx0, 0)) * (Math.min(by1, 1) - Math.max(by0, 0))
-  const area = Math.max(1e-6, (bx1 - bx0) * (by1 - by0))
+  const onCard = (b: SubjectBox) => ({ x0: toCard(b.x0, win.x0, win.x1), x1: toCard(b.x1, win.x0, win.x1), y0: toCard(b.y0, win.y0, win.y1), y1: toCard(b.y1, win.y0, win.y1) })
+  const { x0: bx0, x1: bx1, y0: by0, y1: by1 } = onCard(box), k = onCard(core ?? box)
+  const visible = (Math.min(k.x1, 1) - Math.max(k.x0, 0)) * (Math.min(k.y1, 1) - Math.max(k.y0, 0))
+  const area = Math.max(1e-6, (k.x1 - k.x0) * (k.y1 - k.y0))
   const problems: string[] = []
-  if (visible / area < 0.85) problems.push("the 4:5 crop cuts off the subject")
-  if ((by0 + by1) / 2 > 0.6) problems.push("the subject sits low, under the text block")
+  if (visible / area < (core ? 0.9 : 0.85)) problems.push("the 4:5 crop cuts off the subject")
+  if ((k.y0 + k.y1) / 2 > 0.6) problems.push("the subject sits low, under the text block")
   if (by1 - by0 < 0.3 && bx1 - bx0 < 0.45) problems.push("the subject is small at phone size")
   if ((win.x1 - win.x0) * width < 500) problems.push("the cropped photo is under 500 px wide")
   return { ok: !problems.length, problems }
@@ -437,13 +480,15 @@ const ZOOM = { context: { bottom: 0.6, height: 0.45 }, empty: { bottom: 0.72, he
  * edges and never narrower than 600 px of source, so the upscale stays sharp. lib/image-crop.ts applies it before the
  * Canva fill, which then has nothing left to centre.
  */
-export function zoomCrop(width: number, height: number, box: SubjectBox, placement: Placement, context = true): CropBox {
+export function zoomCrop(width: number, height: number, box: SubjectBox, placement: Placement, context = true, core?: SubjectBox): CropBox {
   const f = FRAME_ASPECT[placement], target = context ? ZOOM.context : ZOOM.empty
-  const bw = (box.x1 - box.x0) * width, bh = (box.y1 - box.y0) * height
+  // The height fits the whole subject; the width only has to hold the core, centred on it.
+  const w = core ?? box
+  const bw = (w.x1 - w.x0) * width, bh = (box.y1 - box.y0) * height
   let wh = Math.max(bh / target.height, bw / (ZOOM.maxWidth * f), ZOOM.minWindowPx / f) // window height in source px
   wh = Math.min(wh, height, width / f)
   const ww = wh * f
-  const left = Math.min(Math.max(((box.x0 + box.x1) / 2) * width - ww / 2, 0), width - ww)
+  const left = Math.min(Math.max(((w.x0 + w.x1) / 2) * width - ww / 2, 0), width - ww)
   const top = Math.min(Math.max(box.y1 * height - target.bottom * wh, 0), height - wh)
   const r = (v: number) => Math.round(v * 10_000) / 10_000
   return { x: r(left / width), y: r(top / height), width: r(ww / width), height: r(wh / height) }
@@ -458,15 +503,15 @@ function boxInCrop(box: SubjectBox, c: CropBox): SubjectBox {
  * no exact match with a subject box, nothing is chosen: a photo that misses the subject or the crop is not placed on
  * the card with a note (the -05 DT101 draft, 2026-10-17, went to Review that way).
  */
-export function choosePhoto(pick: { index: number | null; ranked?: { index: number; box: SubjectBox; context?: boolean }[] }, candidates: MediaCandidate[], placement: Placement): { index: number; crop: CropBox } | { index: null; why: string } {
+export function choosePhoto(pick: { index: number | null; ranked?: RankedPhoto[] }, candidates: MediaCandidate[], placement: Placement): { index: number; crop: CropBox; ranked: RankedPhoto } | { index: null; why: string } {
   if (!pick.ranked?.length) return { index: null, why: "no candidate shows the subject itself" }
   const misses: string[] = []
   for (const r of pick.ranked) {
     const c = candidates[r.index]
     if (!c) continue
-    const crop = zoomCrop(c.width, c.height, r.box, placement, r.context !== false)
-    const fit = cropFit(crop.width * c.width, crop.height * c.height, boxInCrop(r.box, crop), placement)
-    if (fit.ok) return { index: r.index, crop }
+    const crop = zoomCrop(c.width, c.height, r.box, placement, r.context !== false, r.core)
+    const fit = cropFit(crop.width * c.width, crop.height * c.height, boxInCrop(r.box, crop), placement, r.core ? boxInCrop(r.core, crop) : undefined)
+    if (fit.ok) return { index: r.index, crop, ranked: r }
     misses.push(`#${r.index}: ${fit.problems.join("; ")}`)
   }
   return { index: null, why: `no photo of the subject fits the ${placement === "feed" ? "4:5" : "9:16"} card (${misses.join(" · ") || "no usable candidate"})` }
@@ -476,23 +521,31 @@ async function mediaStep(deps: WorkerDeps, ai: McuAi, d: McuDraft): Promise<void
   const job = await deps.store.getJob(d.jobId)
   const used = new Set<string>()
   for (const other of job?.drafts ?? []) if (other !== d.id) for (const m of (await deps.store.getDraft(other))?.media ?? []) if (m) used.add(m.pageUrl)
-  const media: (ChosenMedia | null)[] = []
-  for (const [i, frame] of d.frames.entries()) {
-    if (!SERIES[frame.series].media[d.placement]) { media.push(null); continue }
-    if (d.media[i]) { media.push(d.media[i]); continue }
+  const media: (ChosenMedia | null)[] = d.frames.map((_, i) => d.media[i] ?? null)
+  // The ICYMI cover is filled last, from the lead story's photo.
+  const order = d.frames.map((f, i) => ({ f, i })).sort((a, b) => Number(a.f.series === "icymi_cover") - Number(b.f.series === "icymi_cover"))
+  for (const { f: frame, i } of order) {
+    if (!SERIES[frame.series].media[d.placement]) { media[i] = null; continue }
+    if (media[i]) { used.add(media[i]!.pageUrl); continue }
+    if (frame.series === "icymi_cover") {
+      const lead = media.find((m, j) => !!m && d.frames[j].series === "icymi_story")
+      if (lead) { media[i] = { ...lead }; continue }
+    }
+    const story = frameStory(d, frame, i), representative = allowsRepresentative(frame)
     const avoid = [...used, ...(d.avoidMedia ?? [])]
-    const shown = await gatherMedia(deps, ai, d, frame, avoid)
-    const pick = await ai.pickMedia({ story: d.story, frame, candidates: shown, avoid: [...avoid] })
+    const shown = await gatherMedia(deps, ai, story, frame, avoid)
+    const pick = await ai.pickMedia({ story, frame, candidates: shown, avoid: [...avoid], representative })
     const chosen = choosePhoto(pick, shown.map(x => x.candidate), d.placement)
-    console.info("[content-pipeline] media", JSON.stringify({ draft: d.id, v: d.version, retry: d.mediaRetries ?? 0, shown: shown.map(x => `${x.candidate.origin ?? "?"}:${x.candidate.width}x${x.candidate.height}:${x.candidate.title.slice(0, 60)}`), ranked: pick.ranked ?? null, turnedDown: pick.turnedDown ?? null, chosen: chosen.index, crop: chosen.index === null ? null : chosen.crop, why: chosen.index === null ? chosen.why : null }))
+    console.info("[content-pipeline] media", JSON.stringify({ draft: d.id, v: d.version, frame: i + 1, retry: d.mediaRetries ?? 0, representative, shown: shown.map(x => `${x.candidate.origin ?? "?"}:${x.candidate.width}x${x.candidate.height}:${x.candidate.title.slice(0, 60)}`), ranked: pick.ranked ?? null, turnedDown: pick.turnedDown ?? null, chosen: chosen.index, crop: chosen.index === null ? null : chosen.crop, why: chosen.index === null ? chosen.why : null }))
     if (chosen.index === null) {
       d.media = media
       // No photo of the subject: like a source that can't support the post, the subject is replaced (MAX_AUTO_REPLACE).
-      return sourceHold(deps, ai, d, `no relevant, licensed photo was found${frame.mediaQuery ? ` for "${frame.mediaQuery}"` : ""}: ${chosen.why} (${pick.reason}).`)
+      return sourceHold(deps, ai, d, `no relevant, licensed photo was found${d.frames.length > 1 ? ` for frame ${i + 1}` : ""}${frame.mediaQuery ? ` ("${frame.mediaQuery}")` : ""}: ${chosen.why} (${pick.reason}).`)
     }
     const c = shown[chosen.index].candidate
     used.add(c.pageUrl)
-    media.push({ url: c.url, pageUrl: c.pageUrl, title: c.title, license: c.license, creator: c.creator, credit: c.credit, usGovernment: c.usGovernment, ...(c.date ? { date: c.date } : {}), ...(c.rightsNote ? { note: c.rightsNote } : {}), crop: chosen.crop })
+    const rep = chosen.ranked.representative ? `Representative photo${chosen.ranked.shows ? ` (${chosen.ranked.shows})` : ""}, not the event itself: check the caption doesn't present it as the event` : ""
+    media[i] = { url: c.url, pageUrl: c.pageUrl, title: c.title, license: c.license, creator: c.creator, credit: c.credit, usGovernment: c.usGovernment, ...(c.date ? { date: c.date } : {}), ...(c.rightsNote || rep ? { note: [c.rightsNote, rep].filter(Boolean).join(". ") } : {}), crop: chosen.crop }
   }
   d.media = media
   // Credits and the DoD non-endorsement line belong to the caption the reviewer approves.
@@ -628,7 +681,8 @@ async function sourceHold(deps: WorkerDeps, ai: McuAi, d: McuDraft, reason: stri
   if (!job) return hold(deps, d, reason)
   d.autoReplaced = (d.autoReplaced ?? 0) + 1
   const rejected = [...new Set([d.story.title, ...(d.rejected ?? [])])]
-  const found = await researchStories(deps, ai, { ...job, count: 1 }, (await deps.content.recentPosts()).map(x => x.title), await deps.seeds(), rejected, [d.story.primaryUrl])
+  const inFlight = await storiesInFlight(deps, d.id)
+  const found = await researchStories(deps, ai, { ...job, count: 1 }, (await deps.content.recentPosts()).map(x => x.title), await deps.seeds(), rejected, [d.story.primaryUrl], inFlight)
   if ("hold" in found || !found.length) return hold(deps, d, `${reason} No replacement subject qualified: ${"hold" in found ? found.hold : "none found"}`)
   const was = d.story.title
   d.rejected = rejected; d.story = found[0]
