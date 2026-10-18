@@ -924,7 +924,7 @@ test("News dated by an outlet's recent report of the same event: the official pa
   const d = onlyDraft(w)
   assert.equal(d.story.primaryUrl, PRIMARY); assert.equal(d.story.publishedAt, "2026-09-20"); assert.equal(d.story.reportedAt, "2026-10-15")
   assert.equal(d.frames[0].fields.date, "15OCT26") // the card is dated by the report
-  assert.ok(!w.posts[0].links.includes(REPORT)) // never cited on the post
+  assert.deepEqual(w.posts[0].links.filter(l => l === REPORT), []) // never cited on the post
   assert.match(reviewNotes(d), /Dated by a news report\nThe official page is older; a news outlet reported the same event on 2026-10-15/)
   assert.deepEqual(judged, [`${REPORT} vs ${PRIMARY}`])
   // The official page is an older announcement the report only mentions: the story drops, with the reason.
