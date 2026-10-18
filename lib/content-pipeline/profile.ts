@@ -32,7 +32,8 @@ export interface ProfileSeries extends Series {
   caption?: CaptionFormat
 }
 export interface ProfileRequestKind { kind: RequestKind; label: string; detail: string; series: SeriesKey[]; code: string; recencyDays?: number; undatedOk?: boolean }
-export interface HeadlineChecks { enabled: boolean; fields: string[]; noTerminalPeriod: boolean; deckSentence: boolean; maxSlashes: number; requireVerb: boolean }
+/** fields: one-line headlines; hookFields: multi-line hooks (one punctuation convention across lines); deckField: the deck. */
+export interface HeadlineChecks { enabled: boolean; fields: string[]; hookFields: string[]; maxCommas: number; deckField: string }
 export interface OriginalityChecks { enabled: boolean; headlineMaxRun: number; captionMaxRun: number; exempt: SeriesKey[] }
 export interface BrandProfile {
   schema: typeof PROFILE_SCHEMA
@@ -88,10 +89,11 @@ export function validateProfile(v: unknown): string[] {
 
   if (v.checks !== undefined && keys(v.checks, "checks", [], ["headline", "originality"], p)) {
     const h = v.checks.headline, o = v.checks.originality
-    if (h !== undefined && keys(h, "checks.headline", ["enabled", "fields", "noTerminalPeriod", "deckSentence", "maxSlashes", "requireVerb"], [], p)) {
-      for (const k of ["enabled", "noTerminalPeriod", "deckSentence", "requireVerb"]) if (typeof h[k] !== "boolean") p.push(`checks.headline.${k}: true or false`)
-      if (!(Array.isArray(h.fields) && h.fields.every(f => str(f, 40)))) p.push("checks.headline.fields: field names")
-      if (!int(h.maxSlashes, 0, 5)) p.push("checks.headline.maxSlashes: 0–5")
+    if (h !== undefined && keys(h, "checks.headline", ["enabled", "fields", "hookFields", "maxCommas", "deckField"], [], p)) {
+      if (typeof h.enabled !== "boolean") p.push("checks.headline.enabled: true or false")
+      for (const k of ["fields", "hookFields"]) if (!(Array.isArray(h[k]) && (h[k] as unknown[]).every(f => str(f, 40)))) p.push(`checks.headline.${k}: field names`)
+      if (!int(h.maxCommas, 0, 5)) p.push("checks.headline.maxCommas: 0–5")
+      if (!str(h.deckField, 40)) p.push("checks.headline.deckField: a field name")
     }
     if (o !== undefined && keys(o, "checks.originality", ["enabled", "headlineMaxRun", "captionMaxRun", "exempt"], [], p)) {
       if (typeof o.enabled !== "boolean") p.push("checks.originality.enabled: true or false")

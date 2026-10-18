@@ -1,5 +1,6 @@
 import { SERIES, checkFields, clippedWords, ddmmmyy, normalizeFields, type Placement, type RequestKind } from "./series"
 import { BRAND } from "./brand"
+import { headlineProblems, originalityProblems } from "./copy-checks"
 import { icymiCount, meaningful, normalizeUrl, unusedStorySlot, type McuAi, type ModelCall, type RankedPhoto, type SubjectBox } from "./model"
 import { contentPropertyOf } from "./properties"
 import type { ContentProperty, PipelineMedia } from "@/components/crm/types"
@@ -441,6 +442,10 @@ function validate(frames: FrameCopy[], caption: string, story: Story): string[] 
   // previous subject's mission brief). A roundup's copy is about five stories, so it is not checked here.
   if (!story.roundup && !sameSubject(`${story.title} ${story.sourceTitle}`, [caption, ...frames.flatMap(f => Object.values(f.fields))].join(" "))) problems.push(`the copy is not about this story ("${story.title.slice(0, 100)}"): write it from the source below`)
   for (const f of frames) if (f.fields.deck && !/[.!?]["”’)]?$/.test(f.fields.deck.trim())) problems.push(`the deck must be one complete sentence ending with a period: "${f.fields.deck}"`)
+  // The profile's headline and originality checks (Phase 1c, founder 2026-10-17): off unless the profile turns them on.
+  const checks = BRAND.checks
+  if (checks?.headline) problems.push(...headlineProblems(frames, checks.headline))
+  if (checks?.originality) problems.push(...originalityProblems(frames, caption, story, checks.originality, [...(checks.headline?.fields ?? []), ...(checks.headline?.hookFields ?? [])]))
   const clipped = [...new Set(frames.flatMap(f => clippedWords(f.fields, story.sourceText)))]
   if (clipped.length) problems.push(`abbreviated words on the card (${clipped.join(", ")}); use whole words, and shorter ones if it must fit`)
   return problems

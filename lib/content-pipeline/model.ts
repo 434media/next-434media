@@ -36,7 +36,9 @@ export interface Candidate { title: string; primaryUrl: string; publisher: strin
 /** One model call as served: which model and which provider answered (evidence for the routing check). */
 export interface ModelCall { step: PipelineStep; model: string; provider?: string; finishReason?: string; inputTokens?: number; outputTokens?: number; /** Set when this call is the fallback for a model that could not answer. */ fallbackFrom?: string; fallbackReason?: string }
 
-const system = (extra: string) => [{ role: "system" as const, content: BRAND.editorial, providerOptions: { anthropic: { cacheControl: { type: "ephemeral" as const } } } }, { role: "system" as const, content: extra }]
+/** The cached prefix: the profile's editorial rules, then its headline and originality rules when it carries them. */
+const EDITORIAL = BRAND.headlineRules ? `${BRAND.editorial}\n\n${BRAND.headlineRules}` : BRAND.editorial
+const system = (extra: string) => [{ role: "system" as const, content: EDITORIAL, providerOptions: { anthropic: { cacheControl: { type: "ephemeral" as const } } } }, { role: "system" as const, content: extra }]
 
 function fieldBrief(f: FieldSpec): string {
   return `${f.name} (${f.label}${f.allowed ? `; exactly one of: ${f.allowed.join(" | ")}` : ""}${f.date ? "; DDMMMYY" : ""}${f.perLine && f.maxLines ? `; at most ${f.maxLines} line${f.maxLines > 1 ? "s" : ""} of ~${f.perLine} characters` : ""}${f.maxChars ? `; at most ${f.maxChars} characters` : ""}${f.uppercase ? "; UPPERCASE" : ""}${f.exactLines ? `; exactly ${f.exactLines} lines separated by a line break, each at most ${f.perLine} characters of whole words, never abbreviated` : ""})`
