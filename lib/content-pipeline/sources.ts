@@ -264,27 +264,53 @@ export function imageSize(b: Uint8Array): { width: number; height: number } | nu
   return null
 }
 export const isDvidsImagePage = (u: string) => /^https:\/\/(www\.)?dvidshub\.net\/image\/\d+/i.test(u)
-const GOV_HOST = /(^|\.)(mil|gov)$|(^|\.)dvidshub\.net$/i
 /**
- * The share photo of a page as a candidate, with its rights read from the page. A U.S. military or government page's
- * own photo credited "(U.S. Army photo by …)" is a public-domain government work; "courtesy" photos and company pages
- * are company media, offered first by the editorial rules but flagged for the reviewer to confirm the terms.
+ * Federal hosts, whose own photos are U.S. government works and so public domain (17 U.S.C. §105). Every .mil host and
+ * DVIDS, plus an allowlist of federal .gov domains. A state, county or city .gov is not on it: those governments
+ * usually hold copyright in their photos (security review, 2026-10-17, finding 1).
+ */
+const FEDERAL_GOV = ["defense.gov", "war.gov", "nasa.gov", "dhs.gov", "fema.gov", "cbp.gov", "ice.gov", "tsa.gov", "faa.gov", "dot.gov", "energy.gov", "state.gov", "va.gov", "noaa.gov", "weather.gov", "nist.gov", "usgs.gov", "nps.gov", "doi.gov", "usda.gov", "commerce.gov", "justice.gov", "fbi.gov", "treasury.gov", "whitehouse.gov", "congress.gov", "senate.gov", "house.gov", "gao.gov", "usa.gov", "nsf.gov", "nih.gov", "hhs.gov", "cdc.gov", "epa.gov", "sba.gov", "usaid.gov", "nro.gov", "dni.gov", "cia.gov"]
+export function federalHost(host: string): boolean {
+  const h = host.toLowerCase().replace(/\.$/, "")
+  return /(^|\.)(mil|dvidshub\.net|fed\.us)$/.test(h) || FEDERAL_GOV.some(d => h === d || h.endsWith(`.${d}`))
+}
+/** Hosts that serve a federal site's own photos from another domain (DVIDS's image CDNs). */
+const GOV_MEDIA_HOSTS = ["d1ldvf68ux039x.cloudfront.net", "d34w7g4gy10iej.cloudfront.net"]
+/** The registrable part of a host, as two labels: enough for .mil, .gov and .com, which are what this compares. */
+const site = (host: string) => host.toLowerCase().split(".").slice(-2).join(".")
+/**
+ * The share photo of a page as a candidate, with its rights read from the page. It is a public-domain government work
+ * only when all of these hold: the page is on a federal host; the photo is served from that same site or a known
+ * government media host (a contractor's CDN is not); and no courtesy or copyright notice appears anywhere on the page.
+ * Its credit is the "(U.S. Army photo by …)" line, taken from the page's description first, which describes the share
+ * photo itself. Any other government page's photo is offered with a rights note naming why it isn't public domain;
+ * "courtesy" photos and company pages are company media, offered first by the editorial rules but flagged for the
+ * reviewer to confirm the terms.
  */
 export function pageImageCandidate(page: SourcePage, origin: "source" | "dvids"): MediaCandidate | null {
   if (!page.image || !/^https:\/\//.test(page.image) || isOutlet(page.url)) return null
-  const host = new URL(page.url).hostname, about = `${page.description ?? ""} ${page.text.slice(0, 4000)}`
-  const govCredit = /\(((?:U\.S\.|US) [A-Za-z .]+? (?:photo|illustration|graphic)(?: by [^)]{2,80})?)\)/.exec(about)?.[1]
-  const courtesy = /\((?:[^)]*?)courtesy(?: of)? ([^)]{2,80})\)/i.exec(about)?.[1]
-  const gov = GOV_HOST.test(host) && !courtesy
+  const host = new URL(page.url).hostname, imageHost = new URL(page.image).hostname.toLowerCase(), whole = `${page.description ?? ""} ${page.text}`
+  const credit = /\(((?:U\.S\.|US) [A-Za-z .]+? (?:photo|illustration|graphic)(?: by [^)]{2,80})?)\)/
+  const govCredit = credit.exec(page.description ?? "")?.[1] ?? credit.exec(page.text)?.[1]
+  const courtesy = /\((?:[^)]*?)courtesy(?: of)? ([^)]{2,80})\)/i.exec(whole)?.[1]
+  // A notice, not the word: DVIDS pages link to their own "about/copyright" terms page on every public-domain image.
+  const copyright = /©|\(c\)\s*(19|20)\d{2}|\bcopyright(ed)?\s+(\(c\)|(19|20)\d{2}|by\b)|all rights reserved/i.test(whole)
+  const federal = federalHost(host), onSite = site(imageHost) === site(host) || GOV_MEDIA_HOSTS.includes(imageHost)
+  const gov = federal && onSite && !courtesy && !copyright
+  // A government page whose photo isn't a federal work: say which test it failed, so the reviewer knows what to check.
+  const govNote = courtesy || gov || !/(^|\.)(mil|gov)$|(^|\.)dvidshub\.net$|(^|\.)fed\.us$/i.test(host) ? undefined
+    : !federal ? `${host} is not a federal site, so its photos are not public domain: confirm its terms allow editorial use before approving`
+    : !onSite ? `The photo on ${host} is served from ${imageHost}, not a government media host: confirm who owns it before approving`
+    : `${host} carries a copyright notice: confirm the photo's terms allow editorial use before approving`
   const creator = gov ? govCredit ?? siteOrg(page.siteName, host) : courtesy ?? siteOrg(page.siteName, host)
   const date = /\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec)[a-z]*\.? \d{1,2}, (20\d{2})\b/.exec(page.description ?? "")?.[0]
   const dated = date ? new Date(`${date.replace(/\.|Sept/g, m => m === "Sept" ? "Sep" : "")} UTC`) : null
   return {
     origin, url: page.image, thumbUrl: page.image, pageUrl: page.url, title: page.title.slice(0, 200), description: (page.description ?? "").slice(0, 400),
     width: 0, height: 0, creator: creator.slice(0, 200),
-    license: gov ? "Public domain (U.S. government work)" : courtesy ? "Courtesy photo" : "Official company media",
+    license: gov ? "Public domain (U.S. government work)" : courtesy ? "Courtesy photo" : govNote ? "Government media (confirm terms)" : "Official company media",
     credit: gov ? creator : `${creator} (courtesy)`, usGovernment: gov,
     ...(dated && Number.isFinite(dated.getTime()) ? { date: dated.toISOString().slice(0, 10) } : {}),
-    ...(gov ? {} : { rightsNote: `Company media from ${host}: confirm its terms allow editorial use before approving` }),
+    ...(gov ? {} : { rightsNote: govNote ?? `Company media from ${host}: confirm its terms allow editorial use before approving` }),
   }
 }

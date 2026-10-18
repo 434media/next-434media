@@ -29,10 +29,13 @@ export function firestorePipelineStore(db: FirebaseFirestore.Firestore = getDb()
       return { created: true, job }
     }),
     getJob: async id => ((await jobs.doc(id).get()).data()?.job as McuJob | undefined) ?? null,
-    saveJob: async job => { await jobs.doc(job.id).set({ job: clean(job) }, { merge: true }) },
+    // mergeFields replaces the whole job or draft object and keeps the lease fields beside it. A plain merge kept every
+    // field the new object no longer has: a cleared caption (undefined, dropped by clean) survived a subject switch
+    // and a later step read it back (gate round 3, 2026-10-17: DT101-10 captioned for Raid Hunter, sourced for Thunder).
+    saveJob: async job => { await jobs.doc(job.id).set({ job: clean(job) }, { mergeFields: ["job"] }) },
     createDraft: async draft => { await drafts.doc(draft.id).create({ draft: clean(draft), due: true, leaseUntil: 0, attempts: 0, jobId: draft.jobId, createdAt: draft.createdAt }).catch(e => { if ((e as { code?: number }).code !== 6) throw e }) },
     getDraft: async id => ((await drafts.doc(id).get()).data()?.draft as McuDraft | undefined) ?? null,
-    saveDraft: async draft => { await drafts.doc(draft.id).set({ draft: clean(draft) }, { merge: true }) },
+    saveDraft: async draft => { await drafts.doc(draft.id).set({ draft: clean(draft) }, { mergeFields: ["draft"] }) },
     claim: (k, id, nowMs, leaseMs) => db.runTransaction(async tx => {
       const ref = col(k).doc(id), d = (await tx.get(ref)).data()
       if (!d || d.due !== true || (typeof d.leaseUntil === "number" && d.leaseUntil > nowMs)) return 0

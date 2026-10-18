@@ -1,6 +1,7 @@
 import type { Placement, RequestKind, SeriesKey } from "./series"
 import type { MediaCandidate } from "./sources"
 import type { ModelCall } from "./model"
+import type { PipelineMedia } from "@/components/crm/types"
 
 /**
  * Durable pipeline work, so a Generate request survives interruptions without anyone asking again. A JOB is one
@@ -49,10 +50,11 @@ export interface Story {
   /** Pages that fill what the primary source leaves out (for DT101, the maker and its headquarters); their text follows the primary's in sourceText. */
   supporting?: { url: string; title: string }[]
   /** For ICYMI: the published MCU posts this roundup covers. */
-  roundup?: { postId: string; title: string; caption: string; publishedUrl?: string }[]
+  /** media: the photo the post recorded when the pipeline wrote it (pipeline_media), never read from its editable links. */
+  roundup?: { postId: string; title: string; caption: string; publishedUrl?: string; media?: PipelineMedia }[]
 }
 export interface FrameCopy { series: SeriesKey; fields: Record<string, string>; mediaQuery?: string }
-export interface ChosenMedia extends Pick<MediaCandidate, "url" | "pageUrl" | "license" | "creator" | "credit" | "usGovernment" | "date"> { title: string; note?: string; /** Zoom applied before the Canva fill, as fractions of the photo. */ crop?: CropBox }
+export interface ChosenMedia extends Pick<MediaCandidate, "url" | "pageUrl" | "license" | "creator" | "credit" | "usGovernment" | "date" | "rightsNote"> { title: string; note?: string; /** Zoom applied before the Canva fill, as fractions of the photo. */ crop?: CropBox }
 export interface FrameDesign { templateId: string; designId: string; editUrl: string; viewUrl: string; previewUrls: string[] }
 
 /** posting: the review step passed and the draft is being written to the board as a content post. */
