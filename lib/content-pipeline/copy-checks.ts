@@ -40,11 +40,15 @@ export function headlineProblems(frames: FrameCopy[], c: HeadlineChecks): string
       if (FORBIDDEN.test(v)) out.push(`${at(i)}the headline takes no slash, colon, semicolon, exclamation or question mark: one complete statement ("${v}")`)
       if ((v.match(/,/g) ?? []).length > c.maxCommas) out.push(`${at(i)}the headline has more than ${c.maxCommas} comma${c.maxCommas === 1 ? "" : "s"}: one statement, not a list ("${v}")`)
     }
+    // A hook's lines are one container for one hook (founder, 2026-10-18): the break is layout, not grammar, so the hook
+    // is read as one text and punctuated by its sentences, never line by line. A sentence that ends with a period
+    // inside it means the last one ends with one too ("TAXI SAFE. / LANDING SECURE" fails; "FIRE. / RELOCATE." and
+    // "IT FINDS DRONES / AND STRIKES THEM" pass).
     for (const name of c.hookFields) {
       const lines = (f.fields[name] ?? "").split("\n").map(l => l.trim()).filter(Boolean)
-      if (lines.length < 2) continue
-      const ends = new Set(lines.map(l => /\.$/.test(l)))
-      if (ends.size > 1) out.push(`${at(i)}the hook's lines must be punctuated the same way: a period at the end of every line, or of none ("${lines.join(" / ")}")`)
+      if (!lines.length) continue
+      const hook = bare(lines.join(" "))
+      if (hook.slice(0, -1).includes(".") && !hook.endsWith(".")) out.push(`${at(i)}the hook ends one sentence with a period and leaves the last without one: punctuate it as one written statement, by its sentences, not line by line ("${lines.join(" / ")}")`)
       if (lines.some(l => FORBIDDEN.test(l))) out.push(`${at(i)}the hook takes no slash, colon, semicolon, exclamation or question mark ("${lines.join(" / ")}")`)
     }
     const deck = f.fields[c.deckField]?.trim()

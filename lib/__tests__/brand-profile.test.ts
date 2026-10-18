@@ -73,14 +73,50 @@ test("headline checks: the approved cards pass; round 2's punctuation and decks 
   assert.deepEqual(headlineProblems([card("dt101", { benefit_headline: "SEND SUPPLIES.\nNOT A DRIVER.", subject_identifier: "ULTRA / OVERLAND AI" })], H), [])
   assert.deepEqual(headlineProblems([card("dt101", { benefit_headline: "FIRE.\nRELOCATE." })], H), [])
   assert.deepEqual(headlineProblems([card("news", { headline: "U.S. ARMY BACKS 9 C2 SOFTWARE VENDORS", deck: "Awards worth $93.6 million fund I Corps command software." })], H), [])
-  // DT101-08 (round 2): a period on one line only.
-  assert.match(headlineProblems([card("dt101", { benefit_headline: "TAXI SAFE.\nLANDING SECURE" })], H).join(), /punctuated the same way/)
+  // DT101-08 (round 2): one sentence closed with a period, the next left open.
+  assert.match(headlineProblems([card("dt101", { benefit_headline: "TAXI SAFE.\nLANDING SECURE" })], H).join(), /punctuate it as one written statement, by its sentences, not line by line/)
   // NEWS-04's deck is fragments; a deck that repeats the headline adds nothing.
   assert.match(headlineProblems([card("news", { headline: "PENTAGON PICKS KBR LASER FOR BASE DEFENSE", deck: "Pentagon picks KBR laser for base defense." })], H).join(), /the deck repeats the headline \("pentagon picks kbr/)
   assert.match(headlineProblems([card("news", { headline: "ARMY BACKS VENDORS.", deck: "One. Two." })], H).join(), /takes no period.*deck must be one sentence/)
   assert.match(headlineProblems([card("news", { headline: "DRONES DOWN NOW / TROOPS PROTECTED" })], H).join(), /no slash, colon/)
   assert.match(headlineProblems([card("news", { headline: "LASERS, DRONES, BASES" })], H).join(), /more than 1 comma/)
   assert.deepEqual(headlineProblems([card("news", { headline: "A. B." })], { ...H, enabled: false }), [])
+})
+
+test("the hook is one container for one hook: punctuated by its sentences, never line by line (founder, 2026-10-18)", () => {
+  const hook = (v: string) => headlineProblems([card("dt101", { benefit_headline: v })], H)
+  // One sentence across both lines, with or without its closing period, passes; so do the approved punchy statements.
+  for (const ok of ["IT FINDS DRONES\nAND STRIKES THEM", "IT FINDS DRONES\nAND STRIKES THEM.", "NO PILOT FLEW\nITS FIRST SORTIE", "SEND SUPPLIES.\nNOT A DRIVER.", "FIRE.\nRELOCATE.", "U.S. TROOPS GET\nA LASER SHIELD"]) assert.deepEqual(hook(ok), [], ok)
+  // No period is forced at the end of a line, and a sentence closed early with the next left open fails.
+  assert.match(hook("TAXI SAFE.\nLANDING SECURE").join(), /not line by line/)
+  assert.match(hook("DRONES DOWN.\nTROOPS SAFE NOW").join(), /not line by line/)
+  assert.match(hook("PROTECT TROOPS!\nDRONE DEFENSE").join(), /no slash, colon, semicolon, exclamation or question mark/)
+})
+
+test("the MilCityUSA profile carries the founder's rulings of 2026-10-18", () => {
+  const p = loadProfile("milcity")
+  // The hook: one container for one hook; nothing teaches a statement or a period per line.
+  assert.match(p.headlineRules ?? "", /The two lines are one container for ONE complete, compelling hook\. The line break is layout, not grammar/)
+  assert.match(p.headlineRules ?? "", /never a pattern per line: no period is forced at the end of a line/)
+  for (const text of [p.editorial, p.headlineRules ?? ""]) {
+    assert.doesNotMatch(text, /SEND SUPPLIES\. \/ NOT A DRIVER\.|FIRE\. \/ RELOCATE\./)
+    assert.doesNotMatch(text, /both lines end with a period|a period at the end of every line|punctuated the same way/)
+  }
+  // The journalism rule, for every template's front card, ICYMI story cards excepted.
+  assert.match(p.headlineRules ?? "", /Every headline and hook on the front of a card, in every template \(ICYMI story cards excepted, below\), is compelling journalism/)
+  assert.match(p.headlineRules ?? "", /Passing the checks is the floor, not the goal/)
+  // The originality limits as built: rewritten at 5+ words (headline) and 13+ (caption).
+  assert.equal(p.checks?.originality?.headlineMaxRun, 4); assert.equal(p.checks?.originality?.captionMaxRun, 12)
+  // Breaking freshness: 24 hours by an exact time, a same-event report allowed, bylines checked in America/Chicago.
+  assert.deepEqual(p.requestKinds.find(k => k.kind === "breaking"), { kind: "breaking", label: "Breaking News", detail: "Primary source in the last 24 hours", series: ["breaking"], code: "BN", freshHours: 24, datedByReport: true })
+  assert.equal(p.timeZone, "America/Chicago")
+  assert.match(p.editorial, /otherwise a news outlet's report of the same event with an exact time .*if neither shows it is within 24 hours, it is not Breaking, and it may run as News/)
+  assert.match(p.editorial, /A visible date-only byline is never enough on its own: it is only a cross-check, and only when it is today in America\/Chicago/)
+  // freshHours needs the profile's time zone.
+  const noZone: Record<string, unknown> = { ...milcity }
+  delete noZone.timeZone
+  assert.ok(validateProfile(noZone).some(x => /freshHours: 1–168, with the profile's timeZone/.test(x)))
+  assert.ok(validateProfile({ ...milcity, timeZone: "Central" }).some(x => /timeZone: an IANA time zone/.test(x)))
 })
 
 test("originality: a headline or caption copied from the source is rewritten; quotes, names and ICYMI are not", () => {

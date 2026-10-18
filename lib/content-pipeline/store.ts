@@ -49,6 +49,11 @@ export interface Story {
    */
   reportedAt?: string
   datedBy?: { url: string; publishedAt: string }
+  /**
+   * How a Breaking story was shown to be fresh (founder, 2026-10-18): by the official page's exact time, or by a news
+   * outlet's timed report of the same event (datedBy). byline: a date-only byline, kept only as a cross-check.
+   */
+  fresh?: { at: string; how: "official" | "report"; byline?: string; bylineToday?: boolean }
   /** Primary pages that refused the fetch and were read through the search tool's extracted text instead. */
   readViaSearch?: string[]
   /** Sourced one-sentence "what changed, its consequence, why now" — Breaking only. */

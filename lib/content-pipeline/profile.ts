@@ -31,8 +31,12 @@ export interface ProfileSeries extends Series {
   /** A caption shape the series requires (MCU's DT101 mission brief). */
   caption?: CaptionFormat
 }
-/** datedByReport: a news outlet's report within recencyDays may date the story, when the official page describes the same event. */
-export interface ProfileRequestKind { kind: RequestKind; label: string; detail: string; series: SeriesKey[]; code: string; recencyDays?: number; undatedOk?: boolean; datedByReport?: boolean }
+/**
+ * datedByReport: a news outlet's report may date the story, when the official page describes the same event: within
+ * recencyDays, or, for a freshHours window, by the report's exact time. freshHours: the story must be shown to be this
+ * fresh by an exact time (the official page's, else such a report's); a date alone never is (Breaking, founder 2026-10-18).
+ */
+export interface ProfileRequestKind { kind: RequestKind; label: string; detail: string; series: SeriesKey[]; code: string; recencyDays?: number; undatedOk?: boolean; datedByReport?: boolean; freshHours?: number }
 /** fields: one-line headlines; hookFields: multi-line hooks (one punctuation convention across lines); deckField: the deck. */
 export interface HeadlineChecks { enabled: boolean; fields: string[]; hookFields: string[]; maxCommas: number; deckField: string }
 export interface OriginalityChecks { enabled: boolean; headlineMaxRun: number; captionMaxRun: number; exempt: SeriesKey[] }
@@ -50,6 +54,8 @@ export interface BrandProfile {
   /** With each request kind's code, the stored draft ids ("MCU-NEWS-20261018-01"). */
   draftPrefix: string
   rulesVersion: string
+  /** The brand's home time zone (IANA): the calendar day a date-only byline is checked against. */
+  timeZone?: string
   never: { id: string; what: string }[]
   /** The editorial rules the writer and research are prompted with (the cached system prefix). */
   editorial: string
@@ -80,11 +86,12 @@ function keys(o: unknown, where: string, required: string[], optional: string[],
 /** Problems with an emitted profile (empty = loadable). Mirrors brand_profile_extract.py's validate(). */
 export function validateProfile(v: unknown): string[] {
   const p: string[] = []
-  if (!keys(v, "profile", ["schema", "generatedBy", "profile", "profileVersion", "profileDate", "profileSha256", "id", "name", "shortName", "rulesVersion", "draftPrefix", "never", "editorial", "series", "requestKinds", "research", "photos", "posts", "seeds"], ["headlineRules", "checks"], p)) return p
+  if (!keys(v, "profile", ["schema", "generatedBy", "profile", "profileVersion", "profileDate", "profileSha256", "id", "name", "shortName", "rulesVersion", "draftPrefix", "never", "editorial", "series", "requestKinds", "research", "photos", "posts", "seeds"], ["headlineRules", "checks", "timeZone"], p)) return p
   if (v.schema !== PROFILE_SCHEMA) p.push(`schema must be ${PROFILE_SCHEMA}`)
   if (!(typeof v.id === "string" && /^[a-z][a-z0-9-]{1,30}$/.test(v.id))) p.push("id: lowercase letters, digits and hyphens")
   for (const [k, n] of [["name", 60], ["shortName", 20], ["rulesVersion", 80], ["editorial", 40000]] as const) if (!str(v[k], n)) p.push(`${k}: 1–${n} characters`)
   if (!(typeof v.draftPrefix === "string" && /^[A-Z][A-Z0-9]{1,9}$/.test(v.draftPrefix))) p.push("draftPrefix: 2–10 uppercase letters or digits")
+  if ("timeZone" in v && !(typeof v.timeZone === "string" && /^[A-Z][A-Za-z_]+(\/[A-Za-z_]+){1,2}$/.test(v.timeZone))) p.push("timeZone: an IANA time zone, e.g. America/Chicago")
   if ("headlineRules" in v && !str(v.headlineRules, 20000)) p.push("headlineRules: 1–20,000 characters")
   if (!Array.isArray(v.never) || !v.never.every(n => isObj(n) && Object.keys(n).sort().join() === "id,what" && str(n.id, 80) && str(n.what, 400))) p.push("never: a list of {id, what}")
 
@@ -141,13 +148,14 @@ export function validateProfile(v: unknown): string[] {
   const kinds = Array.isArray(v.requestKinds) && v.requestKinds.length ? v.requestKinds : (p.push("requestKinds: a non-empty list"), [])
   kinds.forEach((k: unknown, i: number) => {
     const w = `requestKinds[${i}]`
-    if (!keys(k, w, ["kind", "label", "detail", "series", "code"], ["recencyDays", "undatedOk", "datedByReport"], p)) return
+    if (!keys(k, w, ["kind", "label", "detail", "series", "code"], ["recencyDays", "undatedOk", "datedByReport", "freshHours"], p)) return
     if (!(REQUEST_KINDS as readonly unknown[]).includes(k.kind)) p.push(`${w}.kind: one of ${REQUEST_KINDS.join(", ")}`)
     if (!str(k.label, 60) || !str(k.detail, 120)) p.push(`${w}: label 1–60 and detail 1–120 characters`)
     if (!(typeof k.code === "string" && /^[A-Z0-9]{2,8}$/.test(k.code))) p.push(`${w}.code: 2–8 uppercase letters or digits (draft ids)`)
     if ("recencyDays" in k && !int(k.recencyDays, 1, 3650)) p.push(`${w}.recencyDays: 1–3650`)
     if ("undatedOk" in k && typeof k.undatedOk !== "boolean") p.push(`${w}.undatedOk: true or false`)
-    if ("datedByReport" in k && !(typeof k.datedByReport === "boolean" && "recencyDays" in k)) p.push(`${w}.datedByReport: true or false, with recencyDays`)
+    if ("freshHours" in k && !(int(k.freshHours, 1, 168) && "timeZone" in v)) p.push(`${w}.freshHours: 1–168, with the profile's timeZone`)
+    if ("datedByReport" in k && !(typeof k.datedByReport === "boolean" && ("recencyDays" in k || "freshHours" in k))) p.push(`${w}.datedByReport: true or false, with recencyDays or freshHours`)
     if (!(Array.isArray(k.series) && k.series.length && k.series.every(x => typeof x === "string" && x in series))) p.push(`${w}.series: series defined in this profile`)
     else if (!k.series.every(x => (series[x as string] as { templates?: { feed?: string } })?.templates?.feed)) p.push(`${w}: every series it fills needs a feed template`)
   })
