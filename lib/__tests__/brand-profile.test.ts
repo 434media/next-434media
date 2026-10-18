@@ -78,6 +78,8 @@ test("headline checks: the approved cards pass; round 2's punctuation and decks 
   // NEWS-04's deck is fragments; a deck that repeats the headline adds nothing.
   assert.match(headlineProblems([card("news", { headline: "PENTAGON PICKS KBR LASER FOR BASE DEFENSE", deck: "Pentagon picks KBR laser for base defense." })], H).join(), /the deck repeats the headline \("pentagon picks kbr/)
   assert.match(headlineProblems([card("news", { headline: "ARMY BACKS VENDORS.", deck: "One. Two." })], H).join(), /takes no period.*deck must be one sentence/)
+  // NEWS-04's deck: fragments joined by a comma, with no closing period.
+  assert.match(headlineProblems([card("news", { headline: "KBR FIREFLY PILOT PROGRAM", deck: "KBR Firefly laser pilot for base defense, Xbox controller" })], H).join(), /the deck is one complete sentence ending with a period, not a list of fragments/)
   assert.match(headlineProblems([card("news", { headline: "DRONES DOWN NOW / TROOPS PROTECTED" })], H).join(), /no slash, colon/)
   assert.match(headlineProblems([card("news", { headline: "LASERS, DRONES, BASES" })], H).join(), /more than 1 comma/)
   assert.deepEqual(headlineProblems([card("news", { headline: "A. B." })], { ...H, enabled: false }), [])

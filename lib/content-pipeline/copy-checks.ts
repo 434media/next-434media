@@ -54,6 +54,7 @@ export function headlineProblems(frames: FrameCopy[], c: HeadlineChecks): string
     const deck = f.fields[c.deckField]?.trim()
     if (deck) {
       if (/[.!?]["”’)]?\s+["“‘(]?[A-Z]/.test(bare(deck))) out.push(`${at(i)}the deck must be one sentence, not two: "${deck}"`)
+      else if (!/\.["”’)]?$/.test(deck)) out.push(`${at(i)}the deck is one complete sentence ending with a period, not a list of fragments: "${deck}"`)
       if (/\bSource:/i.test(deck)) out.push(`${at(i)}the deck carries no "Source:"; the caption's source line does`)
       const head = c.fields.map(n => f.fields[n] ?? "").join(" ")
       const shared = longestSharedRun(words(deck), words(head))
