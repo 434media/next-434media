@@ -1,4 +1,5 @@
 import { gateway } from "@ai-sdk/gateway"
+import { BRAND } from "./brand"
 import { createMcuAi } from "./model"
 import { PIPELINE_MODELS } from "./models"
 import { fetchImage, fetchSourcePage, searchCommons, searchNasa, searchOpenverse } from "./sources"
@@ -19,7 +20,8 @@ export async function pipelineDeps(): Promise<WorkerDeps> {
   const searchTools = { web_search: gateway.tools.parallelSearch({ mode: "agentic", maxResults: 10 }) }
   return {
     store: firestorePipelineStore(),
-    ai: onCall => createMcuAi({ models: PIPELINE_MODELS, searchTools, onCall }),
+    // The same search tool, set to return a page's full extracted text: refused official pages are read through it.
+    ai: onCall => createMcuAi({ models: PIPELINE_MODELS, searchTools, readTools: { web_search: gateway.tools.parallelSearch({ mode: "one-shot", maxResults: 5, excerpts: { maxCharsPerResult: 20_000 } }) }, onCall }),
     seeds: getMcuSeeds,
     icymiWindow: getIcymiWindow,
     fetchPage: url => fetchSourcePage(url),
@@ -28,10 +30,11 @@ export async function pipelineDeps(): Promise<WorkerDeps> {
     searchMore: async q => (await Promise.all([searchOpenverse(q).catch(() => []), searchNasa(q).catch(() => [])])).flat(),
     nowMs: Date.now,
     content: {
-      // MCU's posts under any of the names they carry (older records are not all tagged "milcity"), as findPosts
-      // matches them (title, caption or tags), with when each went out for the ICYMI window. Newest first.
+      // The brand's posts under any of the names they carry (older MCU records are not all tagged "milcity"), as
+      // findPosts matches them (title, caption or tags), with when each went out for the ICYMI window. Newest first.
       recentPosts: async () => {
-        const mcu = (await tools.intake.listPosts()).filter(p => !p.archived && [p.title, p.social_copy, p.tags, p.platform].some(v => typeof v === "string" && /milcity|\bmcu\b/i.test(v)))
+        const ours = new RegExp(BRAND.posts.match, "i")
+        const mcu = (await tools.intake.listPosts()).filter(p => !p.archived && [p.title, p.social_copy, p.tags, p.platform].some(v => typeof v === "string" && ours.test(v)))
         const when = (p: (typeof mcu)[number]) => p.posted_at || (p.status === "posted" || p.published_url ? p.date_to_post : undefined)
         return mcu.map((p): PostRow => ({ id: p.id, title: p.title, status: p.status, ...(p.published_url ? { publishedUrl: p.published_url } : {}), ...(p.social_copy ? { caption: p.social_copy.slice(0, 2200) } : {}), ...(when(p) ? { publishedAt: when(p) } : {}), ...(Array.isArray(p.pipeline_media) && p.pipeline_media.length ? { media: p.pipeline_media.slice(0, 6) } : {}) }))
           .sort((a, b) => (b.publishedAt ?? "").localeCompare(a.publishedAt ?? "")).slice(0, 75)
@@ -46,8 +49,8 @@ export async function pipelineDeps(): Promise<WorkerDeps> {
         // Idempotent on requestId: a resumed step finds the post it already created.
         const post = await tools.intake.findByRequestId(p.requestId) ?? await crm.createContentPost({
           user: p.requestedBy.name, date_created: now.slice(0, 10), platform: p.property, status: "needs_approval", title: p.title,
-          notes: p.notes, social_copy: p.caption, links: p.links, pipeline_media: p.media, assets: [], tags: "milcity", social_platforms: ["instagram", "facebook"],
-          intake: { requestId: p.requestId, metaBrand: "milcity", requestedBy: p.requestedBy.email, at: now },
+          notes: p.notes, social_copy: p.caption, links: p.links, pipeline_media: p.media, assets: [], tags: BRAND.posts.tag, social_platforms: ["instagram", "facebook"],
+          intake: { requestId: p.requestId, metaBrand: BRAND.posts.metaBrand, requestedBy: p.requestedBy.email, at: now },
         })
         if (post.assets.length && post.export_fingerprint) return { postId: post.id, holds: [] }
         // Fresh exports in frame order; a single design is bound to the post as its Canva source.
@@ -70,8 +73,8 @@ export async function pipelineDeps(): Promise<WorkerDeps> {
         const post = await crm.createContentPost({
           user: p.requestedBy.name, date_created: now.slice(0, 10), platform: p.property, status: "needs_approval", title: p.title.slice(0, 200),
           notes: `The content pipeline found no new content for this request, so nothing was drafted. Confirm to close it.\n\nWhy: ${p.reason}`.slice(0, 4000),
-          links: p.tried.map(t => t.url), assets: [], tags: "milcity", social_platforms: [],
-          intake: { requestId: p.requestId, metaBrand: "milcity", requestedBy: p.requestedBy.email, at: now },
+          links: p.tried.map(t => t.url), assets: [], tags: BRAND.posts.tag, social_platforms: [],
+          intake: { requestId: p.requestId, metaBrand: BRAND.posts.metaBrand, requestedBy: p.requestedBy.email, at: now },
           pipeline_outcome: { kind: "no_new_content", job_id: p.jobId, reason: p.reason, tried: p.tried },
         })
         return { postId: post.id }

@@ -8,7 +8,7 @@
 import { test } from "node:test"
 import assert from "node:assert/strict"
 import { SERIES, checkFields, clippedWords, ddmmmyy, lineCount, type SeriesKey } from "../content-pipeline/series"
-import { runDue, RETRY_MS, icymiStory, icymiWindow, staleSource, allowsRepresentative, sameSubject, makerOf, searchedPageUsable, unsourcedNumbers, withCredits, imageLabel, mediaQueries, cropFit, choosePhoto, zoomCrop, reviewNotes, DOD_NOTICE, LEASE_MS, type WorkerDeps, type DesignInput, type PostInput, type NoContentInput } from "../content-pipeline/worker"
+import { runDue, RETRY_MS, exactTime, zonedDay, icymiStory, icymiWindow, staleSource, allowsRepresentative, sameSubject, makerOf, searchedPageUsable, unsourcedNumbers, withCredits, imageLabel, mediaQueries, cropFit, choosePhoto, zoomCrop, reviewNotes, DOD_NOTICE, LEASE_MS, type WorkerDeps, type DesignInput, type PostInput, type NoContentInput } from "../content-pipeline/worker"
 import { firestorePipelineStore } from "../firestore-content-pipeline"
 import { MAX_ATTEMPTS, type McuDraft, type McuJob, type McuStore } from "../content-pipeline/store"
 import { archiveRelevant, assertPublicHttps, federalHost, guardedFetch, isOutlet, siteOrg, imageSize, pageImageCandidate, parsePage, searchNasa, searchOpenverse, usableLicense, type MediaCandidate } from "../content-pipeline/sources"
@@ -153,15 +153,75 @@ test("five stories: one research pass, one draft per story, no photo reused acro
   assert.equal(w.alerts.length, 1); assert.equal(w.alerts[0].drafts.length, 5)
 })
 
-test("Breaking: an announcement older than 24 hours, or with no stated time, is not Breaking — the job holds and says why", async () => {
+test("Breaking: an announcement older than 24 hours, or with no stated time, is not Breaking — the job holds and says it may run as News", async () => {
   const old = world({ pagePublished: "2026-10-14T09:00:00Z" })
   await old.start({ kind: "breaking" })
-  assert.equal(old.store.drafts.size, 0); assert.match((await old.store.getJob("job-breaking-1"))!.note!, /more than 24 hours ago/)
+  assert.equal(old.store.drafts.size, 0); assert.match((await old.store.getJob("job-breaking-1"))!.note!, /publish time \(2026-10-14T09:00:00Z\) is more than 24 hours old, so it isn't Breaking News; it may run as News/)
   const undated = world({ pagePublished: "" })
   await undated.start({ kind: "breaking" })
-  assert.equal(undated.store.drafts.size, 0); assert.match((await undated.store.getJob("job-breaking-1"))!.note!, /states no publication time/)
+  assert.equal(undated.store.drafts.size, 0); assert.match((await undated.store.getJob("job-breaking-1"))!.note!, /shows no publish time, and no news report of the same event shows an exact time within 24 hours, so it isn't Breaking News; it may run as News/)
   // A job that opens no drafts still reports back once, with its reason.
   assert.equal(old.alerts.length, 1); assert.deepEqual(old.alerts[0].drafts, []); assert.equal(undated.alerts.length, 1)
+})
+
+test("an exact time is one with a time of day; a date alone never is; a time with no zone is read at its earliest moment", () => {
+  assert.equal(exactTime("2026-10-16"), null); assert.equal(exactTime(""), null); assert.equal(exactTime(undefined), null)
+  assert.equal(exactTime("2026-10-16T09:00:00Z"), Date.parse("2026-10-16T09:00:00Z"))
+  assert.equal(exactTime("2026-10-16T04:00:00-05:00"), Date.parse("2026-10-16T09:00:00Z"))
+  assert.equal(exactTime("2026-10-16T09:00:00"), Date.parse("2026-10-15T19:00:00Z")) // UTC+14: never fresher than it is
+  assert.equal(zonedDay(Date.parse("2026-10-17T03:00:00Z"), "America/Chicago"), "2026-10-16")
+})
+
+test("Breaking freshness, in order: the official page's exact time; else a timed outlet report of the same event; else not Breaking (founder, 2026-10-18)", async () => {
+  const PRIMARY = "https://www.army.mil/article/1", REPORT = "https://www.defensenews.com/2026/10/16/army-c2"
+  const candidate = { title: "Army picks nine C2 software vendors", primaryUrl: PRIMARY, publisher: "U.S. Army", why: "news", whyNow: "The Army named its I Corps C2 vendors today, which sets who builds the software.", reportUrl: REPORT }
+  const make = (official: string, report: string, same = true) => {
+    const w = world({ ai: { research: async () => ({ candidates: [candidate] }), sameEvent: async () => ({ same, reason: same ? "the same award" : "an older announcement" }) } })
+    w.deps.fetchPage = async url => url === REPORT ? { url, title: "Army awards nine companies C2 software deals", text: ARMY_TEXT, ...(report ? { publishedAt: report } : {}) } : { url, title: "Army awards C2 contracts", text: ARMY_TEXT, ...(official ? { publishedAt: official } : {}) }
+    return w
+  }
+  const note = async (w: ReturnType<typeof world>) => (await w.store.getJob("job-breaking-1"))!.note ?? ""
+
+  // 1. The official page's machine-readable time decides, when it has one.
+  const a = make("2026-10-16T09:00:00Z", "")
+  await a.start({ kind: "breaking" })
+  assert.deepEqual(onlyDraft(a).story.fresh, { at: "2026-10-16T09:00:00.000Z", how: "official" })
+  assert.match(reviewNotes(onlyDraft(a)), /How fresh\nThe official page's publish time, 2026-10-16T09:00:00.000Z\./)
+  // An official time older than 24 hours is not rescued by a fresh report.
+  const old = make("2026-10-15T09:00:00Z", "2026-10-16T12:00:00Z")
+  await old.start({ kind: "breaking" })
+  assert.equal(old.store.drafts.size, 0); assert.match(await note(old), /more than 24 hours old, so it isn't Breaking News; it may run as News/)
+
+  // 2. A date-only official page, and an outlet's report of the same event with an exact time: Breaking, dated by the
+  // report, which is never cited. The date-only byline is today in America/Chicago, so it agrees as a cross-check.
+  const b = make("2026-10-16", "2026-10-16T15:30:00Z")
+  await b.start({ kind: "breaking" })
+  const d = onlyDraft(b)
+  assert.deepEqual(d.story.fresh, { at: "2026-10-16T15:30:00.000Z", how: "report", byline: "2026-10-16", bylineToday: true })
+  assert.equal(d.story.reportedAt, "2026-10-16"); assert.equal(d.frames[0].fields.date, "16OCT26")
+  assert.deepEqual(b.posts[0].links.filter(l => l === REPORT), []) // never cited on the post
+  assert.match(reviewNotes(d), /How fresh\nA news outlet's report of the same event, timed 2026-10-16T15:30:00.000Z; the official page shows no time\. The outlet is not cited\. The page's date-only byline, 2026-10-16, is today in America\/Chicago and agrees\./)
+  assert.doesNotMatch(reviewNotes(d), /The official page is older/)
+  // A byline that isn't today is recorded and not counted; the report still decides.
+  const c = make("2026-10-14", "2026-10-16T15:30:00Z")
+  await c.start({ kind: "breaking" })
+  assert.match(reviewNotes(onlyDraft(c)), /date-only byline, 2026-10-14, is not today in America\/Chicago, so it isn't counted/)
+
+  // 3. Neither shows it: not Breaking, and it may run as News. A date-only byline today is never enough alone, a
+  // report with only a date is not an exact time, and a report of a different event doesn't count.
+  const e = make("2026-10-16", "")
+  await e.start({ kind: "breaking" })
+  assert.equal(e.store.drafts.size, 0)
+  assert.match(await note(e), /shows only a date \(2026-10-16, today in America\/Chicago, which is a cross-check, never enough on its own\), and no news report of the same event shows an exact time within 24 hours \(the outlet's report shows no exact publish time\), so it isn't Breaking News; it may run as News/)
+  const f = make("2026-10-16", "2026-10-16")
+  await f.start({ kind: "breaking" })
+  assert.match(await note(f), /the outlet's report shows no exact publish time/)
+  const g = make("2026-10-16", "2026-10-16T15:30:00Z", false)
+  await g.start({ kind: "breaking" })
+  assert.match(await note(g), /the official page is not the event the outlet reported \(an older announcement\)/)
+  const h = make("2026-10-16", "2026-10-15T12:00:00Z")
+  await h.start({ kind: "breaking" })
+  assert.match(await note(h), /the outlet's report \(2026-10-15T12:00:00Z\) is more than 24 hours old/)
 })
 
 test("every candidate dropped: research runs once more, avoiding them, before the job holds (production, 2026-10-17)", async () => {
@@ -909,4 +969,49 @@ test("a pipeline post records the photo it used, with its rights, as pipeline_me
   const [m] = w.posts[0].media
   assert.equal(m.url, CANDIDATE.url); assert.equal(m.pageUrl, CANDIDATE.pageUrl); assert.equal(m.license, CANDIDATE.license); assert.equal(m.credit, CANDIDATE.credit); assert.equal(m.usGovernment, true)
   assert.equal("crop" in m, false); assert.equal("note" in m, false) // the record is the photo and its rights, not the review notes
+})
+test("News dated by an outlet's recent report of the same event: the official page may be older; the outlet is never cited (founder, 2026-10-18)", async () => {
+  const PRIMARY = "https://www.army.mil/article/1", REPORT = "https://www.defensenews.com/2026/10/15/army-c2"
+  const candidate = { title: "Army picks nine C2 software vendors", primaryUrl: PRIMARY, publisher: "U.S. Army", why: "news", reportUrl: REPORT, reportPublishedAt: "2026-10-15" }
+  const judged: string[] = []
+  const make = (same: boolean) => {
+    const w = world({ ai: { research: async () => ({ candidates: [candidate] }), sameEvent: async ({ report, primary }) => { judged.push(`${report.url} vs ${primary.url}`); return { same, reason: same ? "the same award" : "the page is the 2024 program launch the report mentions" } } } })
+    w.deps.fetchPage = async url => url === REPORT ? { url, title: "Army awards nine companies C2 software deals", text: ARMY_TEXT, publishedAt: "2026-10-15T12:00:00Z" } : { url, title: "Army awards C2 contracts", text: ARMY_TEXT, publishedAt: "2026-09-20T09:00:00Z" }
+    return w
+  }
+  const w = make(true)
+  await w.start({ kind: "news" })
+  const d = onlyDraft(w)
+  assert.equal(d.story.primaryUrl, PRIMARY); assert.equal(d.story.publishedAt, "2026-09-20"); assert.equal(d.story.reportedAt, "2026-10-15")
+  assert.equal(d.frames[0].fields.date, "15OCT26") // the card is dated by the report
+  assert.deepEqual(w.posts[0].links.filter(l => l === REPORT), []) // never cited on the post
+  assert.match(reviewNotes(d), /Dated by a news report\nThe official page is older; a news outlet reported the same event on 2026-10-15/)
+  assert.deepEqual(judged, [`${REPORT} vs ${PRIMARY}`])
+  // The official page is an older announcement the report only mentions: the story drops, with the reason.
+  const no = make(false)
+  await no.start({ kind: "news" })
+  assert.match((await no.store.getJob("job-news-1"))!.note!, /more than 7 days ago; the official page is not the event the outlet reported \(the page is the 2024 program launch/)
+  // A report older than the window doesn't date anything; nor does one that isn't an outlet's.
+  const stale = world({ ai: { research: async () => ({ candidates: [{ ...candidate, reportPublishedAt: "2026-10-01" }] }), sameEvent: async () => ({ same: true, reason: "" }) } })
+  stale.deps.fetchPage = async url => ({ url, title: "Army awards C2 contracts", text: ARMY_TEXT, publishedAt: url === REPORT ? "2026-10-01T12:00:00Z" : "2026-09-20T09:00:00Z" })
+  await stale.start({ kind: "news" })
+  assert.match((await stale.store.getJob("job-news-1"))!.note!, /the outlet's report is not from the last 7 days/)
+})
+
+test("an official page that refuses the fetch is read through the search tool's extracted text; an outlet never is (founder, 2026-10-18)", async () => {
+  const GOV = "https://www.defense.gov/News/Releases/Release/Article/1", read: string[] = []
+  const w = world({ ai: { research: async () => ({ candidates: [{ title: "Army picks nine C2 software vendors", primaryUrl: GOV, publisher: "Department of War", why: "news" }] }), readRefusedPage: async url => { read.push(url); return { url, title: "Army awards C2 contracts", text: ARMY_TEXT, publishedAt: "2026-10-16" } } } })
+  const fetched = w.deps.fetchPage
+  w.deps.fetchPage = async url => { if (url === GOV) throw new Error("http_403"); return fetched(url) }
+  await w.start({ kind: "news" })
+  const d = onlyDraft(w)
+  assert.equal(d.story.primaryUrl, GOV); assert.deepEqual(d.story.readViaSearch, [GOV]); assert.deepEqual(read, [GOV])
+  assert.match(reviewNotes(d), /Read through the search tool\nThese official pages refused the pipeline's fetch/)
+  // An outlet is skipped before any fetch, and a server error is not a refusal: neither is read through the search.
+  const OUT = "https://www.defensenews.com/2026/10/16/x", BROKEN = "https://www.army.mil/article/5"
+  const v = world({ ai: { research: async () => ({ candidates: [{ title: "Army picks nine C2 software vendors", primaryUrl: OUT, alternateUrls: [BROKEN], publisher: "Defense News", why: "news" }] }), readRefusedPage: async url => { read.push(url); return null } } })
+  v.deps.fetchPage = async url => { throw new Error(url === BROKEN ? "http_500" : "http_403") }
+  await v.start({ kind: "news" })
+  assert.deepEqual(read, [GOV]) // nothing new was read through the search
+  assert.match((await v.store.getJob("job-news-1"))!.note!, /news outlet's article, not the primary source; http_500 at https:\/\/www\.army\.mil\/article\/5/)
 })

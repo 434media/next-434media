@@ -1,14 +1,16 @@
-import type { RequestKind } from "./series"
+import { BRAND } from "./brand"
+import type { RequestKind } from "./profile"
 
 /**
- * MCU content seeds: where research looks first, and the DT101 ideas waiting to be made. The values are a copy of the
- * founder's Tracker (a private Google Sheet) and his named organizations, so they are not in this public repository:
+ * Content seeds: where research looks first, and the backlog of ideas waiting to be made. The values are private (for
+ * MilCityUSA, a copy of the founder's Tracker and his named organizations), so they are not in this public repository:
  * they live in Firestore (lib/firestore-content-pipeline.ts, `content_pipeline_config/mcu_seeds`) and are loaded by a
- * super-admin through PUT /api/admin/content-pipeline/seeds. Only their shape and the brief built from them are here.
- * Without seeds, research still runs on the editorial rules alone, and the run records that it did.
+ * super-admin through PUT /api/admin/content-pipeline/seeds. The brand profile gives their shape: the organization
+ * kinds, the order research looks in, and which kind uses the backlog. The field names (dt101Backlog, dt101Covered)
+ * are stored values and are not renamed. Without seeds, research still runs on the editorial rules alone.
  */
-export const SEED_ORG_KINDS = ["neo-prime", "prime", "government", "research", "ecosystem", "outlet"] as const
-export interface SeedOrg { name: string; site: string; kind: typeof SEED_ORG_KINDS[number] }
+export const SEED_ORG_KINDS: readonly string[] = BRAND.seeds.orgKinds
+export interface SeedOrg { name: string; site: string; kind: string }
 export interface McuSeeds {
   purpose: string
   cohorts: string[]
@@ -26,12 +28,13 @@ export interface McuSeeds {
 /** The research brief: purpose, cohorts and where to look first. */
 export function seedBrief(kind: RequestKind, seeds: McuSeeds | null): string {
   if (!seeds) return "No source seeds are loaded: find stories from primary sources on your own, under the rules above."
-  const list = (kinds: SeedOrg["kind"][], withSite = true) => seeds.orgs.filter(o => kinds.includes(o.kind)).map(o => withSite ? `${o.name} (${o.site})` : o.name).join(", ")
+  const shape = BRAND.seeds
+  const list = (kinds: string[], withSite = true) => seeds.orgs.filter(o => kinds.includes(o.kind)).map(o => withSite ? `${o.name} (${o.site})` : o.name).join(", ")
   return [
     seeds.purpose,
     `Source cohorts:\n${seeds.cohorts.map(c => `- ${c}`).join("\n")}`,
-    `Look first at these builders' own newsrooms: ${list(["neo-prime"])}. Primes: ${list(["prime"], false)}. Government, research and ecosystem: ${list(["government", "research", "ecosystem"])}. Outlets for finding stories (then cite the primary source): ${seeds.orgs.filter(o => o.kind === "outlet").map(o => o.site).join(", ")}. These are a starting point, not a limit.`,
-    ...(kind === "dt101" ? [`DT101 ideas waiting to be made (prefer one of these unless the reviewer steers otherwise; already covered: ${seeds.dt101Covered.join(", ") || "none listed"}):\n${seeds.dt101Backlog.map(b => `- ${b.subject} — ${b.maker} (${b.url})`).join("\n")}`] : []),
+    `${shape.lookFirst.map(g => `${g.label}: ${list(g.kinds, g.sites)}`).join(". ")}. Outlets for finding stories (then cite the primary source): ${seeds.orgs.filter(o => o.kind === shape.outletKind).map(o => o.site).join(", ")}. These are a starting point, not a limit.`,
+    ...(shape.backlog && kind === shape.backlog.kind ? [`${shape.backlog.label} (prefer one of these unless the reviewer steers otherwise; already covered: ${seeds.dt101Covered.join(", ") || "none listed"}):\n${seeds.dt101Backlog.map(b => `- ${b.subject} — ${b.maker} (${b.url})`).join("\n")}`] : []),
   ].join("\n\n")
 }
 

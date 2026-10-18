@@ -1,6 +1,7 @@
 import { SERIES, checkFields, clippedWords, ddmmmyy, normalizeFields, type Placement, type RequestKind } from "./series"
-import { MCU_RULES_VERSION } from "./editorial"
-import { icymiCount, meaningful, normalizeUrl, unusedStorySlot, type McuAi, type ModelCall, type RankedPhoto, type SubjectBox } from "./model"
+import { BRAND } from "./brand"
+import { headlineProblems, originalityProblems } from "./copy-checks"
+import { icymiCount, meaningful, normalizeUrl, unusedStorySlot, type Candidate, type McuAi, type ModelCall, type RankedPhoto, type SubjectBox } from "./model"
 import { contentPropertyOf } from "./properties"
 import type { ContentProperty, PipelineMedia } from "@/components/crm/types"
 import type { McuSeeds } from "./seeds"
@@ -61,12 +62,11 @@ export const RETRY_MS = 60_000
  * here could return the pilot's design or bind the pilot's published post.
  */
 export const KEY_PREFIX = "admin:"
-const BREAKING_WINDOW_MS = 24 * 3600_000
 /** Drafts opened this recently, by any job, count for the repeat-story check (store.recentStories). */
 const RECENT_STORY_MS = 3 * 864e5
 /** The seeds' outlet sites, beside sources.ts's own list. */
 async function outletSites(deps: Pick<WorkerDeps, "seeds">): Promise<string[]> {
-  return ((await deps.seeds().catch(() => null))?.orgs ?? []).filter(o => o.kind === "outlet").map(o => o.site)
+  return ((await deps.seeds().catch(() => null))?.orgs ?? []).filter(o => o.kind === BRAND.seeds.outletKind).map(o => o.site)
 }
 /** Stories other drafts are working on: their titles steer research, their URLs are refused. */
 async function storiesInFlight(deps: WorkerDeps, exceptDraft?: string): Promise<{ titles: string[]; urls: Set<string> }> {
@@ -75,17 +75,17 @@ async function storiesInFlight(deps: WorkerDeps, exceptDraft?: string): Promise<
 }
 /**
  * How recent a story's source must be (Phase 1b, 2026-10-17; the -05 DT101 draft was built on a 2025-07-16 article for
- * a card dated 2026-10-17). Breaking: the page's own stated time, within 24 hours (below). News: published within the
+ * a card dated 2026-10-17). Breaking: an exact time within the profile's freshHours (breakingFreshness, below). News: published within the
  * last 7 days, by the page's stated date or else the date the search reported; with no date at all it is dropped,
  * since the card prints the source date. DT101 is an explainer, so an undated page describing the system (the maker's
  * product page) counts as current; but a dated page is a news hook, and it must be from the last 90 days. A stale
  * page is a miss like an unreadable one, so the subject's other primary pages are tried before it drops.
  */
-export const RECENCY_DAYS: Partial<Record<RequestKind, number>> = { news: 7, dt101: 90 }
-export function staleSource(kind: RequestKind, publishedAt: string | undefined, nowMs: number): string | null {
-  const days = RECENCY_DAYS[kind]
+export const RECENCY_DAYS: Partial<Record<RequestKind, number>> = Object.fromEntries(BRAND.requestKinds.filter(k => k.recencyDays).map(k => [k.kind, k.recencyDays]))
+export function staleSource(kind: RequestKind, publishedAt: string | undefined, nowMs: number, within?: number): string | null {
+  const days = within ?? RECENCY_DAYS[kind]
   if (!days) return null
-  if (!publishedAt) return kind === "news" ? "states no publication date" : null
+  if (!publishedAt) return BRAND.requestKinds.find(k => k.kind === kind)?.undatedOk ? null : "states no publication date"
   const age = nowMs - Date.parse(`${publishedAt}T23:59:59Z`)
   return age > days * 864e5 ? `published ${publishedAt}, more than ${days} days ago` : null
 }
@@ -97,8 +97,9 @@ const MAX_SHOWN = 8
 const MAX_VISION_BYTES = 4_500_000
 
 const iso = (deps: Pick<WorkerDeps, "nowMs">) => new Date(deps.nowMs()).toISOString()
-export const KIND_CODE: Record<RequestKind, string> = { news: "NEWS", breaking: "BN", dt101: "DT101", icymi: "ICYMI" }
-export const label = (k: RequestKind) => k === "icymi" ? "ICYMI roundup" : SERIES[k].label
+/** Each request kind's code in draft ids ("MCU-NEWS-20261018-01"), and its label, from the brand profile. */
+export const KIND_CODE = Object.fromEntries(BRAND.requestKinds.map(k => [k.kind, k.code])) as Record<RequestKind, string>
+export const label = (k: RequestKind) => BRAND.requestKinds.find(x => x.kind === k)?.label ?? k
 
 /** Runs due work until the time budget is spent. Returns how many steps ran. */
 export async function runDue(deps: WorkerDeps, budgetMs = 240_000): Promise<number> {
@@ -173,13 +174,13 @@ async function jobStep(deps: WorkerDeps, id: string, attempt: number): Promise<v
       await deps.notify(job, []).catch(err => console.error("[content-pipeline] notify failed", id, err instanceof Error ? err.message : err))
       return
     }
-    const day = iso(deps).slice(0, 10).replace(/-/g, ""), prefix = `MCU-${KIND_CODE[job.kind]}-${day}-`
+    const day = iso(deps).slice(0, 10).replace(/-/g, ""), prefix = `${BRAND.draftPrefix}-${KIND_CODE[job.kind]}-${day}-`
     let n = await deps.store.highestDraftNumber(prefix)
     const now = iso(deps)
     for (const story of stories) {
       const draftId = `${prefix}${String(++n).padStart(2, "0")}`
       job.drafts.push(draftId)
-      await deps.store.createDraft({ id: draftId, jobId: id, kind: job.kind, placement: job.placement, request: job.request, status: "queued", version: 1, ...(job.topic ? { direction: job.topic } : {}), story, frames: [], media: [], designs: [], qa: [], notices: [], calls: calls.map(c => ({ ...c, at: now })), history: [{ at: now, event: `opened under ${MCU_RULES_VERSION}` }], createdAt: now, updatedAt: now })
+      await deps.store.createDraft({ id: draftId, jobId: id, kind: job.kind, placement: job.placement, request: job.request, status: "queued", version: 1, ...(job.topic ? { direction: job.topic } : {}), story, frames: [], media: [], designs: [], qa: [], notices: [], calls: calls.map(c => ({ ...c, at: now })), history: [{ at: now, event: `opened under ${BRAND.rulesVersion}` }], createdAt: now, updatedAt: now })
     }
     job.status = "drafting"; job.updatedAt = now; job.note = undefined
     if (job.kind !== "icymi" && stories.length < job.count) job.note = `${stories.length} of ${job.count} qualified`
@@ -232,12 +233,13 @@ export function icymiWindow(nowMs: number, lookbackDays: number | null): { start
 export function icymiStory(posts: PostRow[], window: { startMs: number; endMs: number; label: string }): Story[] | { hold: string } {
   const at = (p: PostRow) => p.publishedAt ? Date.parse(p.publishedAt) : NaN
   // DT101 posts are told by their mission-brief caption too: older manual ones aren't titled DT101 (gate round 1, ULTRA).
-  const eligible = posts.filter(p => (p.status === "posted" || p.publishedUrl) && !/icymi|dt101|defense tech 101|salute to troops/i.test(p.title) && p.caption && !/MISSION BRIEF \/\//i.test(p.caption) && at(p) >= window.startMs && at(p) < window.endMs)
+  const exclude = new RegExp(BRAND.posts.roundupExclude, "i"), excludeCaption = new RegExp(BRAND.posts.roundupExcludeCaption, "i")
+  const eligible = posts.filter(p => (p.status === "posted" || p.publishedUrl) && !exclude.test(p.title) && p.caption && !excludeCaption.test(p.caption) && at(p) >= window.startMs && at(p) < window.endMs)
     .sort((a, b) => at(b) - at(a))
     .filter((p, i, all) => all.findIndex(x => x.title.trim().toLowerCase() === p.title.trim().toLowerCase()) === i)
     .slice(0, ICYMI_MAX)
-  if (!eligible.length) return { hold: `no MCU News or Breaking story was published in ${window.label}, so there is no ICYMI` }
-  return [{ title: "ICYMI roundup", primaryUrl: eligible[0].publishedUrl || "https://www.instagram.com/milcityusa/", publisher: "MilCityUSA", sourceTitle: `${eligible.length} published MCU ${eligible.length === 1 ? "story" : "stories"} from ${window.label}`, sourceText: eligible.map((p, i) => `${i + 1}. ${p.title}\n${p.caption}`).join("\n\n"), roundup: eligible.map(p => ({
+  if (!eligible.length) return { hold: `no ${BRAND.shortName} News or Breaking story was published in ${window.label}, so there is no ICYMI` }
+  return [{ title: "ICYMI roundup", primaryUrl: eligible[0].publishedUrl || BRAND.posts.homeUrl, publisher: BRAND.name, sourceTitle: `${eligible.length} published ${BRAND.shortName} ${eligible.length === 1 ? "story" : "stories"} from ${window.label}`, sourceText: eligible.map((p, i) => `${i + 1}. ${p.title}\n${p.caption}`).join("\n\n"), roundup: eligible.map(p => ({
     postId: p.id, title: p.title, caption: (p.caption || "").split("\n").filter(l => !/^Image: /.test(l) && l !== DOD_NOTICE).join("\n").trim().slice(0, 800), ...(p.publishedUrl ? { publishedUrl: p.publishedUrl } : {}), ...(p.media?.[0] ? { media: p.media[0] } : {}),
   })) }]
 }
@@ -246,37 +248,52 @@ export function icymiStory(posts: PostRow[], window: { startMs: number; endMs: n
 async function researchStories(deps: WorkerDeps, ai: McuAi, job: Pick<McuJob, "kind" | "count" | "topic">, recentTitles: string[], seeds: McuSeeds | null, avoid: string[] = [], avoidUrls: string[] = [], inFlight: { titles: string[]; urls: Set<string> } = { titles: [], urls: new Set() }): Promise<Story[] | { hold: string; tried?: string[]; triedUrls?: string[] }> {
   const today = iso(deps).slice(0, 10)
   const r = await ai.research({ kind: job.kind, count: job.count, ...(job.topic ? { topic: job.topic } : {}), today, recentTitles, seeds, ...(avoid.length ? { avoid } : {}), ...(inFlight.titles.length ? { drafting: inFlight.titles } : {}) })
-  const stories: Story[] = [], dropped: string[] = [], outlets = (seeds?.orgs ?? []).filter(o => o.kind === "outlet").map(o => o.site)
+  const stories: Story[] = [], dropped: string[] = [], outlets = (seeds?.orgs ?? []).filter(o => o.kind === BRAND.seeds.outletKind).map(o => o.site)
   for (const c of r.candidates) {
     if (stories.length >= job.count) break
     // The primary page first, then other primary pages for the same subject (product page, .mil/.gov page, press
     // release), so one unreadable page doesn't drop the subject. Each miss keeps its reason for the hold note.
     if (avoidUrls.includes(c.primaryUrl)) { dropped.push(`${c.title}: already tried`); continue }
     if (inFlight.urls.has(normalizeUrl(c.primaryUrl))) { dropped.push(`${c.title}: already being drafted`); continue }
-    let page: SourcePage | null = null, publishedAt: string | undefined
-    const misses: string[] = []
+    let page: SourcePage | null = null, publishedAt: string | undefined, dating: { reportedAt: string; datedBy: { url: string; publishedAt: string } } | undefined
+    const misses: string[] = [], readVia: string[] = [], rule = BRAND.requestKinds.find(k => k.kind === job.kind)
     // The story is sourced from its primary page: an outlet's article only led to it (gate round 2: two DT101 cards
     // sourced from Defense News). Outlet URLs are skipped; another primary page for the subject is tried instead.
     for (const url of [...new Set([c.primaryUrl, ...(c.alternateUrls ?? [])])].slice(0, 5)) {
       if (isOutlet(url, outlets)) { misses.push(`${url} is a news outlet's article, not the primary source`); continue }
-      try {
-        const p = await deps.fetchPage(url)
-        if (p.text.length < 400) { misses.push(`no readable article at ${url}`); continue }
-        // The search's date stands in only for the page it described, never for an alternate.
-        const date = normalizeDate(p.publishedAt) ?? (url === c.primaryUrl ? normalizeDate(c.publishedAt) : undefined)
-        const stale = staleSource(job.kind, date, deps.nowMs())
-        if (stale) { misses.push(`${url} ${stale}`); continue }
-        page = p; publishedAt = date; break
-      } catch (err) { misses.push(`${err instanceof Error ? err.message : "unreachable"} at ${url}`) }
+      let p: SourcePage, viaSearch = false
+      try { p = await deps.fetchPage(url) } catch (err) {
+        const reason = err instanceof Error ? err.message : "unreachable"
+        // An official page that refuses the pipeline's fetch (faa.gov, defense.gov, war.gov in round 3) is read from
+        // the search tool's extracted content instead (founder, 2026-10-18): that exact page only, never an outlet
+        // (skipped above), and no browser user agent is spoofed.
+        const read = /^http_(401|403|429)$/.test(reason) && ai.readRefusedPage ? await ai.readRefusedPage(url).catch(() => null) : null
+        if (!read) { misses.push(`${reason} at ${url}`); continue }
+        p = read; viaSearch = true
+      }
+      if (p.text.length < 400) { misses.push(`no readable article at ${url}${viaSearch ? " (read through the search tool)" : ""}`); continue }
+      // The search's date stands in only for the page it described, never for an alternate.
+      const date = normalizeDate(p.publishedAt) ?? (url === c.primaryUrl ? normalizeDate(c.publishedAt) : undefined)
+      const stale = staleSource(job.kind, date, deps.nowMs())
+      if (stale) {
+        // News may be dated by an outlet's recent report of the same event (founder, 2026-10-18), never cited.
+        const dated = rule?.datedByReport && rule.recencyDays ? await reportDating(deps, ai, c, p, outlets, { days: rule.recencyDays }) : { why: "" }
+        if (!("reportedAt" in dated)) { misses.push(`${url} ${stale}${dated.why ? `; ${dated.why}` : ""}`); continue }
+        dating = dated
+      }
+      if (viaSearch) readVia.push(url)
+      page = p; publishedAt = date; break
     }
     if (!page) { dropped.push(`${c.title}: source page unreachable, unreadable or out of date (${misses.join("; ").slice(0, 300)})`); continue }
-    if (job.kind === "breaking") {
-      // The 24-hour window is checked against the source's own stated date, not the model's reading.
-      const t = page.publishedAt ? Date.parse(page.publishedAt) : NaN
-      if (!Number.isFinite(t)) { dropped.push(`${c.title}: the source page states no publication time, so the 24-hour Breaking window can't be verified`); continue }
-      if (deps.nowMs() - t > BREAKING_WINDOW_MS) { dropped.push(`${c.title}: announced more than 24 hours ago (News at most)`); continue }
-      if (!c.whyNow) { dropped.push(`${c.title}: no sourced why-now sentence`); continue }
+    let fresh: Story["fresh"]
+    if (rule?.freshHours) {
+      // Breaking freshness (founder, 2026-10-18), checked against exact times read from the pages, never the model's.
+      const f = await breakingFreshness(deps, ai, c, page, outlets, rule)
+      if ("why" in f) { dropped.push(`${c.title}: ${f.why}, so it isn't ${rule.label}; it may run as News`); continue }
+      fresh = f.fresh
+      if (f.dating) dating = f.dating
     }
+    if (job.kind === "breaking" && !c.whyNow) { dropped.push(`${c.title}: no sourced why-now sentence`); continue }
     if (stories.some(s => normalizeUrl(s.primaryUrl) === normalizeUrl(page.url)) || avoidUrls.includes(page.url) || inFlight.urls.has(normalizeUrl(page.url))) { dropped.push(`${c.title}: already used, rejected or being drafted`); continue }
     // Supporting pages fill what the primary leaves out (a DT101 card needs the maker and its headquarters, which an
     // Army article often omits: live test, 2026-10-16). Unreachable ones are skipped; the primary still decides.
@@ -287,12 +304,76 @@ async function researchStories(deps: WorkerDeps, ai: McuAi, job: Pick<McuJob, "k
       try { const sp = await deps.fetchPage(u); if (sp.text.length >= 200 && sp.url !== page.url && (COMPANY_PAGE.test(new URL(sp.url).pathname) || sameSubject(c.title, `${sp.title} ${sp.text.slice(0, 6000)}`))) supporting.push(sp) } catch { /* skipped */ }
     }
     const sourceText = supporting.length ? [page.text.slice(0, 16_000), ...supporting.map(sp => `--- SUPPORTING SOURCE: ${sp.title || sp.url} (${sp.url}) ---\n${sp.text.slice(0, 4_000)}`)].join("\n\n") : page.text
-    stories.push({ title: c.title, primaryUrl: page.url, publisher: c.publisher || page.siteName || new URL(page.url).hostname, ...(publishedAt ? { publishedAt } : {}), ...(job.kind === "breaking" && c.whyNow ? { whyNow: c.whyNow } : {}), sourceTitle: page.title || c.title, sourceText, ...(supporting.length ? { supporting: supporting.map(sp => ({ url: sp.url, title: sp.title || sp.url })) } : {}) })
+    stories.push({ title: c.title, primaryUrl: page.url, publisher: c.publisher || page.siteName || new URL(page.url).hostname, ...(publishedAt ? { publishedAt } : {}), ...(dating ?? {}), ...(fresh ? { fresh } : {}), ...(readVia.length ? { readViaSearch: readVia } : {}), ...(job.kind === "breaking" && c.whyNow ? { whyNow: c.whyNow } : {}), sourceTitle: page.title || c.title, sourceText, ...(supporting.length ? { supporting: supporting.map(sp => ({ url: sp.url, title: sp.title || sp.url })) } : {}) })
   }
   // The model's note is chatter about how it chose ("Candidates selected based on relevance…", round 2) unless it is
   // the only explanation, when nothing was found.
   if (!stories.length) return { hold: [r.candidates.length ? "" : r.note, ...dropped].filter(Boolean).join("; ") || "no candidates found", tried: [...avoid, ...r.candidates.map(c => c.title)], triedUrls: [...avoidUrls, ...r.candidates.map(c => c.primaryUrl)] }
   return stories
+}
+/**
+ * Whether a news outlet's report dates a story whose official page is older or undated (founder, 2026-10-18): the
+ * report is an outlet's, it is read, its own date (else the search's) is within `days`, it names the story's subject,
+ * and the model judges that the official page describes the same event the report covers, not an older announcement
+ * the report only mentions. The outlet dates the story and is never cited.
+ */
+async function reportDating(deps: WorkerDeps, ai: McuAi, c: Pick<Candidate, "title" | "reportUrl" | "reportPublishedAt">, primary: SourcePage, outlets: string[], within: { days: number } | { hours: number }): Promise<{ reportedAt: string; datedBy: { url: string; publishedAt: string } } | { why: string }> {
+  if (!c.reportUrl || !/^https:\/\//.test(c.reportUrl)) return { why: "" }
+  if (!isOutlet(c.reportUrl, outlets)) return { why: "the report named is not a news outlet's" }
+  let report: SourcePage
+  try { report = await deps.fetchPage(c.reportUrl) } catch (err) { return { why: `the outlet's report couldn't be read (${err instanceof Error ? err.message : "unreachable"})` } }
+  let at: string | undefined
+  if ("hours" in within) {
+    // An hours window needs the report page's own exact time; a date, or the model's reading of it, is not enough.
+    const t = exactTime(report.publishedAt)
+    if (t === null) return { why: "the outlet's report shows no exact publish time" }
+    if (!withinHours(t, deps.nowMs(), within.hours)) return { why: `the outlet's report (${report.publishedAt}) is more than ${within.hours} hours old` }
+    at = new Date(t).toISOString()
+  } else {
+    at = normalizeDate(report.publishedAt) ?? normalizeDate(c.reportPublishedAt)
+    if (!at || staleSource("news", at, deps.nowMs(), within.days)) return { why: `the outlet's report is not from the last ${within.days} days` }
+  }
+  if (!sameSubject(c.title, `${report.title} ${report.text.slice(0, 8000)}`)) return { why: "the outlet's report is not about this story" }
+  const judged = ai.sameEvent ? await ai.sameEvent({ report: { ...report, publishedAt: at }, primary }).catch(() => null) : null
+  if (!judged?.same) return { why: `the official page is not the event the outlet reported${judged?.reason ? ` (${judged.reason.slice(0, 160)})` : ""}` }
+  return { reportedAt: "hours" in within ? zonedDay(Date.parse(at), BRAND.timeZone) : at, datedBy: { url: report.url, publishedAt: at } }
+}
+/**
+ * A machine-readable time with a time of day, as UTC milliseconds; null for a date alone or nothing. A time with no
+ * zone is read at its earliest possible moment (UTC+14), so it can only look older than it is, never fresher.
+ */
+export function exactTime(v: string | undefined): number | null {
+  const s = v?.trim()
+  if (!s || !/\d{1,2}:\d{2}/.test(s)) return null
+  const zoned = /(?:Z|[+-]\d{2}:?\d{2}|\b(?:UTC|GMT|[ECMP][SD]T))$/i.test(s)
+  const t = zoned ? Date.parse(s) : /^\d{4}-\d{2}-\d{2}[T ]/.test(s) ? Date.parse(`${s.replace(" ", "T")}Z`) - 14 * 3600_000 : Date.parse(`${s} UTC`) - 14 * 3600_000
+  return Number.isFinite(t) ? t : null
+}
+const withinHours = (t: number, nowMs: number, hours: number) => t <= nowMs + 15 * 60_000 && nowMs - t <= hours * 3600_000
+/** The calendar day (YYYY-MM-DD) of an instant in a time zone (the brand's; UTC when it has none). */
+export function zonedDay(ms: number, timeZone = "UTC"): string {
+  return new Intl.DateTimeFormat("en-CA", { timeZone }).format(ms)
+}
+/**
+ * Breaking freshness (founder, 2026-10-18), in order: the official page's machine-readable publish time, when it
+ * carries a time of day; otherwise a news outlet's report of the same event with an exact time (it dates the story and
+ * is never cited); if neither shows the story is within the window, it isn't Breaking, and it may run as News. A
+ * date-only byline never qualifies on its own: it is recorded only as a cross-check, which counts only when it is
+ * today in the brand's time zone.
+ */
+export async function breakingFreshness(deps: WorkerDeps, ai: McuAi, c: Pick<Candidate, "title" | "publishedAt" | "reportUrl" | "reportPublishedAt">, page: SourcePage, outlets: string[], rule: { freshHours?: number; datedByReport?: boolean }): Promise<{ fresh: NonNullable<Story["fresh"]>; dating?: { reportedAt: string; datedBy: { url: string; publishedAt: string } } } | { why: string }> {
+  const hours = rule.freshHours ?? 24, now = deps.nowMs(), zone = BRAND.timeZone
+  const dateOnly = exactTime(page.publishedAt) === null ? normalizeDate(page.publishedAt) ?? normalizeDate(c.publishedAt) : undefined
+  const byline = dateOnly ? { byline: dateOnly, bylineToday: dateOnly === zonedDay(now, zone) } : {}
+  const official = exactTime(page.publishedAt)
+  if (official !== null) {
+    if (!withinHours(official, now, hours)) return { why: `the official page's publish time (${page.publishedAt}) is more than ${hours} hours old` }
+    return { fresh: { at: new Date(official).toISOString(), how: "official" } }
+  }
+  const dated = rule.datedByReport ? await reportDating(deps, ai, c, page, outlets, { hours }) : { why: "" }
+  if ("reportedAt" in dated) return { fresh: { at: dated.datedBy.publishedAt, how: "report", ...byline }, dating: dated }
+  const date = dateOnly ? `only a date (${dateOnly}${byline.bylineToday ? `, today in ${zone}, which is a cross-check, never enough on its own` : ""})` : "no publish time"
+  return { why: `the official page shows ${date}, and no news report of the same event shows an exact time within ${hours} hours${dated.why ? ` (${dated.why})` : ""}` }
 }
 /** A maker's own about page: kept as a supporting source for the headquarters even though it doesn't name the product. */
 const COMPANY_PAGE = /\/(about|about-us|who-we-are|company|our-company|contact|contact-us|locations|leadership|overview)(\/|$)/i
@@ -410,7 +491,7 @@ async function writeStep(deps: WorkerDeps, ai: McuAi, d: McuDraft): Promise<void
 /** Fills what the server knows better than the model: DDMMMYY dates, the ICYMI counters, uppercase fields. */
 function fix(f: FrameCopy, index: number, d: McuDraft, today: string): FrameCopy {
   const series = SERIES[f.series], fields = { ...f.fields }
-  if (series.fields.some(x => x.name === "date")) fields.date = ddmmmyy(f.series === "icymi_cover" ? today : d.story.publishedAt ?? today)
+  if (series.fields.some(x => x.name === "date")) fields.date = ddmmmyy(f.series === "icymi_cover" ? today : d.story.reportedAt ?? d.story.publishedAt ?? today)
   if (f.series === "icymi_story") fields.counter = `0${index} / 0${icymiCount(d.story)}` // the cover is not counted
   if (f.series === "icymi_cover") for (const k of Object.keys(fields)) if (unusedStorySlot(k, icymiCount(d.story))) delete fields[k]
   return { ...f, fields: normalizeFields(series, fields) }
@@ -429,15 +510,20 @@ function validate(frames: FrameCopy[], caption: string, story: Story): string[] 
   // The caption ends with its own "Source:" line, and a DT101 caption is the mission brief (gate round 2: a DT101 with
   // a three-paragraph news caption, another with no source line, a News caption with "Source:" mid-paragraph).
   if (!/^Source: \S/m.test(body)) problems.push('the caption needs its source on a line of its own: "Source: <organization>, <date>"')
-  if (frames[0]?.series === "dt101") {
+  const format = frames[0] ? SERIES[frames[0].series]?.caption : undefined
+  if (format) {
     const lines = body.split("\n").map(l => l.trim()).filter(Boolean)
-    if (!/^MISSION BRIEF \/\/ \S/.test(lines[0] ?? "") || !/^\/\/\S/.test(lines[1] ?? "")) problems.push('the DT101 caption must be the mission brief: "MISSION BRIEF // <SUBJECT>", then "//<Company>", then the labelled lines, each on its own line with a blank line between')
-    for (const label of ["Tech:", "Platform:", "Goal:"]) if (!lines.some(l => l.startsWith(label))) problems.push(`the mission brief has no "${label}" line`)
+    if (format.firstLines.some((re, i) => !new RegExp(re).test(lines[i] ?? ""))) problems.push(format.format)
+    for (const label of format.labels) if (!lines.some(l => l.startsWith(label))) problems.push(format.missingLabel.replace("{label}", label))
   }
   // The copy must be about this draft's story (gate round 3: after a subject switch, DT101-10 and -12 carried the
   // previous subject's mission brief). A roundup's copy is about five stories, so it is not checked here.
   if (!story.roundup && !sameSubject(`${story.title} ${story.sourceTitle}`, [caption, ...frames.flatMap(f => Object.values(f.fields))].join(" "))) problems.push(`the copy is not about this story ("${story.title.slice(0, 100)}"): write it from the source below`)
   for (const f of frames) if (f.fields.deck && !/[.!?]["”’)]?$/.test(f.fields.deck.trim())) problems.push(`the deck must be one complete sentence ending with a period: "${f.fields.deck}"`)
+  // The profile's headline and originality checks (Phase 1c, founder 2026-10-17): off unless the profile turns them on.
+  const checks = BRAND.checks
+  if (checks?.headline) problems.push(...headlineProblems(frames, checks.headline))
+  if (checks?.originality) problems.push(...originalityProblems(frames, caption, story, checks.originality, [...(checks.headline?.fields ?? []), ...(checks.headline?.hookFields ?? [])]))
   const clipped = [...new Set(frames.flatMap(f => clippedWords(f.fields, story.sourceText)))]
   if (clipped.length) problems.push(`abbreviated words on the card (${clipped.join(", ")}); use whole words, and shorter ones if it must fit`)
   return problems
@@ -530,10 +616,10 @@ export function publishedPhoto(item: NonNullable<Story["roundup"]>[number]): Med
 export function frameStory(d: Pick<McuDraft, "story">, frame: FrameCopy, index: number): Story {
   if (frame.series !== "icymi_story") return d.story
   const p = d.story.roundup?.[index - 1]
-  return p ? { title: p.title.replace(/^MCU-[A-Z0-9]+-\d{8}-\d{2}\s+v\d+\s+—\s+/, ""), primaryUrl: p.publishedUrl ?? "", publisher: "MilCityUSA", sourceTitle: p.title, sourceText: p.caption } : d.story
+  return p ? { title: p.title.replace(new RegExp(`^${BRAND.draftPrefix}-[A-Z0-9]+-\\d{8}-\\d{2}\\s+v\\d+\\s+—\\s+`), ""), primaryUrl: p.publishedUrl ?? "", publisher: BRAND.name, sourceTitle: p.title, sourceText: p.caption } : d.story
 }
-/** News, Breaking and the ICYMI story cards may use a representative photo; DT101 always shows the system itself. */
-export const allowsRepresentative = (frame: FrameCopy) => frame.series === "news" || frame.series === "breaking" || frame.series === "icymi_story"
+/** Series the brand profile marks representative (for MCU: News, Breaking and the ICYMI story cards; never DT101). */
+export const allowsRepresentative = (frame: FrameCopy) => SERIES[frame.series]?.representative === true
 const FRAME_ASPECT: Record<Placement, number> = { feed: 4 / 5, reels: 9 / 16 }
 /**
  * Where a photo's subject lands on the card. Canva fills the template's full-bleed frame like CSS "cover": scaled to
@@ -760,12 +846,15 @@ async function reviewStep(deps: WorkerDeps, ai: McuAi, d: McuDraft): Promise<voi
 
 /** The content post's review notes: sources, photo rights, checks and what was not done. Plain text, ≤4,000 characters. */
 export function reviewNotes(d: McuDraft): string {
-  const sections: string[] = [`${d.id} · v${d.version} · ${label(d.kind)} — drafted by the content pipeline (${MCU_RULES_VERSION}). Review the card and caption, then approve through the publisher.`]
+  const sections: string[] = [`${d.id} · v${d.version} · ${label(d.kind)} — drafted by the content pipeline (${BRAND.rulesVersion}). Review the card and caption, then approve through the publisher.`]
   d.frames.forEach((f, i) => {
     const vals = SERIES[f.series].fields.filter(x => f.fields[x.name]).map(x => `- ${x.label}: ${f.fields[x.name]}`)
     sections.push(`Graphic copy${d.frames.length > 1 ? ` — ${i + 1}. ${SERIES[f.series].label}` : ""} (on the card)\n${vals.join("\n")}`)
   })
   sections.push(`Source\n${d.story.sourceTitle.slice(0, 160)} — ${d.story.publisher}${d.story.publishedAt ? `, ${d.story.publishedAt}` : ""}\n${d.story.primaryUrl}${(d.story.supporting ?? []).map(x => `\nAlso: ${x.title.slice(0, 120)} — ${x.url}`).join("")}`)
+  if (d.story.datedBy && !d.story.fresh) sections.push(`Dated by a news report\nThe official page is older; a news outlet reported the same event on ${d.story.datedBy.publishedAt}, which dates the story and the card. The outlet is not cited: ${d.story.datedBy.url}`)
+  if (d.story.readViaSearch?.length) sections.push(`Read through the search tool\nThese official pages refused the pipeline's fetch, so their text was read from the search tool's extracted content: ${d.story.readViaSearch.join(" ; ")}`)
+  if (d.story.fresh) sections.push(`How fresh\n${d.story.fresh.how === "official" ? `The official page's publish time, ${d.story.fresh.at}.` : `A news outlet's report of the same event, timed ${d.story.fresh.at}; the official page shows no time. The outlet is not cited.`}${d.story.fresh.byline ? ` The page's date-only byline, ${d.story.fresh.byline}, ${d.story.fresh.bylineToday ? `is today in ${BRAND.timeZone ?? "the brand's time zone"} and agrees` : `is not today in ${BRAND.timeZone ?? "the brand's time zone"}, so it isn't counted`}.` : ""}`)
   if (d.story.whyNow) sections.push(`Why Breaking\n${d.story.whyNow}`)
   const media = d.media.map((m, i) => m ? `- ${d.media.length > 1 ? `${i + 1}: ` : ""}${m.title.slice(0, 80)} — ${m.license}${m.creator && m.creator !== "Unknown" ? `, ${m.creator}` : ""}\n  ${m.pageUrl}${m.note ? `\n  ${m.note}` : ""}` : null).filter(Boolean)
   sections.push(`Photo rights\n${media.length ? media.join("\n") : "- No photo on this card"}`)

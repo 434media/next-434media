@@ -225,8 +225,8 @@ export function archiveRelevant(c: Pick<MediaCandidate, "title" | "description" 
 
 // ── News outlets: secondary sources, and never a photo source ──
 /**
- * News outlets' hosts. Their pages lead to a story's primary source (MCU_EDITORIAL: "use secondary coverage only to
- * find it") and their photos are licensed to them. Gate round 2 (2026-10-17) placed Defense News photos labelled
+ * News outlets' hosts. Their pages lead to a story's primary source (the editorial rules: "use secondary coverage only
+ * to find it") and their photos are licensed to them. Gate round 2 (2026-10-17) placed Defense News photos labelled
  * "Official company media" and sourced two DT101 cards from Defense News articles. The seeds' outlet list adds to it.
  */
 const OUTLETS = ["defensenews.com", "breakingdefense.com", "defenseone.com", "defensescoop.com", "c4isrnet.com", "militarytimes.com", "armytimes.com", "navytimes.com", "airforcetimes.com", "marinecorpstimes.com", "federaltimes.com", "airandspaceforces.com", "twz.com", "thedrive.com", "janes.com", "insidedefense.com", "nationaldefensemagazine.org", "flightglobal.com", "aviationweek.com", "spacenews.com", "military.com", "stripes.com", "navalnews.com", "defence-blog.com", "armyrecognition.com", "overtdefense.com", "sandboxx.us", "defensedaily.com", "executivegov.com", "govconwire.com", "washingtontechnology.com", "fedscoop.com", "nextgov.com", "reuters.com", "apnews.com", "bloomberg.com", "wsj.com", "nytimes.com", "washingtonpost.com", "politico.com", "axios.com", "cnn.com", "cnbc.com", "foxnews.com", "nbcnews.com", "cbsnews.com", "abcnews.go.com", "bbc.com", "bbc.co.uk", "theguardian.com", "newsweek.com", "forbes.com", "businessinsider.com", "yahoo.com", "msn.com", "techcrunch.com", "theverge.com", "wired.com", "popularmechanics.com", "interestingengineering.com", "newatlas.com", "thedefensepost.com", "defense-aerospace.com", "army-technology.com", "naval-technology.com", "airforce-technology.com", "globalmilitaryreview.com", "militaryaerospace.com", "satnews.com", "spacepolicyonline.com"]

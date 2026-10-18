@@ -43,6 +43,19 @@ export interface Story {
   primaryUrl: string
   publisher: string
   publishedAt?: string
+  /**
+   * News dated by an outlet's report (founder, 2026-10-18): the report's date, which the card prints. The outlet is
+   * never cited; its URL is kept for the reviewer only (reviewNotes), never on the post's links.
+   */
+  reportedAt?: string
+  datedBy?: { url: string; publishedAt: string }
+  /**
+   * How a Breaking story was shown to be fresh (founder, 2026-10-18): by the official page's exact time, or by a news
+   * outlet's timed report of the same event (datedBy). byline: a date-only byline, kept only as a cross-check.
+   */
+  fresh?: { at: string; how: "official" | "report"; byline?: string; bylineToday?: boolean }
+  /** Primary pages that refused the fetch and were read through the search tool's extracted text instead. */
+  readViaSearch?: string[]
   /** Sourced one-sentence "what changed, its consequence, why now" — Breaking only. */
   whyNow?: string
   sourceText: string

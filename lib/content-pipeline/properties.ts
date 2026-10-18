@@ -1,6 +1,6 @@
 import type { Brand, ContentProperty } from "@/components/crm/types"
 import type { LeadPlatform } from "@/types/crm-types"
-import { SERIES, type RequestKind } from "./series"
+import { loadProfile, profileProblems, type RequestKind } from "./profile"
 
 /**
  * The properties the Generate panel offers (the CRM roster; the UI word is "Property", the code keeps "brand" and
@@ -26,16 +26,15 @@ export function contentPropertyOf(id: string | undefined): ContentProperty {
   return (PIPELINE_PROPERTIES.find(p => p.id === (id ?? DEFAULT_PROPERTY)) ?? PIPELINE_PROPERTIES[0]).contentProperty
 }
 
-/** What a property's templates generate: for MilCityUSA, the series the worker fills, with their brand templates (feed). */
+/**
+ * What a property's templates generate: the request kinds in its brand profile, with the brand templates (feed) each
+ * fills. A property whose profile is missing or fails validation generates nothing, so Generate never offers it.
+ */
 export interface PipelineTemplate { kind: RequestKind; label: string; templates: string[]; detail: string }
-export const PROPERTY_TEMPLATES: Record<string, readonly PipelineTemplate[]> = {
-  milcity: [
-    { kind: "news", label: SERIES.news.label, templates: [SERIES.news.templates.feed], detail: "One story, one card" },
-    { kind: "breaking", label: SERIES.breaking.label, templates: [SERIES.breaking.templates.feed], detail: "Primary source in the last 24 hours" },
-    { kind: "dt101", label: SERIES.dt101.label, templates: [SERIES.dt101.templates.feed], detail: "Benefit-led card, mission-brief caption" },
-    { kind: "icymi", label: "ICYMI roundup", templates: [SERIES.icymi_cover.templates.feed, SERIES.icymi_story.templates.feed], detail: "Cover + five published stories" },
-  ],
-}
+export const PROPERTY_TEMPLATES: Record<string, readonly PipelineTemplate[]> = Object.fromEntries(PIPELINE_PROPERTIES.filter(p => !profileProblems(p.id).length).map(p => {
+  const b = loadProfile(p.id)
+  return [p.id, b.requestKinds.map(k => ({ kind: k.kind, label: k.label, templates: k.series.map(s => b.series[s]!.templates.feed), detail: k.detail }))]
+}))
 export function propertyCanGenerate(id: string, kind: string): boolean {
   return !!PIPELINE_PROPERTIES.find(p => p.id === id && p.active) && !!PROPERTY_TEMPLATES[id]?.some(t => t.kind === kind)
 }

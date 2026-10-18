@@ -1,10 +1,10 @@
 import { generateText, stepCountIs, tool, type ToolSet } from "ai"
 import { z } from "zod4"
-import { MCU_EDITORIAL, NEVER_REVIVE } from "./editorial"
+import { BRAND } from "./brand"
 import { CALL_FALLBACK, callOptions, outputBudget, type PipelineStep } from "./models"
 import { seedBrief, type McuSeeds } from "./seeds"
 import { SERIES, type FieldSpec, type RequestKind, type SeriesKey } from "./series"
-import type { MediaCandidate } from "./sources"
+import type { MediaCandidate, SourcePage } from "./sources"
 import type { FrameCopy, Story } from "./store"
 
 /**
@@ -21,6 +21,13 @@ export interface McuAi {
    * source. instructions: a reviewer's change to an existing draft (the drawer, Phase 2).
    */
   write(input: { kind: RequestKind; story: Story; today: string; previous?: { frames: FrameCopy[]; caption: string }; instructions?: string; problems?: string[]; direction?: string; seeds?: McuSeeds | null }): Promise<{ frames: FrameCopy[]; caption: string; hold?: string }>
+  /**
+   * An official page that refused the fetch, read from the search tool's extracted content (founder, 2026-10-18).
+   * Null unless the search returns that exact page. Never used for an outlet.
+   */
+  readRefusedPage?(url: string): Promise<SourcePage | null>
+  /** Whether an official page describes the same event an outlet's report covers, not an older one it only mentions. */
+  sameEvent?(input: { report: SourcePage; primary: SourcePage }): Promise<{ same: boolean; reason: string }>
   /** DVIDS image pages (and official .mil/.gov photo pages) showing the card's subject, found by web search. */
   findPhotoPages(input: { story: Story; frame: FrameCopy }): Promise<string[]>
   /** The best candidate, and for each relevant one (best first) where its subject sits, so the server can test the 4:5 crop. */
@@ -32,11 +39,14 @@ export interface McuAi {
 }
 /** The main subject's bounding box as fractions of the photo (0–1, origin top left). */
 export interface SubjectBox { x0: number; y0: number; x1: number; y1: number }
-export interface Candidate { title: string; primaryUrl: string; publisher: string; publishedAt?: string; whyNow?: string; why: string; supportingUrls?: string[]; /** Other primary pages for the same subject, tried when the primary can't be read. */ alternateUrls?: string[] }
+/** reportUrl/reportPublishedAt: the news outlet's report that led to the story, which may date a News story (never cited). */
+export interface Candidate { title: string; primaryUrl: string; publisher: string; publishedAt?: string; whyNow?: string; why: string; supportingUrls?: string[]; /** Other primary pages for the same subject, tried when the primary can't be read. */ alternateUrls?: string[]; reportUrl?: string; reportPublishedAt?: string }
 /** One model call as served: which model and which provider answered (evidence for the routing check). */
 export interface ModelCall { step: PipelineStep; model: string; provider?: string; finishReason?: string; inputTokens?: number; outputTokens?: number; /** Set when this call is the fallback for a model that could not answer. */ fallbackFrom?: string; fallbackReason?: string }
 
-const system = (extra: string) => [{ role: "system" as const, content: MCU_EDITORIAL, providerOptions: { anthropic: { cacheControl: { type: "ephemeral" as const } } } }, { role: "system" as const, content: extra }]
+/** The cached prefix: the profile's editorial rules, then its headline and originality rules when it carries them. */
+const EDITORIAL = BRAND.headlineRules ? `${BRAND.editorial}\n\n${BRAND.headlineRules}` : BRAND.editorial
+const system = (extra: string) => [{ role: "system" as const, content: EDITORIAL, providerOptions: { anthropic: { cacheControl: { type: "ephemeral" as const } } } }, { role: "system" as const, content: extra }]
 
 function fieldBrief(f: FieldSpec): string {
   return `${f.name} (${f.label}${f.allowed ? `; exactly one of: ${f.allowed.join(" | ")}` : ""}${f.date ? "; DDMMMYY" : ""}${f.perLine && f.maxLines ? `; at most ${f.maxLines} line${f.maxLines > 1 ? "s" : ""} of ~${f.perLine} characters` : ""}${f.maxChars ? `; at most ${f.maxChars} characters` : ""}${f.uppercase ? "; UPPERCASE" : ""}${f.exactLines ? `; exactly ${f.exactLines} lines separated by a line break, each at most ${f.perLine} characters of whole words, never abbreviated` : ""})`
@@ -47,7 +57,7 @@ export function framesFor(kind: RequestKind, stories = 5): SeriesKey[] {
   return kind === "icymi" ? ["icymi_cover", ...Array.from({ length: stories }, () => "icymi_story" as const)] : [kind]
 }
 
-const candidateSchema = z.object({ candidates: z.array(z.object({ title: z.string(), primaryUrl: z.string(), publisher: z.string(), publishedAt: z.string().optional(), whyNow: z.string().optional(), why: z.string(), supportingUrls: z.array(z.string()).optional(), alternateUrls: z.array(z.string()).optional().describe("other primary pages for the same subject: the maker's product page, a .mil or .gov page, a press release") })), note: z.string().optional() })
+const candidateSchema = z.object({ candidates: z.array(z.object({ title: z.string(), primaryUrl: z.string(), publisher: z.string(), publishedAt: z.string().optional(), whyNow: z.string().optional(), why: z.string(), supportingUrls: z.array(z.string()).optional(), alternateUrls: z.array(z.string()).optional().describe("other primary pages for the same subject: the maker's product page, a .mil or .gov page, a press release"), reportUrl: z.string().optional().describe("the news outlet's report that led you to this story, when one did; never the primaryUrl"), reportPublishedAt: z.string().optional().describe("that report's publication date, YYYY-MM-DD, or its exact time (ISO, with its zone) when it states one") })), note: z.string().optional() })
 /** Every https URL in the search tool's results, in order, de-duplicated (the tool's output shape is not relied on). */
 export function searchResultUrls(steps: readonly { toolResults: readonly { output?: unknown }[] }[]): string[] {
   const out: string[] = []
@@ -79,12 +89,12 @@ async function submitted<T>(r: { toolCalls: { toolName: string; input: unknown }
 }
 
 /**
- * The brand direction the writer gets beside MCU_EDITORIAL (the cached prefix: voice, accuracy, series, caption and
+ * The brand direction the writer gets beside the profile's editorial rules (the cached prefix: voice, accuracy, series, caption and
  * media rules, as in the pilot skill): MCU's purpose and source cohorts from the seeds, which the pilot gave research
  * only. Empty when no seeds are loaded.
  */
 export function brandDirection(seeds: McuSeeds | null | undefined): string {
-  return seeds ? `MCU PURPOSE: ${seeds.purpose}\nWho MCU covers:\n${seeds.cohorts.map(c => `- ${c}`).join("\n")}\n\n` : ""
+  return seeds ? `${BRAND.shortName} PURPOSE: ${seeds.purpose}\nWho ${BRAND.shortName} covers:\n${seeds.cohorts.map(c => `- ${c}`).join("\n")}\n\n` : ""
 }
 
 const TEXT_WORDS = /\b(text|headline|hook|deck|caption|label|font|type|letters?|words?|typo|spell|misspell|abbreviat|truncat|line break|copy)/i
@@ -176,14 +186,15 @@ export function readPick(pick: { index: number | null; reason: string; ranked?: 
   const index = pick.index !== null && ranked.some(x => x.index === pick.index && !x.representative) ? pick.index : ranked[0]?.index ?? null
   return { index, reason: pick.reason, ...(ranked.length ? { ranked } : {}), ...(turnedDown.length ? { turnedDown } : {}) }
 }
-export function createMcuAi(deps: { models: Record<PipelineStep, string>; searchTools: ToolSet; onCall?(call: ModelCall): void; fallbacks?: Partial<Record<PipelineStep, string>> }): McuAi {
+/** readTools: the search tool set up to return a page's full extracted text, for refused official pages. */
+export function createMcuAi(deps: { models: Record<PipelineStep, string>; searchTools: ToolSet; readTools?: ToolSet; onCall?(call: ModelCall): void; fallbacks?: Partial<Record<PipelineStep, string>> }): McuAi {
   const m = deps.models, fallbacks = deps.fallbacks ?? CALL_FALLBACK
   const run = <R extends Served, T = R>(step: PipelineStep, call: (model: string) => Promise<R>, accept: (r: R) => T | Promise<T> = r => r as unknown as T): Promise<T> =>
     servedCall(step, m[step], fallbacks[step], deps.onCall, call, accept)
   return {
     async research({ kind, count, topic, today, recentTitles, avoid, drafting, seeds }) {
-      const want = kind === "dt101" ? "defense technologies worth a Defense Tech 101 explainer (a specific, real product or system with a clear maker and a sourced status)" : kind === "breaking" ? "Breaking-qualified developments (primary-source announcement within the last 24 hours AND consequential enough to need immediate attention)" : "defense-industry news stories from the last 7 days"
-      const task = `${seedBrief(kind, seeds)}\n\nToday is ${today}. Task: find up to ${count + 2} ${want}${topic ? `, about: ${topic}` : ""}. Search the web; for each, find the ORIGINAL primary-source page (the company, agency or service's own announcement, contract notice or official article) and give its exact URL. A news outlet's article (Defense News, Breaking Defense, Reuters and the like) is never the primaryUrl or an alternate: use it only to find the primary page, and leave the story out if you can't find that page. Skip anything MCU already covered (recent MCU titles below) and anything listed under NEVER. Prefer U.S. defense, national-security and defense-tech companies and programs. ${kind === "dt101" ? "A DT101 card needs the maker and its headquarters: when the primary page does not name them, give supportingUrls with up to two pages that do (the maker's own product or about page first). The primary source must be current: a dated article or announcement from the last 90 days, or the maker's own product page; an older article is rejected, so give the product page or a recent announcement instead, with the older article only as a supporting source. " : kind === "news" ? "Give each story's publication date (publishedAt, YYYY-MM-DD) as the page states it; anything published more than 7 days ago is rejected. " : ""}${kind === "breaking" ? "For each, give whyNow: one sourced sentence on what is newly different, its material consequence, and why it needs attention now. If nothing qualifies, return no candidates and say why in note." : ""}\nNever revive: ${NEVER_REVIVE.map(n => `${n.id} — ${n.what}`).join("; ")}.${avoid?.length ? `\nThese subjects were turned down or could not be sourced; pick something clearly different: ${avoid.join("; ")}.` : ""}${drafting?.length ? `\nBeing drafted now; pick a different subject, not another angle on the same program, contract or product: ${drafting.join("; ")}.` : ""}\nRecent MCU titles:\n${recentTitles.map(t => `- ${t}`).join("\n") || "- (none found)"}`
+      const brief = BRAND.research.kinds[kind] ?? { want: "stories", guidance: "" }, want = brief.want
+      const task = `${seedBrief(kind, seeds)}\n\nToday is ${today}. Task: find up to ${count + 2} ${want}${topic ? `, about: ${topic}` : ""}. Search the web; for each, find the ORIGINAL primary-source page (the company, agency or service's own announcement, contract notice or official article) and give its exact URL. A news outlet's article (${BRAND.research.outletExamples}) is never the primaryUrl or an alternate: use it only to find the primary page, and leave the story out if you can't find that page. Skip anything ${BRAND.shortName} already covered (recent ${BRAND.shortName} titles below) and anything listed under NEVER. ${BRAND.research.scope} ${brief.guidance}\nNever revive: ${BRAND.never.map(n => `${n.id} — ${n.what}`).join("; ")}.${avoid?.length ? `\nThese subjects were turned down or could not be sourced; pick something clearly different: ${avoid.join("; ")}.` : ""}${drafting?.length ? `\nBeing drafted now; pick a different subject, not another angle on the same program, contract or product: ${drafting.join("; ")}.` : ""}\nRecent ${BRAND.shortName} titles:\n${recentTitles.map(t => `- ${t}`).join("\n") || "- (none found)"}`
       // Two calls, because asking for structured output in the same call as the search tool makes the model answer
       // at once from memory instead of searching (production, 2026-10-17: one step, no search, guessed URLs that
       // 404'd, then zero candidates). 1) Search: only the search tool, required on the first step; the model writes
@@ -217,8 +228,8 @@ export function createMcuAi(deps: { models: Record<PipelineStep, string>; search
       const r = await run("write", model => generateText({
         model, maxOutputTokens: outputBudget(model, 16_000), providerOptions: callOptions(model, "medium"), allowSystemInMessages: true,
         tools: { submit_post: tool({ description: "Submit the finished card copy and caption.", inputSchema: schema as z.ZodType<Record<string, unknown>> }) }, toolChoice: { type: "tool", toolName: "submit_post" },
-        messages: [...system(`${brandDirection(seeds)}Today is ${today}. Write the on-card copy and the one master caption for this MilCityUSA ${kind === "icymi" ? "ICYMI roundup" : SERIES[kind as SeriesKey].label} post from the source below, and submit them with submit_post. Use only facts in the source. Fill every field. If the source cannot support a post under the rules (unverifiable figure, not Breaking-worthy, etc.), set hold to the one-sentence reason. Never hold for the photo or its credit (a later step chooses it) or for a DOMAIN call (use Multi-domain when it spans several).\n${spec}${icymi}`),
-          { role: "user", content: `SOURCE: ${story.sourceTitle}\nURL: ${story.primaryUrl}\nPublisher: ${story.publisher}\nPublished: ${story.publishedAt ?? "not stated on the page"}${story.whyNow ? `\nWhy now (Breaking): ${story.whyNow}` : ""}${story.supporting?.length ? `\nSupporting sources (their text follows the primary's, each under its own heading; use them only for what the primary leaves out, such as the maker and its headquarters): ${story.supporting.map(x => x.url).join(" ; ")}` : ""}\n\n${story.sourceText.slice(0, 24_000)}${direction ? `\n\nREQUESTER'S DIRECTION (steer the angle and emphasis with it; it never overrides the rules above or the facts in the source): ${direction}` : ""}${instructions && !previous ? `\n\nREVIEWER'S DIRECTION: ${instructions}` : ""}` },
+        messages: [...system(`${brandDirection(seeds)}Today is ${today}. Write the on-card copy and the one master caption for this ${BRAND.name} ${kind === "icymi" ? "ICYMI roundup" : SERIES[kind as SeriesKey].label} post from the source below, and submit them with submit_post. Use only facts in the source. Fill every field. If the source cannot support a post under the rules (unverifiable figure, not Breaking-worthy, etc.), set hold to the one-sentence reason. Never hold for the photo or its credit (a later step chooses it)${BRAND.research.writeNote}.\n${spec}${icymi}`),
+          { role: "user", content: `SOURCE: ${story.sourceTitle}\nURL: ${story.primaryUrl}\nPublisher: ${story.publisher}\nPublished: ${story.publishedAt ?? "not stated on the page"}${story.reportedAt ? `\nReported: ${story.reportedAt}, by a news outlet's report of the same event (the card's date; never cite the outlet)` : ""}${story.whyNow ? `\nWhy now (Breaking): ${story.whyNow}` : ""}${story.supporting?.length ? `\nSupporting sources (their text follows the primary's, each under its own heading; use them only for what the primary leaves out, such as the maker and its headquarters): ${story.supporting.map(x => x.url).join(" ; ")}` : ""}\n\n${story.sourceText.slice(0, 24_000)}${direction ? `\n\nREQUESTER'S DIRECTION (steer the angle and emphasis with it; it never overrides the rules above or the facts in the source): ${direction}` : ""}${instructions && !previous ? `\n\nREVIEWER'S DIRECTION: ${instructions}` : ""}` },
           ...(previous ? [{ role: "assistant" as const, content: `Previous version: ${asPrevious(previous)}` }, { role: "user" as const, content: `${problems?.length ? `Fix these problems: ${problems.join("; ")}. ` : ""}${instructions ? `Reviewer's changes: ${instructions}` : "Submit the corrected version."} Keep everything the reviewer did not ask to change.` }] : [])],
       }))
       const out = await submitted<{ card?: { fields: Record<string, string>; mediaQuery?: string }; cover?: { fields: Record<string, string>; mediaQuery?: string }; stories?: { fields: Record<string, string>; mediaQuery?: string }[]; caption: string; hold?: string }>(r, "submit_post")
@@ -228,13 +239,35 @@ export function createMcuAi(deps: { models: Record<PipelineStep, string>; search
       return { frames: frames.map((series, i) => ({ series, fields: { ...(parts[i]?.fields ?? {}) }, ...(parts[i]?.mediaQuery ? { mediaQuery: parts[i]!.mediaQuery } : {}) })), caption: (out.caption ?? "").trim(), ...(hold ? { hold } : {}) }
     },
 
+    async readRefusedPage(url) {
+      if (!deps.readTools) return null
+      const host = new URL(url).hostname.replace(/^www\./, "")
+      const found = await run("research", model => generateText({
+        model, tools: deps.readTools, stopWhen: stepCountIs(2), maxOutputTokens: outputBudget(model, 4_000), providerOptions: callOptions(model, "low"),
+        prepareStep: ({ stepNumber }) => stepNumber === 0 ? { toolChoice: "required" as const } : {},
+        messages: [{ role: "system", content: `Read one official web page through the search tool. Search once, with objective "The full text of the page at ${url}", search_queries ["${url}"], and source_policy include_domains ["${host}"]. Then reply "done".` }, { role: "user", content: url }],
+      }), r => ({ results: r.steps.flatMap(st => st.toolResults.flatMap(tr => (tr.output as { results?: { url?: string; title?: string; excerpt?: string; publishDate?: string | null }[] } | undefined)?.results ?? [])), finishReason: r.finishReason, providerMetadata: r.providerMetadata, usage: r.usage }))
+      // Only the page asked for: never another page the search happened to return.
+      const hit = found.results.find(x => typeof x.url === "string" && normalizeUrl(x.url) === normalizeUrl(url) && typeof x.excerpt === "string")
+      return hit ? { url, title: hit.title ?? "", text: hit.excerpt!, ...(hit.publishDate ? { publishedAt: hit.publishDate } : {}) } : null
+    },
+
+    async sameEvent({ report, primary }) {
+      return run("research", model => generateText({
+        model, maxOutputTokens: outputBudget(model, 4_000), providerOptions: callOptions(model, "low"),
+        tools: { judge_event: tool({ description: "Say whether the official page describes the same event the report covers.", inputSchema: z.object({ same: z.boolean(), reason: z.string().describe("one sentence") }) }) }, toolChoice: { type: "tool", toolName: "judge_event" },
+        messages: [{ role: "system", content: "A news outlet's report and an official page follow. Decide whether the official page describes the same event the report covers: the same award, test, delivery, announcement or decision, at the same time. It is NOT the same event when the official page is an older announcement the report only mentions as background, or a page about the same program but a different milestone. When you can't tell, answer same: false." },
+          { role: "user", content: `REPORT: ${report.title}\nDate: ${report.publishedAt ?? "not stated"}\n${report.text.slice(0, 6_000)}\n\nOFFICIAL PAGE: ${primary.title}\nDate: ${primary.publishedAt ?? "not stated"}\n${primary.text.slice(0, 6_000)}` }],
+      }), r => submitted<{ same: boolean; reason: string }>(r, "judge_event"))
+    },
+
     async findPhotoPages({ story, frame }) {
       const subject = frame.fields.subject_identifier || frame.fields.headline || story.title
       // Search, then pick from what the search returned (the same two-call pattern as research, for the same reason).
       const searched = await run("photoSearch", model => generateText({
         model, tools: deps.searchTools, stopWhen: stepCountIs(6), maxOutputTokens: outputBudget(model, 8_000), providerOptions: callOptions(model, "low"),
         prepareStep: ({ stepNumber }) => stepNumber === 0 ? { toolChoice: "required" as const } : {},
-        messages: [{ role: "system", content: "You find photos for a defense-news social card. Search the web for pages whose main photo shows the subject itself (the actual system, product, vehicle, unit or event in the story), from sources whose photos may be used with credit: DVIDS image pages (https://www.dvidshub.net/image/<number>/...); U.S. government pages (defense.gov, war.gov, army.mil, navy.mil, af.mil, marines.mil, spaceforce.mil, uscg.mil, nasa.gov, other .mil and .gov sites); and the maker's own newsroom, press-release, press-kit or media pages. Never news outlets' or stock-photo sites' pages (their photos are licensed to them). Return exact page URLs only, best first; never image-file URLs, search pages or guesses. Return an empty list if none show the subject. Search first, then list the best page URLs you found with one line each on what their main photo shows." },
+        messages: [{ role: "system", content: `You find photos for ${BRAND.photos.searchSubject}. Search the web for pages whose main photo shows the subject itself (the actual system, product, vehicle, unit or event in the story), from sources whose photos may be used with credit: DVIDS image pages (https://www.dvidshub.net/image/<number>/...); U.S. government pages (defense.gov, war.gov, army.mil, navy.mil, af.mil, marines.mil, spaceforce.mil, uscg.mil, nasa.gov, other .mil and .gov sites); and the maker's own newsroom, press-release, press-kit or media pages. Never news outlets' or stock-photo sites' pages (their photos are licensed to them). Return exact page URLs only, best first; never image-file URLs, search pages or guesses. Return an empty list if none show the subject. Search first, then list the best page URLs you found with one line each on what their main photo shows.` },
           { role: "user", content: `Subject: ${subject}\nStory: ${story.title}\nPublisher: ${story.publisher}\nPhoto idea: ${frame.mediaQuery ?? ""}` }],
       }), r => ({ text: r.text, urls: searchResultUrls(r.steps) }))
       if (!searched.urls.length) return []
@@ -252,7 +285,7 @@ export function createMcuAi(deps: { models: Record<PipelineStep, string>; search
       if (!candidates.length) return { index: null, reason: "no licensed candidates" }
       const pick = await run("photoPick", model => generateText({
         model, maxOutputTokens: outputBudget(model, 8_000), providerOptions: callOptions(model, "low"),
-        messages: [{ role: "system", content: (representative ? REPRESENTATIVE : "") + "You choose the photo for a MilCityUSA social card: 1080 × 1350, full bleed, the photo filling the frame, the text block on a dark scrim over the lower 40%. The approved look is a close, dominant hero subject that fills the upper part of the frame and stays recognizable at phone size. Judge each candidate by what its pixels show, never by its title, page or description: a page about a product often carries an unrelated share image (another aircraft, a hangar, a logo, an event photo). For each candidate you rank, first say in a few words what the photo itself shows, then whether that is the exact subject named below (match: exact), something related but not it (another variant, another vehicle, a generic scene: related), or not it at all (unrelated). Rank only candidates that visibly show the actual system, product, vehicle, unit or organization in the story, best first; a photo of something or someone that merely shares a name with it (a person, a band, a book, a convention panel, a logo or a graphic) is NOT relevant, and when you can't tell, leave it out. A blurry, dark or partial view of the subject is not a match either. Give each one's subject bounding box as fractions of that photo (x0, y0 top-left to x1, y1 bottom-right; 0–1), and its core: the part that must stay in frame for the subject to be recognized. The card is a tall 4:5 crop, so a wide subject loses its ends; the core is what it can't lose. Also say whether its background adds context (terrain, a setting, operators or other equipment that make the photo more interesting, like a forest behind an off-road vehicle) or is empty space (open sky, plain water, a blank wall or pier) that the subject should fill instead. Reject mostly-sky or empty frames, tail-only or cropped-off subjects, tiny distant subjects, and unrelated archive imagery presented as the event. index is your single best choice, or null if none is relevant and strong." },
+        messages: [{ role: "system", content: (representative ? REPRESENTATIVE : "") + `You choose the photo for ${BRAND.photos.card}. The approved look is a close, dominant hero subject that fills the upper part of the frame and stays recognizable at phone size. Judge each candidate by what its pixels show, never by its title, page or description: a page about a product often carries an unrelated share image (another aircraft, a hangar, a logo, an event photo). For each candidate you rank, first say in a few words what the photo itself shows, then whether that is the exact subject named below (match: exact), something related but not it (another variant, another vehicle, a generic scene: related), or not it at all (unrelated). Rank only candidates that visibly show the actual system, product, vehicle, unit or organization in the story, best first; a photo of something or someone that merely shares a name with it (a person, a band, a book, a convention panel, a logo or a graphic) is NOT relevant, and when you can't tell, leave it out. A blurry, dark or partial view of the subject is not a match either. Give each one's subject bounding box as fractions of that photo (x0, y0 top-left to x1, y1 bottom-right; 0–1), and its core: the part that must stay in frame for the subject to be recognized. The card is a tall 4:5 crop, so a wide subject loses its ends; the core is what it can't lose. Also say whether its background adds context (terrain, a setting, operators or other equipment that make the photo more interesting, like a forest behind an off-road vehicle) or is empty space (open sky, plain water, a blank wall or pier) that the subject should fill instead. Reject mostly-sky or empty frames, tail-only or cropped-off subjects, tiny distant subjects, and unrelated archive imagery presented as the event. index is your single best choice, or null if none is relevant and strong.` },
           { role: "user", content: [
             { type: "text", text: `Story: ${story.title}\nThe subject to show: ${frame.fields.subject_identifier || frame.fields.headline || story.title}\nCard: ${JSON.stringify(frame.fields)}\nAvoid repeating: ${avoid.join(", ") || "none"}\nCandidates follow, numbered from 0.` },
             ...candidates.flatMap((c, i) => [{ type: "text" as const, text: `#${i}: ${c.candidate.title} — ${c.candidate.description} (${c.candidate.width}×${c.candidate.height}, ${c.candidate.date ?? "date unknown"})` }, { type: "image" as const, image: c.image, mediaType: c.mime }]),
