@@ -71,18 +71,27 @@ export function captionProse(caption: string): string {
   return caption.split("\n").filter(l => !NOT_PROSE.test(l.trim())).join("\n").replace(/["“][^"”]*["”]/g, " ")
 }
 
-export function originalityProblems(frames: FrameCopy[], caption: string, story: Pick<Story, "sourceTitle" | "sourceText">, c: OriginalityChecks, headlineFields: string[]): string[] {
+/**
+ * Each field that copies more of its source than the profile allows: which frame and field ("caption" for the caption),
+ * the copied run, and the problem as validate words it. The fresh-wording pass (worker.ts freshStep) shows the writer
+ * the run and asks for fresh wording of just these fields.
+ */
+export interface Copied { frame: number; field: string; run: string[]; message: string }
+export function originalityFindings(frames: FrameCopy[], caption: string, story: Pick<Story, "sourceTitle" | "sourceText">, c: OriginalityChecks, headlineFields: string[]): Copied[] {
   if (!c.enabled || frames.some(f => c.exempt.includes(f.series))) return []
-  const out: string[] = [], source = words(story.sourceTitle)
+  const out: Copied[] = [], source = words(story.sourceTitle)
   frames.forEach((f, i) => {
     for (const name of headlineFields) {
       const v = f.fields[name]
       if (!v) continue
       const shared = longestSharedRun(words(v), source)
-      if (shared.length > c.headlineMaxRun) out.push(`${frames.length > 1 ? `frame ${i + 1}: ` : ""}the headline copies ${shared.length} words in a row from the source's headline ("${shared.run.join(" ")}"): write it fresh, in your own words, from the facts`)
+      if (shared.length > c.headlineMaxRun) out.push({ frame: i, field: name, run: shared.run, message: `${frames.length > 1 ? `frame ${i + 1}: ` : ""}the headline copies ${shared.length} words in a row from the source's headline ("${shared.run.join(" ")}"): write it fresh, in your own words, from the facts` })
     }
   })
   const shared = longestSharedRun(words(captionProse(caption)), words(story.sourceText))
-  if (shared.length > c.captionMaxRun) out.push(`the caption copies ${shared.length} words in a row from the source ("${shared.run.slice(0, 16).join(" ")}${shared.length > 16 ? " …" : ""}"): write it fresh, and quote only in quotation marks, attributed`)
+  if (shared.length > c.captionMaxRun) out.push({ frame: -1, field: "caption", run: shared.run, message: `the caption copies ${shared.length} words in a row from the source ("${shared.run.slice(0, 16).join(" ")}${shared.length > 16 ? " …" : ""}"): write it fresh, and quote only in quotation marks, attributed` })
   return out
+}
+export function originalityProblems(frames: FrameCopy[], caption: string, story: Pick<Story, "sourceTitle" | "sourceText">, c: OriginalityChecks, headlineFields: string[]): string[] {
+  return originalityFindings(frames, caption, story, c, headlineFields).map(x => x.message)
 }

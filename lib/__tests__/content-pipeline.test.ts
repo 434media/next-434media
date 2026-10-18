@@ -1229,3 +1229,159 @@ test("a cover template without the story_numbers field keeps the old notice, and
   assert.equal(w.designs[0].text.story_numbers, undefined) // the template has no such field, so it isn't sent
   assert.ok(d.notices.some(n => /ICYMI cover: 3 of 5 story slots used\. The template prints the numbers 01–05 itself/.test(n)))
 })
+
+// ── gate round 6 fixes (2026-10-18) ──
+import { publishedPost, labelDefect, MAX_FRESH_ATTEMPTS, REVIEW_DRAFT_TITLE } from "../content-pipeline/worker"
+import { originalityFindings } from "../content-pipeline/copy-checks"
+
+test("round 6, ICYMI: the engine decides eligibility (posted, not a review draft, with a card); a writer's hold on a roundup is overruled", async () => {
+  // The round-6 shape: a pilot post still titled REVIEW DRAFT, and a post with a link but never published, beside three published ones.
+  const marconi = published(4, { title: "MCU-BN-20261009-02 | Marconi … | REVIEW DRAFT" }), unpublished = published(5, { status: "needs_approval" })
+  assert.equal(publishedPost(marconi), false); assert.equal(publishedPost(unpublished), false); assert.equal(publishedPost(published(1)), true)
+  assert.ok(REVIEW_DRAFT_TITLE.test("x | review-draft")); assert.ok(REVIEW_DRAFT_TITLE.test("MCU-BN-01 | Marconi | REVIEW DRAFT | v2")); assert.ok(!REVIEW_DRAFT_TITLE.test("MCU-NEWS-20261001-01 v1 — ARMY REVIEWS DRAFTING RULES"))
+  // A headline that only mentions a review draft is a real story, not the pilot's marker (coordinator's review of #205).
+  assert.ok(!REVIEW_DRAFT_TITLE.test("MCU-NEWS-20261016-01 v1 — DOD OPENS REVIEW DRAFT OF CMMC RULE")); assert.equal(publishedPost(published(9, { title: "MCU-NEWS-20261016-01 v1 — DoD opens review draft of CMMC rule" })), true)
+  const writes: unknown[] = []
+  const w = world({ ai: { write: async i => { writes.push(i); const out = await coverWriter()(i); return writes.length === 1 ? { ...out, hold: "Story 3 (MCU-BN-20261009-02, Marconi) is marked REVIEW DRAFT; only three Approved stories" } : out } } })
+  w.deps.content.recentPosts = async () => [published(1), published(2), published(3), marconi, unpublished]
+  await w.start({ kind: "icymi" })
+  const d = onlyDraft(w)
+  assert.equal(d.status, "in_review", d.holdReason)
+  assert.deepEqual(d.story.roundup!.map(r => r.postId), ["p1", "p2", "p3"]) // the two are left out in code, never by the model
+  assert.equal(writes.length, 1) // the hold was not obeyed and cost no rewrite
+  assert.ok(d.history.some(h => /the writer asked to hold the roundup .*overruled: the engine decides which stories qualify/.test(h.event)))
+  assert.equal(w.posts[0].slides!.length, 3)
+  // With only two truly published, there is no roundup, and the note says so.
+  const two = world()
+  two.deps.content.recentPosts = async () => [published(1), published(2), marconi, unpublished]
+  await two.start({ kind: "icymi" })
+  assert.equal(two.store.drafts.size, 0); assert.match(two.notices[0].reason, /^only 2 MCU News or Breaking stories with a published card/)
+})
+
+const COPIED = "The U.S. Army awarded contracts worth $93.6 million to nine companies on Oct. 15, 2026 to deliver next-generation command and control software.\n\nSource: U.S. Army, 2026-10-15"
+const FRESH = "Nine companies will build command software for I Corps under $93.6 million in Army awards.\n\nSource: U.S. Army, 2026-10-15"
+const NEWS_CARD = { headline: "Army backs 9 C2 software vendors", deck: "Awards worth $93.6 million fund I Corps command software.", source: "ARMY.MIL" }
+type WriteArgs = Parameters<McuAi["write"]>[0]
+function freshWorld(answer: (i: WriteArgs, n: number) => { fields?: Record<string, string>; caption: string }) {
+  const writes: WriteArgs[] = []
+  const w = world({ ai: { write: async i => { writes.push(structuredClone(i)); const a = answer(i, writes.length); return { frames: [{ series: "news" as SeriesKey, fields: a.fields ?? NEWS_CARD }], caption: a.caption } } } })
+  return { ...w, writes }
+}
+
+test("round 6, originality: a caption that still copies after two rewrites gets a targeted rewording, shown the copied run, before any hold", async () => {
+  assert.ok(originalityFindings([{ series: "news", fields: NEWS_CARD }], COPIED, { sourceTitle: "x", sourceText: ARMY_TEXT }, { enabled: true, headlineMaxRun: 4, captionMaxRun: 12, exempt: [] }, ["headline"]).some(c => c.field === "caption" && c.run.length > 12))
+  const w = freshWorld(i => ({ caption: i.fresh ? FRESH : COPIED, ...(i.fresh ? { fields: { ...NEWS_CARD, headline: "Something the pass must not take" } } : {}) }))
+  await w.start()
+  const d = onlyDraft(w)
+  assert.equal(d.status, "in_review", d.holdReason)
+  assert.equal(w.writes.length, 4); assert.ok(w.writes.slice(0, 3).every(x => !x.fresh))
+  assert.match(w.writes[3].fresh![0], /^caption: the caption copies \d+ words in a row from the source \("the u\.s army awarded contracts worth/)
+  assert.ok(d.caption!.startsWith(FRESH)); assert.equal(d.frames[0].fields.headline, "ARMY BACKS 9 C2 SOFTWARE VENDORS") // only the named field was taken
+})
+
+test("round 6, originality: a copied headline is reworded on its own; the caption and other fields stay; the limits are unchanged", async () => {
+  const w = freshWorld(i => i.fresh ? { fields: { ...NEWS_CARD, headline: "Army backs 9 C2 software vendors", deck: "A deck the pass must not take." }, caption: "A caption the pass must not take." } : { fields: { ...NEWS_CARD, headline: "New contract awards support Army C2 vendors" }, caption: NEWS_CARD.deck.replace(/\.$/, "") + ".\n\nSource: U.S. Army, 2026-10-15" })
+  await w.start()
+  const d = onlyDraft(w)
+  assert.equal(d.status, "in_review", d.holdReason)
+  assert.match(w.writes[3].fresh![0], /^headline: the headline copies 6 words in a row from the source's headline/)
+  assert.equal(d.frames[0].fields.headline, "ARMY BACKS 9 C2 SOFTWARE VENDORS"); assert.equal(d.frames[0].fields.deck, NEWS_CARD.deck); assert.ok(d.caption!.startsWith("Awards worth $93.6 million"))
+  // Four copied words in a row are still allowed; five are not (the founder's limits, unchanged).
+  const lim = { enabled: true, headlineMaxRun: 4, captionMaxRun: 12, exempt: [] as SeriesKey[] }
+  assert.equal(originalityFindings([{ series: "news", fields: { headline: "contract awards support Army now" } }], "", { sourceTitle: "New contract awards support Army C2", sourceText: "" }, lim, ["headline"]).length, 0)
+  assert.equal(originalityFindings([{ series: "news", fields: { headline: "new contract awards support Army" } }], "", { sourceTitle: "New contract awards support Army C2", sourceText: "" }, lim, ["headline"]).length, 1)
+})
+
+test("round 6, originality: rewordings that keep copying are turned down and the draft holds after the attempts, saying so", async () => {
+  const w = freshWorld(() => ({ caption: COPIED }))
+  await w.start()
+  const d = onlyDraft(w)
+  assert.equal(d.status, "held"); assert.equal(w.writes.length, 3 + MAX_FRESH_ATTEMPTS)
+  assert.match(d.holdReason!, /^the copy still breaks the template rules after two rewrites and 3 rewording attempts: the caption copies/)
+  assert.deepEqual(w.writes[4].fresh!.slice(-1), ["the last answer still copied the same run of words: say it differently, in your own words"])
+  assert.equal(w.designs.length, 0); assert.equal(w.posts.length, 0)
+})
+
+test("round 6, credit: the photo's page publisher is credited, never a stale site name (rtx.com's og:site_name 'United Technologies')", () => {
+  assert.equal(siteOrg("United Technologies", "www.rtx.com", "RTX's Raytheon awarded $6.3 billion multi-year contract for SM-3 IB interceptors"), "RTX")
+  assert.equal(siteOrg("United Technologies", "www.rtx.com"), "United Technologies") // without the title's evidence it isn't set aside
+  // Short or acronym hosts keep their own correct names, never the bare host (coordinator's review of #205).
+  for (const [name, host, title] of [["U.S. Air Force", "www.af.mil", "Airmen test new base defense sensors"], ["General Dynamics", "www.gd.com", "General Dynamics awarded Army contract"], ["AeroVironment", "www.avinc.com", "Switchblade 600 delivered to the Army"], ["Mercury Systems", "www.mrcy.com", "Mercury unveils new processing module"], ["Fort Cavazos", "home.army.mil", "III Armored Corps soldiers train at Fort Cavazos"], ["U.S. Department of War", "www.defense.gov", "Secretary visits Pacific allies"]]) {
+    assert.equal(siteOrg(name, host, title), name, host)
+    assert.equal(imageLabel({ ...CHOSEN, creator: siteOrg(name, host, title) }), `IMAGE: ${name.toUpperCase()}`)
+  }
+  // Names that agree with their host are kept as written.
+  assert.equal(siteOrg("Lockheed Martin | Newsroom", "news.lockheedmartin.com"), "Lockheed Martin")
+  assert.equal(siteOrg("General Atomics Aeronautical Systems", "www.ga-asi.com"), "General Atomics Aeronautical Systems")
+  assert.equal(siteOrg("DVIDS", "www.dvidshub.net"), "DVIDS"); assert.equal(siteOrg("U.S. Army", "www.army.mil"), "U.S. Army")
+  const rtx = pageImageCandidate({ url: "https://www.rtx.com/news/news-center/2026/10/12/coyote", title: "RTX's Raytheon tests Coyote Block 2C with a rocket motor", text: "", image: "https://prd-sc102-cdn.rtx.com/-/media/coyote.jpg", siteName: "United Technologies" }, "source")!
+  assert.equal(rtx.creator, "RTX"); assert.equal(rtx.credit, "RTX (courtesy)")
+  assert.equal(imageLabel({ ...CHOSEN, creator: rtx.creator, credit: rtx.credit, date: "2026-10-12" }, "2026-10-12"), "IMAGE: RTX • 12 OCT 2026")
+})
+
+test("round 6, credit placement: a label that crosses the subject re-zooms the photo above the text block and fills once more; never twice", async () => {
+  assert.ok(labelDefect(`The image credit line "IMAGE: UNITED TECHNOLOGIES • 12 OCT 2026" runs across the rocket's nozzle and exhaust.`))
+  assert.ok(!labelDefect("the benefit headline text is clipped")); assert.ok(!labelDefect("the image credit is misspelled"))
+  // Contrast alone is not a placement defect: a re-zoom can't fix it, so it never spends the refit.
+  assert.ok(!labelDefect("the image credit line is low-contrast and hard to read")); assert.ok(!labelDefect("IMAGE: U.S. ARMY label is illegible"))
+  const LOW = { x0: 0.4, y0: 0.3, x1: 0.6, y1: 0.6 }, defect = { defect: `The image credit line "IMAGE: U.S. ARMY" runs across the vehicle's wheels.`, photo: false }
+  let checks = 0
+  const w = world({ ai: { pickMedia: async () => ({ index: 0, reason: "ok", ranked: [{ index: 0, box: LOW }] }), checkArtwork: async () => checks++ === 0 ? [defect] : [] } })
+  await w.start({ kind: "dt101" })
+  const d = onlyDraft(w)
+  assert.equal(d.status, "in_review"); assert.equal(d.labelRefit, 1); assert.deepEqual(d.qa, [])
+  assert.equal(w.designs.length, 2); assert.match(w.designs[1].requestId, /:l1$/)
+  const [a, b] = [w.designs[0].image!.crop!, w.designs[1].image!.crop!]
+  // The subject's base now sits at half the card's height, above the text block where the label is set.
+  const base = (c: typeof a) => (LOW.y1 - c.y) / c.height
+  assert.ok(base(a) > 0.55 && Math.abs(base(b) - 0.5) < 0.01, JSON.stringify({ a: base(a), b: base(b) }))
+  assert.ok(d.history.some(h => /the image label crosses the subject .* re-zoomed above the text block and is filled again \(1\/1\)/.test(h.event)))
+  // A label that still collides goes to review with the defect; no second refit.
+  const again = world({ ai: { pickMedia: async () => ({ index: 0, reason: "ok", ranked: [{ index: 0, box: LOW }] }), checkArtwork: async () => [defect] } })
+  await again.start({ kind: "dt101" })
+  assert.equal(again.designs.length, 2); assert.equal(onlyDraft(again).status, "in_review"); assert.ok(onlyDraft(again).qa.includes(defect.defect))
+})
+
+test("round 6, Breaking with no photo of its own: a representative search (people, unit, equipment) runs before the subject is given up", async () => {
+  const DV = "https://www.dvidshub.net/image/9600001/office-strategic-capital-director-visits-plant"
+  const big = new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x04, 0, 0, 0xff, 0xc0, 0x00, 0x11, 0x08, 0x02, 0x9b, 0x03, 0xe8, 0x03, 0, 0, 0, 0])
+  const asked: boolean[] = [], picked: number[] = []
+  const w = world({ ai: {
+    findPhotoPages: async ({ representative }) => { asked.push(!!representative); return representative ? [DV] : [] },
+    pickMedia: async ({ candidates }) => { picked.push(candidates.length); return candidates.length ? { index: 0, reason: "the office's director at the plant", ranked: [{ index: 0, box: HERO, representative: true, shows: "the OSC director touring a drug-ingredient plant" }] } : { index: null, reason: "no licensed candidates" } },
+  } })
+  w.deps.searchCommons = async () => []
+  w.deps.fetchImage = async () => ({ bytes: big, mime: "image/jpeg" })
+  const page = w.deps.fetchPage
+  w.deps.fetchPage = async url => url === DV ? { url, title: "Office of Strategic Capital director visits plant", text: "", image: "https://d1ldvf68ux039x.cloudfront.net/2000w_q95.jpg", description: "The director tours the plant, Oct. 16, 2026. (U.S. Army photo by Spc. A)" } : page(url)
+  await w.start({ kind: "breaking" })
+  const d = onlyDraft(w)
+  assert.equal(d.status, "in_review", d.holdReason)
+  assert.deepEqual(asked, [false, true]); assert.deepEqual(picked, [0, 1])
+  assert.equal(d.media[0]!.pageUrl, DV); assert.match(d.media[0]!.note!, /Representative photo \(the OSC director touring a drug-ingredient plant\), not the event itself/)
+  // Nothing representative either: the hold says both searches ran (and DT101, which never takes one, never asks).
+  const none = world({ ai: { findPhotoPages: async ({ representative }) => { asked.push(!!representative); return [] }, pickMedia: async () => ({ index: null, reason: "no licensed candidates" }) } })
+  none.deps.searchCommons = async () => []
+  await none.start({ kind: "breaking" })
+  assert.match(onlyDraft(none).holdReason!, /no relevant, licensed photo was found.*a representative photo \(the people, unit or equipment the story is about\) was searched for too, and none was found/)
+  asked.length = 0
+  const dt = world({ ai: { findPhotoPages: async ({ representative }) => { asked.push(!!representative); return [] }, pickMedia: async () => ({ index: null, reason: "none" }) } })
+  dt.deps.searchCommons = async () => []
+  await dt.start({ kind: "dt101" })
+  assert.ok(asked.length > 0 && asked.every(x => x === false))
+})
+
+test("round 6 review: a replacement subject gets its own label refit (sourceHold resets it, as it resets photo retries)", async () => {
+  const LOW = { x0: 0.4, y0: 0.3, x1: 0.6, y1: 0.6 }, label = { defect: `The image credit line "IMAGE: U.S. ARMY" runs across the vehicle.`, photo: false }
+  let picks = 0, checks = 0
+  // Subject 1: the label collides (refit), then a photo defect sends it back for a photo and none is left, so the
+  // subject is replaced. Subject 2: the label collides again, and gets its own refit.
+  const w = world({ ai: {
+    pickMedia: async () => ++picks === 2 ? { index: null, reason: "nothing else" } : { index: 0, reason: "ok", ranked: [{ index: 0, box: LOW }] },
+    checkArtwork: async () => { checks++; return checks === 1 || checks === 3 ? [label] : checks === 2 ? [{ defect: "the subject is cut off", photo: true }] : [] },
+  } })
+  await w.start({ kind: "dt101" })
+  const d = onlyDraft(w)
+  assert.equal(d.status, "in_review", d.holdReason); assert.equal(d.autoReplaced, 1); assert.equal(d.labelRefit, 1)
+  assert.deepEqual(w.designs.map(x => x.requestId.replace(/^admin:MCU-DT101-20261016-01:v1:f1/, "")), ["", ":l1", ":r1", ":r1:l1"])
+})
