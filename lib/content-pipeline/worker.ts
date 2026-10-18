@@ -62,6 +62,8 @@ export interface WorkerDeps {
    * notifications, and a CRM task, each linking to the draft in the Admin. Returns the task's id when one was recorded.
    */
   askChoice?(job: McuJob, draft: McuDraft): Promise<{ taskId?: string }>
+  /** Closes the choice's CRM task, with what happened (picked, closed or superseded). */
+  closeChoiceTask?: ChoiceTasks["close"]
   nowMs(): number
 }
 export const LEASE_MS = 290_000
@@ -146,6 +148,10 @@ async function jobStep(deps: WorkerDeps, id: string, attempt: number): Promise<v
     const calls: ModelCall[] = []
     const ai = deps.ai(c => calls.push(c)), titles = posts.map(p => p.title), seeds = job.kind === "icymi" ? null : await deps.seeds()
     const inFlight = job.kind === "icymi" ? { titles: [], urls: new Set<string>() } : await storiesInFlight(deps)
+    // A new roundup supersedes any earlier one still waiting for a choice: that draft closes, and so does its task.
+    if (job.kind === "icymi") for (const waiting of await deps.store.choosingDrafts().catch(() => [])) {
+      await closeRoundup(deps.store, waiting, "the content pipeline", iso(deps), `regenerated: a new ICYMI request (${id}) replaced it`, deps.closeChoiceTask ? { close: deps.closeChoiceTask } : undefined)
+    }
     let stories: Story[] | { hold: string; tried?: string[]; triedUrls?: string[] } = job.kind === "icymi" ? icymiStory(posts, icymiWindow(deps.nowMs(), (await deps.icymiWindow?.().catch(() => null))?.lookbackDays ?? null), roundupSize()) : await researchStories(deps, ai, job, titles, seeds, [], [], inFlight)
     // Every candidate dropped (a blocked or script-only source page, no readable article, outside the Breaking window):
     // research once more, steering away from what was tried, before the job holds (production, 2026-10-17).
@@ -280,7 +286,8 @@ function roundupStory(items: RoundupItem[], label: string): Story {
  * The requester's choice for an ICYMI draft waiting on one (the Admin's picker): min–max of the candidates, kept in
  * the roundup's order (newest first). The draft then runs like any roundup. Returns why a choice is refused.
  */
-export async function chooseRoundup(store: McuStore, draftId: string, postIds: string[], by: string, nowIso: string): Promise<{ ok: true } | { error: string }> {
+export interface ChoiceTasks { close(taskId: string, note: string): Promise<void> }
+export async function chooseRoundup(store: McuStore, draftId: string, postIds: string[], by: string, nowIso: string, tasks?: ChoiceTasks): Promise<{ ok: true } | { error: string }> {
   const d = await store.getDraft(draftId)
   if (!d || d.kind !== "icymi") return { error: "No ICYMI draft with that id" }
   if (d.status !== "choosing") return { error: "This draft is not waiting for a choice" }
@@ -295,6 +302,29 @@ export async function chooseRoundup(store: McuStore, draftId: string, postIds: s
   await store.saveDraft(d); await store.release("draft", draftId, true)
   const job = await store.getJob(d.jobId)
   if (job) await store.saveJob({ ...job, note: `${picked.size} stories chosen by ${by}`, updatedAt: nowIso })
+  await closeTask(tasks, d, `Done: ${picked.size} stories chosen by ${by} at ${nowIso} (${postIds.join(", ")}). The ICYMI draft ${d.id} is running.`)
+  return { ok: true }
+}
+/** The choice's CRM task closes with what happened; a failure is logged and never undoes the draft's change. */
+async function closeTask(tasks: ChoiceTasks | undefined, d: McuDraft, note: string): Promise<void> {
+  if (!tasks || !d.choice?.taskId) return
+  await tasks.close(d.choice.taskId, note).catch(err => console.error("[content-pipeline] choice task not closed", d.id, err instanceof Error ? err.message : err))
+}
+/**
+ * An ICYMI draft waiting for a choice that ends without one: closed by the requester in the Admin, or superseded by a
+ * new ICYMI request. The draft is held with the reason, its job settles, and its CRM task closes with that reason.
+ */
+export async function closeRoundup(store: McuStore, draftId: string, by: string, nowIso: string, reason: string, tasks?: ChoiceTasks): Promise<{ ok: true } | { error: string }> {
+  const d = await store.getDraft(draftId)
+  if (!d || d.kind !== "icymi") return { error: "No ICYMI draft with that id" }
+  if (d.status !== "choosing") return { error: "This draft is not waiting for a choice" }
+  d.status = "held"; d.holdReason = `no stories chosen: ${reason}`; d.updatedAt = nowIso
+  d.choice = { ...d.choice!, closedBy: by, closedAt: nowIso, closedReason: reason }
+  d.history.push({ at: nowIso, event: `closed by ${by} without a choice: ${reason}` })
+  await store.saveDraft(d)
+  const job = await store.getJob(d.jobId)
+  if (job && job.status === "drafting") await store.saveJob({ ...job, status: "done", note: `No stories chosen: ${reason}`, notifiedAt: job.notifiedAt ?? nowIso, updatedAt: nowIso })
+  await closeTask(tasks, d, `Closed without a choice by ${by} at ${nowIso}: ${reason}.`)
   return { ok: true }
 }
 

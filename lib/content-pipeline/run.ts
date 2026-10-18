@@ -3,9 +3,17 @@ import { BRAND } from "./brand"
 import { createMcuAi } from "./model"
 import { PIPELINE_MODELS } from "./models"
 import { fetchImage, fetchSourcePage, searchCommons, searchNasa, searchOpenverse } from "./sources"
-import { runDue, label, type PostRow, type WorkerDeps } from "./worker"
+import { runDue, label, type ChoiceTasks, type PostRow, type WorkerDeps } from "./worker"
 import type { McuDraft, McuJob } from "./store"
 import { adoptablePost, pipelineMarked } from "./ownership"
+
+/** The ICYMI choice's CRM task: completed, with what happened in its notes (who chose and when, or why it closed). */
+export const choiceTasks: ChoiceTasks = {
+  close: async (taskId, note) => {
+    const { updateUnifiedTask } = await import("@/lib/firestore-crm")
+    await updateUnifiedTask(taskId, { status: "completed", completed_date: new Date().toISOString().slice(0, 10), notes: note })
+  },
+}
 
 /**
  * Production wiring for the content pipeline worker. The Canva fill, the export staging and the content-post lookup
@@ -94,6 +102,7 @@ export async function pipelineDeps(): Promise<WorkerDeps> {
         : `No ${kind} draft: ${(job.note ?? "no qualifying story found").slice(0, 300)}`
       await sendDraftsReadyNotification({ recipients: [job.request.actorEmail], message, postId: ready[0]?.postId ?? job.noContentPostId ?? "", title: ready[0] ? `${ready.length} drafts ready` : drafts.length ? `${kind} drafts` : `No new ${kind} content` })
     },
+    closeChoiceTask: choiceTasks.close,
     // An ICYMI roundup with more stories than it takes: the requester chooses on the draft, in the Admin.
     askChoice: async (job: McuJob, draft: McuDraft) => {
       const [{ postSlackNotice }, { createUnifiedTask }] = await Promise.all([import("@/lib/owned-meta-slack"), import("@/lib/firestore-crm")])

@@ -49,10 +49,10 @@ function RoundupPicker({ draftId, onDone }: { draftId: string; onDone: () => voi
   if (draft.status !== "choosing") return <p className="text-xs text-neutral-500">{draftId}: the stories are already chosen.</p>
   const { min, max } = draft.choice ?? { min: 3, max: 5 }, items = draft.story.roundup ?? []
   const toggle = (id: string) => setPicked(p => p.includes(id) ? p.filter(x => x !== id) : [...p, id])
-  const submit = async () => {
+  const submit = async (close = false) => {
     setSaving(true); setError(null)
     try {
-      const r = await fetch(`/api/admin/content-pipeline/drafts/${encodeURIComponent(draftId)}`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ postIds: items.filter(p => picked.includes(p.postId)).map(p => p.postId) }) })
+      const r = await fetch(`/api/admin/content-pipeline/drafts/${encodeURIComponent(draftId)}`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(close ? { close: true } : { postIds: items.filter(p => picked.includes(p.postId)).map(p => p.postId) }) })
       const data = await r.json().catch(() => ({}))
       if (!r.ok) { setError(data.error || "Could not record the choice"); return }
       onDone()
@@ -72,9 +72,12 @@ function RoundupPicker({ draftId, onDone }: { draftId: string; onDone: () => voi
         ))}
       </div>
       {error && <p className="text-xs text-red-600">{error}</p>}
-      <button type="button" onClick={submit} disabled={saving || picked.length < min || picked.length > max}
+      <button type="button" onClick={() => submit()} disabled={saving || picked.length < min || picked.length > max}
         className="w-full h-8 rounded-md bg-neutral-900 text-white text-xs font-medium disabled:opacity-50">
         Use {picked.length} {picked.length === 1 ? "story" : "stories"}
+      </button>
+      <button type="button" onClick={() => submit(true)} disabled={saving} className="w-full text-[11px] text-neutral-500 hover:text-neutral-800 hover:underline underline-offset-2">
+        Close without a roundup
       </button>
     </div>
   )

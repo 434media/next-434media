@@ -106,7 +106,7 @@ export interface McuDraft {
   mediaRetries?: number
   holdReason?: string
   /** An ICYMI roundup's size, and who chose its stories when more qualified than it takes. */
-  choice?: { min: number; max: number; chosenBy?: string; chosenAt?: string; taskId?: string }
+  choice?: { min: number; max: number; chosenBy?: string; chosenAt?: string; taskId?: string; closedBy?: string; closedAt?: string; closedReason?: string }
   error?: string
   /** The content post on the Admin board (crm_content_posts) this draft became. */
   postId?: string
@@ -141,6 +141,8 @@ export interface McuStore {
    * round 1 (2026-10-17) drafted Anduril's Steelfin in two concurrent jobs and the Army's NGC2 awards twice in one.
    */
   recentStories(sinceIso: string): Promise<{ draftId: string; jobId: string; title: string; primaryUrl: string }[]>
+  /** Ids of ICYMI drafts waiting for the requester's choice, so a new roundup can close them. */
+  choosingDrafts(): Promise<string[]>
 }
 
 export const WORKING: readonly DraftStatus[] = ["queued", "writing", "media", "designing", "reviewing", "posting"]

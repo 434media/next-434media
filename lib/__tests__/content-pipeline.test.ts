@@ -8,7 +8,7 @@
 import { test } from "node:test"
 import assert from "node:assert/strict"
 import { SERIES, checkFields, clippedWords, ddmmmyy, fitLines, lineCount, measure, normalizeFields, overLimits, type SeriesKey } from "../content-pipeline/series"
-import { runDue, chooseRoundup, MAX_FIT_ATTEMPTS, RETRY_MS, exactTime, zonedDay, icymiStory, icymiWindow, staleSource, allowsRepresentative, sameSubject, makerOf, searchedPageUsable, unsourcedNumbers, withCredits, imageLabel, mediaQueries, cropFit, choosePhoto, zoomCrop, reviewNotes, DOD_NOTICE, LEASE_MS, type WorkerDeps, type DesignInput, type PostInput, type NoContentInput } from "../content-pipeline/worker"
+import { runDue, chooseRoundup, closeRoundup, MAX_FIT_ATTEMPTS, RETRY_MS, exactTime, zonedDay, icymiStory, icymiWindow, staleSource, allowsRepresentative, sameSubject, makerOf, searchedPageUsable, unsourcedNumbers, withCredits, imageLabel, mediaQueries, cropFit, choosePhoto, zoomCrop, reviewNotes, DOD_NOTICE, LEASE_MS, type WorkerDeps, type DesignInput, type PostInput, type NoContentInput } from "../content-pipeline/worker"
 import { firestorePipelineStore } from "../firestore-content-pipeline"
 import { MAX_ATTEMPTS, type McuDraft, type McuJob, type McuStore } from "../content-pipeline/store"
 import type { PostRow } from "../content-pipeline/worker"
@@ -36,6 +36,7 @@ class MemStore implements McuStore {
   pilotUsed: string[] = [] // ids the pilot already used, as the shared ledgers record them
   async highestDraftNumber(prefix: string) { return Math.max(0, ...[...this.drafts.keys(), ...this.pilotUsed].filter(k => k.startsWith(prefix)).map(k => Number(k.slice(prefix.length, prefix.length + 2)))) }
   async backoff(k: "job" | "draft", id: string, until: number) { this.col(k).get(id)!.leaseUntil = until }
+  async choosingDrafts() { return [...this.drafts.values()].filter(v => v.draft.status === "choosing").map(v => v.draft.id) }
   async recentStories(since: string) { return [...this.drafts.values()].map(v => v.draft).filter(d => d.createdAt >= since && d.story).map(d => ({ draftId: d.id, jobId: d.jobId, title: d.story.title, primaryUrl: d.story.primaryUrl })) }
 }
 
@@ -1047,8 +1048,10 @@ test("ICYMI with 7 eligible posts: the draft waits for the requester's choice, w
   assert.deepEqual(await chooseRoundup(w.store, d.id, ["p1", "p2"], "marcos@434media.com", at), { error: "Choose 3–5 stories" })
   assert.deepEqual(await chooseRoundup(w.store, d.id, ["p1", "p1", "p2"], "marcos@434media.com", at), { error: "Choose stories offered on this draft, each once" })
   assert.deepEqual(await chooseRoundup(w.store, d.id, ["p1", "p2", "p9"], "marcos@434media.com", at), { error: "Choose stories offered on this draft, each once" })
-  // Chosen out of order: the roundup keeps the posts' order (newest first).
-  assert.deepEqual(await chooseRoundup(w.store, d.id, ["p6", "p2", "p4", "p3"], "marcos@434media.com", at), { ok: true })
+  // Chosen out of order: the roundup keeps the posts' order (newest first). The task closes with who chose and when.
+  const closed: { taskId: string; note: string }[] = [], tasks = { close: async (taskId: string, note: string) => { closed.push({ taskId, note }) } }
+  assert.deepEqual(await chooseRoundup(w.store, d.id, ["p6", "p2", "p4", "p3"], "marcos@434media.com", at, tasks), { ok: true })
+  assert.deepEqual(closed, [{ taskId: "task-1", note: `Done: 4 stories chosen by marcos@434media.com at ${at} (p6, p2, p4, p3). The ICYMI draft ${d.id} is running.` }])
   assert.deepEqual(await chooseRoundup(w.store, d.id, ["p1", "p2", "p3"], "marcos@434media.com", at), { error: "This draft is not waiting for a choice" })
   await runDue(w.deps, 1e9)
   d = onlyDraft(w)
@@ -1182,4 +1185,32 @@ test("measuring as the card sets it: every character counts once, lines wrap at 
   assert.equal(fitLines("FIRE.\nRELOCATE.", 16, 2), "FIRE.\nRELOCATE.") // the writer's break is kept when it fits
   assert.equal(fitLines("SOLAR POWER KEEPS\nIT ON PATROL", 16, 2), null) // no break fits: the words must be shortened
   assert.equal(fitLines("UNSTOPPABLE", 16, 2), null) // never splits a word
+})
+
+test("an ICYMI choice that ends without one closes its task with the reason: closed in the Admin, or replaced by a new request", async () => {
+  const closed: { taskId: string; note: string }[] = []
+  const w = world({ ai: { write: coverWriter() } })
+  w.deps.content.recentPosts = async () => [1, 2, 3, 4, 5, 6].map(n => published(n))
+  let tasks = 0
+  w.deps.askChoice = async () => ({ taskId: `task-${++tasks}` })
+  w.deps.closeChoiceTask = async (taskId, note) => { closed.push({ taskId, note }) }
+  // Closed in the Admin: the draft holds with the reason, the job settles, the task closes.
+  await w.start({ kind: "icymi" })
+  const first = onlyDraft(w), at = new Date(NOW).toISOString()
+  assert.deepEqual(await closeRoundup(w.store, first.id, "marcos@434media.com", at, "closed in the Admin", { close: w.deps.closeChoiceTask! }), { ok: true })
+  const held = (await w.store.getDraft(first.id))!
+  assert.equal(held.status, "held"); assert.equal(held.holdReason, "no stories chosen: closed in the Admin"); assert.equal(held.choice!.closedBy, "marcos@434media.com")
+  assert.equal((await w.store.getJob("job-icymi-1"))!.status, "done")
+  assert.deepEqual(closed, [{ taskId: "task-1", note: `Closed without a choice by marcos@434media.com at ${at}: closed in the Admin.` }])
+  assert.deepEqual(await closeRoundup(w.store, first.id, "marcos@434media.com", at, "again"), { error: "This draft is not waiting for a choice" })
+  // Regenerated: a new ICYMI request closes the earlier draft still waiting, and its task, before it opens its own.
+  await w.store.createJob(job({ id: "job-icymi-2", kind: "icymi" }))
+  await runDue(w.deps, 1e9)
+  await w.store.createJob(job({ id: "job-icymi-3", kind: "icymi" }))
+  await runDue(w.deps, 1e9)
+  const drafts = [...w.store.drafts.values()].map(v => v.draft)
+  const second = drafts.find(x => x.jobId === "job-icymi-2")!, third = drafts.find(x => x.jobId === "job-icymi-3")!
+  assert.equal(second.status, "held"); assert.equal(second.holdReason, "no stories chosen: regenerated: a new ICYMI request (job-icymi-3) replaced it")
+  assert.equal(third.status, "choosing")
+  assert.deepEqual(closed.slice(1).map(c => c.taskId), ["task-2"]); assert.match(closed[1].note, /^Closed without a choice by the content pipeline at .*: regenerated: a new ICYMI request \(job-icymi-3\) replaced it\.$/)
 })

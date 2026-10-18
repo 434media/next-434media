@@ -36,6 +36,7 @@ export function firestorePipelineStore(db: FirebaseFirestore.Firestore = getDb()
     createDraft: async draft => { await drafts.doc(draft.id).create({ draft: clean(draft), due: true, leaseUntil: 0, attempts: 0, jobId: draft.jobId, createdAt: draft.createdAt }).catch(e => { if ((e as { code?: number }).code !== 6) throw e }) },
     getDraft: async id => ((await drafts.doc(id).get()).data()?.draft as McuDraft | undefined) ?? null,
     saveDraft: async draft => { await drafts.doc(draft.id).set({ draft: clean(draft) }, { mergeFields: ["draft"] }) },
+    choosingDrafts: async () => (await drafts.where("draft.status", "==", "choosing").limit(20).get()).docs.map(d => d.id),
     claim: (k, id, nowMs, leaseMs) => db.runTransaction(async tx => {
       const ref = col(k).doc(id), d = (await tx.get(ref)).data()
       if (!d || d.due !== true || (typeof d.leaseUntil === "number" && d.leaseUntil > nowMs)) return 0
