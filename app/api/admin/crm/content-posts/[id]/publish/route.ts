@@ -3,6 +3,7 @@ import type { NextRequest } from "next/server"
 import { getSession, isAuthorizedAdmin, canSend, isCrmSuperAdmin } from "@/lib/auth"
 import { getContentPostById, updateContentPost } from "@/lib/firestore-crm"
 import type { ContentPostStatus, TaskComment } from "@/components/crm/types"
+import { outcomeStatusRefusal } from "@/lib/content-post-guards"
 
 // POST /api/admin/crm/content-posts/[id]/publish
 // Body: { published_url?: string, posted_at?: string }
@@ -69,6 +70,11 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
   const post = await getContentPostById(id)
   if (!post) {
     return NextResponse.json({ error: "Content post not found" }, { status: 404 })
+  }
+  // A content-pipeline "no new content" card is never marked posted (security review, finding 4).
+  const outcomeRefusal = outcomeStatusRefusal(post, "posted")
+  if (outcomeRefusal) {
+    return NextResponse.json({ error: outcomeRefusal }, { status: 409 })
   }
   if (!POSTABLE_FROM.includes(post.status)) {
     return NextResponse.json(

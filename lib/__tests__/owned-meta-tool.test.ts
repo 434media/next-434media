@@ -630,3 +630,50 @@ test("a failed Canva connect logs only Canva's short error code or the failing s
   assert.equal(connectFailureCode(new canvaError("concurrent")), "store_conflict")
   assert.equal(connectFailureCode(Object.assign(new Error("firestore"), { name: "FirebaseError" })), "store:FirebaseError")
 })
+
+// ── Security review findings 3 and 4 (2026-10-18) ──
+import { PIPELINE_KEY_PREFIX, PIPELINE_SOURCE, adoptablePost, pipelineMarked, reservedRequestId } from "../content-pipeline/ownership"
+import { KEY_PREFIX } from "../content-pipeline/worker"
+import { outcomeStatusRefusal } from "../content-post-guards"
+
+test("finding 3: the pipeline's admin: request ids are reserved; create_post and canva_create_design refuse them", async () => {
+  assert.equal(PIPELINE_KEY_PREFIX, KEY_PREFIX) // one prefix: the one the worker keys its ledgers with
+  for (const id of ["admin:MCU-NEWS-20261018-03:v1", "ADMIN:MCU-NEWS-20261018-03:v1", " admin:x1234567"]) assert.equal(reservedRequestId(id), true, id)
+  assert.equal(reservedRequestId("slack:C0C9RQE54SG:1792145804.228509"), false)
+  const { deps: d, created } = intake([])
+  const input = { requestId: "admin:MCU-NEWS-20261018-03:v1", title: "Planted", brand: "milcity" as const, caption: "Not the pipeline's caption." }
+  await assert.rejects(createPost(d, PRINCIPAL, input), /requestIds starting with "admin:" are reserved for the content pipeline/)
+  assert.equal(created.length, 0)
+  assert.equal((await createPost(d, PRINCIPAL, { ...input, requestId: "slack:C0C9RQE54SG:1792145804.228509" })).created, true)
+  // The Canva ledger: a reserved id never reaches Canva; any other id does.
+  const asked: string[] = []
+  const tools = deps(new Store(), provider(), { canvaCreate: async i => { asked.push(i.requestId); return { design: { designId: "DAGnew1234", editUrl: "e", viewUrl: "v", previewUrls: [] }, reused: false } as never } })
+  const fill = { templateId: "EAHXWo1LiF8", title: "Card", text: { headline: "X" } }
+  const refused = await runOwnedMetaTool("canva_create_design", { requestId: "admin:MCU-NEWS-20261018-03:v1:f1", ...fill }, PRINCIPAL, tools)
+  assert.equal(refused.status, 409); assert.match(String(refused.body.error), /reserved for the content pipeline/)
+  assert.equal((await runOwnedMetaTool("canva_create_design", { requestId: "slack:C1:1792145804.1:f1", ...fill }, PRINCIPAL, tools)).status, 200)
+  assert.deepEqual(asked, ["slack:C1:1792145804.1:f1"])
+})
+
+test("finding 3: the pipeline adopts an existing post for its request id only when it created it", () => {
+  const intakeOf = (source?: string) => ({ requestId: "admin:MCU-NEWS-20261018-03:v1", metaBrand: "milcity", requestedBy: "x@434media.com", at: NOW, ...(source ? { source } : {}) }) as ContentPost["intake"]
+  assert.equal(adoptablePost(null), null)
+  const ours = post({ id: "ours-1234567", intake: intakeOf(PIPELINE_SOURCE) })
+  assert.equal(adoptablePost(ours), ours)
+  // A post planted under the pipeline's request id (by another caller, before the prefix was reserved) is refused.
+  assert.throws(() => adoptablePost(post({ id: "planted-12345", intake: intakeOf() })), /Post planted-12345 already holds this draft's request id but was not created by the content pipeline/)
+  assert.throws(() => adoptablePost(post({ id: "planted-12345", intake: intakeOf("slack") })), /not created by the content pipeline/)
+  // What run.ts writes carries the marker; nothing else about the post changes.
+  const fields = post({ intake: { requestId: "admin:x1234567", metaBrand: "milcity", requestedBy: "a@b.c", at: NOW } })
+  assert.deepEqual(pipelineMarked(fields), { ...fields, intake: { ...fields.intake!, source: PIPELINE_SOURCE } })
+})
+
+test("finding 4: a no-content card's status never changes through the generic update or Mark as posted", () => {
+  const notice = post({ status: "needs_approval", pipeline_outcome: { kind: "no_new_content", job_id: "job-1", reason: "nothing qualified", tried: [] } })
+  for (const next of ["approved", "scheduled", "posted", "rejected", "in_progress"]) assert.match(outcomeStatusRefusal(notice, next) ?? "", /no new content was found, so its status can't change; close it with Confirm no new content/, next)
+  // Saving other fields (status unchanged or absent) still works, and ordinary posts are untouched.
+  assert.equal(outcomeStatusRefusal(notice, "needs_approval"), null)
+  assert.equal(outcomeStatusRefusal(notice, undefined), null)
+  assert.equal(outcomeStatusRefusal(post({ status: "approved" }), "posted"), null)
+  assert.equal(outcomeStatusRefusal(null, "approved"), null)
+})
