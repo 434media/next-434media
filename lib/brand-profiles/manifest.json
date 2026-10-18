@@ -2,10 +2,10 @@
   "profiles": {
     "milcity": {
       "profile": "06 Standards/Brand Profiles/MilCityUSA.md",
-      "profileVersion": "1.1.0",
-      "profileSha256": "4158d5e0f965576a",
+      "profileVersion": "1.2.0",
+      "profileSha256": "4a0003e65f819f77",
       "artifact": "milcity.json",
-      "artifactSha256": "34e6df514dac3986",
+      "artifactSha256": "175ae0ea06fc9ebe",
       "generated": "2026-10-18"
     }
   }

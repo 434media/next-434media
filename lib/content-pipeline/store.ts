@@ -62,16 +62,24 @@ export interface Story {
   sourceTitle: string
   /** Pages that fill what the primary source leaves out (for DT101, the maker and its headquarters); their text follows the primary's in sourceText. */
   supporting?: { url: string; title: string }[]
-  /** For ICYMI: the published MCU posts this roundup covers. */
-  /** media: the photo the post recorded when the pipeline wrote it (pipeline_media), never read from its editable links. */
-  roundup?: { postId: string; title: string; caption: string; publishedUrl?: string; media?: PipelineMedia }[]
+  /**
+   * For ICYMI: the published posts this roundup covers, in order (while the draft is choosing, every candidate). media:
+   * the photo the post recorded when the pipeline wrote it (pipeline_media), never read from its editable links. card:
+   * the post's own exported card (its first staged image asset), reused as the story's slide exactly as posted.
+   */
+  roundup?: RoundupItem[]
+}
+export interface RoundupItem { postId: string; title: string; caption: string; publishedUrl?: string; publishedAt?: string; media?: PipelineMedia; card?: { url: string; sha256?: string }
 }
 export interface FrameCopy { series: SeriesKey; fields: Record<string, string>; mediaQuery?: string }
 export interface ChosenMedia extends Pick<MediaCandidate, "url" | "pageUrl" | "license" | "creator" | "credit" | "usGovernment" | "date" | "rightsNote"> { title: string; note?: string; /** Zoom applied before the Canva fill, as fractions of the photo. */ crop?: CropBox }
 export interface FrameDesign { templateId: string; designId: string; editUrl: string; viewUrl: string; previewUrls: string[] }
 
-/** posting: the review step passed and the draft is being written to the board as a content post. */
-export type DraftStatus = "queued" | "writing" | "media" | "designing" | "reviewing" | "posting" | "in_review" | "held" | "failed"
+/**
+ * posting: the review step passed and the draft is being written to the board as a content post. choosing: an ICYMI
+ * roundup with more stories than it takes waits for the requester to choose them in the Admin (chooseRoundup).
+ */
+export type DraftStatus = "queued" | "writing" | "media" | "designing" | "reviewing" | "posting" | "in_review" | "held" | "failed" | "choosing"
 export interface McuDraft {
   id: string
   jobId: string
@@ -97,6 +105,8 @@ export interface McuDraft {
   /** How many times the artwork check sent the draft back for a different photo. */
   mediaRetries?: number
   holdReason?: string
+  /** An ICYMI roundup's size, and who chose its stories when more qualified than it takes. */
+  choice?: { min: number; max: number; chosenBy?: string; chosenAt?: string; taskId?: string }
   error?: string
   /** The content post on the Admin board (crm_content_posts) this draft became. */
   postId?: string

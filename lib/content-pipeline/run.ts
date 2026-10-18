@@ -37,7 +37,9 @@ export async function pipelineDeps(): Promise<WorkerDeps> {
         const ours = new RegExp(BRAND.posts.match, "i")
         const mcu = (await tools.intake.listPosts()).filter(p => !p.archived && [p.title, p.social_copy, p.tags, p.platform].some(v => typeof v === "string" && ours.test(v)))
         const when = (p: (typeof mcu)[number]) => p.posted_at || (p.status === "posted" || p.published_url ? p.date_to_post : undefined)
-        return mcu.map((p): PostRow => ({ id: p.id, title: p.title, status: p.status, ...(p.published_url ? { publishedUrl: p.published_url } : {}), ...(p.social_copy ? { caption: p.social_copy.slice(0, 2200) } : {}), ...(when(p) ? { publishedAt: when(p) } : {}), ...(Array.isArray(p.pipeline_media) && p.pipeline_media.length ? { media: p.pipeline_media.slice(0, 6) } : {}) }))
+        // card: the post's first staged image, the card as posted, which ICYMI reuses as the story's slide.
+        const card = (p: (typeof mcu)[number]) => (Array.isArray(p.assets) ? p.assets : []).find(a => a.kind === "image" && /^https:\/\//.test(a.url))
+        return mcu.map((p): PostRow => ({ id: p.id, title: p.title, status: p.status, ...(p.published_url ? { publishedUrl: p.published_url } : {}), ...(p.social_copy ? { caption: p.social_copy.slice(0, 2200) } : {}), ...(when(p) ? { publishedAt: when(p) } : {}), ...(Array.isArray(p.pipeline_media) && p.pipeline_media.length ? { media: p.pipeline_media.slice(0, 6) } : {}), ...(card(p) ? { card: { url: card(p)!.url, ...(card(p)!.sha256 ? { sha256: card(p)!.sha256 } : {}) } } : {}) }))
           .sort((a, b) => (b.publishedAt ?? "").localeCompare(a.publishedAt ?? "")).slice(0, 75)
       },
       templateFields: templateId => tools.canvaFields(templateId),
@@ -54,8 +56,9 @@ export async function pipelineDeps(): Promise<WorkerDeps> {
           intake: { requestId: p.requestId, metaBrand: BRAND.posts.metaBrand, requestedBy: p.requestedBy.email, at: now },
         }))
         if (post.assets.length && post.export_fingerprint) return { postId: post.id, holds: [] }
-        // Fresh exports in frame order; a single design is bound to the post as its Canva source.
-        const single = p.designIds.length === 1
+        // Fresh exports in frame order; a single design is bound to the post as its Canva source. Slides (an ICYMI
+        // roundup's published story cards) follow the exports as they are, so such a post is bound to no one design.
+        const slides = p.slides ?? [], single = p.designIds.length === 1 && !slides.length
         const items: { url: string; label: string }[] = []
         for (const [i, id] of p.designIds.entries()) {
           const urls = await tools.canvaExport(id)
@@ -63,6 +66,7 @@ export async function pipelineDeps(): Promise<WorkerDeps> {
           if (single) urls.forEach((url, n) => items.push({ url, label: `page-${n + 1}` }))
           else items.push({ url: urls[0], label: `frame-${i + 1}` })
         }
+        items.push(...slides)
         const attached = await attachExports(tools.intake, { postId: post.id, items, randomId: tools.randomId, ...(single ? { canva: { designId: p.designIds[0] } } : {}) })
         return { postId: post.id, holds: attached.holds }
       },
@@ -89,6 +93,23 @@ export async function pipelineDeps(): Promise<WorkerDeps> {
         ? `${ready.length} ${kind} draft${ready.length === 1 ? "" : "s"} ready for review${held.length ? ` (${held.length} held or failed: see Generate)` : ""}`
         : `No ${kind} draft: ${(job.note ?? "no qualifying story found").slice(0, 300)}`
       await sendDraftsReadyNotification({ recipients: [job.request.actorEmail], message, postId: ready[0]?.postId ?? job.noContentPostId ?? "", title: ready[0] ? `${ready.length} drafts ready` : drafts.length ? `${kind} drafts` : `No new ${kind} content` })
+    },
+    // An ICYMI roundup with more stories than it takes: the requester chooses on the draft, in the Admin.
+    askChoice: async (job: McuJob, draft: McuDraft) => {
+      const [{ postSlackNotice }, { createUnifiedTask }] = await Promise.all([import("@/lib/owned-meta-slack"), import("@/lib/firestore-crm")])
+      const path = `/admin/content?icymiDraft=${encodeURIComponent(draft.id)}`, url = `${process.env.NEXT_PUBLIC_SITE_URL || "https://www.434media.com"}${path}`
+      const n = draft.story.roundup?.length ?? 0, { min, max } = draft.choice ?? { min: 3, max: 5 }
+      const message = `${BRAND.name} ICYMI: ${n} published stories qualify; choose ${min}–${max} for the roundup on ${draft.id}`
+      const task = await createUnifiedTask({
+        title: `Choose the ICYMI stories (${draft.id})`, description: `${message}.\n\nOpen the draft in the Admin to choose: ${url}`,
+        assigned_to: job.request.actorName || "Unassigned", assigned_by: "Content pipeline",
+        status: "not_started", priority: "high", due_date: new Date().toISOString().slice(0, 10), web_links: [url], tags: ["content-pipeline", "icymi"],
+      }).catch(err => { console.error("[content-pipeline] choice task failed", draft.id, err instanceof Error ? err.message : err); return null })
+      await Promise.all([
+        postSlackNotice(`${message}: ${url}`, process.env.OWNED_META_SLACK_WEBHOOK_URL),
+        sendDraftsReadyNotification({ recipients: [job.request.actorEmail], message, postId: task?.id ?? "", title: `Choose the ICYMI stories`, link: path }),
+      ])
+      return task ? { taskId: task.id } : {}
     },
   }
 }

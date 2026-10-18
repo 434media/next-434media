@@ -54,7 +54,8 @@ test("the Generate panel's templates come from the profile, as they were in code
     { kind: "news", label: "News", templates: ["EAHXWo1LiF8"], detail: "One story, one card" },
     { kind: "breaking", label: "Breaking News", templates: ["EAHXZAbAA8s"], detail: "Primary source in the last 24 hours" },
     { kind: "dt101", label: "Defense Tech 101", templates: ["EAHYOAJhC_8"], detail: "Benefit-led card, mission-brief caption" },
-    { kind: "icymi", label: "ICYMI roundup", templates: ["EAHXZPgjqSY", "EAHXZJnAT0o"], detail: "Cover + five published stories" },
+    // Since profile 1.2.0 an ICYMI roundup fills only its cover; its stories are their published cards (founder, 2026-10-18).
+    { kind: "icymi", label: "ICYMI roundup", templates: ["EAHXZPgjqSY"], detail: "Cover + 3–5 published story cards" },
   ])
   assert.ok(PIPELINE_PROPERTIES.filter(p => p.active).every(p => !profileProblems(p.id).length))
 })
@@ -104,8 +105,8 @@ test("the MilCityUSA profile carries the founder's rulings of 2026-10-18", () =>
     assert.doesNotMatch(text, /SEND SUPPLIES\. \/ NOT A DRIVER\.|FIRE\. \/ RELOCATE\./)
     assert.doesNotMatch(text, /both lines end with a period|a period at the end of every line|punctuated the same way/)
   }
-  // The journalism rule, for every template's front card, ICYMI story cards excepted.
-  assert.match(p.headlineRules ?? "", /Every headline and hook on the front of a card, in every template \(ICYMI story cards excepted, below\), is compelling journalism/)
+  // The journalism rule, for every template's front card, ICYMI excepted (since 1.2.0: its cover headline is fixed).
+  assert.match(p.headlineRules ?? "", /Every headline and hook on the front of a card, in every template \(ICYMI excepted, below\), is compelling journalism/)
   assert.match(p.headlineRules ?? "", /Passing the checks is the floor, not the goal/)
   // The originality limits as built: rewritten at 5+ words (headline) and 13+ (caption).
   assert.equal(p.checks?.originality?.headlineMaxRun, 4); assert.equal(p.checks?.originality?.captionMaxRun, 12)
@@ -139,5 +140,26 @@ test("the MilCityUSA profile turns the checks on and prompts the writer with the
   const p = loadProfile("milcity")
   assert.equal(p.checks?.headline?.enabled, true); assert.equal(p.checks?.originality?.headlineMaxRun, 4); assert.equal(p.checks?.originality?.captionMaxRun, 12)
   assert.match(p.headlineRules ?? "", /^HEADLINES, DECKS AND ORIGINALITY/)
-  assert.match(p.headlineRules ?? "", /ICYMI story cards are the one exception/)
+  assert.match(p.headlineRules ?? "", /ICYMI is the one exception: its cover headline is a fixed line, and each story after the cover is the card MilCityUSA already published, reused as it is/)
+})
+
+test("the simpler ICYMI is in the profile: a fixed cover headline, 3 to 5 stories, and both keys validated (founder, 2026-10-18)", () => {
+  const p = loadProfile("milcity")
+  assert.equal(p.profileVersion, "1.2.0"); assert.equal(p.rulesVersion, "mcu-rules-2026-10-18.2")
+  const headline = SERIES.icymi_cover.fields.find(f => f.name === "headline")!
+  assert.equal(headline.fixed, "TOP DEFENSE DEVELOPMENTS"); assert.equal(headline.serverFilled, undefined)
+  const icymi = p.requestKinds.find(k => k.kind === "icymi")!
+  assert.deepEqual([icymi.series, icymi.minStories, icymi.maxStories], [["icymi_cover"], 3, 5])
+  assert.ok(SERIES.icymi_story) // kept for drafts made before 1.2.0
+  assert.match(p.editorial, /three to five MCU News or Breaking stories already published in the previous week/)
+  // A fixed value is text, set by the server: never with serverFilled, allowed or date, and at most 60 characters.
+  const fixedBad = clone(); ((fixedBad.series as Record<string, { fields: Record<string, unknown>[] }>).icymi_cover.fields[0]).serverFilled = true
+  assert.match(validateProfile(fixedBad).join("; "), /series\.icymi_cover\.fields\[0\]\.fixed: 1–60 characters, not with serverFilled, allowed or date/)
+  const fixedLong = clone(); ((fixedLong.series as Record<string, { fields: Record<string, unknown>[] }>).icymi_cover.fields[0]).fixed = "X".repeat(61)
+  assert.match(validateProfile(fixedLong).join("; "), /fixed: 1–60 characters/)
+  // A roundup's size comes as a pair, 1–10, the minimum at most the maximum.
+  const at = (c: Record<string, unknown>) => (c.requestKinds as Record<string, unknown>[]).find(k => k.kind === "icymi")!
+  const lone = clone(); delete at(lone).maxStories
+  const upside = clone(); at(upside).minStories = 6
+  for (const c of [lone, upside]) assert.match(validateProfile(c).join("; "), /minStories and maxStories together, 1–10, minStories at most maxStories/)
 })

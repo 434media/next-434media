@@ -106,7 +106,9 @@ export function NotificationsPopover() {
   const items = tab === "new" ? notifications : notificationHistory
 
   const handleClick = (n: Notification) => {
-    if (n.task_id) {
+    if (n.link?.startsWith("/admin/")) {
+      router.push(n.link)
+    } else if (n.task_id) {
       if (n.is_content_post) {
         // Content posts live on the standalone /admin/content route now; deep-link
         // straight to the post via ?openContent= (the page reads it on load).

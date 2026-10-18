@@ -7,10 +7,11 @@
  */
 import { test } from "node:test"
 import assert from "node:assert/strict"
-import { SERIES, checkFields, clippedWords, ddmmmyy, lineCount, type SeriesKey } from "../content-pipeline/series"
-import { runDue, RETRY_MS, exactTime, zonedDay, icymiStory, icymiWindow, staleSource, allowsRepresentative, sameSubject, makerOf, searchedPageUsable, unsourcedNumbers, withCredits, imageLabel, mediaQueries, cropFit, choosePhoto, zoomCrop, reviewNotes, DOD_NOTICE, LEASE_MS, type WorkerDeps, type DesignInput, type PostInput, type NoContentInput } from "../content-pipeline/worker"
+import { SERIES, checkFields, clippedWords, ddmmmyy, fitLines, lineCount, measure, normalizeFields, overLimits, type SeriesKey } from "../content-pipeline/series"
+import { runDue, chooseRoundup, MAX_FIT_ATTEMPTS, RETRY_MS, exactTime, zonedDay, icymiStory, icymiWindow, staleSource, allowsRepresentative, sameSubject, makerOf, searchedPageUsable, unsourcedNumbers, withCredits, imageLabel, mediaQueries, cropFit, choosePhoto, zoomCrop, reviewNotes, DOD_NOTICE, LEASE_MS, type WorkerDeps, type DesignInput, type PostInput, type NoContentInput } from "../content-pipeline/worker"
 import { firestorePipelineStore } from "../firestore-content-pipeline"
 import { MAX_ATTEMPTS, type McuDraft, type McuJob, type McuStore } from "../content-pipeline/store"
+import type { PostRow } from "../content-pipeline/worker"
 import { archiveRelevant, assertPublicHttps, federalHost, guardedFetch, isOutlet, siteOrg, imageSize, pageImageCandidate, parsePage, searchNasa, searchOpenverse, usableLicense, type MediaCandidate } from "../content-pipeline/sources"
 import { brandDirection, isPhotoDefect, meaningful, readPick, searchResultUrls, servedBy, servedCall, type McuAi, type ModelCall } from "../content-pipeline/model"
 import { PIPELINE_MODELS, FALLBACK_MODELS, CALL_FALLBACK, callOptions, outputBudget } from "../content-pipeline/models"
@@ -805,27 +806,6 @@ function onlyDraftShape(): McuDraft {
   return { id: "x", jobId: "x", kind: "news", placement: "feed", request: { actorEmail: "a@b.c", actorName: "A" }, status: "in_review", version: 1, story: { title: "", primaryUrl: "", publisher: "", sourceTitle: "", sourceText: "" }, frames: [], media: [], designs: [], qa: [], notices: [], history: [], createdAt: new Date(NOW).toISOString(), updatedAt: new Date(NOW).toISOString() }
 }
 
-test("ICYMI: DT101 posts are not recapped; each card's photo is its own story's; the cover reuses the lead story's photo", async () => {
-  const posted = (n: number, over: Partial<{ title: string; caption: string }> = {}) => ({ id: `p${n}`, title: over.title ?? `MCU-NEWS-2026101${n}-01 v1 — STORY ${n}`, status: "posted", publishedUrl: `https://www.instagram.com/milcityusa/p/${n}/`, caption: over.caption ?? `Story ${n} caption. Source: U.S. Army, 2026-10-1${n}`, publishedAt: `2026-10-${String(12 - n).padStart(2, "0")}T15:00:00Z` }) // in the previous week, newest first
-  const subjects: string[] = []
-  const w = world({ ai: {
-    write: async () => ({ frames: [{ series: "icymi_cover" as SeriesKey, fields: { headline: "Week in defense", story_01: "One", story_02: "Two", story_03: "Three", story_04: "Four", story_05: "Five" } }, ...[1, 2, 3, 4, 5].map(n => ({ series: "icymi_story" as SeriesKey, fields: { headline: `Story ${n}`, deck: `Deck ${n}.` } }))], caption: "Roundup.\n\nSource: MilCityUSA" }),
-    pickMedia: async ({ story, candidates }) => { subjects.push(story.title); return { index: 0, reason: "ok", ranked: [{ index: 0, box: HERO }], ...(candidates.length ? {} : {}) } },
-  } })
-  w.deps.content.recentPosts = async () => [posted(1, { title: "ULTRA explainer", caption: "MISSION BRIEF // ULTRA\n\n//Overland AI" }), posted(2), posted(3), posted(4), posted(5), posted(6)]
-  const fetched: string[] = []
-  const fetchPage = w.deps.fetchPage
-  w.deps.fetchPage = async url => { fetched.push(url); return fetchPage(url) }
-  w.deps.searchCommons = async q => [{ ...CANDIDATE, url: `https://upload.wikimedia.org/${encodeURIComponent(q)}.jpg`, thumbUrl: `https://upload.wikimedia.org/t/${encodeURIComponent(q)}.jpg`, pageUrl: `https://commons.wikimedia.org/wiki/File:${encodeURIComponent(q)}` }]
-  await w.start({ kind: "icymi" })
-  const d = onlyDraft(w)
-  assert.deepEqual(d.story.roundup!.map(r => r.postId), ["p2", "p3", "p4", "p5", "p6"]) // the DT101 mission brief is left out
-  assert.deepEqual(subjects, ["STORY 2", "STORY 3", "STORY 4", "STORY 5", "STORY 6"]) // one pick per story card; none for the cover
-  assert.ok(!fetched.some(u => new URL(u).hostname === "www.instagram.com")) // a social post's image is never a photo source
-  assert.equal(d.media[0]!.pageUrl, d.media[1]!.pageUrl) // the cover shows the lead story's photo
-  assert.equal(new Set(d.media.slice(1).map(m => m!.pageUrl)).size, 5)
-  assert.equal(d.status, "in_review"); assert.equal(w.designs.length, 6)
-})
 
 test("a redirect to plain http is followed over https, and a blocked hop is named", async () => {
   const check = (raw: string) => assertPublicHttps(raw, async () => ["93.184.216.34"])
@@ -904,23 +884,6 @@ test("ICYMI window: the previous Monday-to-Sunday week in Chicago, or the last N
   assert.equal(wide.endMs - wide.startMs, 14 * 864e5); assert.equal(wide.label, "the last 14 days")
 })
 
-test("ICYMI: four stories make a cover and four cards, counted of four; the unused cover slot is blanked, with a notice", async () => {
-  const p = (n: number, at: string) => ({ id: `p${n}`, title: `MCU-NEWS-20261009-0${n} v1 — STORY ${n}`, status: "posted", publishedUrl: `https://www.instagram.com/milcityusa/p/${n}/`, caption: `Story ${n} caption.\n\nSource: U.S. Army, 2026-10-09`, publishedAt: at })
-  let fieldsAsked: string[] = []
-  const w = world({ ai: { write: async i => { fieldsAsked = [String(i.story.roundup?.length)]; return { frames: [{ series: "icymi_cover" as SeriesKey, fields: { headline: "Four defense developments", story_01: "One", story_02: "Two", story_03: "Three", story_04: "Four" } }, ...[1, 2, 3, 4].map(n => ({ series: "icymi_story" as SeriesKey, fields: { headline: `Story ${n}`, deck: `Deck ${n}.` } }))], caption: "Roundup.\n\nSource: MilCityUSA" } } } })
-  w.deps.content.recentPosts = async () => [p(1, "2026-10-10T15:00:00Z"), p(2, "2026-10-09T15:00:00Z"), p(3, "2026-10-09T14:00:00Z"), p(4, "2026-10-09T13:00:00Z"), { ...p(5, "2026-09-20T13:00:00Z"), title: "Too old" }, { ...p(6, "2026-10-08T13:00:00Z"), title: "MCU-NEWS-20261009-01 v1 — STORY 1" }]
-  w.deps.icymiWindow = async () => ({ lookbackDays: 14 })
-  w.deps.searchCommons = async q => [{ ...CANDIDATE, url: `https://upload.wikimedia.org/${encodeURIComponent(q)}.jpg`, thumbUrl: `https://upload.wikimedia.org/t/${encodeURIComponent(q)}.jpg`, pageUrl: `https://commons.wikimedia.org/wiki/File:${encodeURIComponent(q)}` }]
-  await w.start({ kind: "icymi" })
-  const d = onlyDraft(w)
-  assert.equal(fieldsAsked[0], "4"); assert.deepEqual(d.story.roundup!.map(r => r.postId), ["p1", "p2", "p3", "p4"]) // newest first; the old one and the repeat left out
-  assert.equal(d.status, "in_review"); assert.equal(d.frames.length, 5); assert.deepEqual(d.frames.slice(1).map(f => f.fields.counter), ["01 / 04", "02 / 04", "03 / 04", "04 / 04"])
-  assert.equal(w.designs.length, 5); assert.equal(w.designs[0].text.story_05, " "); assert.equal(w.designs[0].text.story_04, "Four")
-  assert.ok(d.notices.some(n => /ICYMI cover: 4 of 5 story slots used/.test(n)))
-  // Previous week only (the default): the same posts give nothing for a Friday in the week after next.
-  const none = icymiStory([p(1, "2026-10-10T15:00:00Z")], icymiWindow(Date.parse("2026-10-23T18:00:00Z"), null))
-  assert.ok("hold" in none)
-})
 
 // ── Phase 1b, gate round 3 (production, 2026-10-17 19:53Z: none reached Review) ──
 test("a subject switch rewrites everything: the old subject's copy never survives, and copy about another subject is rewritten", async () => {
@@ -959,33 +922,6 @@ test("the store replaces a draft on save, so a cleared field is cleared in Fires
   assert.equal("caption" in ((calls[0].data as { draft: Record<string, unknown> }).draft), false)
 })
 
-test("ICYMI story cards reuse the photo recorded on their published post, with its rights as approved; links are never read", async () => {
-  const DVIDS = (n: number) => `https://www.dvidshub.net/image/95000${n}/story-${n}`
-  // Post 1 was written by the pipeline with company media; someone has since appended a DVIDS page to its links.
-  const record = { url: "https://www.overland.ai/media/ultra.jpg", pageUrl: "https://www.overland.ai/press/ultra", title: "ULTRA on test", license: "Official company media", creator: "Overland AI", credit: "Overland AI (courtesy)", usGovernment: false, rightsNote: "Company media from www.overland.ai: confirm its terms allow editorial use before approving" }
-  const post = (n: number, media?: typeof record) => ({ id: `p${n}`, title: `MCU-NEWS-20261009-0${n} v1 — STORY ${n}`, status: "posted", publishedUrl: `https://www.instagram.com/milcityusa/p/${n}/`, publishedAt: `2026-10-0${9 - n}T15:00:00Z`,
-    caption: `Story ${n} caption.\n\nSource: U.S. Army, 2026-10-09\n\nImage: U.S. Army photo by Spc. ${n}\n\n${DOD_NOTICE}`, links: [`https://www.army.mil/article/${n}`, DVIDS(n)], ...(media ? { media: [media] } : {}) })
-  const searched: string[] = [], pages: string[] = [], images: string[] = []
-  const w = world({ ai: { write: async () => ({ frames: [{ series: "icymi_cover" as SeriesKey, fields: { headline: "Two Army stories", story_01: "One", story_02: "Two" } }, ...[1, 2].map(n => ({ series: "icymi_story" as SeriesKey, fields: { headline: `Story ${n}`, deck: `Deck ${n}.` } }))], caption: "Roundup.\n\nSource: MilCityUSA" }) } })
-  w.deps.content.recentPosts = async () => [post(1, record), post(2)]
-  const big = new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x04, 0, 0, 0xff, 0xc0, 0x00, 0x11, 0x08, 0x07, 0xd0, 0x0b, 0xb8, 0x03, 0, 0, 0, 0]) // 3000 × 2000
-  w.deps.fetchImage = async url => { images.push(url); return { bytes: big, mime: "image/jpeg" } }
-  w.deps.fetchPage = async url => { pages.push(url); return url.startsWith("https://www.dvidshub.net/") ? { url, title: "Soldiers", text: "", image: "https://d1ldvf68ux039x.cloudfront.net/x.jpg", description: "(U.S. Army photo by Spc. 9)" } : { url, title: "t", text: ARMY_TEXT } }
-  w.deps.searchCommons = async q => { searched.push(q); return [{ ...CANDIDATE, pageUrl: `https://commons.wikimedia.org/wiki/File:${encodeURIComponent(q)}`, url: `https://upload.wikimedia.org/${encodeURIComponent(q)}.jpg`, thumbUrl: `https://upload.wikimedia.org/t/${encodeURIComponent(q)}.jpg` }] }
-  await w.start({ kind: "icymi" })
-  const d = onlyDraft(w)
-  assert.equal(d.status, "in_review")
-  const m = d.media[1]!
-  assert.equal(m.url, record.url); assert.equal(m.pageUrl, record.pageUrl); assert.ok(images.includes(record.url)) // exactly the recorded image
-  assert.equal(m.license, "Official company media"); assert.equal(m.credit, "Overland AI (courtesy)"); assert.equal(m.usGovernment, false) // never relabelled
-  assert.match(m.note!, /confirm its terms allow editorial use before approving\. Reused from the published post p1/) // the original note is kept
-  assert.ok(!pages.some(u => u.startsWith("https://www.dvidshub.net/"))) // the editable links were never fetched
-  assert.equal(d.media[0]!.url, record.url) // the cover shows the lead story's photo
-  assert.match(d.media[2]!.note!, /has no recorded photo, so this one was searched for: check it against p2/)
-  assert.ok(searched.length > 0 && searched.every(q => !/Story 1\b/.test(q))) // only story 2 was searched for
-  // The roundup's own post records its photos too, for the reviewer and any later reuse.
-  assert.equal(w.posts[0].media[0].url, record.url); assert.equal(w.posts[0].media.length, 3)
-})
 
 test("a pipeline post records the photo it used, with its rights, as pipeline_media", async () => {
   const w = world()
@@ -1039,4 +975,211 @@ test("an official page that refuses the fetch is read through the search tool's 
   await v.start({ kind: "news" })
   assert.deepEqual(read, [GOV]) // nothing new was read through the search
   assert.match((await v.store.getJob("job-news-1"))!.note!, /news outlet's article, not the primary source; http_500 at https:\/\/www\.army\.mil\/article\/5/)
+})
+
+// ── Phase 1c, gate round 5 (production 5e42ad8, 2026-10-18: text on Claude Haiku 5.5) ──
+// The simpler ICYMI (founder, 2026-10-18): one new cover with the fixed headline, then each chosen story's own
+// published card exactly as posted; 3 to 5 of the previous week's News and Breaking posts; more than 5 waits for the
+// requester's choice; fewer than 3 makes a no-content card.
+const ROUNDUP_CAPTION = "This week's top defense developments, in one place.\n\nSource: MilCityUSA"
+/** A published News post in the previous week (the week of 2026-10-05 for NOW), newest first by n, with its staged card. */
+const published = (n: number, over: Partial<PostRow> = {}): PostRow => ({ id: `p${n}`, title: `MCU-NEWS-2026100${Math.min(9, n)}-01 v1 — STORY ${n}`, status: "posted", publishedUrl: `https://www.instagram.com/milcityusa/p/${n}/`, caption: `Story ${n} caption.\n\nSource: U.S. Army, 2026-10-0${Math.min(9, n)}`, publishedAt: `2026-10-${String(12 - n).padStart(2, "0")}T15:00:00Z`, card: { url: `https://blob.example/content-posts/p${n}-01-page-1.jpg`, sha256: `sha-${n}` }, ...over })
+/** A writer that answers only for the cover: one row per story. */
+const coverWriter = (rows: (n: number) => string = n => `Story ${n} in one row`) => async (i: { story: { roundup?: unknown[] }; fit?: string[] }) => ({ frames: [{ series: "icymi_cover" as SeriesKey, fields: Object.fromEntries((i.story.roundup ?? []).map((_, k) => [`story_0${k + 1}`, rows(k + 1)])) }], caption: ROUNDUP_CAPTION })
+
+test("ICYMI with 4 eligible posts: one cover with the fixed headline and four rows, then the four published cards as they were posted, in order", async () => {
+  const writes: { fit?: string[]; frames?: number }[] = [], picks: string[] = [], checked: string[] = []
+  const w = world({ ai: {
+    write: async i => { writes.push({ ...(i.fit ? { fit: i.fit } : {}) }); return coverWriter()(i) },
+    pickMedia: async ({ story }) => { picks.push(story.title); return { index: 0, reason: "ok", ranked: [{ index: 0, box: HERO }] } },
+    checkArtwork: async ({ frame }) => { checked.push(frame.series); return [] },
+  } })
+  // A DT101 mission brief, an older post, a repeat title and a post with no staged card are left out.
+  w.deps.content.recentPosts = async () => [published(1), published(2), published(3), published(4), published(5, { title: "ULTRA explainer", caption: "MISSION BRIEF // ULTRA\n\n//Overland AI" }), published(6, { publishedAt: "2026-09-20T13:00:00Z" }), published(7, { title: published(1).title }), published(8, { card: undefined })]
+  await w.start({ kind: "icymi" })
+  const d = onlyDraft(w)
+  assert.equal(d.status, "in_review")
+  assert.deepEqual(d.story.roundup!.map(r => r.postId), ["p1", "p2", "p3", "p4"])
+  // Only the cover is written, filled in Canva and checked; nothing is written, photographed or checked per story.
+  assert.equal(d.frames.length, 1); assert.equal(d.frames[0].series, "icymi_cover"); assert.equal(writes.length, 1)
+  assert.equal(w.designs.length, 1); assert.deepEqual(checked, ["icymi_cover"]); assert.equal(picks.length, 1)
+  const cover = w.designs[0].text
+  assert.equal(cover.headline, "TOP DEFENSE DEVELOPMENTS") // the profile's fixed value, never the model's
+  assert.deepEqual([cover.story_01, cover.story_04, cover.story_05], ["Story 1 in one row", "Story 4 in one row", " "]) // the unused slot is blanked
+  assert.ok(d.notices.some(n => /ICYMI cover: 4 of 5 story slots used/.test(n)))
+  // The board write: the cover's export, then each story's own staged card, exactly as posted, in order.
+  assert.equal(w.posts.length, 1)
+  assert.deepEqual(w.posts[0].designIds, [d.designs[0].designId])
+  assert.deepEqual(w.posts[0].slides, [1, 2, 3, 4].map(n => ({ url: `https://blob.example/content-posts/p${n}-01-page-1.jpg`, label: `story-${n}` })))
+  assert.ok([1, 2, 3, 4].every(n => w.posts[0].links.includes(`https://www.instagram.com/milcityusa/p/${n}/`)))
+  assert.match(w.posts[0].notes, /Story slides \(each story's published card, reused exactly as posted\)\n1\. MCU-NEWS-20261001-01 v1 — STORY 1 — post p1/)
+  // The window is unchanged: the same posts give nothing for a Friday in the week after next.
+  assert.ok("hold" in icymiStory([published(1)], icymiWindow(Date.parse("2026-10-23T18:00:00Z"), null)))
+})
+
+test("ICYMI with 2 eligible posts: no roundup; a no-content card says why (coordinator's assumption, for the founder to confirm)", async () => {
+  const w = world({ ai: { write: async () => { throw new Error("nothing is written") } } })
+  w.deps.content.recentPosts = async () => [published(1), published(2)]
+  await w.start({ kind: "icymi" })
+  assert.equal(w.store.drafts.size, 0); assert.equal(w.posts.length, 0); assert.equal(w.designs.length, 0)
+  assert.equal(w.notices.length, 1)
+  assert.match(w.notices[0].reason, /^only 2 MCU News or Breaking stories with a published card were published in the week of 2026-10-05, and an ICYMI takes at least 3, so there is no ICYMI$/)
+  const j = (await w.store.getJob("job-icymi-1"))!
+  assert.equal(j.status, "held"); assert.equal(j.noContentPostId, "notice-1"); assert.equal(w.alerts.length, 1)
+})
+
+test("ICYMI with 7 eligible posts: the draft waits for the requester's choice, with an alert and a task; a choice of 3–5 then runs it", async () => {
+  const asked: { job: McuJob; draft: McuDraft }[] = []
+  const w = world({ ai: { write: coverWriter() } })
+  w.deps.content.recentPosts = async () => [1, 2, 3, 4, 5, 6, 7].map(n => published(n))
+  w.deps.askChoice = async (job, draft) => { asked.push({ job, draft }); return { taskId: "task-1" } }
+  await w.start({ kind: "icymi" })
+  let d = onlyDraft(w)
+  assert.equal(d.status, "choosing"); assert.equal(d.story.roundup!.length, 7); assert.deepEqual(d.choice, { min: 3, max: 5, taskId: "task-1" })
+  assert.equal(asked.length, 1); assert.equal(asked[0].draft.id, d.id)
+  assert.equal(w.designs.length, 0); assert.equal(w.posts.length, 0)
+  assert.equal(w.alerts.length, 0) // no "drafts ready" until it has run
+  assert.match((await w.store.getJob("job-icymi-1"))!.note!, /7 published stories qualify: choose 3–5 of them on the ICYMI draft/)
+  assert.equal(await runDue(w.deps, 1e9), 0) // nothing runs while it waits
+  // Refused: too many, too few, a repeat, a story not offered, a draft not waiting.
+  const at = new Date(NOW).toISOString()
+  assert.deepEqual(await chooseRoundup(w.store, d.id, ["p1", "p2", "p3", "p4", "p5", "p6"], "marcos@434media.com", at), { error: "Choose 3–5 stories" })
+  assert.deepEqual(await chooseRoundup(w.store, d.id, ["p1", "p2"], "marcos@434media.com", at), { error: "Choose 3–5 stories" })
+  assert.deepEqual(await chooseRoundup(w.store, d.id, ["p1", "p1", "p2"], "marcos@434media.com", at), { error: "Choose stories offered on this draft, each once" })
+  assert.deepEqual(await chooseRoundup(w.store, d.id, ["p1", "p2", "p9"], "marcos@434media.com", at), { error: "Choose stories offered on this draft, each once" })
+  // Chosen out of order: the roundup keeps the posts' order (newest first).
+  assert.deepEqual(await chooseRoundup(w.store, d.id, ["p6", "p2", "p4", "p3"], "marcos@434media.com", at), { ok: true })
+  assert.deepEqual(await chooseRoundup(w.store, d.id, ["p1", "p2", "p3"], "marcos@434media.com", at), { error: "This draft is not waiting for a choice" })
+  await runDue(w.deps, 1e9)
+  d = onlyDraft(w)
+  assert.equal(d.status, "in_review"); assert.deepEqual(d.story.roundup!.map(r => r.postId), ["p2", "p3", "p4", "p6"])
+  assert.equal(d.choice!.chosenBy, "marcos@434media.com"); assert.match(d.story.sourceTitle, /^4 published MCU stories from the week of 2026-10-05$/)
+  assert.deepEqual(w.posts[0].slides!.map(x => x.url), [2, 3, 4, 6].map(n => `https://blob.example/content-posts/p${n}-01-page-1.jpg`))
+  assert.equal(w.designs[0].text.headline, "TOP DEFENSE DEVELOPMENTS"); assert.equal(w.designs[0].text.story_04, "Story 4 in one row"); assert.equal(w.designs[0].text.story_05, " ")
+  assert.match(w.posts[0].notes, /Chosen by marcos@434media\.com/)
+  assert.equal(w.alerts.length, 1); assert.match((await w.store.getJob("job-icymi-1"))!.note!, /4 stories chosen by marcos@434media\.com/)
+})
+
+test("the ICYMI cover reuses a story's recorded photo with its rights as approved; links are never read; with none, only the lead story is searched", async () => {
+  const record = { url: "https://www.overland.ai/media/ultra.jpg", pageUrl: "https://www.overland.ai/press/ultra", title: "ULTRA on test", license: "Official company media", creator: "Overland AI", credit: "Overland AI (courtesy)", usGovernment: false, rightsNote: "Company media from www.overland.ai: confirm its terms allow editorial use before approving" }
+  const pages: string[] = [], searched: string[] = []
+  const w = world({ ai: { write: coverWriter() } })
+  // The lead story has no record; the second does. Someone has appended a DVIDS page to every post's links.
+  w.deps.content.recentPosts = async () => [published(1), published(2, { media: [record] }), published(3)]
+  w.deps.fetchPage = async url => { pages.push(url); return { url, title: "t", text: ARMY_TEXT } }
+  w.deps.searchCommons = async q => { searched.push(q); return [CANDIDATE] }
+  const big = new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x04, 0, 0, 0xff, 0xc0, 0x00, 0x11, 0x08, 0x07, 0xd0, 0x0b, 0xb8, 0x03, 0, 0, 0, 0]) // 3000 × 2000
+  w.deps.fetchImage = async () => ({ bytes: big, mime: "image/jpeg" })
+  await w.start({ kind: "icymi" })
+  const d = onlyDraft(w)
+  assert.equal(d.status, "in_review")
+  assert.equal(d.media[0]!.url, record.url); assert.equal(d.media[0]!.license, "Official company media"); assert.equal(d.media[0]!.usGovernment, false)
+  assert.match(d.media[0]!.note!, /confirm its terms allow editorial use before approving\. Reused from the published post p2/)
+  assert.equal(pages.length, 0); assert.equal(searched.length, 0) // nothing fetched or searched
+  // No story has a record: the cover's photo is searched for the lead story only, and the reviewer is told.
+  const w2 = world({ ai: { write: coverWriter(), pickMedia: async ({ story }) => { searched.push(story.title); return { index: 0, reason: "ok", ranked: [{ index: 0, box: HERO }] } } } })
+  w2.deps.content.recentPosts = async () => [published(1), published(2), published(3)]
+  searched.length = 0
+  await w2.start({ kind: "icymi" })
+  const d2 = onlyDraft(w2)
+  assert.equal(d2.status, "in_review"); assert.deepEqual(searched, ["STORY 1"])
+  assert.match(d2.media[0]!.note!, /No story's published post has a recorded photo, so the cover's was searched for: check it against p1/)
+})
+
+// Fitting copy (gate round 5). Seasats Lightfish (MCU-DT101-20261018-04) and Anduril EagleEye (-06) were held with
+// "Benefit hook: each line at most 16 characters" after two rewrites. Their exact hooks were not recorded outside
+// Firestore, so these inputs reconstruct the shape of the failure: a good hook a few characters past 16 on a line.
+const LIGHTFISH_TEXT = "SAN DIEGO — Seasats builds the Lightfish, a solar-powered autonomous surface vessel that patrols coastal waters for weeks without a crew. The Lightfish carries cameras and sensors and reports what it sees by satellite. The U.S. Navy has tested Lightfish vessels in exercises this year. ".repeat(4)
+const LIGHTFISH_BRIEF = "MISSION BRIEF // LIGHTFISH\n\n//Seasats\n\n📍San Diego, CA\n\nTech: Autonomous surface vessel\n\nPlatform: Solar-powered boat\n\nGoal: Watch coastal waters without a crew aboard.\n\nSource: Seasats, 2026-10-16"
+const EAGLEEYE_TEXT = "COSTA MESA, Calif. — Anduril's EagleEye is a mixed-reality helmet system that shows each soldier the same picture of the fight: drones, sensors and teammates on one display. The Army is testing EagleEye with infantry squads. ".repeat(4)
+const EAGLEEYE_BRIEF = "MISSION BRIEF // EAGLEEYE\n\n//Anduril\n\n📍Costa Mesa, CA\n\nTech: Mixed-reality helmet\n\nPlatform: Soldier-worn display\n\nGoal: Give every soldier one shared picture of the battle.\n\nSource: Anduril, 2026-10-16"
+type WriteIn = Parameters<McuAi["write"]>[0]
+function dt101World(subject: { title: string; text: string; brief: string; line: string }, hook: (i: WriteIn, n: number) => string, extra: Partial<McuAi> = {}) {
+  const writes: WriteIn[] = []
+  const w = world({ ai: {
+    research: async () => ({ candidates: [{ title: subject.title, primaryUrl: "https://example.com/product", publisher: subject.line.split(" / ")[1], why: "dt101" }] }),
+    write: async i => { writes.push(structuredClone(i)); return { frames: [{ series: "dt101" as SeriesKey, fields: { benefit_headline: hook(i, writes.length), subject_identifier: i.fit ? "SOMETHING ELSE / ANOTHER MAKER" : subject.line } }], caption: i.fit ? "A caption the fit pass must not take." : subject.brief } },
+    ...extra,
+  } })
+  w.deps.fetchPage = async url => ({ url, title: subject.title, text: subject.text, publishedAt: "2026-10-16T09:00:00Z" })
+  return { ...w, writes }
+}
+const LIGHTFISH = { title: "Seasats Lightfish autonomous surface vessel", text: LIGHTFISH_TEXT, brief: LIGHTFISH_BRIEF, line: "LIGHTFISH / SEASATS" }
+const EAGLEEYE = { title: "Anduril EagleEye mixed-reality helmet", text: EAGLEEYE_TEXT, brief: EAGLEEYE_BRIEF, line: "EAGLEEYE / ANDURIL" }
+
+test("round 5, Seasats Lightfish: a rewrite is told the measured line; the shortening-only fit then fits the hook, and nothing else changes", async () => {
+  // Three answers a few characters over that no line break can fix (as Haiku's were), then a fit that does.
+  const w = dt101World(LIGHTFISH, (i, n) => i.fit ? "It patrols seas\nwith no crew" : n === 1 ? "Solar power keeps\nit on patrol" : "It patrols for weeks\nwith no crew")
+  await w.start({ kind: "dt101" })
+  const d = onlyDraft(w)
+  assert.equal(d.status, "in_review", d.holdReason)
+  assert.equal(d.frames[0].fields.benefit_headline, "IT PATROLS SEAS\nWITH NO CREW")
+  // The rewrite named the limit, the measured length and the overflowing line.
+  assert.ok(w.writes[1].problems!.includes('Benefit hook: each line at most 16 characters, counting letters, spaces and punctuation; line 1 "SOLAR POWER KEEPS" is 17, 1 over'))
+  assert.ok(w.writes[2].problems!.includes('Benefit hook: each line at most 16 characters, counting letters, spaces and punctuation; line 1 "IT PATROLS FOR WEEKS" is 20, 4 over'))
+  // Then one shortening-only request, about the hook alone; its other answers (subject, caption) were not taken.
+  assert.equal(w.writes.length, 4); assert.deepEqual(w.writes[3].fit, ['Benefit hook: each line at most 16 characters, counting letters, spaces and punctuation; line 1 "IT PATROLS FOR WEEKS" is 20, 4 over'])
+  assert.equal(w.writes[3].problems, undefined)
+  assert.equal(d.frames[0].fields.subject_identifier, "LIGHTFISH / SEASATS"); assert.ok(d.caption!.startsWith(LIGHTFISH_BRIEF))
+  assert.deepEqual(w.designs[0].text.benefit_headline, "IT PATROLS SEAS\nWITH NO CREW")
+})
+
+test("round 5, Anduril EagleEye: a hook whose words fit two lines with another break is re-broken, with no rewrite and no word changed", async () => {
+  const w = dt101World(EAGLEEYE, () => "One helmet shows the\nwhole fight")
+  await w.start({ kind: "dt101" })
+  const d = onlyDraft(w)
+  assert.equal(d.status, "in_review", d.holdReason); assert.equal(w.writes.length, 1)
+  assert.equal(d.frames[0].fields.benefit_headline, "ONE HELMET SHOWS\nTHE WHOLE FIGHT")
+  // One line written as a single line is set across the two, too: the break is layout, not grammar.
+  assert.equal(normalizeFields(SERIES.dt101, { benefit_headline: "It finds drones and strikes them" }).benefit_headline, "IT FINDS DRONES\nAND STRIKES THEM")
+})
+
+test("fitting never relaxes a limit or cuts a word: a longer or broken shortening is turned down, and the draft is held after the fit attempts", async () => {
+  // Every answer stays over, and the fit answers are longer, then shorter but copying the source's headline.
+  const w = dt101World(EAGLEEYE, (i, n) => !i.fit ? "Every soldier sees\nwhat the squad sees" : n === 4 ? "Every single soldier\nsees what the squad sees" : n === 5 ? "Eyes on. Squad\nsees all" : "Each soldier sees\nthe squad view")
+  await w.start({ kind: "dt101" })
+  const d = onlyDraft(w)
+  assert.equal(d.status, "held"); assert.equal(w.writes.length, 3 + MAX_FIT_ATTEMPTS)
+  // The third answer was shorter and kept, but still a character over: the draft is held on it, measured.
+  assert.match(d.holdReason!, /^the copy still breaks the template rules after two rewrites and 3 shortening attempts: Benefit hook: each line at most 16 characters, counting letters, spaces and punctuation; line 1 "EACH SOLDIER SEES" is 17, 1 over$/)
+  assert.deepEqual(w.writes[3].fit, ['Benefit hook: each line at most 16 characters, counting letters, spaces and punctuation; line 1 "EVERY SOLDIER SEES" is 18, 2 over; line 2 "WHAT THE SQUAD SEES" is 19, 3 over'])
+  assert.deepEqual(w.writes[4].fit!.slice(-1), ["the last answer was not shorter: use fewer or shorter words"])
+  assert.match(w.writes[5].fit!.slice(-1)[0], /^the last shorter version was turned down because it broke these rules: the hook ends one sentence with a period/)
+  // Nothing reaches Canva or the board, and nothing was cut to fit.
+  assert.equal(d.frames.length, 0); assert.equal(w.designs.length, 0)
+})
+
+test("a problem other than length is held as before, with no fit attempt (no change in behaviour)", async () => {
+  // A figure the source doesn't give, beside an overlong hook: the old hold, word for word, after the same 3 writes.
+  const w = dt101World({ ...LIGHTFISH, brief: LIGHTFISH_BRIEF.replace("Watch coastal waters", "Watch 400 miles of coast") }, () => "Solar power keeps\nit on patrol")
+  await w.start({ kind: "dt101" })
+  const d = onlyDraft(w)
+  assert.equal(d.status, "held"); assert.equal(w.writes.length, 3); assert.ok(w.writes.every(x => !x.fit))
+  assert.match(d.holdReason!, /^the copy still breaks the template rules after two rewrites: Benefit hook: each line at most 16 characters.*; these figures are not in the source: 400/)
+})
+
+test("the same fit logic for every field: a News headline past 3 lines and an ICYMI cover row past its line are shortened the same way", async () => {
+  const news = world({ ai: { write: async i => ({ frames: [{ series: "news" as SeriesKey, fields: { headline: i.fit ? "Army backs 9 C2 software vendors" : "Army backs nine command and control software vendors", deck: "Awards worth $93.6 million fund I Corps command software.", source: "ARMY.MIL" } }], caption: "The Army awarded $93.6 million to nine companies for command and control software.\n\nSource: U.S. Army, 2026-10-15" }) } })
+  await news.start({ kind: "news" })
+  const n = onlyDraft(news)
+  assert.equal(n.status, "in_review", n.holdReason); assert.equal(n.frames[0].fields.headline, "ARMY BACKS 9 C2 SOFTWARE VENDORS")
+  const row = (k: number, fit?: boolean) => k === 1 && !fit ? "Army backs nine software vendors for its I Corps command" : `Story ${k} in one row`
+  const icymi = world({ ai: { write: async i => ({ frames: [{ series: "icymi_cover" as SeriesKey, fields: Object.fromEntries((i.story.roundup ?? []).map((_, k) => [`story_0${k + 1}`, row(k + 1, !!i.fit)])) }], caption: ROUNDUP_CAPTION }) } })
+  icymi.deps.content.recentPosts = async () => [published(1), published(2), published(3)]
+  await icymi.start({ kind: "icymi" })
+  const c = onlyDraft(icymi)
+  assert.equal(c.status, "in_review", c.holdReason); assert.equal(c.frames[0].fields.story_01, "Story 1 in one row")
+  assert.ok(c.history.some(h => /copy written/.test(h.event)))
+})
+
+test("measuring as the card sets it: every character counts once, lines wrap at whole words, and a re-break keeps the words", () => {
+  assert.equal(measure("CAFÉ’S"), 6); assert.equal(measure("🛰 UP"), 4)
+  assert.deepEqual(overLimits(SERIES.dt101.fields[0], "FIRE.\nRELOCATE."), [])
+  assert.deepEqual(overLimits(SERIES.dt101.fields[0], "SEND SUPPLIES ANYWHERE.\nNOT A DRIVER."), ['Benefit hook: each line at most 16 characters, counting letters, spaces and punctuation; line 1 "SEND SUPPLIES ANYWHERE." is 23, 7 over'])
+  assert.deepEqual(overLimits(SERIES.news.fields[0], "ARMY BACKS NINE COMMAND AND CONTROL SOFTWARE VENDORS"), ['Headline runs past 3 lines (about 45 characters); shorten it: "ARMY BACKS NINE COMMAND AND CONTROL SOFTWARE VENDORS" is 52 characters and wraps to 5 lines of at most 15'])
+  assert.deepEqual(overLimits(SERIES.dt101.fields[1], "A".repeat(41)), ["Subject is 41 characters; at most 40"])
+  assert.equal(fitLines("ONE HELMET SHOWS THE\nWHOLE FIGHT", 16, 2), "ONE HELMET SHOWS\nTHE WHOLE FIGHT")
+  assert.equal(fitLines("FIRE.\nRELOCATE.", 16, 2), "FIRE.\nRELOCATE.") // the writer's break is kept when it fits
+  assert.equal(fitLines("SOLAR POWER KEEPS\nIT ON PATROL", 16, 2), null) // no break fits: the words must be shortened
+  assert.equal(fitLines("UNSTOPPABLE", 16, 2), null) // never splits a word
 })

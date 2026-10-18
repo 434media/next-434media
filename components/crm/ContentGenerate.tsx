@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react"
 import Link from "next/link"
+import { useSearchParams } from "next/navigation"
 import { Newspaper, X, Loader2, ArrowUpRight } from "lucide-react"
 import { DEFAULT_PROPERTY, PIPELINE_PROPERTIES, PROPERTY_TEMPLATES } from "@/lib/content-pipeline/properties"
 import type { RequestKind } from "@/lib/content-pipeline/series"
@@ -19,13 +20,69 @@ interface RunsResponse { seeds: { loaded: boolean; snapshot?: string }; jobs: Jo
 
 const STATUS_LABEL: Record<string, string> = {
   researching: "Researching", drafting: "Drafting", done: "Done", held: "Held", failed: "Failed",
-  queued: "Queued", writing: "Writing", media: "Finding a photo", designing: "Filling Canva", reviewing: "Checking artwork", posting: "Adding to board", in_review: "In Review",
+  choosing: "Waiting for your choice", queued: "Queued", writing: "Writing", media: "Finding a photo", designing: "Filling Canva", reviewing: "Checking artwork", posting: "Adding to board", in_review: "In Review",
 }
-const SETTLED = new Set(["done", "held", "failed", "in_review"])
+const SETTLED = new Set(["done", "held", "failed", "in_review", "choosing"])
 const kindLabel = (k: string, property = DEFAULT_PROPERTY) => PROPERTY_TEMPLATES[property]?.find(t => t.kind === k)?.label ?? k
 const propertyLabel = (id: string) => PIPELINE_PROPERTIES.find(p => p.id === id)?.label ?? id
 
+interface RoundupView { postId: string; title: string; publishedAt?: string; card?: { url: string } }
+interface ChoiceDraft { id: string; status: string; story: { roundup?: RoundupView[] }; choice?: { min: number; max: number } }
+
+// An ICYMI draft waiting for the requester's choice (more published stories qualified than a roundup takes): pick
+// min–max of them. Functional only; its look waits for the Phase 3b polish pass. Linked from the Slack alert, the
+// admin notification and the CRM task as /admin/content?icymiDraft=<id>.
+function RoundupPicker({ draftId, onDone }: { draftId: string; onDone: () => void }) {
+  const [draft, setDraft] = useState<ChoiceDraft | null>(null)
+  const [picked, setPicked] = useState<string[]>([])
+  const [error, setError] = useState<string | null>(null)
+  const [saving, setSaving] = useState(false)
+  useEffect(() => {
+    let live = true
+    fetch(`/api/admin/content-pipeline/drafts/${encodeURIComponent(draftId)}`, { cache: "no-store" })
+      .then(async r => { const data = await r.json().catch(() => ({})); if (!live) return; if (r.ok) setDraft(data.draft); else setError(data.error || "Could not read the draft") })
+      .catch(() => live && setError("Could not read the draft"))
+    return () => { live = false }
+  }, [draftId])
+  if (error && !draft) return <p className="text-xs text-red-600">{error}</p>
+  if (!draft) return <p className="text-xs text-neutral-500">Loading {draftId}…</p>
+  if (draft.status !== "choosing") return <p className="text-xs text-neutral-500">{draftId}: the stories are already chosen.</p>
+  const { min, max } = draft.choice ?? { min: 3, max: 5 }, items = draft.story.roundup ?? []
+  const toggle = (id: string) => setPicked(p => p.includes(id) ? p.filter(x => x !== id) : [...p, id])
+  const submit = async () => {
+    setSaving(true); setError(null)
+    try {
+      const r = await fetch(`/api/admin/content-pipeline/drafts/${encodeURIComponent(draftId)}`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ postIds: items.filter(p => picked.includes(p.postId)).map(p => p.postId) }) })
+      const data = await r.json().catch(() => ({}))
+      if (!r.ok) { setError(data.error || "Could not record the choice"); return }
+      onDone()
+    } catch { setError("Could not record the choice") } finally { setSaving(false) }
+  }
+  return (
+    <div className="space-y-2 rounded-md ring-1 ring-amber-200 bg-amber-50 p-2.5">
+      <p className="text-xs font-medium text-neutral-900">{draftId}: choose {min}–{max} stories for the ICYMI roundup</p>
+      <div className="space-y-1">
+        {items.map(p => (
+          <label key={p.postId} className="flex items-center gap-2 text-[11px] text-neutral-800 cursor-pointer">
+            <input type="checkbox" checked={picked.includes(p.postId)} onChange={() => toggle(p.postId)} />
+            {/* eslint-disable-next-line @next/next/no-img-element -- the post's own staged card, shown as it was posted */}
+            {p.card && <img src={p.card.url} alt="" className="w-8 h-10 object-cover rounded-sm shrink-0" />}
+            <span className="min-w-0 truncate">{p.title}{p.publishedAt ? ` · ${p.publishedAt.slice(0, 10)}` : ""}</span>
+          </label>
+        ))}
+      </div>
+      {error && <p className="text-xs text-red-600">{error}</p>}
+      <button type="button" onClick={submit} disabled={saving || picked.length < min || picked.length > max}
+        className="w-full h-8 rounded-md bg-neutral-900 text-white text-xs font-medium disabled:opacity-50">
+        Use {picked.length} {picked.length === 1 ? "story" : "stories"}
+      </button>
+    </div>
+  )
+}
+
 export function ContentGenerate({ onDraftsReady }: { onDraftsReady?: () => void }) {
+  const linked = useSearchParams()?.get("icymiDraft") ?? null
+  const [choosing, setChoosing] = useState<string | null>(null)
   const [open, setOpen] = useState(false)
   const [property, setProperty] = useState(DEFAULT_PROPERTY)
   const [kind, setKind] = useState<Kind>("dt101")
@@ -51,6 +108,8 @@ export function ContentGenerate({ onDraftsReady }: { onDraftsReady?: () => void 
 
   const active = !!runs?.jobs.some(j => !SETTLED.has(j.status) || j.drafts.some(d => !SETTLED.has(d.status)))
   useEffect(() => { void load() }, [load])
+  // Opened from the choice alert: show the picker for that draft.
+  useEffect(() => { if (linked && /^[A-Z0-9-]{10,40}$/.test(linked)) { setChoosing(linked); setOpen(true) } }, [linked])
   useEffect(() => {
     if (!open && !active) return
     const t = setInterval(load, 8000)
@@ -115,6 +174,8 @@ export function ContentGenerate({ onDraftsReady }: { onDraftsReady?: () => void 
             <button type="button" onClick={() => setOpen(false)} aria-label="Close" className="p-1 rounded text-neutral-400 hover:text-neutral-700"><X className="w-4 h-4" /></button>
           </div>
 
+          {choosing && <RoundupPicker key={choosing} draftId={choosing} onDone={() => { setChoosing(null); void load() }} />}
+
           <div className="space-y-3">
             <div className="space-y-1">
               <label className="text-xs font-medium text-neutral-700" htmlFor="gen-property">Property</label>
@@ -141,7 +202,7 @@ export function ContentGenerate({ onDraftsReady }: { onDraftsReady?: () => void 
             <div className="flex items-center gap-3">
               <label className="text-xs font-medium text-neutral-700" htmlFor="gen-count">Posts</label>
               {kind === "icymi" ? (
-                <span className="text-xs text-neutral-500">One roundup of five published stories</span>
+                <span className="text-xs text-neutral-500">One roundup of 3–5 published stories</span>
               ) : (
                 <select id="gen-count" value={count} onChange={e => setCount(Number(e.target.value))} className="h-8 rounded-md ring-1 ring-neutral-200 bg-white px-2 text-sm">
                   {[1, 2, 3, 4, 5].map(n => <option key={n} value={n}>{n}</option>)}
@@ -191,6 +252,9 @@ export function ContentGenerate({ onDraftsReady }: { onDraftsReady?: () => void 
                           {d.holdReason ? ` — ${d.holdReason}` : d.error ? (d.status === "failed" ? ` — ${d.error}` : ` — retrying after: ${d.error}`) : ""}
                         </p>
                       </div>
+                      {d.status === "choosing" && (
+                        <button type="button" onClick={() => setChoosing(d.id)} className="shrink-0 font-medium text-neutral-700 hover:text-neutral-900 hover:underline underline-offset-2">Choose stories</button>
+                      )}
                       {d.postId && (
                         <Link href={`/admin/content?openContent=${encodeURIComponent(d.postId)}`} onClick={() => setOpen(false)}
                           className="shrink-0 inline-flex items-center gap-0.5 font-medium text-neutral-700 hover:text-neutral-900 hover:underline underline-offset-2">

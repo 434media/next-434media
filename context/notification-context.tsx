@@ -14,6 +14,8 @@ export interface Notification {
   created_at: string
   read: boolean
   is_content_post?: boolean
+  // An Admin path the notification opens instead of its task or post (the content pipeline's ICYMI choice).
+  link?: string
 }
 
 interface NotificationContextType {

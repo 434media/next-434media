@@ -1,4 +1,4 @@
-import { SERIES, checkFields, clippedWords, ddmmmyy, normalizeFields, type Placement, type RequestKind } from "./series"
+import { SERIES, checkFields, clippedWords, ddmmmyy, measure, normalizeFields, overLimits, type Placement, type RequestKind } from "./series"
 import { BRAND } from "./brand"
 import { headlineProblems, originalityProblems } from "./copy-checks"
 import { icymiCount, meaningful, normalizeUrl, unusedStorySlot, type Candidate, type McuAi, type ModelCall, type RankedPhoto, type SubjectBox } from "./model"
@@ -6,7 +6,7 @@ import { contentPropertyOf } from "./properties"
 import type { ContentProperty, PipelineMedia } from "@/components/crm/types"
 import type { McuSeeds } from "./seeds"
 import { MIN_SHORT_SIDE, archiveRelevant, federalHost, imageSize, isDvidsImagePage, isOutlet, pageImageCandidate, type MediaCandidate, type SourcePage } from "./sources"
-import { MAX_ATTEMPTS, WORKING, type ChosenMedia, type CropBox, type FrameCopy, type FrameDesign, type McuDraft, type McuJob, type McuStore, type Story } from "./store"
+import { MAX_ATTEMPTS, WORKING, type ChosenMedia, type CropBox, type FrameCopy, type FrameDesign, type McuDraft, type McuJob, type McuStore, type RoundupItem, type Story } from "./store"
 
 /**
  * The pipeline worker: advances due jobs and drafts one step at a time, saving after every step, so an interrupted run
@@ -18,8 +18,11 @@ import { MAX_ATTEMPTS, WORKING, type ChosenMedia, type CropBox, type FrameCopy, 
  * Moved from the pilot's Slack MCU skill (lib/slack/mcu/worker.ts at b36e7be). Slack review messages are replaced by
  * the board; revision ("revise", "refresh", "ready") moves to the drawer in Phase 2 and is not carried here.
  */
-/** publishedAt: when the post went out (posted_at, else its post date), for the ICYMI window; media: its pipeline_media. */
-export interface PostRow { id: string; title: string; status: string; publishedUrl?: string; caption?: string; publishedAt?: string; media?: PipelineMedia[] }
+/**
+ * publishedAt: when the post went out (posted_at, else its post date), for the ICYMI window; media: its pipeline_media;
+ * card: its first staged image asset, the card as it was posted, which an ICYMI roundup reuses as that story's slide.
+ */
+export interface PostRow { id: string; title: string; status: string; publishedUrl?: string; caption?: string; publishedAt?: string; media?: PipelineMedia[]; card?: { url: string; sha256?: string } }
 export interface DesignInput { requestId: string; templateId: string; title: string; text: Record<string, string>; image?: { field: string; url: string; name: string; crop?: CropBox } }
 export interface ContentSide {
   /** MCU's content posts, for the repeat-story check and ICYMI. */
@@ -34,8 +37,11 @@ export interface ContentSide {
 }
 /** property: the content post's Property (its `platform` field), e.g. "MilCityUSA". */
 export interface NoContentInput { requestId: string; jobId: string; property: ContentProperty; title: string; reason: string; tried: { title: string; url: string }[]; requestedBy: { email: string; name: string } }
-/** media: the photo each frame used, recorded on the post as pipeline_media for ICYMI to reuse. */
-export interface PostInput { requestId: string; property: ContentProperty; title: string; caption: string; notes: string; links: string[]; media: PipelineMedia[]; designIds: string[]; requestedBy: { email: string; name: string } }
+/**
+ * media: the photo each frame used, recorded on the post as pipeline_media for ICYMI to reuse. slides: images staged
+ * after the designs' exports, as they are (an ICYMI roundup's stories: each one's published card).
+ */
+export interface PostInput { requestId: string; property: ContentProperty; title: string; caption: string; notes: string; links: string[]; media: PipelineMedia[]; designIds: string[]; slides?: { url: string; label: string }[]; requestedBy: { email: string; name: string } }
 export interface WorkerDeps {
   store: McuStore
   /** The model calls; each call is reported through onCall so the draft records which model and provider served it. */
@@ -51,6 +57,11 @@ export interface WorkerDeps {
   icymiWindow?(): Promise<{ lookbackDays: number | null }>
   /** The one "N drafts ready" alert for a finished job. */
   notify(job: McuJob, drafts: McuDraft[]): Promise<void>
+  /**
+   * An ICYMI roundup with more stories than it takes waits for the requester's choice: an alert in Slack and the admin
+   * notifications, and a CRM task, each linking to the draft in the Admin. Returns the task's id when one was recorded.
+   */
+  askChoice?(job: McuJob, draft: McuDraft): Promise<{ taskId?: string }>
   nowMs(): number
 }
 export const LEASE_MS = 290_000
@@ -135,7 +146,7 @@ async function jobStep(deps: WorkerDeps, id: string, attempt: number): Promise<v
     const calls: ModelCall[] = []
     const ai = deps.ai(c => calls.push(c)), titles = posts.map(p => p.title), seeds = job.kind === "icymi" ? null : await deps.seeds()
     const inFlight = job.kind === "icymi" ? { titles: [], urls: new Set<string>() } : await storiesInFlight(deps)
-    let stories: Story[] | { hold: string; tried?: string[]; triedUrls?: string[] } = job.kind === "icymi" ? icymiStory(posts, icymiWindow(deps.nowMs(), (await deps.icymiWindow?.().catch(() => null))?.lookbackDays ?? null)) : await researchStories(deps, ai, job, titles, seeds, [], [], inFlight)
+    let stories: Story[] | { hold: string; tried?: string[]; triedUrls?: string[] } = job.kind === "icymi" ? icymiStory(posts, icymiWindow(deps.nowMs(), (await deps.icymiWindow?.().catch(() => null))?.lookbackDays ?? null), roundupSize()) : await researchStories(deps, ai, job, titles, seeds, [], [], inFlight)
     // Every candidate dropped (a blocked or script-only source page, no readable article, outside the Breaking window):
     // research once more, steering away from what was tried, before the job holds (production, 2026-10-17).
     // Zero candidates too: that pass found nothing to try, so the second pass is the search's one retry, not a loop.
@@ -176,15 +187,24 @@ async function jobStep(deps: WorkerDeps, id: string, attempt: number): Promise<v
     }
     const day = iso(deps).slice(0, 10).replace(/-/g, ""), prefix = `${BRAND.draftPrefix}-${KIND_CODE[job.kind]}-${day}-`
     let n = await deps.store.highestDraftNumber(prefix)
-    const now = iso(deps)
+    const now = iso(deps), size = roundupSize(), choosing: McuDraft[] = []
     for (const story of stories) {
       const draftId = `${prefix}${String(++n).padStart(2, "0")}`
       job.drafts.push(draftId)
-      await deps.store.createDraft({ id: draftId, jobId: id, kind: job.kind, placement: job.placement, request: job.request, status: "queued", version: 1, ...(job.topic ? { direction: job.topic } : {}), story, frames: [], media: [], designs: [], qa: [], notices: [], calls: calls.map(c => ({ ...c, at: now })), history: [{ at: now, event: `opened under ${BRAND.rulesVersion}` }], createdAt: now, updatedAt: now })
+      // More published stories than a roundup takes: the draft waits for the requester to choose (founder, 2026-10-18).
+      const choose = job.kind === "icymi" && (story.roundup?.length ?? 0) > size.max
+      const draft: McuDraft = { id: draftId, jobId: id, kind: job.kind, placement: job.placement, request: job.request, status: choose ? "choosing" : "queued", version: 1, ...(job.topic ? { direction: job.topic } : {}), ...(job.kind === "icymi" ? { choice: { min: size.min, max: size.max } } : {}), story, frames: [], media: [], designs: [], qa: [], notices: [], calls: calls.map(c => ({ ...c, at: now })), history: [{ at: now, event: `opened under ${BRAND.rulesVersion}${choose ? `; ${story.roundup!.length} stories qualify, waiting for the requester to choose ${size.min}–${size.max}` : ""}` }], createdAt: now, updatedAt: now }
+      await deps.store.createDraft(draft)
+      if (choose) { await deps.store.release("draft", draftId, false); choosing.push(draft) }
     }
     job.status = "drafting"; job.updatedAt = now; job.note = undefined
     if (job.kind !== "icymi" && stories.length < job.count) job.note = `${stories.length} of ${job.count} qualified`
+    if (choosing.length) job.note = `${choosing[0].story.roundup!.length} published stories qualify: choose ${size.min}–${size.max} of them on the ICYMI draft`
     await deps.store.saveJob(job); await deps.store.release("job", id, false)
+    for (const d of choosing) {
+      const asked = await deps.askChoice?.(job, d).catch(err => { console.error("[content-pipeline] choice alert failed", d.id, err instanceof Error ? err.message : err); return null })
+      if (asked?.taskId) { d.choice = { ...d.choice!, taskId: asked.taskId }; await deps.store.saveDraft(d) }
+    }
     console.info("[content-pipeline] job drafting", JSON.stringify({ job: id, kind: job.kind, drafts: job.drafts, stories: stories.map(s => s.primaryUrl) }))
   } catch (err) {
     console.error("[content-pipeline] research failed", id, err instanceof Error ? err.message : err)
@@ -223,25 +243,59 @@ export function icymiWindow(nowMs: number, lookbackDays: number | null): { start
   const endMs = chicagoMidnight(monday.getUTCFullYear(), monday.getUTCMonth() + 1, monday.getUTCDate()), startMs = chicagoMidnight(prev.getUTCFullYear(), prev.getUTCMonth() + 1, prev.getUTCDate())
   return { startMs, endMs, label: `the week of ${prev.toISOString().slice(0, 10)}` }
 }
+/** The ICYMI roundup's size, from the profile's request kind (3–5 for MCU), else 1–5. */
+export function roundupSize(): { min: number; max: number } {
+  const k = BRAND.requestKinds.find(x => x.kind === "icymi")
+  return { min: k?.minStories ?? 1, max: k?.maxStories ?? ICYMI_MAX }
+}
+/** Candidates offered for a choice, newest first. */
+const MAX_CHOICES = 20
 /**
- * ICYMI: up to five published MCU News or Breaking stories from the window, newest first, no repeats; held only when
- * none qualify (founder, 2026-10-17: "UP TO 5"). A post with no publication time can't be placed in a week, so it is
- * left out.
+ * ICYMI (founder, 2026-10-18): the window's published News or Breaking stories, newest first, no repeats, each with
+ * its own published card to reuse as its slide. Fewer than `min`: no roundup. More than `max`: every candidate, up
+ * to MAX_CHOICES, for the requester to choose from (the job opens the draft as "choosing"). A post with no
+ * publication time can't be placed in a week, and a post with no staged card has no slide, so both are left out.
  * TODO(analytics): the founder's rule is the five best-performing stories; rank by performance once analytics are
- * mapped to this workflow. Until then, recency.
+ * mapped to this workflow. Until then, recency, and the requester's choice when more qualify.
  */
-export function icymiStory(posts: PostRow[], window: { startMs: number; endMs: number; label: string }): Story[] | { hold: string } {
+export function icymiStory(posts: PostRow[], window: { startMs: number; endMs: number; label: string }, size = { min: 1, max: ICYMI_MAX }): Story[] | { hold: string } {
   const at = (p: PostRow) => p.publishedAt ? Date.parse(p.publishedAt) : NaN
   // DT101 posts are told by their mission-brief caption too: older manual ones aren't titled DT101 (gate round 1, ULTRA).
   const exclude = new RegExp(BRAND.posts.roundupExclude, "i"), excludeCaption = new RegExp(BRAND.posts.roundupExcludeCaption, "i")
   const eligible = posts.filter(p => (p.status === "posted" || p.publishedUrl) && !exclude.test(p.title) && p.caption && !excludeCaption.test(p.caption) && at(p) >= window.startMs && at(p) < window.endMs)
     .sort((a, b) => at(b) - at(a))
     .filter((p, i, all) => all.findIndex(x => x.title.trim().toLowerCase() === p.title.trim().toLowerCase()) === i)
-    .slice(0, ICYMI_MAX)
+  const withCard = eligible.filter(p => p.card && /^https:\/\//.test(p.card.url)).slice(0, MAX_CHOICES)
   if (!eligible.length) return { hold: `no ${BRAND.shortName} News or Breaking story was published in ${window.label}, so there is no ICYMI` }
-  return [{ title: "ICYMI roundup", primaryUrl: eligible[0].publishedUrl || BRAND.posts.homeUrl, publisher: BRAND.name, sourceTitle: `${eligible.length} published ${BRAND.shortName} ${eligible.length === 1 ? "story" : "stories"} from ${window.label}`, sourceText: eligible.map((p, i) => `${i + 1}. ${p.title}\n${p.caption}`).join("\n\n"), roundup: eligible.map(p => ({
-    postId: p.id, title: p.title, caption: (p.caption || "").split("\n").filter(l => !/^Image: /.test(l) && l !== DOD_NOTICE).join("\n").trim().slice(0, 800), ...(p.publishedUrl ? { publishedUrl: p.publishedUrl } : {}), ...(p.media?.[0] ? { media: p.media[0] } : {}),
-  })) }]
+  if (withCard.length < size.min) return { hold: `only ${withCard.length} ${BRAND.shortName} News or Breaking ${withCard.length === 1 ? "story" : "stories"} with a published card ${withCard.length === 1 ? "was" : "were"} published in ${window.label}${eligible.length > withCard.length ? ` (${eligible.length - withCard.length} more without a staged card)` : ""}, and an ICYMI takes at least ${size.min}, so there is no ICYMI` }
+  return [roundupStory(withCard.map(p => ({
+    postId: p.id, title: p.title, caption: (p.caption || "").split("\n").filter(l => !/^Image: /.test(l) && l !== DOD_NOTICE).join("\n").trim().slice(0, 800), ...(p.publishedUrl ? { publishedUrl: p.publishedUrl } : {}), ...(p.publishedAt ? { publishedAt: p.publishedAt } : {}), ...(p.media?.[0] ? { media: p.media[0] } : {}), card: p.card!,
+  })), window.label)]
+}
+/** The roundup's story: its source is the stories' own titles and captions, in order. */
+function roundupStory(items: RoundupItem[], label: string): Story {
+  return { title: "ICYMI roundup", primaryUrl: items[0]?.publishedUrl || BRAND.posts.homeUrl, publisher: BRAND.name, sourceTitle: `${items.length} published ${BRAND.shortName} ${items.length === 1 ? "story" : "stories"} from ${label}`, sourceText: items.map((p, i) => `${i + 1}. ${p.title}\n${p.caption}`).join("\n\n"), roundup: items }
+}
+/**
+ * The requester's choice for an ICYMI draft waiting on one (the Admin's picker): min–max of the candidates, kept in
+ * the roundup's order (newest first). The draft then runs like any roundup. Returns why a choice is refused.
+ */
+export async function chooseRoundup(store: McuStore, draftId: string, postIds: string[], by: string, nowIso: string): Promise<{ ok: true } | { error: string }> {
+  const d = await store.getDraft(draftId)
+  if (!d || d.kind !== "icymi") return { error: "No ICYMI draft with that id" }
+  if (d.status !== "choosing") return { error: "This draft is not waiting for a choice" }
+  const { min, max } = d.choice ?? roundupSize(), picked = new Set(postIds), items = d.story.roundup ?? []
+  if (picked.size !== postIds.length || postIds.some(id => !items.some(p => p.postId === id))) return { error: "Choose stories offered on this draft, each once" }
+  if (picked.size < min || picked.size > max) return { error: `Choose ${min}–${max} stories` }
+  const label = d.story.sourceTitle.replace(/^\d+ published \S+ (stories|story) from /, "")
+  d.story = roundupStory(items.filter(p => picked.has(p.postId)), label)
+  d.choice = { ...d.choice!, min, max, chosenBy: by, chosenAt: nowIso }
+  d.status = "queued"; d.updatedAt = nowIso
+  d.history.push({ at: nowIso, event: `${picked.size} stories chosen by ${by}` })
+  await store.saveDraft(d); await store.release("draft", draftId, true)
+  const job = await store.getJob(d.jobId)
+  if (job) await store.saveJob({ ...job, note: `${picked.size} stories chosen by ${by}`, updatedAt: nowIso })
+  return { ok: true }
 }
 
 /** On a hold, `tried` and `triedUrls` name the candidates that were dropped, so a second pass can avoid them. */
@@ -448,7 +502,7 @@ async function maybeNotify(deps: WorkerDeps, jobId: string): Promise<void> {
   const job = await deps.store.getJob(jobId)
   if (!job || job.notifiedAt || job.status !== "drafting") return
   const drafts = (await Promise.all(job.drafts.map(id => deps.store.getDraft(id)))).filter((x): x is McuDraft => !!x)
-  if (drafts.length < job.drafts.length || drafts.some(x => WORKING.includes(x.status))) return
+  if (drafts.length < job.drafts.length || drafts.some(x => WORKING.includes(x.status) || x.status === "choosing")) return
   job.status = "done"; job.notifiedAt = iso(deps); job.updatedAt = job.notifiedAt
   await deps.store.saveJob(job)
   await deps.notify(job, drafts).catch(err => console.error("[content-pipeline] notify failed", jobId, err instanceof Error ? err.message : err))
@@ -483,16 +537,64 @@ async function writeStep(deps: WorkerDeps, ai: McuAi, d: McuDraft): Promise<void
   if (out.hold) return sourceHold(deps, ai, d, out.hold)
   out.frames = out.frames.map((f, i) => fix(f, i, d, today))
   problems = validate(out.frames, out.caption, d.story)
+  // Only length is left: before holding, ask for shorter wording of just the fields that run over (gate round 5).
+  if (problems.length && problems.every(p => overflow(out.frames).some(o => o.message === p))) {
+    const fitted = await fitStep(ai, d, out, today, steer)
+    if (fitted.tries) {
+      out = fitted.out; problems = validate(out.frames, out.caption, d.story)
+      if (problems.length) return hold(deps, d, `the copy still breaks the template rules after two rewrites and ${fitted.tries} shortening attempt${fitted.tries === 1 ? "" : "s"}: ${problems.slice(0, 4).join("; ")}`)
+    }
+  }
   if (problems.length) return hold(deps, d, `the copy still breaks the template rules after two rewrites: ${problems.slice(0, 4).join("; ")}`)
   d.frames = out.frames; d.caption = out.caption; d.holdReason = undefined; d.error = undefined
   d.status = d.media.length === d.frames.length && d.media.every(Boolean) ? "designing" : "media"
   await save(deps, d, `copy written (v${d.version})`)
 }
-/** Fills what the server knows better than the model: DDMMMYY dates, the ICYMI counters, uppercase fields. */
-function fix(f: FrameCopy, index: number, d: McuDraft, today: string): FrameCopy {
+/** Shortening attempts after the rewrites, before a draft is held for length alone. */
+export const MAX_FIT_ATTEMPTS = 3
+/** Each field that runs past its limits, with the measured problem (as validate words it). */
+function overflow(frames: FrameCopy[]): { frame: number; field: string; message: string }[] {
+  return frames.flatMap((f, i) => SERIES[f.series].fields.flatMap(spec => typeof f.fields[spec.name] === "string" && f.fields[spec.name].trim()
+    ? overLimits(spec, f.fields[spec.name]).map(m => ({ frame: i, field: spec.name, message: frames.length > 1 ? `frame ${i + 1}: ${m}` : m }))
+    : []))
+}
+/**
+ * The shortening-only fit (gate round 5: Haiku wrote good DT101 hooks that ran a few characters past 16 a line, twice).
+ * The writer is asked to shorten only the fields that run over, told each one's limit, measured length and overflowing
+ * line. Only those fields are taken from its answer, and only when the new value is shorter than the old; the caption
+ * and every other field stay as they were. A shorter value that breaks another rule is turned down, and the next
+ * attempt is told why. Nothing is cut or abbreviated here, and no limit is relaxed: the copy passes every rule, or the
+ * draft is held. tries: how many attempts were made (0 when nothing could be asked).
+ */
+async function fitStep(ai: McuAi, d: McuDraft, out: { frames: FrameCopy[]; caption: string }, today: string, steer: { seeds: McuSeeds | null; direction?: string }): Promise<{ out: { frames: FrameCopy[]; caption: string }; tries: number }> {
+  let cur = out, tries = 0, turnedDown: string[] = []
+  for (; tries < MAX_FIT_ATTEMPTS; tries++) {
+    const over = overflow(cur.frames)
+    if (!over.length) break
+    const r = await ai.write({ kind: d.kind, story: d.story, today, ...steer, previous: { frames: cur.frames, caption: cur.caption }, fit: [...over.map(o => o.message), ...turnedDown] })
+    const next = cur.frames.map(f => ({ ...f, fields: { ...f.fields } }))
+    let shorter = false
+    for (const o of over) {
+      const raw = r.frames[o.frame]?.fields[o.field]
+      if (typeof raw !== "string" || !raw.trim()) continue
+      const value = fix({ ...next[o.frame], fields: { ...next[o.frame].fields, [o.field]: raw } }, o.frame, d, today).fields[o.field]
+      if (measure(value) < measure(cur.frames[o.frame].fields[o.field])) { next[o.frame].fields[o.field] = value; shorter = true }
+    }
+    turnedDown = []
+    if (!shorter) { turnedDown = ["the last answer was not shorter: use fewer or shorter words"]; continue }
+    const candidate = { frames: next, caption: cur.caption }
+    const broke = validate(candidate.frames, candidate.caption, d.story).filter(p => !overflow(candidate.frames).some(o => o.message === p))
+    if (broke.length) { turnedDown = [`the last shorter version was turned down because it broke these rules: ${broke.slice(0, 3).join("; ")}`]; continue }
+    cur = candidate
+    if (!overflow(cur.frames).length) { tries++; break }
+  }
+  return { out: cur, tries }
+}
+/** Fills what the server knows better than the model: DDMMMYY dates, fixed values, uppercase fields. */
+function fix(f: FrameCopy, _index: number, d: McuDraft, today: string): FrameCopy {
   const series = SERIES[f.series], fields = { ...f.fields }
   if (series.fields.some(x => x.name === "date")) fields.date = ddmmmyy(f.series === "icymi_cover" ? today : d.story.reportedAt ?? d.story.publishedAt ?? today)
-  if (f.series === "icymi_story") fields.counter = `0${index} / 0${icymiCount(d.story)}` // the cover is not counted
+  for (const x of series.fields) if (x.fixed) fields[x.name] = x.fixed
   if (f.series === "icymi_cover") for (const k of Object.keys(fields)) if (unusedStorySlot(k, icymiCount(d.story))) delete fields[k]
   return { ...f, fields: normalizeFields(series, fields) }
 }
@@ -597,7 +699,7 @@ async function gatherMedia(deps: WorkerDeps, ai: McuAi, story: Story, frame: Fra
 const SOCIAL_HOST = /^https:\/\/([a-z0-9-]+\.)*(instagram\.com|facebook\.com|fb\.com|threads\.net|x\.com|twitter\.com|linkedin\.com|tiktok\.com|youtube\.com)(\/|$)/i
 /**
  * The photo an ICYMI story's published post used (founder, 2026-10-17: the roundup reuses the stories' approved
- * images), from the record the pipeline wrote on the post (pipeline_media). It is fetched from exactly the recorded
+ * images; the cover takes the first story's that can be recovered), from the record the pipeline wrote on the post (pipeline_media). It is fetched from exactly the recorded
  * URL and keeps the rights it was approved with: its license, credit, government status and rights note are never
  * overridden, and "Reused" is added beside the note, not in place of it. A post's links are not read: any content
  * editor can change them, and their last page needn't hold the photo used (security review, 2026-10-17, finding 2).
@@ -609,16 +711,15 @@ export function publishedPhoto(item: NonNullable<Story["roundup"]>[number]): Med
   return [{ url: m.url, thumbUrl: m.url, pageUrl: m.pageUrl, title: m.title, description: "", width: 0, height: 0, license: m.license, creator: m.creator, credit: m.credit, usGovernment: m.usGovernment === true, ...(m.date ? { date: m.date } : {}), rightsNote: [m.rightsNote, `Reused from the published post ${item.postId}`].filter(Boolean).join(". ") }]
 }
 /**
- * The story a frame's photo is about. An ICYMI story card shows the published story it recaps (its title and caption),
- * not the roundup; the cover takes the lead story's photo (mediaStep). Gate round 1 (2026-10-17) searched for a cover
- * photo of the roundup's theme, "Multi-domain", and found nothing.
+ * The story a frame's photo is about. The ICYMI cover shows the lead story it recaps (its title and caption), not the
+ * roundup: gate round 1 (2026-10-17) searched for a cover photo of the roundup's theme, "Multi-domain", and found nothing.
  */
-export function frameStory(d: Pick<McuDraft, "story">, frame: FrameCopy, index: number): Story {
-  if (frame.series !== "icymi_story") return d.story
-  const p = d.story.roundup?.[index - 1]
+export function frameStory(d: Pick<McuDraft, "story">, frame: FrameCopy): Story {
+  if (frame.series !== "icymi_cover") return d.story
+  const p = d.story.roundup?.[0]
   return p ? { title: p.title.replace(new RegExp(`^${BRAND.draftPrefix}-[A-Z0-9]+-\\d{8}-\\d{2}\\s+v\\d+\\s+—\\s+`), ""), primaryUrl: p.publishedUrl ?? "", publisher: BRAND.name, sourceTitle: p.title, sourceText: p.caption } : d.story
 }
-/** Series the brand profile marks representative (for MCU: News, Breaking and the ICYMI story cards; never DT101). */
+/** Series the brand profile marks representative (for MCU: News and Breaking; never DT101). */
 export const allowsRepresentative = (frame: FrameCopy) => SERIES[frame.series]?.representative === true
 const FRAME_ASPECT: Record<Placement, number> = { feed: 4 / 5, reels: 9 / 16 }
 /**
@@ -704,9 +805,7 @@ async function mediaStep(deps: WorkerDeps, ai: McuAi, d: McuDraft): Promise<void
   const used = new Set<string>()
   for (const other of job?.drafts ?? []) if (other !== d.id) for (const m of (await deps.store.getDraft(other))?.media ?? []) if (m) used.add(m.pageUrl)
   const media: (ChosenMedia | null)[] = d.frames.map((_, i) => d.media[i] ?? null)
-  // The ICYMI cover is filled last, from the lead story's photo.
-  const order = d.frames.map((f, i) => ({ f, i })).sort((a, b) => Number(a.f.series === "icymi_cover") - Number(b.f.series === "icymi_cover"))
-  for (const { f: frame, i } of order) {
+  for (const [i, frame] of d.frames.entries()) {
     const series = SERIES[frame.series], field = series.media[d.placement], templateId = series.templates[d.placement]
     if (!field) { media[i] = null; continue }
     if (media[i]) { used.add(media[i]!.pageUrl); continue }
@@ -717,14 +816,13 @@ async function mediaStep(deps: WorkerDeps, ai: McuAi, d: McuDraft): Promise<void
       d.notices = [...new Set([...d.notices, `${series.label} ${d.placement} template has no photo field, so no photo was searched for frame ${i + 1}: connect its photo frame as a data field in Canva`])]
       continue
     }
-    if (frame.series === "icymi_cover") {
-      const lead = media.find((m, j) => !!m && d.frames[j].series === "icymi_story")
-      if (lead) { media[i] = { ...lead }; continue }
-    }
-    const story = frameStory(d, frame, i), representative = allowsRepresentative(frame)
+    const story = frameStory(d, frame), representative = allowsRepresentative(frame)
     const avoid = [...used, ...(d.avoidMedia ?? [])]
-    const item = frame.series === "icymi_story" ? d.story.roundup?.[i - 1] : undefined
-    const reuse = item ? publishedPhoto(item) : []
+    // The ICYMI cover reuses a story's recorded photo, the lead story's first; only when none can be recovered is the
+    // lead story's photo searched for.
+    const roundup = frame.series === "icymi_cover" ? d.story.roundup ?? [] : []
+    const reuse = roundup.flatMap(publishedPhoto)
+    const item = roundup.length ? roundup.find(p => publishedPhoto(p).length) ?? roundup[0] : undefined
     let shown = reuse.length ? await gatherMedia(deps, ai, story, frame, avoid, reuse) : []
     // Nothing recoverable from the published post: search, and say so.
     const searched = !shown.length
@@ -739,7 +837,7 @@ async function mediaStep(deps: WorkerDeps, ai: McuAi, d: McuDraft): Promise<void
     }
     const c = shown[chosen.index].candidate
     used.add(c.pageUrl)
-    const fresh = item && searched ? `The published post has no recorded photo${item.media ? " that could be fetched" : ""}, so this one was searched for: check it against ${item.postId}` : ""
+    const fresh = item && searched ? `No story's published post has a recorded photo${reuse.length ? " that could be fetched" : ""}, so the cover's was searched for: check it against ${item.postId}` : ""
     const rep = chosen.ranked.representative ? `Representative photo${chosen.ranked.shows ? ` (${chosen.ranked.shows})` : ""}, not the event itself: check the caption doesn't present it as the event` : ""
     media[i] = { url: c.url, pageUrl: c.pageUrl, title: c.title, license: c.license, creator: c.creator, credit: c.credit, usGovernment: c.usGovernment, ...(c.date ? { date: c.date } : {}), ...(c.rightsNote ? { rightsNote: c.rightsNote } : {}), ...(c.rightsNote || rep || fresh ? { note: [c.rightsNote, rep, fresh].filter(Boolean).join(". ") } : {}), crop: chosen.crop }
   }
@@ -808,7 +906,6 @@ async function designStep(deps: WorkerDeps, d: McuDraft): Promise<void> {
     const r = await deps.content.createDesign({ requestId: `${KEY_PREFIX}${d.id}:v${d.version}:f${i + 1}${d.autoReplaced ? `:r${d.autoReplaced}` : ""}${d.mediaRetries ? `:m${d.mediaRetries}` : ""}`, templateId, title, text, ...(image ? { image } : {}) })
     designs.push({ templateId, ...r })
   }
-  if (d.frames.some(f => f.series === "icymi_story")) notices.add("ICYMI story cards: the progress bar width can't be set through Canva's API, so each card keeps the template's bar")
   d.designs = designs; d.notices = [...notices]; d.status = "reviewing"
   await save(deps, d, `designs created (v${d.version}): ${designs.map(x => x.designId).join(", ")}`)
 }
@@ -851,6 +948,7 @@ export function reviewNotes(d: McuDraft): string {
     const vals = SERIES[f.series].fields.filter(x => f.fields[x.name]).map(x => `- ${x.label}: ${f.fields[x.name]}`)
     sections.push(`Graphic copy${d.frames.length > 1 ? ` — ${i + 1}. ${SERIES[f.series].label}` : ""} (on the card)\n${vals.join("\n")}`)
   })
+  if (d.kind === "icymi" && d.story.roundup?.length) sections.push(`Story slides (each story's published card, reused exactly as posted)\n${d.story.roundup.map((p, i) => `${i + 1}. ${p.title.slice(0, 120)} — post ${p.postId}${p.publishedUrl ? ` — ${p.publishedUrl}` : ""}`).join("\n")}${d.choice?.chosenBy ? `\nChosen by ${d.choice.chosenBy}` : ""}`)
   sections.push(`Source\n${d.story.sourceTitle.slice(0, 160)} — ${d.story.publisher}${d.story.publishedAt ? `, ${d.story.publishedAt}` : ""}\n${d.story.primaryUrl}${(d.story.supporting ?? []).map(x => `\nAlso: ${x.title.slice(0, 120)} — ${x.url}`).join("")}`)
   if (d.story.datedBy && !d.story.fresh) sections.push(`Dated by a news report\nThe official page is older; a news outlet reported the same event on ${d.story.datedBy.publishedAt}, which dates the story and the card. The outlet is not cited: ${d.story.datedBy.url}`)
   if (d.story.readViaSearch?.length) sections.push(`Read through the search tool\nThese official pages refused the pipeline's fetch, so their text was read from the search tool's extracted content: ${d.story.readViaSearch.join(" ; ")}`)
@@ -868,10 +966,12 @@ export function reviewNotes(d: McuDraft): string {
 async function postStep(deps: WorkerDeps, d: McuDraft): Promise<void> {
   if (d.postId) { d.status = "in_review"; return save(deps, d, "already on the board") }
   const head = d.frames[0]?.fields.headline || d.frames[0]?.fields.subject_identifier || d.story.title
-  const links = [...new Set([d.story.primaryUrl, ...(d.story.supporting ?? []).map(x => x.url), ...d.media.filter((m): m is ChosenMedia => !!m).map(m => m.pageUrl)])]
+  const links = [...new Set([d.story.primaryUrl, ...(d.story.supporting ?? []).map(x => x.url), ...(d.story.roundup ?? []).flatMap(p => p.publishedUrl ? [p.publishedUrl] : []), ...d.media.filter((m): m is ChosenMedia => !!m).map(m => m.pageUrl)])]
+  // An ICYMI roundup: after the cover, each story's own published card, exactly as posted, in order.
+  const slides = d.kind === "icymi" ? (d.story.roundup ?? []).filter(p => p.card).map((p, i) => ({ url: p.card!.url, label: `story-${i + 1}` })) : []
   const media = d.media.filter((m): m is ChosenMedia => !!m).map(m => ({ url: m.url, pageUrl: m.pageUrl, title: m.title, license: m.license, creator: m.creator, credit: m.credit, usGovernment: m.usGovernment, ...(m.date ? { date: m.date } : {}), ...(m.rightsNote ? { rightsNote: m.rightsNote } : {}) }))
   const job = await deps.store.getJob(d.jobId)
-  const r = await deps.content.writePost({ requestId: `${KEY_PREFIX}${d.id}:v${d.version}`, property: contentPropertyOf(job?.property), title: `${d.id} v${d.version} — ${head.replace(/\n/g, " ")}`.slice(0, 200), caption: d.caption ?? "", notes: reviewNotes(d), links, media, designIds: d.designs.map(x => x.designId), requestedBy: { email: d.request.actorEmail, name: d.request.actorName } })
+  const r = await deps.content.writePost({ requestId: `${KEY_PREFIX}${d.id}:v${d.version}`, property: contentPropertyOf(job?.property), title: `${d.id} v${d.version} — ${head.replace(/\n/g, " ")}`.slice(0, 200), caption: d.caption ?? "", notes: reviewNotes(d), links, media, designIds: d.designs.map(x => x.designId), ...(slides.length ? { slides } : {}), requestedBy: { email: d.request.actorEmail, name: d.request.actorName } })
   d.postId = r.postId
   if (r.holds.length) d.qa = [...new Set([...d.qa, ...r.holds])]
   console.info("[content-pipeline] posted", JSON.stringify({ draft: d.id, v: d.version, postId: r.postId, designs: d.designs.map(x => x.designId), holds: r.holds, calls: (d.calls ?? []).map(c => `${c.step}:${c.model}@${c.provider ?? "?"}${c.fallbackFrom ? ` (fallback from ${c.fallbackFrom})` : ""}`) }))
