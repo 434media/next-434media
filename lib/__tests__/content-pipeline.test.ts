@@ -199,7 +199,7 @@ test("Breaking freshness, in order: the official page's exact time; else a timed
   const d = onlyDraft(b)
   assert.deepEqual(d.story.fresh, { at: "2026-10-16T15:30:00.000Z", how: "report", byline: "2026-10-16", bylineToday: true })
   assert.equal(d.story.reportedAt, "2026-10-16"); assert.equal(d.frames[0].fields.date, "16OCT26")
-  assert.ok(!b.posts[0].links.includes(REPORT))
+  assert.deepEqual(b.posts[0].links.filter(l => l === REPORT), []) // never cited on the post
   assert.match(reviewNotes(d), /How fresh\nA news outlet's report of the same event, timed 2026-10-16T15:30:00.000Z; the official page shows no time\. The outlet is not cited\. The page's date-only byline, 2026-10-16, is today in America\/Chicago and agrees\./)
   assert.doesNotMatch(reviewNotes(d), /The official page is older/)
   // A byline that isn't today is recorded and not counted; the report still decides.
