@@ -3,6 +3,7 @@ import { createHash } from "node:crypto"
 import { assetDigest, measureExport } from "./owned-meta-assets"
 import { META_FORMAT_RULES } from "./owned-meta-formats"
 import { isExcludedPostId, MetaBlocked, type MetaBrand } from "./owned-meta-publisher"
+import { PIPELINE_KEY_PREFIX, reservedRequestId } from "./content-pipeline/ownership"
 
 /**
  * Content lookup, creation and export attachment for the publisher's machine surface.
@@ -55,6 +56,7 @@ export async function findPosts(deps: IntakeDeps, input: { query?: string; canva
 /** Idempotent on requestId: a repeated request returns the post it already created. */
 export async function createPost(deps: IntakeDeps, principal: Principal, input: { requestId: string; title: string; brand: MetaBrand; caption: string; dateToPost?: string; notes?: string; canvaDesignId?: string }): Promise<{ created: boolean; post: PostSummary; similar: PostSummary[] }> {
   if (!/^[A-Za-z0-9_.:-]{8,128}$/.test(input.requestId)) throw new MetaBlocked("A stable requestId (8–128 characters) is required so a repeated request cannot create a second post")
+  if (reservedRequestId(input.requestId)) throw new MetaBlocked(`requestIds starting with "${PIPELINE_KEY_PREFIX}" are reserved for the content pipeline`)
   const title = input.title.trim()
   if (!title || title.length > 200) throw new MetaBlocked("Title required (at most 200 characters)")
   if (input.dateToPost && !/^\d{4}-\d{2}-\d{2}$/.test(input.dateToPost)) throw new MetaBlocked("dateToPost must be YYYY-MM-DD")

@@ -5,6 +5,7 @@ import { PIPELINE_MODELS } from "./models"
 import { fetchImage, fetchSourcePage, searchCommons, searchNasa, searchOpenverse } from "./sources"
 import { runDue, label, type PostRow, type WorkerDeps } from "./worker"
 import type { McuDraft, McuJob } from "./store"
+import { adoptablePost, pipelineMarked } from "./ownership"
 
 /**
  * Production wiring for the content pipeline worker. The Canva fill, the export staging and the content-post lookup
@@ -46,12 +47,12 @@ export async function pipelineDeps(): Promise<WorkerDeps> {
       },
       writePost: async p => {
         const now = new Date().toISOString()
-        // Idempotent on requestId: a resumed step finds the post it already created.
-        const post = await tools.intake.findByRequestId(p.requestId) ?? await crm.createContentPost({
+        // Idempotent on requestId: a resumed step finds the post it already created, and only a post it created.
+        const post = adoptablePost(await tools.intake.findByRequestId(p.requestId)) ?? await crm.createContentPost(pipelineMarked({
           user: p.requestedBy.name, date_created: now.slice(0, 10), platform: p.property, status: "needs_approval", title: p.title,
           notes: p.notes, social_copy: p.caption, links: p.links, pipeline_media: p.media, assets: [], tags: BRAND.posts.tag, social_platforms: ["instagram", "facebook"],
           intake: { requestId: p.requestId, metaBrand: BRAND.posts.metaBrand, requestedBy: p.requestedBy.email, at: now },
-        })
+        }))
         if (post.assets.length && post.export_fingerprint) return { postId: post.id, holds: [] }
         // Fresh exports in frame order; a single design is bound to the post as its Canva source.
         const single = p.designIds.length === 1
@@ -67,16 +68,16 @@ export async function pipelineDeps(): Promise<WorkerDeps> {
       },
       writeNoContent: async p => {
         const now = new Date().toISOString()
-        const existing = await tools.intake.findByRequestId(p.requestId)
+        const existing = adoptablePost(await tools.intake.findByRequestId(p.requestId))
         if (existing) return { postId: existing.id }
         // A notice, not a post: no assets, no platforms, no Canva design. pipeline_outcome marks it everywhere.
-        const post = await crm.createContentPost({
+        const post = await crm.createContentPost(pipelineMarked({
           user: p.requestedBy.name, date_created: now.slice(0, 10), platform: p.property, status: "needs_approval", title: p.title.slice(0, 200),
           notes: `The content pipeline found no new content for this request, so nothing was drafted. Confirm to close it.\n\nWhy: ${p.reason}`.slice(0, 4000),
           links: p.tried.map(t => t.url), assets: [], tags: BRAND.posts.tag, social_platforms: [],
           intake: { requestId: p.requestId, metaBrand: BRAND.posts.metaBrand, requestedBy: p.requestedBy.email, at: now },
           pipeline_outcome: { kind: "no_new_content", job_id: p.jobId, reason: p.reason, tried: p.tried },
-        })
+        }))
         return { postId: post.id }
       },
     },

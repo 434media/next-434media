@@ -8,6 +8,7 @@ import {
   deleteContentPost,
 } from "@/lib/firestore-crm"
 import { notifyContentNeedsApproval } from "@/lib/content-approval-notification"
+import { outcomeStatusRefusal } from "@/lib/content-post-guards"
 
 // Check admin access
 async function requireAdmin() {
@@ -144,6 +145,12 @@ export async function PUT(request: NextRequest) {
     // an edit to one already there) — the email should fire only on entry.
     const existing = await getContentPostById(id)
     const prevStatus = existing?.status
+
+    // A content-pipeline "no new content" card never changes status here (security review, finding 4).
+    const outcomeRefusal = outcomeStatusRefusal(existing, body.status)
+    if (outcomeRefusal) {
+      return NextResponse.json({ error: outcomeRefusal }, { status: 409 })
+    }
 
     // Producers (intern / crm_only) may edit drafts and submit for review, but
     // moving a post INTO an approved/scheduled/posted state is an operator
