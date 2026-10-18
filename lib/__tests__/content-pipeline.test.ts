@@ -527,18 +527,26 @@ test("DT101 image label reads like the approved cards", () => {
   assert.equal(imageLabel({ ...CANDIDATE, title: "x", creator: "Northrop Grumman", credit: "Northrop Grumman / CC BY 4.0", usGovernment: false }, "2026-10-10"), "IMAGE: NORTHROP GRUMMAN")
 })
 
-test("model settings: founder defaults, routing pinned to zero-retention no-training providers, Scout's output cap", () => {
-  assert.deepEqual(PIPELINE_MODELS, { research: "nvidia/nemotron-3.5-lightning", write: "nvidia/nemotron-3.5-lightning", photoSearch: "nvidia/nemotron-3.5-lightning", photoPick: "anthropic/claude-sonnet-5.5", artworkCheck: "anthropic/claude-sonnet-5.5" }) // moved to the fallback, gate round 1
-  assert.deepEqual(FALLBACK_MODELS, { text: "anthropic/claude-opus-5.5", vision: "anthropic/claude-sonnet-5.5" })
+test("model settings: text on Haiku 5.5 with Llama 3.3 70B as fallback (plan v8), vision on Sonnet 5.5, routing pinned to zero-retention no-training providers", () => {
+  // Founder, 2026-10-18: "Haiku first … Let's lock it in and proceed." Vision moved to its fallback in gate round 1.
+  assert.deepEqual(PIPELINE_MODELS, { research: "anthropic/claude-haiku-5.5", write: "anthropic/claude-haiku-5.5", photoSearch: "anthropic/claude-haiku-5.5", photoPick: "anthropic/claude-sonnet-5.5", artworkCheck: "anthropic/claude-sonnet-5.5" })
+  assert.deepEqual(FALLBACK_MODELS, { text: "meta/llama-3.3-70b", vision: "anthropic/claude-sonnet-5.5" })
+  // Opus 5.5 is no longer a text model or fallback anywhere.
+  assert.ok(![...Object.values(PIPELINE_MODELS), ...Object.values(FALLBACK_MODELS), ...Object.values(CALL_FALLBACK)].some(m => /opus/.test(m)))
+  assert.deepEqual(CALL_FALLBACK, { research: "meta/llama-3.3-70b", write: "meta/llama-3.3-70b", photoSearch: "meta/llama-3.3-70b", photoPick: "anthropic/claude-sonnet-5.5", artworkCheck: "anthropic/claude-sonnet-5.5" })
+  // Haiku keeps the token-trap handling: effort set, thinking never disabled; and the generous budgets stay as they were.
+  assert.deepEqual(callOptions("anthropic/claude-haiku-5.5", "medium"), { anthropic: { output_config: { effort: "medium" } }, gateway: { only: ["anthropic", "bedrock", "claudeaws", "vertexAnthropic"], zeroDataRetention: true, disallowPromptTraining: true } })
+  assert.equal(outputBudget("anthropic/claude-haiku-5.5", 24_000), 24_000); assert.equal(outputBudget("anthropic/claude-haiku-5.5", 16_000), 16_000)
+  // Llama 3.3 70B: Bedrock only (it reports zero retention and no training), and Bedrock caps its output at 8,192.
+  assert.deepEqual(callOptions("meta/llama-3.3-70b", "medium"), { gateway: { only: ["bedrock"], zeroDataRetention: true, disallowPromptTraining: true } })
+  assert.equal(outputBudget("meta/llama-3.3-70b", 24_000), 8_192)
   // runinfra (no ZDR, may train) is never a route for Nemotron.
   assert.deepEqual(callOptions("nvidia/nemotron-3.5-lightning", "medium"), { gateway: { only: ["deepinfra", "fireworks"], zeroDataRetention: true, disallowPromptTraining: true } })
   // Both qualifying Scout providers, so one at capacity can't stop a run (preview, 2026-10-17).
   assert.deepEqual(callOptions("meta/llama-4-scout", "low"), { gateway: { order: ["deepinfra", "bedrock"], only: ["deepinfra", "bedrock"], zeroDataRetention: true, disallowPromptTraining: true } })
   // The fallbacks keep the token-trap handling (effort, not disabled thinking) and enforce the same retention terms.
   const anthropicOnly = ["anthropic", "bedrock", "claudeaws", "vertexAnthropic"]
-  assert.deepEqual(callOptions("anthropic/claude-opus-5.5", "medium"), { anthropic: { output_config: { effort: "medium" } }, gateway: { only: anthropicOnly, zeroDataRetention: true, disallowPromptTraining: true } })
   assert.deepEqual(callOptions("anthropic/claude-sonnet-5.5", "low"), { anthropic: { output_config: { effort: "low" } }, gateway: { only: anthropicOnly, zeroDataRetention: true, disallowPromptTraining: true } })
-  assert.deepEqual(CALL_FALLBACK, { photoPick: "anthropic/claude-sonnet-5.5", artworkCheck: "anthropic/claude-sonnet-5.5" })
   assert.equal(outputBudget("meta/llama-4-scout", 8_000), 8_000); assert.equal(outputBudget("meta/llama-4-scout", 24_000), 8_192); assert.equal(outputBudget("nvidia/nemotron-3.5-lightning", 24_000), 24_000)
   assert.equal(servedBy({ gateway: { routing: { finalProvider: "fireworks" } } }), "fireworks"); assert.equal(servedBy(undefined), undefined)
 })
@@ -552,8 +560,25 @@ test("a vision call nobody qualifying can answer goes once to Sonnet 5.5, and th
   // An answer without the required tool call counts as a failure too.
   const noTool = await servedCall("artworkCheck", "meta/llama-4-scout", CALL_FALLBACK.artworkCheck, undefined, async model => ({ finishReason: "stop", model }), r => { if (r.model !== "anthropic/claude-sonnet-5.5") throw new Error("model did not call report_defects"); return "ok" })
   assert.equal(noTool, "ok")
-  // A text step has no automatic fallback: the error stands and the step retries.
-  await assert.rejects(servedCall("write", "nvidia/nemotron-3.5-lightning", CALL_FALLBACK.write, undefined, async () => { throw capacity }, r => r), /at capacity/)
+  // A step with no fallback: the error stands and the step retries.
+  await assert.rejects(servedCall("write", "nvidia/nemotron-3.5-lightning", undefined, undefined, async () => { throw capacity }, r => r), /at capacity/)
+})
+
+test("a text call Haiku 5.5 can't answer goes once to Llama 3.3 70B; when that fails too, it is logged and the step fails with both reasons", async () => {
+  const seen: ModelCall[] = [], tried: string[] = [], errors: unknown[][] = []
+  const capacity = new Error("The request limited providers for this model and they are currently at capacity")
+  const ok = await servedCall("write", PIPELINE_MODELS.write, CALL_FALLBACK.write, c => seen.push(c), async model => { tried.push(model); if (model === "anthropic/claude-haiku-5.5") throw capacity; return { finishReason: "tool-calls", providerMetadata: { gateway: { routing: { finalProvider: "bedrock" } } }, model } }, r => r.model)
+  assert.equal(ok, "meta/llama-3.3-70b"); assert.deepEqual(tried, ["anthropic/claude-haiku-5.5", "meta/llama-3.3-70b"])
+  assert.equal(seen[0].fallbackFrom, "anthropic/claude-haiku-5.5"); assert.equal(seen[0].provider, "bedrock")
+  // Bedrock refusing Llama's forced tool (as it refused Scout's, 2026-10-17): never silent.
+  const original = console.error
+  console.error = (...a: unknown[]) => { errors.push(a) }
+  try {
+    await assert.rejects(servedCall("research", PIPELINE_MODELS.research, CALL_FALLBACK.research, undefined, async model => { if (model === "anthropic/claude-haiku-5.5") throw capacity; throw new Error("This model doesn't support the toolConfig.toolChoice.tool field") }, r => r),
+      /research: anthropic\/claude-haiku-5\.5 failed \(.*at capacity\); its fallback meta\/llama-3\.3-70b failed too \(This model doesn't support the toolConfig\.toolChoice\.tool field\)/)
+  } finally { console.error = original }
+  assert.equal(errors.length, 1); assert.equal(errors[0][0], "[content-pipeline] fallback failed")
+  assert.deepEqual(JSON.parse(String(errors[0][1])), { step: "research", from: "anthropic/claude-haiku-5.5", to: "meta/llama-3.3-70b", reason: capacity.message, fallbackReason: "This model doesn't support the toolConfig.toolChoice.tool field" })
 })
 
 test("a draft on its last attempt shows as failed with its error at once, not as still working", async () => {
