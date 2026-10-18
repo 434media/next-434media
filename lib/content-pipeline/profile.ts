@@ -36,7 +36,8 @@ export interface ProfileSeries extends Series {
  * recencyDays, or, for a freshHours window, by the report's exact time. freshHours: the story must be shown to be this
  * fresh by an exact time (the official page's, else such a report's); a date alone never is (Breaking, founder 2026-10-18).
  */
-export interface ProfileRequestKind { kind: RequestKind; label: string; detail: string; series: SeriesKey[]; code: string; recencyDays?: number; undatedOk?: boolean; datedByReport?: boolean; freshHours?: number }
+/** minStories/maxStories: a roundup's size; with more than maxStories, the requester chooses (ICYMI, founder 2026-10-18). */
+export interface ProfileRequestKind { kind: RequestKind; label: string; detail: string; series: SeriesKey[]; code: string; recencyDays?: number; undatedOk?: boolean; datedByReport?: boolean; freshHours?: number; minStories?: number; maxStories?: number }
 /** fields: one-line headlines; hookFields: multi-line hooks (one punctuation convention across lines); deckField: the deck. */
 export interface HeadlineChecks { enabled: boolean; fields: string[]; hookFields: string[]; maxCommas: number; deckField: string }
 export interface OriginalityChecks { enabled: boolean; headlineMaxRun: number; captionMaxRun: number; exempt: SeriesKey[] }
@@ -126,7 +127,7 @@ export function validateProfile(v: unknown): string[] {
     const names = new Set<string>()
     fields.forEach((f: unknown, i: number) => {
       const fw = `${w}.fields[${i}]`
-      if (!keys(f, fw, ["name", "label"], ["perLine", "maxLines", "maxChars", "allowed", "date", "uppercase", "exactLines", "serverFilled"], p)) return
+      if (!keys(f, fw, ["name", "label"], ["perLine", "maxLines", "maxChars", "allowed", "date", "uppercase", "exactLines", "serverFilled", "fixed"], p)) return
       if (!(typeof f.name === "string" && /^[a-z0-9_]{1,40}$/.test(f.name))) p.push(`${fw}.name: lowercase field name`)
       else if (names.has(f.name)) p.push(`${fw}.name: ${f.name} repeats`)
       else names.add(f.name)
@@ -135,6 +136,7 @@ export function validateProfile(v: unknown): string[] {
       for (const k of ["date", "uppercase", "serverFilled"]) if (k in f && typeof f[k] !== "boolean") p.push(`${fw}.${k}: true or false`)
       if ("allowed" in f && !(Array.isArray(f.allowed) && f.allowed.length && f.allowed.every(a => str(a, 60)))) p.push(`${fw}.allowed: a non-empty list`)
       if ("exactLines" in f && !("perLine" in f)) p.push(`${fw}: exactLines needs perLine`)
+      if ("fixed" in f && !(str(f.fixed, 60) && !("serverFilled" in f) && !("allowed" in f) && !("date" in f))) p.push(`${fw}.fixed: 1–60 characters, not with serverFilled, allowed or date`)
     })
     if (s.caption !== undefined && keys(s.caption, `${w}.caption`, ["firstLines", "labels", "format", "missingLabel"], [], p)) {
       const c = s.caption
@@ -148,7 +150,7 @@ export function validateProfile(v: unknown): string[] {
   const kinds = Array.isArray(v.requestKinds) && v.requestKinds.length ? v.requestKinds : (p.push("requestKinds: a non-empty list"), [])
   kinds.forEach((k: unknown, i: number) => {
     const w = `requestKinds[${i}]`
-    if (!keys(k, w, ["kind", "label", "detail", "series", "code"], ["recencyDays", "undatedOk", "datedByReport", "freshHours"], p)) return
+    if (!keys(k, w, ["kind", "label", "detail", "series", "code"], ["recencyDays", "undatedOk", "datedByReport", "freshHours", "minStories", "maxStories"], p)) return
     if (!(REQUEST_KINDS as readonly unknown[]).includes(k.kind)) p.push(`${w}.kind: one of ${REQUEST_KINDS.join(", ")}`)
     if (!str(k.label, 60) || !str(k.detail, 120)) p.push(`${w}: label 1–60 and detail 1–120 characters`)
     if (!(typeof k.code === "string" && /^[A-Z0-9]{2,8}$/.test(k.code))) p.push(`${w}.code: 2–8 uppercase letters or digits (draft ids)`)
@@ -156,6 +158,7 @@ export function validateProfile(v: unknown): string[] {
     if ("undatedOk" in k && typeof k.undatedOk !== "boolean") p.push(`${w}.undatedOk: true or false`)
     if ("freshHours" in k && !(int(k.freshHours, 1, 168) && "timeZone" in v)) p.push(`${w}.freshHours: 1–168, with the profile's timeZone`)
     if ("datedByReport" in k && !(typeof k.datedByReport === "boolean" && ("recencyDays" in k || "freshHours" in k))) p.push(`${w}.datedByReport: true or false, with recencyDays or freshHours`)
+    if (("minStories" in k || "maxStories" in k) && !(int(k.minStories, 1, 10) && int(k.maxStories, 1, 10) && (k.minStories as number) <= (k.maxStories as number))) p.push(`${w}: minStories and maxStories together, 1–10, minStories at most maxStories`)
     if (!(Array.isArray(k.series) && k.series.length && k.series.every(x => typeof x === "string" && x in series))) p.push(`${w}.series: series defined in this profile`)
     else if (!k.series.every(x => (series[x as string] as { templates?: { feed?: string } })?.templates?.feed)) p.push(`${w}: every series it fills needs a feed template`)
   })

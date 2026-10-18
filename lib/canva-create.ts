@@ -149,7 +149,8 @@ export const MCU_BRAND_TEMPLATES: ReadonlySet<string> = new Set([
   "EAHXZAbAA8s", "EAHXZAPPFLQ", // Breaking News
   "EAHYOAJhC_8", // Defense Tech 101, benefit-led feed (founder-approved design, published 2026-10-16)
   "EAHXZIadVzM", "EAHXZAunvYI", // Defense Tech 101, original MAKER/DOMAIN/STATUS masters (retired for new posts)
-  "EAHXZPgjqSY", "EAHXZJnI-Nc", // ICYMI cover
+  "EAHXZPgjqSY", "EAHXZJnI-Nc", // ICYMI cover (EAHXZPgjqSY: the fixed-five original, retired for new posts)
+  "EAHYYaSYfJI", // ICYMI feed cover for 3–5 stories: row numbers are the field story_numbers (published 2026-10-18)
   "EAHXZJnAT0o", "EAHXZMFmSh0", // ICYMI story
   "EAHXZOYmzQ8", "EAHXZHGriWI", // Follow-on graphic
   "EAHXZEmHgsE", "EAHXZHixcNk", // Follow-on text
