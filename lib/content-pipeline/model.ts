@@ -143,7 +143,12 @@ export async function servedCall<R extends Served, T>(step: PipelineStep, model:
     if (!fallback || fallback === model) throw err
     const reason = (err instanceof Error ? err.message : String(err)).slice(0, 200)
     console.warn("[content-pipeline] fallback", JSON.stringify({ step, from: model, to: fallback, reason }))
-    return once(fallback, { from: model, reason })
+    try { return await once(fallback, { from: model, reason }) } catch (err2) {
+      // The fallback failed too (Llama 3.3 70B refusing a forced tool, say): logged, and the step fails with both reasons.
+      const second = (err2 instanceof Error ? err2.message : String(err2)).slice(0, 200)
+      console.error("[content-pipeline] fallback failed", JSON.stringify({ step, from: model, to: fallback, reason, fallbackReason: second }))
+      throw new Error(`${step}: ${model} failed (${reason}); its fallback ${fallback} failed too (${second})`)
+    }
   }
 }
 /**
