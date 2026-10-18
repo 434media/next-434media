@@ -235,13 +235,24 @@ export function isOutlet(url: string, extra: readonly string[] = []): boolean {
   try { host = new URL(url).hostname.toLowerCase().replace(/^www\./, "") } catch { return false }
   return [...OUTLETS, ...extra.map(e => e.toLowerCase().replace(/^https?:\/\//, "").replace(/^www\./, "").replace(/\/.*$/, ""))].some(o => o && (host === o || host.endsWith(`.${o}`)))
 }
+const NOT_A_NAME = new Set(["the", "inc", "corp", "company", "news", "newsroom", "media", "group", "official", "site", "home", "website", "www"])
 /**
  * The organization a site names itself, without a trademark or slogan: og:site_name is sometimes a tagline
- * ("L3Harris® Fast. Forward.", gate round 2), which then printed as the image credit.
+ * ("L3Harris® Fast. Forward.", gate round 2), which then printed as the image credit. The name is trusted only when
+ * it agrees with the page's own host, by a distinctive word, the whole name run together, or its initials: site
+ * metadata goes stale (rtx.com still names itself "United Technologies", RTX's parent before 2020, gate round 6). A
+ * stale name gives way to the host's name as the page's title writes it ("RTX's Raytheon awarded …" → "RTX"), else
+ * to the host itself. The photo's page is what is credited: its publisher, never a name it no longer uses.
  */
-export function siteOrg(siteName: string | undefined, host: string): string {
+export function siteOrg(siteName: string | undefined, host: string, title = ""): string {
   const cut = (siteName ?? "").split(/[®™©|]| [-–—:] /)[0].trim()
-  return cut && cut.length <= 40 ? cut : host.replace(/^www\./, "")
+  const bareHost = host.toLowerCase().replace(/^www\./, ""), labels = bareHost.split(".").slice(0, -1).filter(l => !NOT_A_NAME.has(l)).map(l => l.replace(/-/g, ""))
+  const ws = cut.toLowerCase().split(/[^a-z0-9]+/).filter(Boolean)
+  const agrees = ws.filter(w => w.length >= 3 && !NOT_A_NAME.has(w)).some(w => labels.some(l => l.includes(w)))
+    || labels.some(l => l.length >= 3 && (ws.join("").includes(l) || ws.join("") === l || (ws.length > 1 && l.startsWith(ws.map(w => w[0]).join("")))))
+  if (cut && cut.length <= 40 && agrees) return cut
+  const named = title.match(/[\p{L}\p{N}][\p{L}\p{N}&-]*/gu)?.find(t => labels.includes(t.toLowerCase().replace(/-/g, "")))
+  return named ?? (cut && cut.length <= 40 && !labels.length ? cut : bareHost)
 }
 
 // ── Photos on the story's own pages and on DVIDS ──
@@ -302,7 +313,7 @@ export function pageImageCandidate(page: SourcePage, origin: "source" | "dvids")
     : !federal ? `${host} is not a federal site, so its photos are not public domain: confirm its terms allow editorial use before approving`
     : !onSite ? `The photo on ${host} is served from ${imageHost}, not a government media host: confirm who owns it before approving`
     : `${host} carries a copyright notice: confirm the photo's terms allow editorial use before approving`
-  const creator = gov ? govCredit ?? siteOrg(page.siteName, host) : courtesy ?? siteOrg(page.siteName, host)
+  const creator = gov ? govCredit ?? siteOrg(page.siteName, host, page.title) : courtesy ?? siteOrg(page.siteName, host, page.title)
   const date = /\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec)[a-z]*\.? \d{1,2}, (20\d{2})\b/.exec(page.description ?? "")?.[0]
   const dated = date ? new Date(`${date.replace(/\.|Sept/g, m => m === "Sept" ? "Sep" : "")} UTC`) : null
   return {

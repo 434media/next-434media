@@ -1,6 +1,6 @@
 import type { Placement, RequestKind, SeriesKey } from "./series"
 import type { MediaCandidate } from "./sources"
-import type { ModelCall } from "./model"
+import type { ModelCall, SubjectBox } from "./model"
 import type { PipelineMedia } from "@/components/crm/types"
 
 /**
@@ -72,7 +72,7 @@ export interface Story {
 export interface RoundupItem { postId: string; title: string; caption: string; publishedUrl?: string; publishedAt?: string; media?: PipelineMedia; card?: { url: string; sha256?: string }
 }
 export interface FrameCopy { series: SeriesKey; fields: Record<string, string>; mediaQuery?: string }
-export interface ChosenMedia extends Pick<MediaCandidate, "url" | "pageUrl" | "license" | "creator" | "credit" | "usGovernment" | "date" | "rightsNote"> { title: string; note?: string; /** Zoom applied before the Canva fill, as fractions of the photo. */ crop?: CropBox }
+export interface ChosenMedia extends Pick<MediaCandidate, "url" | "pageUrl" | "license" | "creator" | "credit" | "usGovernment" | "date" | "rightsNote"> { title: string; note?: string; /** Zoom applied before the Canva fill, as fractions of the photo. */ crop?: CropBox; /** Where the pick saw the subject, and the photo's size: lets the crop be computed again (the label refit). */ subject?: { box: SubjectBox; core?: SubjectBox; context: boolean; width: number; height: number } }
 export interface FrameDesign { templateId: string; designId: string; editUrl: string; viewUrl: string; previewUrls: string[] }
 
 /**
@@ -104,6 +104,8 @@ export interface McuDraft {
   avoidMedia?: string[]
   /** How many times the artwork check sent the draft back for a different photo. */
   mediaRetries?: number
+  /** How many times the photo was re-zoomed and filled again because the card's image label crossed the subject (at most once). */
+  labelRefit?: number
   holdReason?: string
   /** An ICYMI roundup's size, and who chose its stories when more qualified than it takes. */
   choice?: { min: number; max: number; chosenBy?: string; chosenAt?: string; taskId?: string; closedBy?: string; closedAt?: string; closedReason?: string }

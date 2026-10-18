@@ -1,6 +1,6 @@
 import { SERIES, checkFields, clippedWords, ddmmmyy, measure, normalizeFields, overLimits, type Placement, type RequestKind } from "./series"
 import { BRAND } from "./brand"
-import { headlineProblems, originalityProblems } from "./copy-checks"
+import { headlineProblems, originalityFindings, originalityProblems, type Copied } from "./copy-checks"
 import { icymiCount, meaningful, normalizeUrl, unusedStorySlot, type Candidate, type McuAi, type ModelCall, type RankedPhoto, type SubjectBox } from "./model"
 import { contentPropertyOf } from "./properties"
 import type { ContentProperty, PipelineMedia } from "@/components/crm/types"
@@ -268,7 +268,7 @@ export function icymiStory(posts: PostRow[], window: { startMs: number; endMs: n
   const at = (p: PostRow) => p.publishedAt ? Date.parse(p.publishedAt) : NaN
   // DT101 posts are told by their mission-brief caption too: older manual ones aren't titled DT101 (gate round 1, ULTRA).
   const exclude = new RegExp(BRAND.posts.roundupExclude, "i"), excludeCaption = new RegExp(BRAND.posts.roundupExcludeCaption, "i")
-  const eligible = posts.filter(p => (p.status === "posted" || p.publishedUrl) && !exclude.test(p.title) && p.caption && !excludeCaption.test(p.caption) && at(p) >= window.startMs && at(p) < window.endMs)
+  const eligible = posts.filter(p => publishedPost(p) && !exclude.test(p.title) && p.caption && !excludeCaption.test(p.caption) && at(p) >= window.startMs && at(p) < window.endMs)
     .sort((a, b) => at(b) - at(a))
     .filter((p, i, all) => all.findIndex(x => x.title.trim().toLowerCase() === p.title.trim().toLowerCase()) === i)
   const withCard = eligible.filter(p => p.card && /^https:\/\//.test(p.card.url)).slice(0, MAX_CHOICES)
@@ -277,6 +277,19 @@ export function icymiStory(posts: PostRow[], window: { startMs: number; endMs: n
   return [roundupStory(withCard.map(p => ({
     postId: p.id, title: p.title, caption: (p.caption || "").split("\n").filter(l => !/^Image: /.test(l) && l !== DOD_NOTICE).join("\n").trim().slice(0, 800), ...(p.publishedUrl ? { publishedUrl: p.publishedUrl } : {}), ...(p.publishedAt ? { publishedAt: p.publishedAt } : {}), ...(p.media?.[0] ? { media: p.media[0] } : {}), card: p.card!,
   })), window.label)]
+}
+/**
+ * A title that still says the post is a review draft (the Slack pilot's "MCU-BN-20261009-02 | Marconi … | REVIEW
+ * DRAFT", gate round 6): whatever its status, it was never published as it stands.
+ */
+export const REVIEW_DRAFT_TITLE = /\breview[\s_-]*draft\b/i
+/**
+ * Whether a post is truly published, for ICYMI (gate round 6): its status is posted (a published link alone isn't
+ * enough: any editor can set one) and its title doesn't mark it a review draft. The engine decides this, never the
+ * writer; with the staged card icymiStory also requires, it is what makes a story eligible.
+ */
+export function publishedPost(p: Pick<PostRow, "status" | "title">): boolean {
+  return p.status === "posted" && !REVIEW_DRAFT_TITLE.test(p.title)
 }
 /** The roundup's story: its source is the stories' own titles and captions, in order. */
 function roundupStory(items: RoundupItem[], label: string): Story {
@@ -554,26 +567,40 @@ async function writeStep(deps: WorkerDeps, ai: McuAi, d: McuDraft): Promise<void
   const today = iso(deps).slice(0, 10)
   let problems: string[] = []
   const seeds = await deps.seeds(), steer = { seeds, ...(d.direction ? { direction: d.direction } : {}) }
+  // A roundup's stories were chosen by the engine (icymiStory: published, with a staged card), so a writer that holds
+  // one on eligibility is overruled and logged, never obeyed (gate round 6: it held on a "REVIEW DRAFT" title).
+  const writerHold = (o: { hold?: string }) => {
+    const h = meaningful(o.hold) // "None" is no hold (gate round 3: it replaced a subject)
+    if (h && d.kind === "icymi") { d.history.push({ at: iso(deps), event: `the writer asked to hold the roundup ("${h.slice(0, 200)}"); overruled: the engine decides which stories qualify` }); return undefined }
+    return h
+  }
   let out = await ai.write({ kind: d.kind, story: d.story, today, ...steer, ...(d.frames.length ? { previous: { frames: d.frames, caption: d.caption ?? "" } } : {}) })
   for (let round = 0; round < 2; round++) {
-    out.hold = meaningful(out.hold) // "None" is no hold (gate round 3: it replaced a subject)
+    out.hold = writerHold(out)
     if (out.hold) return sourceHold(deps, ai, d, out.hold)
     out.frames = out.frames.map((f, i) => fix(f, i, d, today))
     problems = validate(out.frames, out.caption, d.story)
     if (!problems.length) break
     out = await ai.write({ kind: d.kind, story: d.story, today, ...steer, previous: { frames: out.frames, caption: out.caption }, problems })
   }
-  out.hold = meaningful(out.hold)
+  out.hold = writerHold(out)
   if (out.hold) return sourceHold(deps, ai, d, out.hold)
   out.frames = out.frames.map((f, i) => fix(f, i, d, today))
   problems = validate(out.frames, out.caption, d.story)
-  // Only length is left: before holding, ask for shorter wording of just the fields that run over (gate round 5).
-  if (problems.length && problems.every(p => overflow(out.frames).some(o => o.message === p))) {
-    const fitted = await fitStep(ai, d, out, today, steer)
-    if (fitted.tries) {
-      out = fitted.out; problems = validate(out.frames, out.caption, d.story)
-      if (problems.length) return hold(deps, d, `the copy still breaks the template rules after two rewrites and ${fitted.tries} shortening attempt${fitted.tries === 1 ? "" : "s"}: ${problems.slice(0, 4).join("; ")}`)
+  // Only copied wording or length is left: before holding, ask for fresh wording of just the fields that copy the
+  // source (gate round 6), then for shorter wording of just the fields that run over (gate round 5).
+  const targeted = (ps: string[], o: typeof out) => ps.every(p => overflow(o.frames).some(x => x.message === p) || copiedFields(o.frames, o.caption, d.story).some(x => x.message === p))
+  if (problems.length && targeted(problems, out)) {
+    const attempts: string[] = []
+    if (copiedFields(out.frames, out.caption, d.story).length) {
+      const fresh = await freshStep(ai, d, out, today, steer)
+      if (fresh.tries) { out = fresh.out; problems = validate(out.frames, out.caption, d.story); attempts.push(`${fresh.tries} rewording attempt${fresh.tries === 1 ? "" : "s"}`) }
     }
+    if (problems.length && problems.every(p => overflow(out.frames).some(o => o.message === p))) {
+      const fitted = await fitStep(ai, d, out, today, steer)
+      if (fitted.tries) { out = fitted.out; problems = validate(out.frames, out.caption, d.story); attempts.push(`${fitted.tries} shortening attempt${fitted.tries === 1 ? "" : "s"}`) }
+    }
+    if (problems.length && attempts.length) return hold(deps, d, `the copy still breaks the template rules after two rewrites and ${attempts.join(" and ")}: ${problems.slice(0, 4).join("; ")}`)
   }
   if (problems.length) return hold(deps, d, `the copy still breaks the template rules after two rewrites: ${problems.slice(0, 4).join("; ")}`)
   d.frames = out.frames; d.caption = out.caption; d.holdReason = undefined; d.error = undefined
@@ -617,6 +644,53 @@ async function fitStep(ai: McuAi, d: McuDraft, out: { frames: FrameCopy[]; capti
     if (broke.length) { turnedDown = [`the last shorter version was turned down because it broke these rules: ${broke.slice(0, 3).join("; ")}`]; continue }
     cur = candidate
     if (!overflow(cur.frames).length) { tries++; break }
+  }
+  return { out: cur, tries }
+}
+/** Rewording attempts for copied wording, after the rewrites and before the fit; the limits stay as ruled (founder, 2026-10-18). */
+export const MAX_FRESH_ATTEMPTS = 3
+/** The fields that copy more of the source than the profile allows (none when the profile doesn't check originality). */
+function copiedFields(frames: FrameCopy[], caption: string, story: Story): Copied[] {
+  const c = BRAND.checks
+  return c?.originality ? originalityFindings(frames, caption, story, c.originality, [...(c.headline?.fields ?? []), ...(c.headline?.hookFields ?? [])]) : []
+}
+/**
+ * The fresh-wording pass (gate round 6: a News caption still copied 16 words in a row from army.mil after two
+ * rewrites). Like the fit, it is targeted: the writer is shown each copied run and asked to reword only the fields
+ * that carry one. Only those fields are taken from its answer, and only when the field then copies less than before;
+ * every other field and the caption stay as they were. A rewording that breaks another rule (a figure, the source line,
+ * the deck) is turned down and the next attempt is told why; a rewording that runs long is left to the fit pass that
+ * follows. tries: how many attempts were made.
+ */
+async function freshStep(ai: McuAi, d: McuDraft, out: { frames: FrameCopy[]; caption: string }, today: string, steer: { seeds: McuSeeds | null; direction?: string }): Promise<{ out: { frames: FrameCopy[]; caption: string }; tries: number }> {
+  let cur = out, tries = 0, turnedDown: string[] = []
+  const name = (c: Copied) => c.field === "caption" ? "caption" : `${cur.frames.length > 1 ? `frame ${c.frame + 1} ` : ""}${c.field}`
+  const runOf = (all: Copied[], c: Copied) => all.find(x => x.frame === c.frame && x.field === c.field)?.run.length ?? 0
+  for (; tries < MAX_FRESH_ATTEMPTS; tries++) {
+    const copied = copiedFields(cur.frames, cur.caption, d.story)
+    if (!copied.length) break
+    const r = await ai.write({ kind: d.kind, story: d.story, today, ...steer, previous: { frames: cur.frames, caption: cur.caption }, fresh: [...copied.map(c => `${name(c)}: ${c.message}`), ...turnedDown] })
+    const next = { frames: cur.frames.map(f => ({ ...f, fields: { ...f.fields } })), caption: cur.caption }
+    for (const c of copied) {
+      if (c.field === "caption") { if (r.caption?.trim()) next.caption = r.caption.trim(); continue }
+      const raw = r.frames[c.frame]?.fields[c.field]
+      if (typeof raw === "string" && raw.trim()) next.frames[c.frame].fields[c.field] = fix({ ...next.frames[c.frame], fields: { ...next.frames[c.frame].fields, [c.field]: raw } }, c.frame, d, today).fields[c.field]
+    }
+    // A field is taken only when it now copies less; otherwise it keeps its old wording.
+    const after = copiedFields(next.frames, next.caption, d.story)
+    let changed = false
+    for (const c of copied) {
+      if (runOf(after, c) < c.run.length) { changed = true; continue }
+      if (c.field === "caption") next.caption = cur.caption
+      else next.frames[c.frame].fields[c.field] = cur.frames[c.frame].fields[c.field]
+    }
+    turnedDown = []
+    if (!changed) { turnedDown = ["the last answer still copied the same run of words: say it differently, in your own words"]; continue }
+    const left = copiedFields(next.frames, next.caption, d.story)
+    const broke = validate(next.frames, next.caption, d.story).filter(p => !left.some(x => x.message === p) && !overflow(next.frames).some(o => o.message === p))
+    if (broke.length) { turnedDown = [`the last rewording was turned down because it broke these rules: ${broke.slice(0, 3).join("; ")}`]; continue }
+    cur = next
+    if (!left.length) { tries++; break }
   }
   return { out: cur, tries }
 }
@@ -692,7 +766,7 @@ export function searchedPageUsable(url: string, maker: string, outlets: readonly
  * Each is fetched once, sized from its own header and dropped below MIN_SHORT_SIDE; at most MAX_SHOWN go to the
  * vision pick. Sources that need a key or account (the DVIDS API) are not used until the founder adds one.
  */
-async function gatherMedia(deps: WorkerDeps, ai: McuAi, story: Story, frame: FrameCopy, avoid: string[], reuse?: MediaCandidate[]): Promise<{ candidate: MediaCandidate; image: Uint8Array; mime: string }[]> {
+async function gatherMedia(deps: WorkerDeps, ai: McuAi, story: Story, frame: FrameCopy, avoid: string[], reuse?: MediaCandidate[], representativeOnly = false): Promise<{ candidate: MediaCandidate; image: Uint8Array; mime: string }[]> {
   const out: { candidate: MediaCandidate; image: Uint8Array; mime: string }[] = [], seen = new Set<string>(avoid)
   const add = async (c: MediaCandidate | null) => {
     if (!c || out.length >= MAX_SHOWN || seen.has(c.pageUrl) || seen.has(c.url)) return
@@ -712,6 +786,17 @@ async function gatherMedia(deps: WorkerDeps, ai: McuAi, story: Story, frame: Fra
   // An ICYMI story card shows the photo its published post used, when that can be recovered; nothing else is searched.
   if (reuse) { for (const c of reuse) await add(c); return out }
   const pages: SourcePage[] = [], outlets = await outletSites(deps)
+  // The representative pass: only the photo search, asked for the people, unit or equipment the story is about; the
+  // story's pages and the archives were already tried for the subject itself.
+  if (representativeOnly) {
+    const maker = makerOf(frame, story)
+    for (const u of await ai.findPhotoPages({ story, frame, representative: true }).catch(() => [])) {
+      if (out.length >= MAX_SHOWN) break
+      if (!searchedPageUsable(u, maker, outlets)) continue
+      try { const pg = await deps.fetchPage(u); if (searchedPageUsable(pg.url, maker, outlets)) await add(pageImageCandidate(pg, isDvidsImagePage(pg.url) ? "dvids" : "source")) } catch { /* skipped */ }
+    }
+    return out
+  }
   // A social post's share image is MCU's own rendered card (ICYMI's stories link to Instagram), and an outlet's photo
   // is licensed to the outlet: neither is a photo source.
   for (const u of [story.primaryUrl, ...(story.supporting ?? []).map(x => x.url)].filter(u => /^https:\/\//.test(u) && !SOCIAL_HOST.test(u) && !isOutlet(u, outlets))) { try { pages.push(await deps.fetchPage(u)) } catch { /* skipped */ } }
@@ -791,14 +876,14 @@ export function cropFit(width: number, height: number, box: SubjectBox, placemen
  * deconflict themselves a bit better from the text"; the forest "made it contextual and interesting", while open sky
  * "is just unused space to feature the actual vehicle more".
  */
-const ZOOM = { context: { bottom: 0.6, height: 0.45 }, empty: { bottom: 0.72, height: 0.62 }, maxWidth: 0.9, minWindowPx: 600 }
+const ZOOM = { context: { bottom: 0.6, height: 0.45 }, empty: { bottom: 0.72, height: 0.62 }, clear: { bottom: 0.5, height: 0.4 }, maxWidth: 0.9, minWindowPx: 600 }
 /**
  * The crop (fractions of the photo) that zooms a subject into that space on a 4:5 (or 9:16) card, within the photo's
  * edges and never narrower than 600 px of source, so the upscale stays sharp. lib/image-crop.ts applies it before the
  * Canva fill, which then has nothing left to centre.
  */
-export function zoomCrop(width: number, height: number, box: SubjectBox, placement: Placement, context = true, core?: SubjectBox): CropBox {
-  const f = FRAME_ASPECT[placement], target = context ? ZOOM.context : ZOOM.empty
+export function zoomCrop(width: number, height: number, box: SubjectBox, placement: Placement, context = true, core?: SubjectBox, clearOfText = false): CropBox {
+  const f = FRAME_ASPECT[placement], target = clearOfText ? ZOOM.clear : context ? ZOOM.context : ZOOM.empty
   // The height fits the whole subject; the width only has to hold the core, centred on it.
   const w = core ?? box
   const bw = (w.x1 - w.x0) * width, bh = (box.y1 - box.y0) * height
@@ -861,19 +946,35 @@ async function mediaStep(deps: WorkerDeps, ai: McuAi, d: McuDraft): Promise<void
     // Nothing recoverable from the published post: search, and say so.
     const searched = !shown.length
     if (searched) shown = await gatherMedia(deps, ai, story, frame, avoid)
-    const pick = await ai.pickMedia({ story, frame, candidates: shown, avoid: [...avoid], representative })
-    const chosen = choosePhoto(pick, shown.map(x => x.candidate), d.placement)
-    console.info("[content-pipeline] media", JSON.stringify({ draft: d.id, v: d.version, frame: i + 1, retry: d.mediaRetries ?? 0, representative, shown: shown.map(x => `${x.candidate.origin ?? "?"}:${x.candidate.width}x${x.candidate.height}:${x.candidate.title.slice(0, 60)}`), ranked: pick.ranked ?? null, turnedDown: pick.turnedDown ?? null, chosen: chosen.index, crop: chosen.index === null ? null : chosen.crop, why: chosen.index === null ? chosen.why : null }))
+    let pick = await ai.pickMedia({ story, frame, candidates: shown, avoid: [...avoid], representative })
+    let chosen = choosePhoto(pick, shown.map(x => x.candidate), d.placement)
+    const log = (pass: string) => console.info("[content-pipeline] media", JSON.stringify({ draft: d.id, v: d.version, frame: i + 1, retry: d.mediaRetries ?? 0, representative, pass, shown: shown.map(x => `${x.candidate.origin ?? "?"}:${x.candidate.width}x${x.candidate.height}:${x.candidate.title.slice(0, 60)}`), ranked: pick.ranked ?? null, turnedDown: pick.turnedDown ?? null, chosen: chosen.index, crop: chosen.index === null ? null : chosen.crop, why: chosen.index === null ? chosen.why : null }))
+    log("subject")
+    // No photo of the subject, where the series allows a representative one (gate round 6: a Breaking story about an
+    // Office of Strategic Capital loan had no candidate at all): one more search, for the people, unit or equipment the
+    // story is about, before the draft gives up on the subject.
+    let repTried = false
+    if (chosen.index === null && searched && representative) {
+      repTried = true
+      const first = shown
+      shown = await gatherMedia(deps, ai, story, frame, [...avoid, ...first.flatMap(x => [x.candidate.pageUrl, x.candidate.url])], undefined, true)
+      if (shown.length) {
+        pick = await ai.pickMedia({ story, frame, candidates: shown, avoid: [...avoid], representative })
+        chosen = choosePhoto(pick, shown.map(x => x.candidate), d.placement)
+      }
+      log("representative")
+    }
     if (chosen.index === null) {
       d.media = media
       // No photo of the subject: like a source that can't support the post, the subject is replaced (MAX_AUTO_REPLACE).
-      return sourceHold(deps, ai, d, `no relevant, licensed photo was found${d.frames.length > 1 ? ` for frame ${i + 1}` : ""}${frame.mediaQuery ? ` ("${frame.mediaQuery}")` : ""}: ${chosen.why} (${pick.reason}).`)
+      const rep = repTried ? `; a representative photo (the people, unit or equipment the story is about) was searched for too, and ${shown.length ? "none of the photos found qualified" : "none was found"}` : ""
+      return sourceHold(deps, ai, d, `no relevant, licensed photo was found${d.frames.length > 1 ? ` for frame ${i + 1}` : ""}${frame.mediaQuery ? ` ("${frame.mediaQuery}")` : ""}: ${chosen.why} (${pick.reason})${rep}.`)
     }
     const c = shown[chosen.index].candidate
     used.add(c.pageUrl)
     const fresh = item && searched ? `No story's published post has a recorded photo${reuse.length ? " that could be fetched" : ""}, so the cover's was searched for: check it against ${item.postId}` : ""
     const rep = chosen.ranked.representative ? `Representative photo${chosen.ranked.shows ? ` (${chosen.ranked.shows})` : ""}, not the event itself: check the caption doesn't present it as the event` : ""
-    media[i] = { url: c.url, pageUrl: c.pageUrl, title: c.title, license: c.license, creator: c.creator, credit: c.credit, usGovernment: c.usGovernment, ...(c.date ? { date: c.date } : {}), ...(c.rightsNote ? { rightsNote: c.rightsNote } : {}), ...(c.rightsNote || rep || fresh ? { note: [c.rightsNote, rep, fresh].filter(Boolean).join(". ") } : {}), crop: chosen.crop }
+    media[i] = { url: c.url, pageUrl: c.pageUrl, title: c.title, license: c.license, creator: c.creator, credit: c.credit, usGovernment: c.usGovernment, ...(c.date ? { date: c.date } : {}), ...(c.rightsNote ? { rightsNote: c.rightsNote } : {}), ...(c.rightsNote || rep || fresh ? { note: [c.rightsNote, rep, fresh].filter(Boolean).join(". ") } : {}), crop: chosen.crop, subject: { box: chosen.ranked.box, ...(chosen.ranked.core ? { core: chosen.ranked.core } : {}), context: chosen.ranked.context !== false, width: c.width, height: c.height } }
   }
   d.media = media
   // Credits and the DoD non-endorsement line belong to the caption the reviewer approves.
@@ -937,7 +1038,7 @@ async function designStep(deps: WorkerDeps, d: McuDraft): Promise<void> {
     const missing = Object.keys(frame.fields).filter(k => dataset[k] !== "text")
     if (missing.length) notices.add(`${series.label} template has no field for ${missing.join(", ")}`)
     const title = `${d.id} v${d.version}${d.frames.length > 1 ? ` · ${i + 1}/${d.frames.length}` : ""} — ${(frame.fields.headline || frame.fields.subject_identifier || frame.fields.counter || series.label).slice(0, 120)}`
-    const r = await deps.content.createDesign({ requestId: `${KEY_PREFIX}${d.id}:v${d.version}:f${i + 1}${d.autoReplaced ? `:r${d.autoReplaced}` : ""}${d.mediaRetries ? `:m${d.mediaRetries}` : ""}`, templateId, title, text, ...(image ? { image } : {}) })
+    const r = await deps.content.createDesign({ requestId: `${KEY_PREFIX}${d.id}:v${d.version}:f${i + 1}${d.autoReplaced ? `:r${d.autoReplaced}` : ""}${d.mediaRetries ? `:m${d.mediaRetries}` : ""}${d.labelRefit ? `:l${d.labelRefit}` : ""}`, templateId, title, text, ...(image ? { image } : {}) })
     designs.push({ templateId, ...r })
   }
   d.designs = designs; d.notices = [...notices]; d.status = "reviewing"
@@ -951,12 +1052,13 @@ async function reviewStep(deps: WorkerDeps, ai: McuAi, d: McuDraft): Promise<voi
     if (!url) continue
     images.push(await deps.fetchImage(url))
   }
-  const qa: string[] = [], photoDefects: { frame: number; defect: string }[] = []
+  const qa: string[] = [], photoDefects: { frame: number; defect: string }[] = [], labelHits = new Set<number>()
   for (const [i, frame] of d.frames.entries()) {
     if (!images[i]) continue
     for (const p of await ai.checkArtwork({ frame, images: [images[i]], noPhoto: !d.media[i] }).catch(() => [{ defect: "automatic artwork check did not run", photo: false }])) {
       qa.push(d.frames.length > 1 ? `frame ${i + 1}: ${p.defect}` : p.defect)
       if (p.photo) photoDefects.push({ frame: i, defect: p.defect })
+      else if (labelDefect(p.defect) && SERIES[frame.series].fields.some(f => f.name === "image_context")) labelHits.add(i)
     }
   }
   // The machine fixes what it can before anyone reviews: a photo defect sends the draft back for the next photo,
@@ -970,11 +1072,33 @@ async function reviewStep(deps: WorkerDeps, ai: McuAi, d: McuDraft): Promise<voi
     d.status = "media"
     return save(deps, d, `artwork check: ${retryable.map(p => p.defect).join("; ")} — trying another photo (${d.mediaRetries}/${MAX_MEDIA_RETRIES})`)
   }
+  // The image label crosses the subject (gate round 6: "IMAGE: … runs across the rocket's nozzle"). The label's place
+  // is the template's, so the photo moves instead: once, re-zoomed so the subject's base clears the text block, then
+  // filled and checked again. A crop that can't move, or that would break the crop rule, leaves the defect for review.
+  if (labelHits.size && !d.labelRefit) {
+    let moved = false
+    for (const i of labelHits) {
+      const m = d.media[i], s = m?.subject
+      if (!m || !s) continue
+      const crop = zoomCrop(s.width, s.height, s.box, d.placement, s.context, s.core, true)
+      const fit = cropFit(crop.width * s.width, crop.height * s.height, boxInCrop(s.box, crop), d.placement, s.core ? boxInCrop(s.core, crop) : undefined)
+      if (fit.ok && JSON.stringify(crop) !== JSON.stringify(m.crop)) { d.media[i] = { ...m, crop }; moved = true }
+    }
+    if (moved) {
+      d.labelRefit = 1; d.status = "designing"
+      return save(deps, d, `artwork check: the image label crosses the subject (${[...labelHits].map(i => qa.find(q => labelDefect(q) && (d.frames.length === 1 || q.startsWith(`frame ${i + 1}:`))) ?? "").filter(Boolean).join("; ").slice(0, 300)}) — the photo was re-zoomed above the text block and is filled again (1/1)`)
+    }
+  }
   for (const m of d.media) if (m?.note && !qa.includes(m.note)) qa.push(m.note)
   d.qa = qa; d.status = "posting"
   await save(deps, d, `artwork checked (v${d.version}): ${qa.length ? `${qa.length} to check` : "no defects found"}`)
 }
 
+/** An artwork defect about the card's image label (the credit line) colliding with the photo, as the check words it. */
+export function labelDefect(defect: string): boolean {
+  return /\b(image|photo)\s+(credit|label|caption)\b|\bcredit\s+(line|label|text)\b|\bimage_context\b|\b(IMAGE|ARCHIVE):/i.test(defect)
+    && /\b(across|over|overlap\w*|collid\w*|collision|obscur\w*|cross\w*|clash\w*|hard to read|illegible|low[- ]contrast)\b/i.test(defect)
+}
 /** The content post's review notes: sources, photo rights, checks and what was not done. Plain text, ≤4,000 characters. */
 export function reviewNotes(d: McuDraft): string {
   const sections: string[] = [`${d.id} · v${d.version} · ${label(d.kind)} — drafted by the content pipeline (${BRAND.rulesVersion}). Review the card and caption, then approve through the publisher.`]

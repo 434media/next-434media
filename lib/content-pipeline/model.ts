@@ -20,7 +20,11 @@ export interface McuAi {
    * direction: the requester's proactive instruction from Generate (angle, emphasis), never above the rules or the
    * source. instructions: a reviewer's change to an existing draft (the drawer, Phase 2).
    */
-  write(input: { kind: RequestKind; story: Story; today: string; previous?: { frames: FrameCopy[]; caption: string }; instructions?: string; problems?: string[]; direction?: string; seeds?: McuSeeds | null; fit?: string[] }): Promise<{ frames: FrameCopy[]; caption: string; hold?: string }>
+  /**
+   * fit: a shortening-only request for the fields named (worker.ts fitStep). fresh: a rewording-only request for the
+   * fields that copy a run of the source's words, each shown with the copied run (worker.ts freshStep).
+   */
+  write(input: { kind: RequestKind; story: Story; today: string; previous?: { frames: FrameCopy[]; caption: string }; instructions?: string; problems?: string[]; direction?: string; seeds?: McuSeeds | null; fit?: string[]; fresh?: string[] }): Promise<{ frames: FrameCopy[]; caption: string; hold?: string }>
   /**
    * An official page that refused the fetch, read from the search tool's extracted content (founder, 2026-10-18).
    * Null unless the search returns that exact page. Never used for an outlet.
@@ -29,7 +33,8 @@ export interface McuAi {
   /** Whether an official page describes the same event an outlet's report covers, not an older one it only mentions. */
   sameEvent?(input: { report: SourcePage; primary: SourcePage }): Promise<{ same: boolean; reason: string }>
   /** DVIDS image pages (and official .mil/.gov photo pages) showing the card's subject, found by web search. */
-  findPhotoPages(input: { story: Story; frame: FrameCopy }): Promise<string[]>
+  /** representative: also pages showing the people, unit or equipment the story is about (News, Breaking; never DT101). */
+  findPhotoPages(input: { story: Story; frame: FrameCopy; representative?: boolean }): Promise<string[]>
   /** The best candidate, and for each relevant one (best first) where its subject sits, so the server can test the 4:5 crop. */
   /** representative: the story may use a representative photo (News, Breaking, ICYMI stories; never DT101). */
   pickMedia(input: { story: Story; frame: FrameCopy; candidates: { candidate: MediaCandidate; image: Uint8Array; mime: string }[]; avoid: string[]; representative?: boolean }): Promise<{ index: number | null; reason: string; ranked?: RankedPhoto[]; turnedDown?: string[] }>
@@ -80,10 +85,12 @@ function fieldsSchema(series: SeriesKey, stories = 5) {
 }
 const frameSchema = (series: SeriesKey, stories = 5) => z.object({ fields: fieldsSchema(series, stories), mediaQuery: z.string().describe("3–6 words naming the actual subject, for finding a photo") })
 function writeSchema(kind: RequestKind, stories = 5) {
-  const base = { caption: z.string().describe("the one master caption"), hold: z.string().optional().describe("only if the source cannot support the post: the one-sentence reason") }
+  const caption = { caption: z.string().describe("the one master caption") }
+  // A roundup has no hold: the engine has already decided which stories qualify (gate round 6), so the writer is never
+  // offered one to decide it again.
   return kind === "icymi"
-    ? z.object({ cover: frameSchema("icymi_cover", stories), ...base })
-    : z.object({ card: frameSchema(kind as SeriesKey), ...base })
+    ? z.object({ cover: frameSchema("icymi_cover", stories), ...caption })
+    : z.object({ card: frameSchema(kind as SeriesKey), ...caption, hold: z.string().optional().describe("only if the source cannot support the post: the one-sentence reason") })
 }
 async function submitted<T>(r: { toolCalls: { toolName: string; input: unknown }[] }, name: string): Promise<T> {
   const call = r.toolCalls.find(c => c.toolName === name)
@@ -167,6 +174,11 @@ export async function servedCall<R extends Served, T>(step: PipelineStep, model:
  * one system and always needs the system itself.
  */
 const REPRESENTATIVE = "This story is about a program, contract, organization or software that may have no photo of its own. A representative photo is acceptable: the people, unit or equipment the story is about, using or showing it, where the photo's own caption or page identifies that (soldiers testing NGC2, per a DVIDS caption). Mark those match representative, and still prefer an exact one. A generic scene, another program's photo or a logo is not representative.\n\n"
+/**
+ * The representative search (gate round 6: a Breaking story about an Office of Strategic Capital loan found no photo
+ * candidate at all, since a loan has no photo of its own). Asked only where the story allows a representative photo.
+ */
+const REPRESENTATIVE_SEARCH = " This story may have no photo of its own (a contract, a loan, a program, an office, software). Also search for pages whose captioned photo shows the people, unit, office or equipment the story is about, identified by the photo's own caption: the office's leaders at an event, the unit that will field it, the facility or equipment it pays for. Never a generic scene, a logo or another program's photo."
 type RawBox = { x0: number; y0: number; x1: number; y1: number }
 type RawRanked = RawBox & { index: number; shows?: string; match?: string; core?: RawBox; context?: boolean }
 export interface RankedPhoto { index: number; box: SubjectBox; core?: SubjectBox; context?: boolean; shows?: string; representative?: boolean }
@@ -226,21 +238,24 @@ export function createMcuAi(deps: { models: Record<PipelineStep, string>; search
       return { candidates, ...(note ? { note } : {}) }
     },
 
-    async write({ kind, story, today, previous, instructions, problems, direction, seeds, fit }) {
+    async write({ kind, story, today, previous, instructions, problems, direction, seeds, fit, fresh }) {
       const frames = framesFor(kind)
       const spec = frames.map((s, i) => `Frame ${i + 1} — ${SERIES[s].label}: ${SERIES[s].fields.filter(f => !f.fixed && !unusedStorySlot(f.name, icymiCount(story))).map(fieldBrief).join("; ") || "(media only)"}`).join("\n")
       const n = icymiCount(story), nn = `0${n}`
-      const icymi = kind === "icymi" ? `\nICYMI: ${n} published ${n === 1 ? "story" : "stories"}. You write only the cover: its headline is fixed and filled by the server; story_01${n > 1 ? `..story_${nn}` : ""} = one short row per story, in order; date = today as DDMMMYY. After the cover, each story's own published card is posted exactly as it was, so you write nothing for them. The stories:\n${(story.roundup ?? []).map((p, i) => `${i + 1}. ${p.title}\n${p.caption}`).join("\n\n")}` : ""
+      const icymi = kind === "icymi" ? `\nICYMI: ${n} published ${n === 1 ? "story" : "stories"}. The server has already checked that each one was published with its card, so every story below goes in the roundup: never judge or question whether a story qualifies. You write only the cover: its headline is fixed and filled by the server; story_01${n > 1 ? `..story_${nn}` : ""} = one short row per story, in order; date = today as DDMMMYY. After the cover, each story's own published card is posted exactly as it was, so you write nothing for them. The stories:\n${(story.roundup ?? []).map((p, i) => `${i + 1}. ${p.title}\n${p.caption}`).join("\n\n")}` : ""
       const schema = writeSchema(kind, icymiCount(story))
       const asPrevious = (p: { frames: FrameCopy[]; caption: string }) => JSON.stringify(kind === "icymi" ? { cover: { fields: p.frames[0]?.fields }, caption: p.caption } : { card: { fields: p.frames[0]?.fields }, caption: p.caption })
       // A fit request (worker.ts fitStep): only the named fields are shortened; the server keeps everything else as it was.
-      const ask = fit?.length
+      // A fresh-wording request (worker.ts freshStep): only the named fields are reworded; the rest stays as it was.
+      const ask = fresh?.length
+        ? `These fields copy a run of words from the source: ${fresh.join("; ")}. Rewrite only these fields in fresh wording of your own: the same facts and claim, said differently, never the copied run or most of it. A direct quote belongs only in quotation marks, attributed. Keep every rule above, including each field's length limits, and every figure exactly as the source gives it. Leave every other field and, unless it is named here, the caption exactly as they are.`
+        : fit?.length
         ? `These fields run past the template's limits: ${fit.join("; ")}. Shorten only these fields: fewer or shorter whole words, or rephrase. Never abbreviate a word or cut one off. Keep the claim, the facts and every rule above; the result must still be a complete, specific, active statement. Leave every other field and the caption exactly as they are.`
         : `${problems?.length ? `Fix these problems: ${problems.join("; ")}. ` : ""}${instructions ? `Reviewer's changes: ${instructions}` : "Submit the corrected version."} Keep everything the reviewer did not ask to change.`
       const r = await run("write", model => generateText({
         model, maxOutputTokens: outputBudget(model, 16_000), providerOptions: callOptions(model, "medium"), allowSystemInMessages: true,
         tools: { submit_post: tool({ description: "Submit the finished card copy and caption.", inputSchema: schema as z.ZodType<Record<string, unknown>> }) }, toolChoice: { type: "tool", toolName: "submit_post" },
-        messages: [...system(`${brandDirection(seeds)}Today is ${today}. Write the on-card copy and the one master caption for this ${BRAND.name} ${kind === "icymi" ? "ICYMI roundup" : SERIES[kind as SeriesKey].label} post from the source below, and submit them with submit_post. Use only facts in the source. Fill every field. If the source cannot support a post under the rules (unverifiable figure, not Breaking-worthy, etc.), set hold to the one-sentence reason. Never hold for the photo or its credit (a later step chooses it)${BRAND.research.writeNote}.\n${spec}${icymi}`),
+        messages: [...system(`${brandDirection(seeds)}Today is ${today}. Write the on-card copy and the one master caption for this ${BRAND.name} ${kind === "icymi" ? "ICYMI roundup" : SERIES[kind as SeriesKey].label} post from the source below, and submit them with submit_post. Use only facts in the source. Fill every field.${kind === "icymi" ? "" : " If the source cannot support a post under the rules (unverifiable figure, not Breaking-worthy, etc.), set hold to the one-sentence reason. Never hold for the photo or its credit (a later step chooses it)"}${BRAND.research.writeNote}.\n${spec}${icymi}`),
           { role: "user", content: `SOURCE: ${story.sourceTitle}\nURL: ${story.primaryUrl}\nPublisher: ${story.publisher}\nPublished: ${story.publishedAt ?? "not stated on the page"}${story.reportedAt ? `\nReported: ${story.reportedAt}, by a news outlet's report of the same event (the card's date; never cite the outlet)` : ""}${story.whyNow ? `\nWhy now (Breaking): ${story.whyNow}` : ""}${story.supporting?.length ? `\nSupporting sources (their text follows the primary's, each under its own heading; use them only for what the primary leaves out, such as the maker and its headquarters): ${story.supporting.map(x => x.url).join(" ; ")}` : ""}\n\n${story.sourceText.slice(0, 24_000)}${direction ? `\n\nREQUESTER'S DIRECTION (steer the angle and emphasis with it; it never overrides the rules above or the facts in the source): ${direction}` : ""}${instructions && !previous ? `\n\nREVIEWER'S DIRECTION: ${instructions}` : ""}` },
           ...(previous ? [{ role: "assistant" as const, content: `Previous version: ${asPrevious(previous)}` }, { role: "user" as const, content: ask }] : [])],
       }))
@@ -273,20 +288,20 @@ export function createMcuAi(deps: { models: Record<PipelineStep, string>; search
       }), r => submitted<{ same: boolean; reason: string }>(r, "judge_event"))
     },
 
-    async findPhotoPages({ story, frame }) {
+    async findPhotoPages({ story, frame, representative }) {
       const subject = frame.fields.subject_identifier || frame.fields.headline || story.title
       // Search, then pick from what the search returned (the same two-call pattern as research, for the same reason).
       const searched = await run("photoSearch", model => generateText({
         model, tools: deps.searchTools, stopWhen: stepCountIs(6), maxOutputTokens: outputBudget(model, 8_000), providerOptions: callOptions(model, "low"),
         prepareStep: ({ stepNumber }) => stepNumber === 0 ? { toolChoice: "required" as const } : {},
-        messages: [{ role: "system", content: `You find photos for ${BRAND.photos.searchSubject}. Search the web for pages whose main photo shows the subject itself (the actual system, product, vehicle, unit or event in the story), from sources whose photos may be used with credit: DVIDS image pages (https://www.dvidshub.net/image/<number>/...); U.S. government pages (defense.gov, war.gov, army.mil, navy.mil, af.mil, marines.mil, spaceforce.mil, uscg.mil, nasa.gov, other .mil and .gov sites); and the maker's own newsroom, press-release, press-kit or media pages. Never news outlets' or stock-photo sites' pages (their photos are licensed to them). Return exact page URLs only, best first; never image-file URLs, search pages or guesses. Return an empty list if none show the subject. Search first, then list the best page URLs you found with one line each on what their main photo shows.` },
+        messages: [{ role: "system", content: `You find photos for ${BRAND.photos.searchSubject}. Search the web for pages whose main photo shows the subject itself (the actual system, product, vehicle, unit or event in the story), from sources whose photos may be used with credit: DVIDS image pages (https://www.dvidshub.net/image/<number>/...); U.S. government pages (defense.gov, war.gov, army.mil, navy.mil, af.mil, marines.mil, spaceforce.mil, uscg.mil, nasa.gov, other .mil and .gov sites); and the maker's own newsroom, press-release, press-kit or media pages. Never news outlets' or stock-photo sites' pages (their photos are licensed to them). Return exact page URLs only, best first; never image-file URLs, search pages or guesses. Return an empty list if none show the subject.${representative ? REPRESENTATIVE_SEARCH : ""} Search first, then list the best page URLs you found with one line each on what their main photo shows.` },
           { role: "user", content: `Subject: ${subject}\nStory: ${story.title}\nPublisher: ${story.publisher}\nPhoto idea: ${frame.mediaQuery ?? ""}` }],
       }), r => ({ text: r.text, urls: searchResultUrls(r.steps) }))
       if (!searched.urls.length) return []
       const picked = await run("photoSearch", model => generateText({
         model, maxOutputTokens: outputBudget(model, 4_000), providerOptions: callOptions(model, "low"),
         tools: { submit_pages: tool({ description: "Submit the page URLs whose main photo shows the subject, best first.", inputSchema: z.object({ pages: z.array(z.string()).describe("up to 8 page URLs from the list, best first") }) }) }, toolChoice: { type: "tool", toolName: "submit_pages" },
-        messages: [{ role: "system", content: "From the notes and the search-result URLs, submit the pages whose main photo shows the subject itself, best first, using URLs exactly as listed. Never image-file URLs, search pages, news outlets' or stock-photo sites' pages. Submit an empty list if none fit." },
+        messages: [{ role: "system", content: `From the notes and the search-result URLs, submit the pages whose main photo shows the subject itself${representative ? ", or else the people, unit or equipment the story is about, as the page's own caption identifies them" : ""}, best first, using URLs exactly as listed. Never image-file URLs, search pages, news outlets' or stock-photo sites' pages. Submit an empty list if none fit.` },
           { role: "user", content: `Subject: ${subject}\nNOTES:\n${searched.text.slice(0, 6_000) || "(none)"}\n\nSEARCH-RESULT URLS:\n${searched.urls.slice(0, 60).join("\n")}` }],
       }), r => submitted<{ pages: string[] }>(r, "submit_pages"))
       const listed = new Set(searched.urls.map(normalizeUrl))
