@@ -381,8 +381,9 @@ export interface ContentPost {
   pipeline_outcome?: PipelineOutcome | null
   // Set by the content pipeline when it writes a draft: the photo each frame used, in frame order. ICYMI reuses it.
   pipeline_media?: PipelineMedia[]
-  // Set when the publisher's connector created the post; requestId makes creation idempotent.
-  intake?: { requestId: string; metaBrand: string; requestedBy: string; at: string }
+  // Set when the publisher's connector created the post; requestId makes creation idempotent. source marks a post
+  // the content pipeline created (only run.ts sets it); the pipeline adopts no other post for its request ids.
+  intake?: { requestId: string; metaBrand: string; requestedBy: string; at: string; source?: "content-pipeline" }
   archived?: boolean
   // Canva is the permanent creative source; the staged JPEG exports under
   // `assets` are references to it. export_fingerprint is the SHA-256 of the

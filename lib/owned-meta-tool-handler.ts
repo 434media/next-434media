@@ -3,6 +3,7 @@ import { META_BRANDS, MetaBlocked, MetaPermissionError, type MetaBatch, type Met
 import { needsContinuation, noticesFor, parseApprovers, preflightFor, recordExternalPublication, slackApprovalFrom, slackText, summarize, type SlackMessage } from "./owned-meta-tool"
 import { assertAttachable, attachExports, createPost, findPosts, type IntakeDeps, type Principal } from "./owned-meta-intake"
 import type { PrepareChoices } from "./owned-meta-execution"
+import { PIPELINE_KEY_PREFIX, reservedRequestId } from "./content-pipeline/ownership"
 
 /**
  * Operations behind the publisher connector (Smartie, through a ChatGPT MCP connector).
@@ -96,7 +97,9 @@ export async function runOwnedMetaTool(name: ToolName, rawInput: unknown, princi
       }
       case "canva_create_design": {
         const i = parsed.data as z.infer<typeof toolInput.canva_create_design>
-        // Creates a private working design only: nothing is attached, prepared or published here.
+        // Creates a private working design only: nothing is attached, prepared or published here. The pipeline's own
+        // ledger keys are reserved, so a caller can't plant a design the pipeline would then reuse.
+        if (reservedRequestId(i.requestId)) throw new MetaBlocked(`requestIds starting with "${PIPELINE_KEY_PREFIX}" are reserved for the content pipeline`)
         try { const r = await deps.canvaCreate(i); return { status: 200, body: { ...r.design, reused: r.reused } } } catch (error) { throw canvaBlocked(error) }
       }
       case "canva_preview": {
