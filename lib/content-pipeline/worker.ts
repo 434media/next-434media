@@ -280,9 +280,10 @@ export function icymiStory(posts: PostRow[], window: { startMs: number; endMs: n
 }
 /**
  * A title that still says the post is a review draft (the Slack pilot's "MCU-BN-20261009-02 | Marconi … | REVIEW
- * DRAFT", gate round 6): whatever its status, it was never published as it stands.
+ * DRAFT", gate round 6): whatever its status, it was never published as it stands. The pilot's marker is a title segment
+ * of its own, after a "|"; a headline that merely mentions a review draft ("DoD opens review draft of CMMC rule") is not.
  */
-export const REVIEW_DRAFT_TITLE = /\breview[\s_-]*draft\b/i
+export const REVIEW_DRAFT_TITLE = /\|\s*review[\s_-]*draft\s*(\||$)/i
 /**
  * Whether a post is truly published, for ICYMI (gate round 6): its status is posted (a published link alone isn't
  * enough: any editor can set one) and its title doesn't mark it a review draft. The engine decides this, never the
@@ -1094,10 +1095,13 @@ async function reviewStep(deps: WorkerDeps, ai: McuAi, d: McuDraft): Promise<voi
   await save(deps, d, `artwork checked (v${d.version}): ${qa.length ? `${qa.length} to check` : "no defects found"}`)
 }
 
-/** An artwork defect about the card's image label (the credit line) colliding with the photo, as the check words it. */
+/**
+ * An artwork defect about the card's image label (the credit line) colliding with the photo's subject, as the check
+ * words it. Placement only: a remark about contrast or legibility alone is not one, since moving the photo can't fix it.
+ */
 export function labelDefect(defect: string): boolean {
   return /\b(image|photo)\s+(credit|label|caption)\b|\bcredit\s+(line|label|text)\b|\bimage_context\b|\b(IMAGE|ARCHIVE):/i.test(defect)
-    && /\b(across|over|overlap\w*|collid\w*|collision|obscur\w*|cross\w*|clash\w*|hard to read|illegible|low[- ]contrast)\b/i.test(defect)
+    && /\b(across|over|overlap\w*|collid\w*|collision|obscur\w*|cross\w*|clash\w*|covers?|covering|runs into|on top of)\b/i.test(defect)
 }
 /** The content post's review notes: sources, photo rights, checks and what was not done. Plain text, ≤4,000 characters. */
 export function reviewNotes(d: McuDraft): string {
@@ -1151,7 +1155,7 @@ async function sourceHold(deps: WorkerDeps, ai: McuAi, d: McuDraft, reason: stri
   d.rejected = rejected; d.story = found[0]
   // A new subject starts its photo search afresh; its designs get their own Canva request ids (":r<n>"), since a
   // photo hold can come after the first subject's design was created.
-  d.frames = []; d.caption = undefined; d.media = []; d.designs = []; d.qa = []; d.holdReason = undefined; d.mediaRetries = undefined; d.avoidMedia = undefined
+  d.frames = []; d.caption = undefined; d.media = []; d.designs = []; d.qa = []; d.holdReason = undefined; d.mediaRetries = undefined; d.avoidMedia = undefined; d.labelRefit = undefined
   // The new subject starts at writing: if the write below fails, the retry writes again rather than resuming the
   // photo step on nothing (gate round 3).
   d.status = "writing"
