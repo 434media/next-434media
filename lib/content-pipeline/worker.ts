@@ -626,7 +626,11 @@ function fix(f: FrameCopy, _index: number, d: McuDraft, today: string): FrameCop
   if (series.fields.some(x => x.name === "date")) fields.date = ddmmmyy(f.series === "icymi_cover" ? today : d.story.reportedAt ?? d.story.publishedAt ?? today)
   for (const x of series.fields) if (x.fixed) fields[x.name] = x.fixed
   if (f.series === "icymi_cover") for (const k of Object.keys(fields)) if (unusedStorySlot(k, icymiCount(d.story))) delete fields[k]
-  return { ...f, fields: normalizeFields(series, fields) }
+  const out = normalizeFields(series, fields)
+  // The cover's row numbers, one per story used ("01\n02\n03"), so a roundup of 3 or 4 shows no unused number. Set
+  // after normalizing, which would join the lines.
+  if (f.series === "icymi_cover" && series.fields.some(x => x.name === "story_numbers")) out.story_numbers = Array.from({ length: icymiCount(d.story) }, (_, i) => String(i + 1).padStart(2, "0")).join("\n")
+  return { ...f, fields: out }
 }
 function validate(frames: FrameCopy[], caption: string, story: Story): string[] {
   // The cover's slots past the roundup's last story are blank by design, not empty by mistake.
@@ -928,7 +932,7 @@ async function designStep(deps: WorkerDeps, d: McuDraft): Promise<void> {
     // A roundup of fewer than five blanks the cover's unused story slots, so none shows its sample text.
     if (frame.series === "icymi_cover" && icymiCount(d.story) < ICYMI_MAX) {
       for (const f of series.fields) if (unusedStorySlot(f.name, icymiCount(d.story)) && dataset[f.name] === "text") text[f.name] = " "
-      notices.add(`ICYMI cover: ${icymiCount(d.story)} of 5 story slots used. The template prints the numbers 01–05 itself, so the unused numbers still show; the cover needs a version for fewer stories in Canva`)
+      if (dataset.story_numbers !== "text") notices.add(`ICYMI cover: ${icymiCount(d.story)} of 5 story slots used. The template prints the numbers 01–05 itself, so the unused numbers still show; the cover needs a version for fewer stories in Canva`)
     }
     const missing = Object.keys(frame.fields).filter(k => dataset[k] !== "text")
     if (missing.length) notices.add(`${series.label} template has no field for ${missing.join(", ")}`)

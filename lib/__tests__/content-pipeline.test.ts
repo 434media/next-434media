@@ -72,7 +72,7 @@ function world(over: { ai?: Partial<McuAi>; pagePublished?: string; newsFeedHasM
     seeds: async () => over.seeds === undefined ? SEEDS : over.seeds,
     content: {
       recentPosts: async () => [{ id: "p1", title: "Old story", status: "posted", caption: "c" }],
-      templateFields: async t => { const media = t !== SERIES.news.templates.feed || over.newsFeedHasMedia !== false; return { headline: "text", deck: "text", date: "text", source: "text", ...(media ? { media: "image" } : {}), benefit_headline: "text", subject_identifier: "text", image_context: "text", counter: "text", story_01: "text", story_02: "text", story_03: "text", story_04: "text", story_05: "text" } },
+      templateFields: async t => { const media = t !== SERIES.news.templates.feed || over.newsFeedHasMedia !== false; return { headline: "text", deck: "text", date: "text", source: "text", ...(media ? { media: "image" } : {}), benefit_headline: "text", subject_identifier: "text", image_context: "text", counter: "text", story_numbers: "text", story_01: "text", story_02: "text", story_03: "text", story_04: "text", story_05: "text" } },
       createDesign: async i => { over.createDesign?.(i); designs.push(structuredClone(i)); return { designId: `DAH${i.requestId.replace(/[^A-Za-z0-9]/g, "").slice(-8)}`, editUrl: "https://www.canva.com/d/edit", viewUrl: "https://www.canva.com/d/view", previewUrls: ["https://export.canva.com/1.jpg"] } },
       writePost: async p => { posts.push(structuredClone(p)); return { postId: `post-${posts.length}`, holds: [] } },
       writeNoContent: async p => { const at = notices.findIndex(n => n.requestId === p.requestId); if (at >= 0) return { postId: `notice-${at + 1}` }; notices.push(structuredClone(p)); return { postId: `notice-${notices.length}` } },
@@ -1007,7 +1007,9 @@ test("ICYMI with 4 eligible posts: one cover with the fixed headline and four ro
   const cover = w.designs[0].text
   assert.equal(cover.headline, "TOP DEFENSE DEVELOPMENTS") // the profile's fixed value, never the model's
   assert.deepEqual([cover.story_01, cover.story_04, cover.story_05], ["Story 1 in one row", "Story 4 in one row", " "]) // the unused slot is blanked
-  assert.ok(d.notices.some(n => /ICYMI cover: 4 of 5 story slots used/.test(n)))
+  assert.equal(cover.story_numbers, "01\n02\n03\n04") // only the rows used are numbered (EAHYYaSYfJI)
+  assert.equal(w.designs[0].templateId, "EAHYYaSYfJI")
+  assert.ok(!d.notices.some(n => /ICYMI cover: 4 of 5 story slots used/.test(n)))
   // The board write: the cover's export, then each story's own staged card, exactly as posted, in order.
   assert.equal(w.posts.length, 1)
   assert.deepEqual(w.posts[0].designIds, [d.designs[0].designId])
@@ -1059,6 +1061,7 @@ test("ICYMI with 7 eligible posts: the draft waits for the requester's choice, w
   assert.equal(d.choice!.chosenBy, "marcos@434media.com"); assert.match(d.story.sourceTitle, /^4 published MCU stories from the week of 2026-10-05$/)
   assert.deepEqual(w.posts[0].slides!.map(x => x.url), [2, 3, 4, 6].map(n => `https://blob.example/content-posts/p${n}-01-page-1.jpg`))
   assert.equal(w.designs[0].text.headline, "TOP DEFENSE DEVELOPMENTS"); assert.equal(w.designs[0].text.story_04, "Story 4 in one row"); assert.equal(w.designs[0].text.story_05, " ")
+  assert.equal(w.designs[0].text.story_numbers, "01\n02\n03\n04")
   assert.match(w.posts[0].notes, /Chosen by marcos@434media\.com/)
   assert.equal(w.alerts.length, 1); assert.match((await w.store.getJob("job-icymi-1"))!.note!, /4 stories chosen by marcos@434media\.com/)
 })
@@ -1213,4 +1216,16 @@ test("an ICYMI choice that ends without one closes its task with the reason: clo
   assert.equal(second.status, "held"); assert.equal(second.holdReason, "no stories chosen: regenerated: a new ICYMI request (job-icymi-3) replaced it")
   assert.equal(third.status, "choosing")
   assert.deepEqual(closed.slice(1).map(c => c.taskId), ["task-2"]); assert.match(closed[1].note, /^Closed without a choice by the content pipeline at .*: regenerated: a new ICYMI request \(job-icymi-3\) replaced it\.$/)
+})
+
+test("a cover template without the story_numbers field keeps the old notice, and a three-story cover numbers three rows", async () => {
+  const w = world({ ai: { write: coverWriter() } })
+  w.deps.content.recentPosts = async () => [published(1), published(2), published(3)]
+  const fields = w.deps.content.templateFields
+  w.deps.content.templateFields = async t => { const f = await fields(t); delete f.story_numbers; return f }
+  await w.start({ kind: "icymi" })
+  const d = onlyDraft(w)
+  assert.equal(d.status, "in_review"); assert.equal(d.frames[0].fields.story_numbers, "01\n02\n03")
+  assert.equal(w.designs[0].text.story_numbers, undefined) // the template has no such field, so it isn't sent
+  assert.ok(d.notices.some(n => /ICYMI cover: 3 of 5 story slots used\. The template prints the numbers 01–05 itself/.test(n)))
 })

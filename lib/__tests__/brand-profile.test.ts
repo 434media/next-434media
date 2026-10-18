@@ -55,7 +55,7 @@ test("the Generate panel's templates come from the profile, as they were in code
     { kind: "breaking", label: "Breaking News", templates: ["EAHXZAbAA8s"], detail: "Primary source in the last 24 hours" },
     { kind: "dt101", label: "Defense Tech 101", templates: ["EAHYOAJhC_8"], detail: "Benefit-led card, mission-brief caption" },
     // Since profile 1.2.0 an ICYMI roundup fills only its cover; its stories are their published cards (founder, 2026-10-18).
-    { kind: "icymi", label: "ICYMI roundup", templates: ["EAHXZPgjqSY"], detail: "Cover + 3–5 published story cards" },
+    { kind: "icymi", label: "ICYMI roundup", templates: ["EAHYYaSYfJI"], detail: "Cover + 3–5 published story cards" },
   ])
   assert.ok(PIPELINE_PROPERTIES.filter(p => p.active).every(p => !profileProblems(p.id).length))
 })

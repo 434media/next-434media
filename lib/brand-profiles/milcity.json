@@ -4,7 +4,7 @@
   "profile": "06 Standards/Brand Profiles/MilCityUSA.md",
   "profileVersion": "1.2.0",
   "profileDate": "October 18, 2026",
-  "profileSha256": "4a0003e65f819f77",
+  "profileSha256": "989a47156c8b79b8",
   "id": "milcity",
   "name": "MilCityUSA",
   "shortName": "MCU",
@@ -173,7 +173,7 @@
       "key": "icymi_cover",
       "label": "ICYMI cover",
       "templates": {
-        "feed": "EAHXZPgjqSY",
+        "feed": "EAHYYaSYfJI",
         "reels": "EAHXZJnI-Nc"
       },
       "fields": [
@@ -184,6 +184,11 @@
           "maxLines": 3,
           "uppercase": true,
           "fixed": "TOP DEFENSE DEVELOPMENTS"
+        },
+        {
+          "name": "story_numbers",
+          "label": "Story numbers",
+          "serverFilled": true
         },
         {
           "name": "date",
