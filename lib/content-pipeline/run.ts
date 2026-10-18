@@ -20,7 +20,8 @@ export async function pipelineDeps(): Promise<WorkerDeps> {
   const searchTools = { web_search: gateway.tools.parallelSearch({ mode: "agentic", maxResults: 10 }) }
   return {
     store: firestorePipelineStore(),
-    ai: onCall => createMcuAi({ models: PIPELINE_MODELS, searchTools, onCall }),
+    // The same search tool, set to return a page's full extracted text: refused official pages are read through it.
+    ai: onCall => createMcuAi({ models: PIPELINE_MODELS, searchTools, readTools: { web_search: gateway.tools.parallelSearch({ mode: "one-shot", maxResults: 5, excerpts: { maxCharsPerResult: 20_000 } }) }, onCall }),
     seeds: getMcuSeeds,
     icymiWindow: getIcymiWindow,
     fetchPage: url => fetchSourcePage(url),

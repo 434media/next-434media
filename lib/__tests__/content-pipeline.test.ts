@@ -910,3 +910,48 @@ test("a pipeline post records the photo it used, with its rights, as pipeline_me
   assert.equal(m.url, CANDIDATE.url); assert.equal(m.pageUrl, CANDIDATE.pageUrl); assert.equal(m.license, CANDIDATE.license); assert.equal(m.credit, CANDIDATE.credit); assert.equal(m.usGovernment, true)
   assert.equal("crop" in m, false); assert.equal("note" in m, false) // the record is the photo and its rights, not the review notes
 })
+test("News dated by an outlet's recent report of the same event: the official page may be older; the outlet is never cited (founder, 2026-10-18)", async () => {
+  const PRIMARY = "https://www.army.mil/article/1", REPORT = "https://www.defensenews.com/2026/10/15/army-c2"
+  const candidate = { title: "Army picks nine C2 software vendors", primaryUrl: PRIMARY, publisher: "U.S. Army", why: "news", reportUrl: REPORT, reportPublishedAt: "2026-10-15" }
+  const judged: string[] = []
+  const make = (same: boolean) => {
+    const w = world({ ai: { research: async () => ({ candidates: [candidate] }), sameEvent: async ({ report, primary }) => { judged.push(`${report.url} vs ${primary.url}`); return { same, reason: same ? "the same award" : "the page is the 2024 program launch the report mentions" } } } })
+    w.deps.fetchPage = async url => url === REPORT ? { url, title: "Army awards nine companies C2 software deals", text: ARMY_TEXT, publishedAt: "2026-10-15T12:00:00Z" } : { url, title: "Army awards C2 contracts", text: ARMY_TEXT, publishedAt: "2026-09-20T09:00:00Z" }
+    return w
+  }
+  const w = make(true)
+  await w.start({ kind: "news" })
+  const d = onlyDraft(w)
+  assert.equal(d.story.primaryUrl, PRIMARY); assert.equal(d.story.publishedAt, "2026-09-20"); assert.equal(d.story.reportedAt, "2026-10-15")
+  assert.equal(d.frames[0].fields.date, "15OCT26") // the card is dated by the report
+  assert.ok(!w.posts[0].links.includes(REPORT)) // never cited on the post
+  assert.match(reviewNotes(d), /Dated by a news report\nThe official page is older; a news outlet reported the same event on 2026-10-15/)
+  assert.deepEqual(judged, [`${REPORT} vs ${PRIMARY}`])
+  // The official page is an older announcement the report only mentions: the story drops, with the reason.
+  const no = make(false)
+  await no.start({ kind: "news" })
+  assert.match((await no.store.getJob("job-news-1"))!.note!, /more than 7 days ago; the official page is not the event the outlet reported \(the page is the 2024 program launch/)
+  // A report older than the window doesn't date anything; nor does one that isn't an outlet's.
+  const stale = world({ ai: { research: async () => ({ candidates: [{ ...candidate, reportPublishedAt: "2026-10-01" }] }), sameEvent: async () => ({ same: true, reason: "" }) } })
+  stale.deps.fetchPage = async url => ({ url, title: "Army awards C2 contracts", text: ARMY_TEXT, publishedAt: url === REPORT ? "2026-10-01T12:00:00Z" : "2026-09-20T09:00:00Z" })
+  await stale.start({ kind: "news" })
+  assert.match((await stale.store.getJob("job-news-1"))!.note!, /the outlet's report is not from the last 7 days/)
+})
+
+test("an official page that refuses the fetch is read through the search tool's extracted text; an outlet never is (founder, 2026-10-18)", async () => {
+  const GOV = "https://www.defense.gov/News/Releases/Release/Article/1", read: string[] = []
+  const w = world({ ai: { research: async () => ({ candidates: [{ title: "Army picks nine C2 software vendors", primaryUrl: GOV, publisher: "Department of War", why: "news" }] }), readRefusedPage: async url => { read.push(url); return { url, title: "Army awards C2 contracts", text: ARMY_TEXT, publishedAt: "2026-10-16" } } } })
+  const fetched = w.deps.fetchPage
+  w.deps.fetchPage = async url => { if (url === GOV) throw new Error("http_403"); return fetched(url) }
+  await w.start({ kind: "news" })
+  const d = onlyDraft(w)
+  assert.equal(d.story.primaryUrl, GOV); assert.deepEqual(d.story.readViaSearch, [GOV]); assert.deepEqual(read, [GOV])
+  assert.match(reviewNotes(d), /Read through the search tool\nThese official pages refused the pipeline's fetch/)
+  // An outlet is skipped before any fetch, and a server error is not a refusal: neither is read through the search.
+  const OUT = "https://www.defensenews.com/2026/10/16/x", BROKEN = "https://www.army.mil/article/5"
+  const v = world({ ai: { research: async () => ({ candidates: [{ title: "Army picks nine C2 software vendors", primaryUrl: OUT, alternateUrls: [BROKEN], publisher: "Defense News", why: "news" }] }), readRefusedPage: async url => { read.push(url); return null } } })
+  v.deps.fetchPage = async url => { throw new Error(url === BROKEN ? "http_500" : "http_403") }
+  await v.start({ kind: "news" })
+  assert.deepEqual(read, [GOV]) // nothing new was read through the search
+  assert.match((await v.store.getJob("job-news-1"))!.note!, /news outlet's article, not the primary source; http_500 at https:\/\/www\.army\.mil\/article\/5/)
+})

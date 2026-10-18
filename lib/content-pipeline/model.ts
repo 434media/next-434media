@@ -4,7 +4,7 @@ import { BRAND } from "./brand"
 import { CALL_FALLBACK, callOptions, outputBudget, type PipelineStep } from "./models"
 import { seedBrief, type McuSeeds } from "./seeds"
 import { SERIES, type FieldSpec, type RequestKind, type SeriesKey } from "./series"
-import type { MediaCandidate } from "./sources"
+import type { MediaCandidate, SourcePage } from "./sources"
 import type { FrameCopy, Story } from "./store"
 
 /**
@@ -21,6 +21,13 @@ export interface McuAi {
    * source. instructions: a reviewer's change to an existing draft (the drawer, Phase 2).
    */
   write(input: { kind: RequestKind; story: Story; today: string; previous?: { frames: FrameCopy[]; caption: string }; instructions?: string; problems?: string[]; direction?: string; seeds?: McuSeeds | null }): Promise<{ frames: FrameCopy[]; caption: string; hold?: string }>
+  /**
+   * An official page that refused the fetch, read from the search tool's extracted content (founder, 2026-10-18).
+   * Null unless the search returns that exact page. Never used for an outlet.
+   */
+  readRefusedPage?(url: string): Promise<SourcePage | null>
+  /** Whether an official page describes the same event an outlet's report covers, not an older one it only mentions. */
+  sameEvent?(input: { report: SourcePage; primary: SourcePage }): Promise<{ same: boolean; reason: string }>
   /** DVIDS image pages (and official .mil/.gov photo pages) showing the card's subject, found by web search. */
   findPhotoPages(input: { story: Story; frame: FrameCopy }): Promise<string[]>
   /** The best candidate, and for each relevant one (best first) where its subject sits, so the server can test the 4:5 crop. */
@@ -32,7 +39,8 @@ export interface McuAi {
 }
 /** The main subject's bounding box as fractions of the photo (0–1, origin top left). */
 export interface SubjectBox { x0: number; y0: number; x1: number; y1: number }
-export interface Candidate { title: string; primaryUrl: string; publisher: string; publishedAt?: string; whyNow?: string; why: string; supportingUrls?: string[]; /** Other primary pages for the same subject, tried when the primary can't be read. */ alternateUrls?: string[] }
+/** reportUrl/reportPublishedAt: the news outlet's report that led to the story, which may date a News story (never cited). */
+export interface Candidate { title: string; primaryUrl: string; publisher: string; publishedAt?: string; whyNow?: string; why: string; supportingUrls?: string[]; /** Other primary pages for the same subject, tried when the primary can't be read. */ alternateUrls?: string[]; reportUrl?: string; reportPublishedAt?: string }
 /** One model call as served: which model and which provider answered (evidence for the routing check). */
 export interface ModelCall { step: PipelineStep; model: string; provider?: string; finishReason?: string; inputTokens?: number; outputTokens?: number; /** Set when this call is the fallback for a model that could not answer. */ fallbackFrom?: string; fallbackReason?: string }
 
@@ -49,7 +57,7 @@ export function framesFor(kind: RequestKind, stories = 5): SeriesKey[] {
   return kind === "icymi" ? ["icymi_cover", ...Array.from({ length: stories }, () => "icymi_story" as const)] : [kind]
 }
 
-const candidateSchema = z.object({ candidates: z.array(z.object({ title: z.string(), primaryUrl: z.string(), publisher: z.string(), publishedAt: z.string().optional(), whyNow: z.string().optional(), why: z.string(), supportingUrls: z.array(z.string()).optional(), alternateUrls: z.array(z.string()).optional().describe("other primary pages for the same subject: the maker's product page, a .mil or .gov page, a press release") })), note: z.string().optional() })
+const candidateSchema = z.object({ candidates: z.array(z.object({ title: z.string(), primaryUrl: z.string(), publisher: z.string(), publishedAt: z.string().optional(), whyNow: z.string().optional(), why: z.string(), supportingUrls: z.array(z.string()).optional(), alternateUrls: z.array(z.string()).optional().describe("other primary pages for the same subject: the maker's product page, a .mil or .gov page, a press release"), reportUrl: z.string().optional().describe("the news outlet's report that led you to this story, when one did; never the primaryUrl"), reportPublishedAt: z.string().optional().describe("that report's publication date, YYYY-MM-DD") })), note: z.string().optional() })
 /** Every https URL in the search tool's results, in order, de-duplicated (the tool's output shape is not relied on). */
 export function searchResultUrls(steps: readonly { toolResults: readonly { output?: unknown }[] }[]): string[] {
   const out: string[] = []
@@ -178,7 +186,8 @@ export function readPick(pick: { index: number | null; reason: string; ranked?: 
   const index = pick.index !== null && ranked.some(x => x.index === pick.index && !x.representative) ? pick.index : ranked[0]?.index ?? null
   return { index, reason: pick.reason, ...(ranked.length ? { ranked } : {}), ...(turnedDown.length ? { turnedDown } : {}) }
 }
-export function createMcuAi(deps: { models: Record<PipelineStep, string>; searchTools: ToolSet; onCall?(call: ModelCall): void; fallbacks?: Partial<Record<PipelineStep, string>> }): McuAi {
+/** readTools: the search tool set up to return a page's full extracted text, for refused official pages. */
+export function createMcuAi(deps: { models: Record<PipelineStep, string>; searchTools: ToolSet; readTools?: ToolSet; onCall?(call: ModelCall): void; fallbacks?: Partial<Record<PipelineStep, string>> }): McuAi {
   const m = deps.models, fallbacks = deps.fallbacks ?? CALL_FALLBACK
   const run = <R extends Served, T = R>(step: PipelineStep, call: (model: string) => Promise<R>, accept: (r: R) => T | Promise<T> = r => r as unknown as T): Promise<T> =>
     servedCall(step, m[step], fallbacks[step], deps.onCall, call, accept)
@@ -220,7 +229,7 @@ export function createMcuAi(deps: { models: Record<PipelineStep, string>; search
         model, maxOutputTokens: outputBudget(model, 16_000), providerOptions: callOptions(model, "medium"), allowSystemInMessages: true,
         tools: { submit_post: tool({ description: "Submit the finished card copy and caption.", inputSchema: schema as z.ZodType<Record<string, unknown>> }) }, toolChoice: { type: "tool", toolName: "submit_post" },
         messages: [...system(`${brandDirection(seeds)}Today is ${today}. Write the on-card copy and the one master caption for this ${BRAND.name} ${kind === "icymi" ? "ICYMI roundup" : SERIES[kind as SeriesKey].label} post from the source below, and submit them with submit_post. Use only facts in the source. Fill every field. If the source cannot support a post under the rules (unverifiable figure, not Breaking-worthy, etc.), set hold to the one-sentence reason. Never hold for the photo or its credit (a later step chooses it)${BRAND.research.writeNote}.\n${spec}${icymi}`),
-          { role: "user", content: `SOURCE: ${story.sourceTitle}\nURL: ${story.primaryUrl}\nPublisher: ${story.publisher}\nPublished: ${story.publishedAt ?? "not stated on the page"}${story.whyNow ? `\nWhy now (Breaking): ${story.whyNow}` : ""}${story.supporting?.length ? `\nSupporting sources (their text follows the primary's, each under its own heading; use them only for what the primary leaves out, such as the maker and its headquarters): ${story.supporting.map(x => x.url).join(" ; ")}` : ""}\n\n${story.sourceText.slice(0, 24_000)}${direction ? `\n\nREQUESTER'S DIRECTION (steer the angle and emphasis with it; it never overrides the rules above or the facts in the source): ${direction}` : ""}${instructions && !previous ? `\n\nREVIEWER'S DIRECTION: ${instructions}` : ""}` },
+          { role: "user", content: `SOURCE: ${story.sourceTitle}\nURL: ${story.primaryUrl}\nPublisher: ${story.publisher}\nPublished: ${story.publishedAt ?? "not stated on the page"}${story.reportedAt ? `\nReported: ${story.reportedAt}, by a news outlet's report of the same event (the card's date; never cite the outlet)` : ""}${story.whyNow ? `\nWhy now (Breaking): ${story.whyNow}` : ""}${story.supporting?.length ? `\nSupporting sources (their text follows the primary's, each under its own heading; use them only for what the primary leaves out, such as the maker and its headquarters): ${story.supporting.map(x => x.url).join(" ; ")}` : ""}\n\n${story.sourceText.slice(0, 24_000)}${direction ? `\n\nREQUESTER'S DIRECTION (steer the angle and emphasis with it; it never overrides the rules above or the facts in the source): ${direction}` : ""}${instructions && !previous ? `\n\nREVIEWER'S DIRECTION: ${instructions}` : ""}` },
           ...(previous ? [{ role: "assistant" as const, content: `Previous version: ${asPrevious(previous)}` }, { role: "user" as const, content: `${problems?.length ? `Fix these problems: ${problems.join("; ")}. ` : ""}${instructions ? `Reviewer's changes: ${instructions}` : "Submit the corrected version."} Keep everything the reviewer did not ask to change.` }] : [])],
       }))
       const out = await submitted<{ card?: { fields: Record<string, string>; mediaQuery?: string }; cover?: { fields: Record<string, string>; mediaQuery?: string }; stories?: { fields: Record<string, string>; mediaQuery?: string }[]; caption: string; hold?: string }>(r, "submit_post")
@@ -228,6 +237,28 @@ export function createMcuAi(deps: { models: Record<PipelineStep, string>; search
       console.info("[content-pipeline] write", JSON.stringify({ kind, frames: parts.filter(Boolean).length, fields: parts.map(p => Object.keys(p?.fields ?? {}).filter(k => (p?.fields[k] ?? "").trim())), hold: out.hold?.slice(0, 200) ?? null }))
       const hold = meaningful(out.hold)
       return { frames: frames.map((series, i) => ({ series, fields: { ...(parts[i]?.fields ?? {}) }, ...(parts[i]?.mediaQuery ? { mediaQuery: parts[i]!.mediaQuery } : {}) })), caption: (out.caption ?? "").trim(), ...(hold ? { hold } : {}) }
+    },
+
+    async readRefusedPage(url) {
+      if (!deps.readTools) return null
+      const host = new URL(url).hostname.replace(/^www\./, "")
+      const found = await run("research", model => generateText({
+        model, tools: deps.readTools, stopWhen: stepCountIs(2), maxOutputTokens: outputBudget(model, 4_000), providerOptions: callOptions(model, "low"),
+        prepareStep: ({ stepNumber }) => stepNumber === 0 ? { toolChoice: "required" as const } : {},
+        messages: [{ role: "system", content: `Read one official web page through the search tool. Search once, with objective "The full text of the page at ${url}", search_queries ["${url}"], and source_policy include_domains ["${host}"]. Then reply "done".` }, { role: "user", content: url }],
+      }), r => ({ results: r.steps.flatMap(st => st.toolResults.flatMap(tr => (tr.output as { results?: { url?: string; title?: string; excerpt?: string; publishDate?: string | null }[] } | undefined)?.results ?? [])), finishReason: r.finishReason, providerMetadata: r.providerMetadata, usage: r.usage }))
+      // Only the page asked for: never another page the search happened to return.
+      const hit = found.results.find(x => typeof x.url === "string" && normalizeUrl(x.url) === normalizeUrl(url) && typeof x.excerpt === "string")
+      return hit ? { url, title: hit.title ?? "", text: hit.excerpt!, ...(hit.publishDate ? { publishedAt: hit.publishDate } : {}) } : null
+    },
+
+    async sameEvent({ report, primary }) {
+      return run("research", model => generateText({
+        model, maxOutputTokens: outputBudget(model, 4_000), providerOptions: callOptions(model, "low"),
+        tools: { judge_event: tool({ description: "Say whether the official page describes the same event the report covers.", inputSchema: z.object({ same: z.boolean(), reason: z.string().describe("one sentence") }) }) }, toolChoice: { type: "tool", toolName: "judge_event" },
+        messages: [{ role: "system", content: "A news outlet's report and an official page follow. Decide whether the official page describes the same event the report covers: the same award, test, delivery, announcement or decision, at the same time. It is NOT the same event when the official page is an older announcement the report only mentions as background, or a page about the same program but a different milestone. When you can't tell, answer same: false." },
+          { role: "user", content: `REPORT: ${report.title}\nDate: ${report.publishedAt ?? "not stated"}\n${report.text.slice(0, 6_000)}\n\nOFFICIAL PAGE: ${primary.title}\nDate: ${primary.publishedAt ?? "not stated"}\n${primary.text.slice(0, 6_000)}` }],
+      }), r => submitted<{ same: boolean; reason: string }>(r, "judge_event"))
     },
 
     async findPhotoPages({ story, frame }) {

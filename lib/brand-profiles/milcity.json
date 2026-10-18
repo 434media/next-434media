@@ -4,7 +4,7 @@
   "profile": "06 Standards/Brand Profiles/MilCityUSA.md",
   "profileVersion": "1.0.0",
   "profileDate": "October 18, 2026",
-  "profileSha256": "ac92e0ac0cf30864",
+  "profileSha256": "a83c0b0f92863aa4",
   "id": "milcity",
   "name": "MilCityUSA",
   "shortName": "MCU",
@@ -407,7 +407,8 @@
         "news"
       ],
       "code": "NEWS",
-      "recencyDays": 7
+      "recencyDays": 7,
+      "datedByReport": true
     },
     {
       "kind": "breaking",
@@ -447,7 +448,7 @@
     "kinds": {
       "news": {
         "want": "defense-industry news stories from the last 7 days",
-        "guidance": "Give each story's publication date (publishedAt, YYYY-MM-DD) as the page states it; anything published more than 7 days ago is rejected. "
+        "guidance": "Give each story's publication date (publishedAt, YYYY-MM-DD) as the page states it. A story is current when its primary page was published in the last 7 days, or when a news outlet's report from the last 7 days covers it: then give that report as reportUrl and its date as reportPublishedAt, and the primary page needn't be new, but it must describe the same event the outlet reported. An older announcement the outlet only mentions does not count. The outlet is never the source: cite only the primary page. Anything else older than 7 days is rejected. "
       },
       "breaking": {
         "want": "Breaking-qualified developments (primary-source announcement within the last 24 hours AND consequential enough to need immediate attention)",

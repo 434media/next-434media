@@ -43,6 +43,14 @@ export interface Story {
   primaryUrl: string
   publisher: string
   publishedAt?: string
+  /**
+   * News dated by an outlet's report (founder, 2026-10-18): the report's date, which the card prints. The outlet is
+   * never cited; its URL is kept for the reviewer only (reviewNotes), never on the post's links.
+   */
+  reportedAt?: string
+  datedBy?: { url: string; publishedAt: string }
+  /** Primary pages that refused the fetch and were read through the search tool's extracted text instead. */
+  readViaSearch?: string[]
   /** Sourced one-sentence "what changed, its consequence, why now" — Breaking only. */
   whyNow?: string
   sourceText: string

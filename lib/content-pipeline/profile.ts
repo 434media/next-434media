@@ -31,7 +31,8 @@ export interface ProfileSeries extends Series {
   /** A caption shape the series requires (MCU's DT101 mission brief). */
   caption?: CaptionFormat
 }
-export interface ProfileRequestKind { kind: RequestKind; label: string; detail: string; series: SeriesKey[]; code: string; recencyDays?: number; undatedOk?: boolean }
+/** datedByReport: a news outlet's report within recencyDays may date the story, when the official page describes the same event. */
+export interface ProfileRequestKind { kind: RequestKind; label: string; detail: string; series: SeriesKey[]; code: string; recencyDays?: number; undatedOk?: boolean; datedByReport?: boolean }
 /** fields: one-line headlines; hookFields: multi-line hooks (one punctuation convention across lines); deckField: the deck. */
 export interface HeadlineChecks { enabled: boolean; fields: string[]; hookFields: string[]; maxCommas: number; deckField: string }
 export interface OriginalityChecks { enabled: boolean; headlineMaxRun: number; captionMaxRun: number; exempt: SeriesKey[] }
@@ -140,12 +141,13 @@ export function validateProfile(v: unknown): string[] {
   const kinds = Array.isArray(v.requestKinds) && v.requestKinds.length ? v.requestKinds : (p.push("requestKinds: a non-empty list"), [])
   kinds.forEach((k: unknown, i: number) => {
     const w = `requestKinds[${i}]`
-    if (!keys(k, w, ["kind", "label", "detail", "series", "code"], ["recencyDays", "undatedOk"], p)) return
+    if (!keys(k, w, ["kind", "label", "detail", "series", "code"], ["recencyDays", "undatedOk", "datedByReport"], p)) return
     if (!(REQUEST_KINDS as readonly unknown[]).includes(k.kind)) p.push(`${w}.kind: one of ${REQUEST_KINDS.join(", ")}`)
     if (!str(k.label, 60) || !str(k.detail, 120)) p.push(`${w}: label 1–60 and detail 1–120 characters`)
     if (!(typeof k.code === "string" && /^[A-Z0-9]{2,8}$/.test(k.code))) p.push(`${w}.code: 2–8 uppercase letters or digits (draft ids)`)
     if ("recencyDays" in k && !int(k.recencyDays, 1, 3650)) p.push(`${w}.recencyDays: 1–3650`)
     if ("undatedOk" in k && typeof k.undatedOk !== "boolean") p.push(`${w}.undatedOk: true or false`)
+    if ("datedByReport" in k && !(typeof k.datedByReport === "boolean" && "recencyDays" in k)) p.push(`${w}.datedByReport: true or false, with recencyDays`)
     if (!(Array.isArray(k.series) && k.series.length && k.series.every(x => typeof x === "string" && x in series))) p.push(`${w}.series: series defined in this profile`)
     else if (!k.series.every(x => (series[x as string] as { templates?: { feed?: string } })?.templates?.feed)) p.push(`${w}: every series it fills needs a feed template`)
   })
