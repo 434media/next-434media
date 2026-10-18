@@ -2,9 +2,9 @@ import { SERIES, checkFields, clippedWords, ddmmmyy, normalizeFields, type Place
 import { MCU_RULES_VERSION } from "./editorial"
 import { icymiCount, meaningful, normalizeUrl, unusedStorySlot, type McuAi, type ModelCall, type RankedPhoto, type SubjectBox } from "./model"
 import { contentPropertyOf } from "./properties"
-import type { ContentProperty } from "@/components/crm/types"
+import type { ContentProperty, PipelineMedia } from "@/components/crm/types"
 import type { McuSeeds } from "./seeds"
-import { MIN_SHORT_SIDE, archiveRelevant, imageSize, isDvidsImagePage, isOutlet, pageImageCandidate, type MediaCandidate, type SourcePage } from "./sources"
+import { MIN_SHORT_SIDE, archiveRelevant, federalHost, imageSize, isDvidsImagePage, isOutlet, pageImageCandidate, type MediaCandidate, type SourcePage } from "./sources"
 import { MAX_ATTEMPTS, WORKING, type ChosenMedia, type CropBox, type FrameCopy, type FrameDesign, type McuDraft, type McuJob, type McuStore, type Story } from "./store"
 
 /**
@@ -17,8 +17,8 @@ import { MAX_ATTEMPTS, WORKING, type ChosenMedia, type CropBox, type FrameCopy, 
  * Moved from the pilot's Slack MCU skill (lib/slack/mcu/worker.ts at b36e7be). Slack review messages are replaced by
  * the board; revision ("revise", "refresh", "ready") moves to the drawer in Phase 2 and is not carried here.
  */
-/** publishedAt: when the post went out (posted_at, else its post date), for the ICYMI window. */
-export interface PostRow { id: string; title: string; status: string; publishedUrl?: string; caption?: string; publishedAt?: string; links?: string[] }
+/** publishedAt: when the post went out (posted_at, else its post date), for the ICYMI window; media: its pipeline_media. */
+export interface PostRow { id: string; title: string; status: string; publishedUrl?: string; caption?: string; publishedAt?: string; media?: PipelineMedia[] }
 export interface DesignInput { requestId: string; templateId: string; title: string; text: Record<string, string>; image?: { field: string; url: string; name: string; crop?: CropBox } }
 export interface ContentSide {
   /** MCU's content posts, for the repeat-story check and ICYMI. */
@@ -33,7 +33,8 @@ export interface ContentSide {
 }
 /** property: the content post's Property (its `platform` field), e.g. "MilCityUSA". */
 export interface NoContentInput { requestId: string; jobId: string; property: ContentProperty; title: string; reason: string; tried: { title: string; url: string }[]; requestedBy: { email: string; name: string } }
-export interface PostInput { requestId: string; property: ContentProperty; title: string; caption: string; notes: string; links: string[]; designIds: string[]; requestedBy: { email: string; name: string } }
+/** media: the photo each frame used, recorded on the post as pipeline_media for ICYMI to reuse. */
+export interface PostInput { requestId: string; property: ContentProperty; title: string; caption: string; notes: string; links: string[]; media: PipelineMedia[]; designIds: string[]; requestedBy: { email: string; name: string } }
 export interface WorkerDeps {
   store: McuStore
   /** The model calls; each call is reported through onCall so the draft records which model and provider served it. */
@@ -236,10 +237,9 @@ export function icymiStory(posts: PostRow[], window: { startMs: number; endMs: n
     .filter((p, i, all) => all.findIndex(x => x.title.trim().toLowerCase() === p.title.trim().toLowerCase()) === i)
     .slice(0, ICYMI_MAX)
   if (!eligible.length) return { hold: `no MCU News or Breaking story was published in ${window.label}, so there is no ICYMI` }
-  return [{ title: "ICYMI roundup", primaryUrl: eligible[0].publishedUrl || "https://www.instagram.com/milcityusa/", publisher: "MilCityUSA", sourceTitle: `${eligible.length} published MCU ${eligible.length === 1 ? "story" : "stories"} from ${window.label}`, sourceText: eligible.map((p, i) => `${i + 1}. ${p.title}\n${p.caption}`).join("\n\n"), roundup: eligible.map(p => {
-    const credit = /^Image: (.+)$/m.exec(p.caption || "")?.[1]?.trim()
-    return { postId: p.id, title: p.title, caption: (p.caption || "").split("\n").filter(l => !/^Image: /.test(l) && l !== DOD_NOTICE).join("\n").trim().slice(0, 800), ...(p.publishedUrl ? { publishedUrl: p.publishedUrl } : {}), ...(p.links?.length ? { photoPages: p.links } : {}), ...(credit ? { imageCredit: credit.slice(0, 300) } : {}), ...((p.caption || "").includes(DOD_NOTICE) ? { usGovernment: true } : {}) }
-  }) }]
+  return [{ title: "ICYMI roundup", primaryUrl: eligible[0].publishedUrl || "https://www.instagram.com/milcityusa/", publisher: "MilCityUSA", sourceTitle: `${eligible.length} published MCU ${eligible.length === 1 ? "story" : "stories"} from ${window.label}`, sourceText: eligible.map((p, i) => `${i + 1}. ${p.title}\n${p.caption}`).join("\n\n"), roundup: eligible.map(p => ({
+    postId: p.id, title: p.title, caption: (p.caption || "").split("\n").filter(l => !/^Image: /.test(l) && l !== DOD_NOTICE).join("\n").trim().slice(0, 800), ...(p.publishedUrl ? { publishedUrl: p.publishedUrl } : {}), ...(p.media?.[0] ? { media: p.media[0] } : {}),
+  })) }]
 }
 
 /** On a hold, `tried` and `triedUrls` name the candidates that were dropped, so a second pass can avoid them. */
@@ -304,7 +304,7 @@ export function sameSubject(title: string, text: string): boolean {
   const words = tokens.filter(w => w.length >= 3 && !COMMON.has(w))
   // A model designation names the subject however short it is (C2, F-35, YFQ-48A).
   const designations = tokens.filter(w => /\d/.test(w) && /[a-z]/.test(w))
-  if (designations.some(w => new RegExp(`(^|[^a-z0-9])${w.replace(/[.\-]/g, "\\$&")}([^a-z0-9]|$)`).test(hay))) return true
+  if (designations.some(w => new RegExp(`(^|[^a-z0-9])${w.replace(/[.*+?^${}()|[\]\\-]/g, "\\$&")}([^a-z0-9]|$)`).test(hay))) return true
   return words.filter(w => !/\d/.test(w) && hay.includes(w)).length >= 2
 }
 export function normalizeDate(v: string | undefined): string | undefined {
@@ -447,16 +447,16 @@ function validate(frames: FrameCopy[], caption: string, story: Story): string[] 
 export function makerOf(frame: FrameCopy, story: Pick<Story, "publisher">): string {
   return (frame.fields.subject_identifier ?? "").split("/")[1]?.trim() || story.publisher
 }
-const GOV_PAGE = /(^|\.)(mil|gov)$|(^|\.)dvidshub\.net$/i
 /**
- * A page the photo search found is used only when its photo's rights can be read from it: a U.S. government or DVIDS
- * page (public domain unless marked courtesy), or the maker's own site (company media, flagged for the reviewer to
- * confirm its terms). A news outlet's or anyone else's page is skipped: its photo is licensed to that outlet.
+ * A page the photo search found is used only when its photo's rights can be read from it: a federal or DVIDS page
+ * (public domain unless pageImageCandidate finds a notice or an off-site photo), or the maker's own site (company
+ * media, flagged for the reviewer to confirm its terms). A state or local .gov, a news outlet's or anyone else's page
+ * is skipped: its photo belongs to that government or outlet.
  */
 export function searchedPageUsable(url: string, maker: string, outlets: readonly string[] = []): boolean {
   let host: string
   try { host = new URL(url).hostname.toLowerCase() } catch { return false }
-  if (GOV_PAGE.test(host)) return true
+  if (federalHost(host)) return true
   // An outlet is never the maker, even when the maker fallback is the story's publisher ("Defense News", round 2).
   if (isOutlet(url, outlets)) return false
   const words = maker.toLowerCase().split(/[^a-z0-9]+/).filter(w => w.length >= 3 && !["inc", "corp", "the", "company", "technologies", "systems", "industries", "group", "defense", "defence"].includes(w))
@@ -511,23 +511,16 @@ async function gatherMedia(deps: WorkerDeps, ai: McuAi, story: Story, frame: Fra
 const SOCIAL_HOST = /^https:\/\/([a-z0-9-]+\.)*(instagram\.com|facebook\.com|fb\.com|threads\.net|x\.com|twitter\.com|linkedin\.com|tiktok\.com|youtube\.com)(\/|$)/i
 /**
  * The photo an ICYMI story's published post used (founder, 2026-10-17: the roundup reuses the stories' approved
- * images). The post's links hold its photo's page beside its sources: a DVIDS or government page, a Commons file
- * page, or the maker's media page. Its credit is the one its caption printed. Social links and outlets are skipped.
- * Empty when nothing can be recovered (an older post made by hand may not link its photo).
+ * images), from the record the pipeline wrote on the post (pipeline_media). It is fetched from exactly the recorded
+ * URL and keeps the rights it was approved with: its license, credit, government status and rights note are never
+ * overridden, and "Reused" is added beside the note, not in place of it. A post's links are not read: any content
+ * editor can change them, and their last page needn't hold the photo used (security review, 2026-10-17, finding 2).
+ * Empty when the post has no record (a post made by hand, or before the record existed); the photo is then searched for.
  */
-export async function publishedPhoto(deps: Pick<WorkerDeps, "fetchPage" | "searchCommons">, item: NonNullable<Story["roundup"]>[number]): Promise<MediaCandidate[]> {
-  const out: MediaCandidate[] = []
-  for (const u of [...(item.photoPages ?? [])].reverse()) {
-    if (!/^https:\/\//.test(u) || SOCIAL_HOST.test(u) || isOutlet(u)) continue
-    try {
-      const file = /^https:\/\/commons\.wikimedia\.org\/wiki\/(File:[^?#]+)/.exec(u)?.[1]
-      const c = file ? (await deps.searchCommons(decodeURIComponent(file).replace(/^File:/, "").replace(/_/g, " ").replace(/\.[a-z]+$/i, ""))).find(x => x.pageUrl.replace(/ /g, "_") === u || decodeURIComponent(x.pageUrl) === decodeURIComponent(u)) ?? null
-        : await deps.fetchPage(u).then(pg => pageImageCandidate(pg, isDvidsImagePage(pg.url) ? "dvids" : "source"))
-      if (c) out.push({ ...c, ...(item.imageCredit ? { credit: item.imageCredit } : {}), ...(item.usGovernment ? { usGovernment: true } : {}), rightsNote: `Reused from the published post ${item.postId}` })
-    } catch { /* skipped */ }
-    if (out.length >= 2) break
-  }
-  return out
+export function publishedPhoto(item: NonNullable<Story["roundup"]>[number]): MediaCandidate[] {
+  const m = item.media
+  if (!m || !/^https:\/\//.test(m.url) || !/^https:\/\//.test(m.pageUrl)) return []
+  return [{ url: m.url, thumbUrl: m.url, pageUrl: m.pageUrl, title: m.title, description: "", width: 0, height: 0, license: m.license, creator: m.creator, credit: m.credit, usGovernment: m.usGovernment === true, ...(m.date ? { date: m.date } : {}), rightsNote: [m.rightsNote, `Reused from the published post ${item.postId}`].filter(Boolean).join(". ") }]
 }
 /**
  * The story a frame's photo is about. An ICYMI story card shows the published story it recaps (its title and caption),
@@ -645,7 +638,7 @@ async function mediaStep(deps: WorkerDeps, ai: McuAi, d: McuDraft): Promise<void
     const story = frameStory(d, frame, i), representative = allowsRepresentative(frame)
     const avoid = [...used, ...(d.avoidMedia ?? [])]
     const item = frame.series === "icymi_story" ? d.story.roundup?.[i - 1] : undefined
-    const reuse = item ? await publishedPhoto(deps, item) : []
+    const reuse = item ? publishedPhoto(item) : []
     let shown = reuse.length ? await gatherMedia(deps, ai, story, frame, avoid, reuse) : []
     // Nothing recoverable from the published post: search, and say so.
     const searched = !shown.length
@@ -660,9 +653,9 @@ async function mediaStep(deps: WorkerDeps, ai: McuAi, d: McuDraft): Promise<void
     }
     const c = shown[chosen.index].candidate
     used.add(c.pageUrl)
-    const fresh = item && searched ? `The published post's photo could not be recovered from its links, so this one was searched for: check it against ${item.postId}` : ""
+    const fresh = item && searched ? `The published post has no recorded photo${item.media ? " that could be fetched" : ""}, so this one was searched for: check it against ${item.postId}` : ""
     const rep = chosen.ranked.representative ? `Representative photo${chosen.ranked.shows ? ` (${chosen.ranked.shows})` : ""}, not the event itself: check the caption doesn't present it as the event` : ""
-    media[i] = { url: c.url, pageUrl: c.pageUrl, title: c.title, license: c.license, creator: c.creator, credit: c.credit, usGovernment: c.usGovernment, ...(c.date ? { date: c.date } : {}), ...(c.rightsNote || rep || fresh ? { note: [c.rightsNote, rep, fresh].filter(Boolean).join(". ") } : {}), crop: chosen.crop }
+    media[i] = { url: c.url, pageUrl: c.pageUrl, title: c.title, license: c.license, creator: c.creator, credit: c.credit, usGovernment: c.usGovernment, ...(c.date ? { date: c.date } : {}), ...(c.rightsNote ? { rightsNote: c.rightsNote } : {}), ...(c.rightsNote || rep || fresh ? { note: [c.rightsNote, rep, fresh].filter(Boolean).join(". ") } : {}), crop: chosen.crop }
   }
   d.media = media
   // Credits and the DoD non-endorsement line belong to the caption the reviewer approves.
@@ -787,8 +780,9 @@ async function postStep(deps: WorkerDeps, d: McuDraft): Promise<void> {
   if (d.postId) { d.status = "in_review"; return save(deps, d, "already on the board") }
   const head = d.frames[0]?.fields.headline || d.frames[0]?.fields.subject_identifier || d.story.title
   const links = [...new Set([d.story.primaryUrl, ...(d.story.supporting ?? []).map(x => x.url), ...d.media.filter((m): m is ChosenMedia => !!m).map(m => m.pageUrl)])]
+  const media = d.media.filter((m): m is ChosenMedia => !!m).map(m => ({ url: m.url, pageUrl: m.pageUrl, title: m.title, license: m.license, creator: m.creator, credit: m.credit, usGovernment: m.usGovernment, ...(m.date ? { date: m.date } : {}), ...(m.rightsNote ? { rightsNote: m.rightsNote } : {}) }))
   const job = await deps.store.getJob(d.jobId)
-  const r = await deps.content.writePost({ requestId: `${KEY_PREFIX}${d.id}:v${d.version}`, property: contentPropertyOf(job?.property), title: `${d.id} v${d.version} — ${head.replace(/\n/g, " ")}`.slice(0, 200), caption: d.caption ?? "", notes: reviewNotes(d), links, designIds: d.designs.map(x => x.designId), requestedBy: { email: d.request.actorEmail, name: d.request.actorName } })
+  const r = await deps.content.writePost({ requestId: `${KEY_PREFIX}${d.id}:v${d.version}`, property: contentPropertyOf(job?.property), title: `${d.id} v${d.version} — ${head.replace(/\n/g, " ")}`.slice(0, 200), caption: d.caption ?? "", notes: reviewNotes(d), links, media, designIds: d.designs.map(x => x.designId), requestedBy: { email: d.request.actorEmail, name: d.request.actorName } })
   d.postId = r.postId
   if (r.holds.length) d.qa = [...new Set([...d.qa, ...r.holds])]
   console.info("[content-pipeline] posted", JSON.stringify({ draft: d.id, v: d.version, postId: r.postId, designs: d.designs.map(x => x.designId), holds: r.holds, calls: (d.calls ?? []).map(c => `${c.step}:${c.model}@${c.provider ?? "?"}${c.fallbackFrom ? ` (fallback from ${c.fallbackFrom})` : ""}`) }))

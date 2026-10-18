@@ -379,6 +379,8 @@ export interface ContentPost {
   // It has no assets and no Canva design; the publisher, the decision route and export attachment refuse it.
   // Closing it ("Confirm no new content") records closed_at/closed_by and the board stops showing it; nothing is deleted.
   pipeline_outcome?: PipelineOutcome | null
+  // Set by the content pipeline when it writes a draft: the photo each frame used, in frame order. ICYMI reuses it.
+  pipeline_media?: PipelineMedia[]
   // Set when the publisher's connector created the post; requestId makes creation idempotent.
   intake?: { requestId: string; metaBrand: string; requestedBy: string; at: string }
   archived?: boolean
@@ -421,6 +423,23 @@ export interface ContentPost {
   generation_prompt?: string
   created_at: string
   updated_at: string
+}
+
+/**
+ * The photo a content-pipeline post used, as the pipeline chose it: the exact image URL, its page, and its rights as
+ * read then (license, credit, government status and any note the reviewer was asked to check). Server-owned: the
+ * content-post routes' whitelists don't include it, unlike `links`, so ICYMI can reuse it as it was approved.
+ */
+export interface PipelineMedia {
+  url: string
+  pageUrl: string
+  title: string
+  license: string
+  creator: string
+  credit: string
+  usGovernment: boolean
+  date?: string
+  rightsNote?: string
 }
 
 export interface PipelineOutcome {

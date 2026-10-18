@@ -33,7 +33,7 @@ export async function pipelineDeps(): Promise<WorkerDeps> {
       recentPosts: async () => {
         const mcu = (await tools.intake.listPosts()).filter(p => !p.archived && [p.title, p.social_copy, p.tags, p.platform].some(v => typeof v === "string" && /milcity|\bmcu\b/i.test(v)))
         const when = (p: (typeof mcu)[number]) => p.posted_at || (p.status === "posted" || p.published_url ? p.date_to_post : undefined)
-        return mcu.map((p): PostRow => ({ id: p.id, title: p.title, status: p.status, ...(p.published_url ? { publishedUrl: p.published_url } : {}), ...(p.social_copy ? { caption: p.social_copy.slice(0, 2200) } : {}), ...(when(p) ? { publishedAt: when(p) } : {}), ...(p.links?.length ? { links: p.links.filter(l => typeof l === "string").slice(0, 12) } : {}) }))
+        return mcu.map((p): PostRow => ({ id: p.id, title: p.title, status: p.status, ...(p.published_url ? { publishedUrl: p.published_url } : {}), ...(p.social_copy ? { caption: p.social_copy.slice(0, 2200) } : {}), ...(when(p) ? { publishedAt: when(p) } : {}), ...(Array.isArray(p.pipeline_media) && p.pipeline_media.length ? { media: p.pipeline_media.slice(0, 6) } : {}) }))
           .sort((a, b) => (b.publishedAt ?? "").localeCompare(a.publishedAt ?? "")).slice(0, 75)
       },
       templateFields: templateId => tools.canvaFields(templateId),
@@ -46,7 +46,7 @@ export async function pipelineDeps(): Promise<WorkerDeps> {
         // Idempotent on requestId: a resumed step finds the post it already created.
         const post = await tools.intake.findByRequestId(p.requestId) ?? await crm.createContentPost({
           user: p.requestedBy.name, date_created: now.slice(0, 10), platform: p.property, status: "needs_approval", title: p.title,
-          notes: p.notes, social_copy: p.caption, links: p.links, assets: [], tags: "milcity", social_platforms: ["instagram", "facebook"],
+          notes: p.notes, social_copy: p.caption, links: p.links, pipeline_media: p.media, assets: [], tags: "milcity", social_platforms: ["instagram", "facebook"],
           intake: { requestId: p.requestId, metaBrand: "milcity", requestedBy: p.requestedBy.email, at: now },
         })
         if (post.assets.length && post.export_fingerprint) return { postId: post.id, holds: [] }

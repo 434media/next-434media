@@ -11,7 +11,7 @@ import { SERIES, checkFields, clippedWords, ddmmmyy, lineCount, type SeriesKey }
 import { runDue, RETRY_MS, icymiStory, icymiWindow, staleSource, allowsRepresentative, sameSubject, makerOf, searchedPageUsable, unsourcedNumbers, withCredits, imageLabel, mediaQueries, cropFit, choosePhoto, zoomCrop, reviewNotes, DOD_NOTICE, LEASE_MS, type WorkerDeps, type DesignInput, type PostInput, type NoContentInput } from "../content-pipeline/worker"
 import { firestorePipelineStore } from "../firestore-content-pipeline"
 import { MAX_ATTEMPTS, type McuDraft, type McuJob, type McuStore } from "../content-pipeline/store"
-import { archiveRelevant, assertPublicHttps, guardedFetch, isOutlet, siteOrg, imageSize, pageImageCandidate, parsePage, searchNasa, searchOpenverse, usableLicense, type MediaCandidate } from "../content-pipeline/sources"
+import { archiveRelevant, assertPublicHttps, federalHost, guardedFetch, isOutlet, siteOrg, imageSize, pageImageCandidate, parsePage, searchNasa, searchOpenverse, usableLicense, type MediaCandidate } from "../content-pipeline/sources"
 import { brandDirection, isPhotoDefect, meaningful, readPick, searchResultUrls, servedBy, servedCall, type McuAi, type ModelCall } from "../content-pipeline/model"
 import { PIPELINE_MODELS, FALLBACK_MODELS, CALL_FALLBACK, callOptions, outputBudget } from "../content-pipeline/models"
 import { seedBrief, seedProblems, type McuSeeds } from "../content-pipeline/seeds"
@@ -358,6 +358,36 @@ test("a page's own photo carries its rights: Army credit is public domain; compa
   const company = pageImageCandidate({ url: "https://www.saildrone.com/press/voyager", title: "Voyager", siteName: "Saildrone", image: "https://www.saildrone.com/v.jpg", text: "" }, "source")!
   assert.equal(company.license, "Official company media"); assert.equal(company.creator, "Saildrone"); assert.match(company.rightsNote!, /saildrone\.com: confirm its terms allow editorial use/)
   assert.equal(pageImageCandidate({ url: "https://x.example.com", title: "t", text: "" }, "source"), null)
+})
+
+test("only a federal page's own photo is public domain: state and city .gov, off-site photos and copyright notices are flagged", () => {
+  const page = (url: string, image: string, text = "", description = "") => pageImageCandidate({ url, title: "t", image, text, description }, "source")!
+  assert.ok(federalHost("www.army.mil") && federalHost("media.defense.gov") && federalHost("www.nasa.gov") && federalHost("www.dvidshub.net") && federalHost("www.fs.fed.us"))
+  assert.ok(!federalHost("gov.texas.gov") && !federalHost("www.sanantonio.gov") && !federalHost("tmd.texas.gov") && !federalHost("notdefense.gov.example.com"))
+  // A state site's photo: not public domain, no DoD treatment, and the reviewer is told why.
+  const state = page("https://gov.texas.gov/news/post/drone-hub", "https://gov.texas.gov/uploads/drone.jpg", "", "(Office of the Governor photo)")
+  assert.equal(state.usGovernment, false); assert.equal(state.license, "Government media (confirm terms)"); assert.match(state.rightsNote!, /gov\.texas\.gov is not a federal site, so its photos are not public domain/)
+  // A federal page whose share image comes from a contractor's CDN.
+  const offsite = page("https://www.army.mil/article/1", "https://cdn.lockheedmartin.com/ifpc.jpg", "", "(U.S. Army photo by Sgt. A)")
+  assert.equal(offsite.usGovernment, false); assert.match(offsite.rightsNote!, /served from cdn\.lockheedmartin\.com, not a government media host/)
+  // Same site, or DVIDS's image CDN, stays public domain.
+  assert.equal(page("https://www.defense.gov/News/1", "https://media.defense.gov/2026/a.jpg", "", "(U.S. Navy photo by PO2 B)").usGovernment, true)
+  // A courtesy line far down the page (past the old 4,000-character window) still makes it company media.
+  const deep = page("https://www.army.mil/article/2", "https://www.army.mil/e2/a.jpg", `${"Soldiers trained all week. ".repeat(400)}(Photo courtesy of Anduril Industries)`)
+  assert.equal(deep.usGovernment, false); assert.equal(deep.license, "Courtesy photo"); assert.equal(deep.creator, "Anduril Industries")
+  const notice = page("https://www.af.mil/News/3", "https://www.af.mil/a.jpg", "Story text. © 2026 Boeing. All rights reserved.")
+  assert.equal(notice.usGovernment, false); assert.match(notice.rightsNote!, /carries a copyright notice/)
+  // DVIDS links its own terms page ("about/copyright") on every public-domain image: that is not a notice.
+  assert.equal(page("https://www.dvidshub.net/image/1/x", "https://d34w7g4gy10iej.cloudfront.net/x.jpg", "Terms: https://www.dvidshub.net/about/copyright", "(U.S. Army photo by Spc. C)").usGovernment, true)
+  // The credit is the description's, which describes the share photo, not the first one in the article.
+  assert.equal(page("https://www.army.mil/article/4", "https://www.army.mil/b.jpg", "(U.S. Army photo by Sgt. Other)", "(U.S. Army photo by Sgt. Right)").credit, "U.S. Army photo by Sgt. Right")
+  // The photo search no longer admits a state or city .gov page.
+  assert.ok(!searchedPageUsable("https://www.sanantonio.gov/news/x", "x") && searchedPageUsable("https://media.defense.gov/x", "x"))
+})
+
+test("sameSubject escapes a designation before matching it (Mk.48 is not Mk-48 or Mkx48)", () => {
+  assert.ok(sameSubject("Navy tests Mk.48 torpedo", "the mk.48 heavyweight torpedo was fired"))
+  assert.ok(!sameSubject("Navy tests Mk.48 torpedo", "the mkx48 was fired"))
 })
 
 test("the crop rule matches the approved card: subject whole, upper 60%, big enough, enough pixels", () => {
@@ -844,22 +874,39 @@ test("the store replaces a draft on save, so a cleared field is cleared in Fires
   assert.equal("caption" in ((calls[0].data as { draft: Record<string, unknown> }).draft), false)
 })
 
-test("ICYMI story cards reuse their published post's photo and credit; a post that doesn't link its photo is searched, with a note", async () => {
+test("ICYMI story cards reuse the photo recorded on their published post, with its rights as approved; links are never read", async () => {
   const DVIDS = (n: number) => `https://www.dvidshub.net/image/95000${n}/story-${n}`
-  const post = (n: number, linked: boolean) => ({ id: `p${n}`, title: `MCU-NEWS-20261009-0${n} v1 — STORY ${n}`, status: "posted", publishedUrl: `https://www.instagram.com/milcityusa/p/${n}/`, publishedAt: `2026-10-0${9 - n}T15:00:00Z`,
-    caption: `Story ${n} caption.\n\nSource: U.S. Army, 2026-10-09\n\nImage: U.S. Army photo by Spc. ${n}\n\n${DOD_NOTICE}`, links: [`https://www.army.mil/article/${n}`, ...(linked ? [DVIDS(n)] : [])] })
-  const searched: string[] = []
+  // Post 1 was written by the pipeline with company media; someone has since appended a DVIDS page to its links.
+  const record = { url: "https://www.overland.ai/media/ultra.jpg", pageUrl: "https://www.overland.ai/press/ultra", title: "ULTRA on test", license: "Official company media", creator: "Overland AI", credit: "Overland AI (courtesy)", usGovernment: false, rightsNote: "Company media from www.overland.ai: confirm its terms allow editorial use before approving" }
+  const post = (n: number, media?: typeof record) => ({ id: `p${n}`, title: `MCU-NEWS-20261009-0${n} v1 — STORY ${n}`, status: "posted", publishedUrl: `https://www.instagram.com/milcityusa/p/${n}/`, publishedAt: `2026-10-0${9 - n}T15:00:00Z`,
+    caption: `Story ${n} caption.\n\nSource: U.S. Army, 2026-10-09\n\nImage: U.S. Army photo by Spc. ${n}\n\n${DOD_NOTICE}`, links: [`https://www.army.mil/article/${n}`, DVIDS(n)], ...(media ? { media: [media] } : {}) })
+  const searched: string[] = [], pages: string[] = [], images: string[] = []
   const w = world({ ai: { write: async () => ({ frames: [{ series: "icymi_cover" as SeriesKey, fields: { headline: "Two Army stories", story_01: "One", story_02: "Two" } }, ...[1, 2].map(n => ({ series: "icymi_story" as SeriesKey, fields: { headline: `Story ${n}`, deck: `Deck ${n}.` } }))], caption: "Roundup.\n\nSource: MilCityUSA" }) } })
-  w.deps.content.recentPosts = async () => [post(1, true), post(2, false)]
+  w.deps.content.recentPosts = async () => [post(1, record), post(2)]
   const big = new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x04, 0, 0, 0xff, 0xc0, 0x00, 0x11, 0x08, 0x07, 0xd0, 0x0b, 0xb8, 0x03, 0, 0, 0, 0]) // 3000 × 2000
-  w.deps.fetchImage = async () => ({ bytes: big, mime: "image/jpeg" })
-  w.deps.fetchPage = async url => url.startsWith("https://www.dvidshub.net/") ? { url, title: "Soldiers at Story 1", text: "", image: "https://d1ldvf68ux039x.cloudfront.net/x.jpg", description: "Story 1. (U.S. Army photo by Spc. 1)" } : { url, title: "t", text: ARMY_TEXT }
+  w.deps.fetchImage = async url => { images.push(url); return { bytes: big, mime: "image/jpeg" } }
+  w.deps.fetchPage = async url => { pages.push(url); return url.startsWith("https://www.dvidshub.net/") ? { url, title: "Soldiers", text: "", image: "https://d1ldvf68ux039x.cloudfront.net/x.jpg", description: "(U.S. Army photo by Spc. 9)" } : { url, title: "t", text: ARMY_TEXT } }
   w.deps.searchCommons = async q => { searched.push(q); return [{ ...CANDIDATE, pageUrl: `https://commons.wikimedia.org/wiki/File:${encodeURIComponent(q)}`, url: `https://upload.wikimedia.org/${encodeURIComponent(q)}.jpg`, thumbUrl: `https://upload.wikimedia.org/t/${encodeURIComponent(q)}.jpg` }] }
   await w.start({ kind: "icymi" })
   const d = onlyDraft(w)
   assert.equal(d.status, "in_review")
-  assert.equal(d.media[1]!.pageUrl, DVIDS(1)); assert.equal(d.media[1]!.credit, "U.S. Army photo by Spc. 1"); assert.match(d.media[1]!.note!, /Reused from the published post p1/)
-  assert.equal(d.media[0]!.pageUrl, DVIDS(1)) // the cover shows the lead story's photo
-  assert.match(d.media[2]!.note!, /could not be recovered from its links, so this one was searched for: check it against p2/)
+  const m = d.media[1]!
+  assert.equal(m.url, record.url); assert.equal(m.pageUrl, record.pageUrl); assert.ok(images.includes(record.url)) // exactly the recorded image
+  assert.equal(m.license, "Official company media"); assert.equal(m.credit, "Overland AI (courtesy)"); assert.equal(m.usGovernment, false) // never relabelled
+  assert.match(m.note!, /confirm its terms allow editorial use before approving\. Reused from the published post p1/) // the original note is kept
+  assert.ok(!pages.some(u => u.startsWith("https://www.dvidshub.net/"))) // the editable links were never fetched
+  assert.equal(d.media[0]!.url, record.url) // the cover shows the lead story's photo
+  assert.match(d.media[2]!.note!, /has no recorded photo, so this one was searched for: check it against p2/)
   assert.ok(searched.length > 0 && searched.every(q => !/Story 1\b/.test(q))) // only story 2 was searched for
+  // The roundup's own post records its photos too, for the reviewer and any later reuse.
+  assert.equal(w.posts[0].media[0].url, record.url); assert.equal(w.posts[0].media.length, 3)
+})
+
+test("a pipeline post records the photo it used, with its rights, as pipeline_media", async () => {
+  const w = world()
+  await w.start({ kind: "news" })
+  assert.equal(w.posts.length, 1)
+  const [m] = w.posts[0].media
+  assert.equal(m.url, CANDIDATE.url); assert.equal(m.pageUrl, CANDIDATE.pageUrl); assert.equal(m.license, CANDIDATE.license); assert.equal(m.credit, CANDIDATE.credit); assert.equal(m.usGovernment, true)
+  assert.equal("crop" in m, false); assert.equal("note" in m, false) // the record is the photo and its rights, not the review notes
 })
