@@ -1,0 +1,491 @@
+{
+  "schema": "434-brand-profile/1",
+  "generatedBy": "434media/434-context: 04 Build/brand_profile_extract.py",
+  "profile": "06 Standards/Brand Profiles/MilCityUSA.md",
+  "profileVersion": "1.0.0",
+  "profileDate": "October 18, 2026",
+  "profileSha256": "010d97c52f2e54fb",
+  "id": "milcity",
+  "name": "MilCityUSA",
+  "shortName": "MCU",
+  "draftPrefix": "MCU",
+  "rulesVersion": "mcu-rules-2026-10-17.3",
+  "never": [
+    {
+      "id": "MCU-BN-20261010-03",
+      "what": "Space Development Agency adding 21 satellites (routine fleet increment, rejected as Breaking)"
+    }
+  ],
+  "editorial": "You produce MilCityUSA (MCU) social posts for 434 MEDIA, on Instagram (@milcityusa) and the MilCityUSA Facebook Page. MCU is a news channel promoting federal innovation and entrepreneurialism (founder, 2026-10-10): defense and national-security news, technology explainers, and the Salute to Troops live event. It gives intentional priority to neo-primes and venture-backed technology alongside primes and the wider innovation ecosystem. It reads as a news brand: factual, specific, plain, brief. No hype, no opinion presented as fact, no endorsement.\n\nACCURACY COMES BEFORE THE SCHEDULE\n- Prefer the original primary source (the company, agency or service's own release, contract notice or official article). Use secondary coverage only to find it.\n- Every number, dollar figure, program status, date and name on the card and in the caption must appear in the source text you were given. If a figure is uncertain, leave it out or hold the item; never estimate.\n- Keep these separate: source publication date, event date, image date, verification date. Distinguish an announcement or award from delivery or fielded capability; a specific product variant from adjacent variants; editorial interpretation from sourced fact.\n- A collective contract value is not per-company value; do not assign undisclosed amounts or tasks to anyone.\n\nSERIES\n- NEWS: one defense-industry story.\n- BREAKING: fresh and relevant alone is not enough. It needs a genuinely consequential development that warrants immediate attention (for example a consequential funding announcement, major breakthrough, executive order, material partnership or technology advance), verified against its original primary-source announcement made within the last 24 hours. Write one sourced sentence: what is newly different, its material consequence, and why it needs attention now rather than routine News. No invented dollar threshold; no \"viral\" claim without the originating URL, measured reach and observation time. A repost or updated article is not a new event. Routine increments (such as a fleet adding satellites) are News at most. If the gate fails, say so and do not force a Breaking item.\n- DEFENSE TECH 101: one technology explained, on the approved benefit-led card (ULTRA \"SEND SUPPLIES. / NOT A DRIVER.\", HIMARS \"FIRE. / RELOCATE.\"). The card carries only: a BENEFIT HOOK of exactly two short lines (each at most 16 characters, separated by a line break) that leads with the consequence or problem solved, never \"Meet …\" or the product name; and the SUBJECT line \"<SYSTEM> / <MAKER>\" (e.g. \"ULTRA / OVERLAND AI\"). The image label and the \"Read the mission brief\" button are fixed or filled by the server. Everything else (maker, location, tech, platform, goal, backers or ticker, traction) goes in the caption's mission brief. Status language in Traction is a factual claim read from the source: a design, study or unbuilt proposal is a concept; technology still being developed and not yet field tested is in development; anything field tested or flown (flights, firings, trials, field demonstrations or evaluations) is in testing (founder, 2026-10-16); operational use or delivery to units is fielded. Identify the exact variant; never merge specifications across variants.\n- DEFENSE TECH 101 CAPTION, the approved \"mission brief\" format (published ULTRA, 2026-10-10, and HIMARS, 2026-10-11). Exactly this shape: a blank line between every line below, each value short (Tech and Platform are 1–4 words), and any line the source does not support left out entirely (never \"N/A\" or an empty label):\n  MISSION BRIEF // <SUBJECT>\n  //<Company>\n  📍<City, ST of the company headquarters>\n  Tech: <capability in a few words, e.g. \"Autonomy\", \"Precision fires\">\n  Platform: <what it is, e.g. \"Off-road vehicle\", \"Wheeled rocket launcher\">\n  Goal: <the mission or problem it addresses, one sentence>\n  Why: <why it matters, one sentence> (optional)\n  Private company → Backers: <publicly documented investors>. Public company → Ticker: <EXCHANGE>: <TICKER>, and only if the source gives it, Market cap: <currency and amount> · <as-of date> (<data source>). Never put a ticker under Backers; a funding amount is not a valuation.\n  Traction: <named organization and the precise test, purchase or fielding status, with \"per <company>\" when it is the company's claim>\n  The image credit and the endorsement notice are added after this by the server; do not write them.\n  Example (HIMARS): \"MISSION BRIEF // HIMARS\" / \"//Lockheed Martin\" / \"📍Bethesda, MD\" / \"Tech: Precision fires\" / \"Platform: Wheeled rocket launcher\" / \"Goal: Deliver precision fires with a mobile launcher.\" / \"Why: Quick relocation helps crews reduce exposure after firing.\" / \"Ticker: NYSE: LMT\" / \"Traction: 750th launcher delivered Nov. 5, 2025, per Lockheed Martin.\" — each on its own line with a blank line between.\n- ICYMI: a weekly quick brief for readers who want a fast update: up to five MCU News or Breaking stories already published in the previous week (Monday to Sunday, America/Chicago), one cover plus one story card per story, in the same order. It posts on Monday at 7:00 AM CDT. Never duplicate a story or invent filler: with fewer than five, the roundup has fewer cards, and the cover's headline never states a count the roundup doesn't have. With none, there is no ICYMI that week. Stories are chosen by recency for now; choosing the best-performing ones waits for analytics to be mapped to this workflow (founder, 2026-10-17).\n\nCARD COPY\n- Headlines are UPPERCASE, short and concrete. They must fit the template at its largest size (the limits given); if not, choose shorter words — never rely on smaller type.\n- Whole words only. Never clip or abbreviate a word to make it fit (\"PROD\", \"MFG\", \"GOVT\", \"SYS\", \"DEV\"): rephrase with shorter whole words instead. The subject's own name or acronym (HIMARS, C2, UAS) is not an abbreviation.\n- A headline that states a count must be supported by the post as a whole (the cards or the caption name the counted items).\n- Deck: one complete sentence in sentence case, ending with a period, at most two lines, supporting the headline. Never a list of fragments.\n- The headline and the DT101 benefit hook state the source's main point: what the system now does or makes possible (for a first autonomous flight, flying without a pilot), not a side detail of it.\n- Date fields: DDMMMYY, e.g. 14SEP26 (the source's publication date for news).\n- Source field: the outlet or issuing organization, short (e.g. ARMY.MIL, LOCKHEED MARTIN, DOD).\n- Never placeholder text, brackets or sample copy. Empty optional slots are not left showing.\n\nCAPTION (one master caption per post or carousel)\n- 2–5 short paragraphs: what happened, why it matters, what's next where known. Plain sentences. No emoji and no hashtags unless the reviewer asks for them.\n- Carousel: one master caption that adds context; do not repeat a list the cards already show; no per-slide captions.\n- End with a source line (\"Source: <organization>, <date>\") and, when an image needs it, the media credit line exactly as supplied. The U.S. government endorsement notice is added by the server when the image is government imagery.\n- Do not write @handles: account tags are applied only when an official account is verified, which this route cannot do. Use plain company names.\n- Never call MCU's own coverage an endorsement, and never claim results.\n\nMEDIA (chosen by a separate step after the copy is written: never hold the copy for a photo or credit)\n- Relevant, recognizable, appropriately licensed media only; record creator, credit, license and the exact item page. Government-hosted or publicly visible is not by itself a license: prefer public-domain U.S. government imagery and openly licensed images with their credit.\n- The subject and its link to the news must be recognizable at phone size; reject mostly-sky or cropped-off-subject images. Do not present unrelated archive imagery as the event; disclose archive or exercise context in the caption.\n- Official company media first when it exists and its terms allow editorial use; never AI-generated video on news; an AI-generated still is a last resort and is labelled.\n- If no relevant, cleared visual exists, hold the item rather than pad the batch.\n\nNEVER\n- Revive the rejected SDA Breaking draft MCU-BN-20261010-03 (the Space Development Agency's routine 21-satellite addition) under any ID or framing.\n- Republish the already-published Army carousel (CRM Opb3LOHpfZPFoxdQ720F, Canva DAHYHyF5o00) or repeat a story MCU already posted.\n- Position 434 MEDIA or MCU as an AI consultant, technical agency or white-label provider.",
+  "series": {
+    "news": {
+      "key": "news",
+      "label": "News",
+      "templates": {
+        "feed": "EAHXWo1LiF8",
+        "reels": "EAHXZN4kp3Y"
+      },
+      "fields": [
+        {
+          "name": "headline",
+          "label": "Headline",
+          "perLine": 15,
+          "maxLines": 3,
+          "uppercase": true
+        },
+        {
+          "name": "deck",
+          "label": "Deck",
+          "perLine": 50,
+          "maxLines": 2
+        },
+        {
+          "name": "date",
+          "label": "Date",
+          "date": true
+        },
+        {
+          "name": "source",
+          "label": "Source outlet",
+          "maxChars": 28,
+          "uppercase": true
+        }
+      ],
+      "media": {
+        "feed": "media",
+        "reels": "media"
+      },
+      "requestable": true,
+      "representative": true
+    },
+    "breaking": {
+      "key": "breaking",
+      "label": "Breaking News",
+      "templates": {
+        "feed": "EAHXZAbAA8s",
+        "reels": "EAHXZAPPFLQ"
+      },
+      "fields": [
+        {
+          "name": "headline",
+          "label": "Headline",
+          "perLine": 17,
+          "maxLines": 3,
+          "uppercase": true
+        },
+        {
+          "name": "deck",
+          "label": "Deck",
+          "perLine": 50,
+          "maxLines": 2
+        },
+        {
+          "name": "date",
+          "label": "Date",
+          "date": true
+        },
+        {
+          "name": "source",
+          "label": "Source outlet",
+          "maxChars": 28,
+          "uppercase": true
+        }
+      ],
+      "media": {
+        "feed": "media",
+        "reels": "media"
+      },
+      "requestable": true,
+      "representative": true
+    },
+    "dt101": {
+      "key": "dt101",
+      "label": "Defense Tech 101",
+      "templates": {
+        "feed": "EAHYOAJhC_8",
+        "reels": ""
+      },
+      "fields": [
+        {
+          "name": "benefit_headline",
+          "label": "Benefit hook",
+          "perLine": 16,
+          "exactLines": 2,
+          "uppercase": true
+        },
+        {
+          "name": "subject_identifier",
+          "label": "Subject",
+          "maxChars": 40,
+          "uppercase": true
+        },
+        {
+          "name": "image_context",
+          "label": "Image label",
+          "serverFilled": true,
+          "uppercase": true
+        }
+      ],
+      "media": {
+        "feed": "media",
+        "reels": null
+      },
+      "requestable": true,
+      "caption": {
+        "firstLines": [
+          "^MISSION BRIEF \\/\\/ \\S",
+          "^\\/\\/\\S"
+        ],
+        "labels": [
+          "Tech:",
+          "Platform:",
+          "Goal:"
+        ],
+        "format": "the DT101 caption must be the mission brief: \"MISSION BRIEF // <SUBJECT>\", then \"//<Company>\", then the labelled lines, each on its own line with a blank line between",
+        "missingLabel": "the mission brief has no \"{label}\" line"
+      }
+    },
+    "icymi_cover": {
+      "key": "icymi_cover",
+      "label": "ICYMI cover",
+      "templates": {
+        "feed": "EAHXZPgjqSY",
+        "reels": "EAHXZJnI-Nc"
+      },
+      "fields": [
+        {
+          "name": "headline",
+          "label": "Roundup theme",
+          "perLine": 17,
+          "maxLines": 3,
+          "uppercase": true
+        },
+        {
+          "name": "date",
+          "label": "Date",
+          "date": true
+        },
+        {
+          "name": "story_01",
+          "label": "Story 1",
+          "perLine": 38,
+          "maxLines": 1
+        },
+        {
+          "name": "story_02",
+          "label": "Story 2",
+          "perLine": 38,
+          "maxLines": 1
+        },
+        {
+          "name": "story_03",
+          "label": "Story 3",
+          "perLine": 38,
+          "maxLines": 1
+        },
+        {
+          "name": "story_04",
+          "label": "Story 4",
+          "perLine": 38,
+          "maxLines": 1
+        },
+        {
+          "name": "story_05",
+          "label": "Story 5",
+          "perLine": 38,
+          "maxLines": 1
+        }
+      ],
+      "media": {
+        "feed": "media",
+        "reels": "media"
+      },
+      "requestable": true
+    },
+    "icymi_story": {
+      "key": "icymi_story",
+      "label": "ICYMI story",
+      "templates": {
+        "feed": "EAHXZJnAT0o",
+        "reels": "EAHXZMFmSh0"
+      },
+      "fields": [
+        {
+          "name": "counter",
+          "label": "Counter"
+        },
+        {
+          "name": "headline",
+          "label": "Headline",
+          "perLine": 15,
+          "maxLines": 2,
+          "uppercase": true
+        },
+        {
+          "name": "deck",
+          "label": "Deck",
+          "perLine": 50,
+          "maxLines": 2
+        }
+      ],
+      "media": {
+        "feed": "media",
+        "reels": "media"
+      },
+      "requestable": false,
+      "representative": true
+    },
+    "followon_graphic": {
+      "key": "followon_graphic",
+      "label": "Follow-on graphic",
+      "templates": {
+        "feed": "EAHXZOYmzQ8",
+        "reels": "EAHXZHGriWI"
+      },
+      "fields": [],
+      "media": {
+        "feed": "media",
+        "reels": "media"
+      },
+      "requestable": false
+    },
+    "followon_text": {
+      "key": "followon_text",
+      "label": "Follow-on text",
+      "templates": {
+        "feed": "EAHXZEmHgsE",
+        "reels": "EAHXZHixcNk"
+      },
+      "fields": [
+        {
+          "name": "kicker",
+          "label": "Kicker",
+          "allowed": [
+            "WHAT HAPPENED",
+            "WHY IT MATTERS",
+            "WHAT'S NEXT"
+          ]
+        },
+        {
+          "name": "headline",
+          "label": "Headline",
+          "perLine": 24,
+          "maxLines": 3,
+          "uppercase": true
+        },
+        {
+          "name": "body",
+          "label": "Body",
+          "perLine": 50,
+          "maxLines": 3
+        },
+        {
+          "name": "source",
+          "label": "Source outlet",
+          "maxChars": 28,
+          "uppercase": true
+        },
+        {
+          "name": "counter",
+          "label": "Counter"
+        }
+      ],
+      "media": {
+        "feed": "media",
+        "reels": "media"
+      },
+      "requestable": false
+    },
+    "tentpole_talent": {
+      "key": "tentpole_talent",
+      "label": "Tentpole talent (Salute to Troops)",
+      "templates": {
+        "feed": "EAHXZNY2y7A",
+        "reels": "EAHXZeK2aFE"
+      },
+      "fields": [
+        {
+          "name": "talent_name",
+          "label": "Talent name",
+          "perLine": 12,
+          "maxLines": 2,
+          "uppercase": true
+        },
+        {
+          "name": "proof_line",
+          "label": "Proof line",
+          "perLine": 40,
+          "maxLines": 1
+        },
+        {
+          "name": "date",
+          "label": "Date",
+          "date": true
+        },
+        {
+          "name": "venue",
+          "label": "Venue",
+          "maxChars": 30,
+          "uppercase": true
+        }
+      ],
+      "media": {
+        "feed": "media",
+        "reels": "media"
+      },
+      "requestable": false
+    },
+    "tentpole_ceremonial": {
+      "key": "tentpole_ceremonial",
+      "label": "Tentpole ceremonial (Salute to Troops)",
+      "templates": {
+        "feed": "EAHXZShXbag",
+        "reels": "EAHXZQVQ34s"
+      },
+      "fields": [
+        {
+          "name": "talent_name",
+          "label": "Talent name",
+          "perLine": 12,
+          "maxLines": 2,
+          "uppercase": true
+        },
+        {
+          "name": "proof_line",
+          "label": "Proof line",
+          "perLine": 40,
+          "maxLines": 1
+        },
+        {
+          "name": "date",
+          "label": "Date",
+          "date": true
+        },
+        {
+          "name": "venue",
+          "label": "Venue",
+          "maxChars": 30,
+          "uppercase": true
+        }
+      ],
+      "media": {
+        "feed": "media",
+        "reels": "media"
+      },
+      "requestable": false
+    }
+  },
+  "requestKinds": [
+    {
+      "kind": "news",
+      "label": "News",
+      "detail": "One story, one card",
+      "series": [
+        "news"
+      ],
+      "code": "NEWS",
+      "recencyDays": 7
+    },
+    {
+      "kind": "breaking",
+      "label": "Breaking News",
+      "detail": "Primary source in the last 24 hours",
+      "series": [
+        "breaking"
+      ],
+      "code": "BN"
+    },
+    {
+      "kind": "dt101",
+      "label": "Defense Tech 101",
+      "detail": "Benefit-led card, mission-brief caption",
+      "series": [
+        "dt101"
+      ],
+      "code": "DT101",
+      "recencyDays": 90,
+      "undatedOk": true
+    },
+    {
+      "kind": "icymi",
+      "label": "ICYMI roundup",
+      "detail": "Cover + five published stories",
+      "series": [
+        "icymi_cover",
+        "icymi_story"
+      ],
+      "code": "ICYMI"
+    }
+  ],
+  "research": {
+    "scope": "Prefer U.S. defense, national-security and defense-tech companies and programs.",
+    "outletExamples": "Defense News, Breaking Defense, Reuters and the like",
+    "writeNote": " or for a DOMAIN call (use Multi-domain when it spans several)",
+    "kinds": {
+      "news": {
+        "want": "defense-industry news stories from the last 7 days",
+        "guidance": "Give each story's publication date (publishedAt, YYYY-MM-DD) as the page states it; anything published more than 7 days ago is rejected. "
+      },
+      "breaking": {
+        "want": "Breaking-qualified developments (primary-source announcement within the last 24 hours AND consequential enough to need immediate attention)",
+        "guidance": "For each, give whyNow: one sourced sentence on what is newly different, its material consequence, and why it needs attention now. If nothing qualifies, return no candidates and say why in note."
+      },
+      "dt101": {
+        "want": "defense technologies worth a Defense Tech 101 explainer (a specific, real product or system with a clear maker and a sourced status)",
+        "guidance": "A DT101 card needs the maker and its headquarters: when the primary page does not name them, give supportingUrls with up to two pages that do (the maker's own product or about page first). The primary source must be current: a dated article or announcement from the last 90 days, or the maker's own product page; an older article is rejected, so give the product page or a recent announcement instead, with the older article only as a supporting source. "
+      }
+    }
+  },
+  "photos": {
+    "card": "a MilCityUSA social card: 1080 × 1350, full bleed, the photo filling the frame, the text block on a dark scrim over the lower 40%",
+    "searchSubject": "a defense-news social card"
+  },
+  "posts": {
+    "match": "milcity|\\bmcu\\b",
+    "tag": "milcity",
+    "metaBrand": "milcity",
+    "homeUrl": "https://www.instagram.com/milcityusa/",
+    "roundupExclude": "icymi|dt101|defense tech 101|salute to troops",
+    "roundupExcludeCaption": "MISSION BRIEF \\/\\/"
+  },
+  "seeds": {
+    "orgKinds": [
+      "neo-prime",
+      "prime",
+      "government",
+      "research",
+      "ecosystem",
+      "outlet"
+    ],
+    "outletKind": "outlet",
+    "lookFirst": [
+      {
+        "label": "Look first at these builders' own newsrooms",
+        "kinds": [
+          "neo-prime"
+        ],
+        "sites": true
+      },
+      {
+        "label": "Primes",
+        "kinds": [
+          "prime"
+        ],
+        "sites": false
+      },
+      {
+        "label": "Government, research and ecosystem",
+        "kinds": [
+          "government",
+          "research",
+          "ecosystem"
+        ],
+        "sites": true
+      }
+    ],
+    "backlog": {
+      "kind": "dt101",
+      "label": "DT101 ideas waiting to be made"
+    }
+  }
+}

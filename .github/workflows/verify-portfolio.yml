@@ -93,3 +93,5 @@ jobs:
       # Content pipeline in the Admin (moved from the pilot's Slack MCU skill): research → copy → photo → Canva →
       # artwork check → a Review post on the board, the lease rules and the zero-retention model routing. All faked.
       - run: tsx --test lib/__tests__/content-pipeline.test.ts
+      # Brand profiles: the generated MilCityUSA profile validates, matches its manifest hash, and a failing one is refused.
+      - run: tsx --test lib/__tests__/brand-profile.test.ts

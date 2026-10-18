@@ -1,5 +1,5 @@
 import { SERIES, checkFields, clippedWords, ddmmmyy, normalizeFields, type Placement, type RequestKind } from "./series"
-import { MCU_RULES_VERSION } from "./editorial"
+import { BRAND } from "./brand"
 import { icymiCount, meaningful, normalizeUrl, unusedStorySlot, type McuAi, type ModelCall, type RankedPhoto, type SubjectBox } from "./model"
 import { contentPropertyOf } from "./properties"
 import type { ContentProperty, PipelineMedia } from "@/components/crm/types"
@@ -66,7 +66,7 @@ const BREAKING_WINDOW_MS = 24 * 3600_000
 const RECENT_STORY_MS = 3 * 864e5
 /** The seeds' outlet sites, beside sources.ts's own list. */
 async function outletSites(deps: Pick<WorkerDeps, "seeds">): Promise<string[]> {
-  return ((await deps.seeds().catch(() => null))?.orgs ?? []).filter(o => o.kind === "outlet").map(o => o.site)
+  return ((await deps.seeds().catch(() => null))?.orgs ?? []).filter(o => o.kind === BRAND.seeds.outletKind).map(o => o.site)
 }
 /** Stories other drafts are working on: their titles steer research, their URLs are refused. */
 async function storiesInFlight(deps: WorkerDeps, exceptDraft?: string): Promise<{ titles: string[]; urls: Set<string> }> {
@@ -81,11 +81,11 @@ async function storiesInFlight(deps: WorkerDeps, exceptDraft?: string): Promise<
  * product page) counts as current; but a dated page is a news hook, and it must be from the last 90 days. A stale
  * page is a miss like an unreadable one, so the subject's other primary pages are tried before it drops.
  */
-export const RECENCY_DAYS: Partial<Record<RequestKind, number>> = { news: 7, dt101: 90 }
+export const RECENCY_DAYS: Partial<Record<RequestKind, number>> = Object.fromEntries(BRAND.requestKinds.filter(k => k.recencyDays).map(k => [k.kind, k.recencyDays]))
 export function staleSource(kind: RequestKind, publishedAt: string | undefined, nowMs: number): string | null {
   const days = RECENCY_DAYS[kind]
   if (!days) return null
-  if (!publishedAt) return kind === "news" ? "states no publication date" : null
+  if (!publishedAt) return BRAND.requestKinds.find(k => k.kind === kind)?.undatedOk ? null : "states no publication date"
   const age = nowMs - Date.parse(`${publishedAt}T23:59:59Z`)
   return age > days * 864e5 ? `published ${publishedAt}, more than ${days} days ago` : null
 }
@@ -97,8 +97,9 @@ const MAX_SHOWN = 8
 const MAX_VISION_BYTES = 4_500_000
 
 const iso = (deps: Pick<WorkerDeps, "nowMs">) => new Date(deps.nowMs()).toISOString()
-export const KIND_CODE: Record<RequestKind, string> = { news: "NEWS", breaking: "BN", dt101: "DT101", icymi: "ICYMI" }
-export const label = (k: RequestKind) => k === "icymi" ? "ICYMI roundup" : SERIES[k].label
+/** Each request kind's code in draft ids ("MCU-NEWS-20261018-01"), and its label, from the brand profile. */
+export const KIND_CODE = Object.fromEntries(BRAND.requestKinds.map(k => [k.kind, k.code])) as Record<RequestKind, string>
+export const label = (k: RequestKind) => BRAND.requestKinds.find(x => x.kind === k)?.label ?? k
 
 /** Runs due work until the time budget is spent. Returns how many steps ran. */
 export async function runDue(deps: WorkerDeps, budgetMs = 240_000): Promise<number> {
@@ -173,13 +174,13 @@ async function jobStep(deps: WorkerDeps, id: string, attempt: number): Promise<v
       await deps.notify(job, []).catch(err => console.error("[content-pipeline] notify failed", id, err instanceof Error ? err.message : err))
       return
     }
-    const day = iso(deps).slice(0, 10).replace(/-/g, ""), prefix = `MCU-${KIND_CODE[job.kind]}-${day}-`
+    const day = iso(deps).slice(0, 10).replace(/-/g, ""), prefix = `${BRAND.draftPrefix}-${KIND_CODE[job.kind]}-${day}-`
     let n = await deps.store.highestDraftNumber(prefix)
     const now = iso(deps)
     for (const story of stories) {
       const draftId = `${prefix}${String(++n).padStart(2, "0")}`
       job.drafts.push(draftId)
-      await deps.store.createDraft({ id: draftId, jobId: id, kind: job.kind, placement: job.placement, request: job.request, status: "queued", version: 1, ...(job.topic ? { direction: job.topic } : {}), story, frames: [], media: [], designs: [], qa: [], notices: [], calls: calls.map(c => ({ ...c, at: now })), history: [{ at: now, event: `opened under ${MCU_RULES_VERSION}` }], createdAt: now, updatedAt: now })
+      await deps.store.createDraft({ id: draftId, jobId: id, kind: job.kind, placement: job.placement, request: job.request, status: "queued", version: 1, ...(job.topic ? { direction: job.topic } : {}), story, frames: [], media: [], designs: [], qa: [], notices: [], calls: calls.map(c => ({ ...c, at: now })), history: [{ at: now, event: `opened under ${BRAND.rulesVersion}` }], createdAt: now, updatedAt: now })
     }
     job.status = "drafting"; job.updatedAt = now; job.note = undefined
     if (job.kind !== "icymi" && stories.length < job.count) job.note = `${stories.length} of ${job.count} qualified`
@@ -232,12 +233,13 @@ export function icymiWindow(nowMs: number, lookbackDays: number | null): { start
 export function icymiStory(posts: PostRow[], window: { startMs: number; endMs: number; label: string }): Story[] | { hold: string } {
   const at = (p: PostRow) => p.publishedAt ? Date.parse(p.publishedAt) : NaN
   // DT101 posts are told by their mission-brief caption too: older manual ones aren't titled DT101 (gate round 1, ULTRA).
-  const eligible = posts.filter(p => (p.status === "posted" || p.publishedUrl) && !/icymi|dt101|defense tech 101|salute to troops/i.test(p.title) && p.caption && !/MISSION BRIEF \/\//i.test(p.caption) && at(p) >= window.startMs && at(p) < window.endMs)
+  const exclude = new RegExp(BRAND.posts.roundupExclude, "i"), excludeCaption = new RegExp(BRAND.posts.roundupExcludeCaption, "i")
+  const eligible = posts.filter(p => (p.status === "posted" || p.publishedUrl) && !exclude.test(p.title) && p.caption && !excludeCaption.test(p.caption) && at(p) >= window.startMs && at(p) < window.endMs)
     .sort((a, b) => at(b) - at(a))
     .filter((p, i, all) => all.findIndex(x => x.title.trim().toLowerCase() === p.title.trim().toLowerCase()) === i)
     .slice(0, ICYMI_MAX)
-  if (!eligible.length) return { hold: `no MCU News or Breaking story was published in ${window.label}, so there is no ICYMI` }
-  return [{ title: "ICYMI roundup", primaryUrl: eligible[0].publishedUrl || "https://www.instagram.com/milcityusa/", publisher: "MilCityUSA", sourceTitle: `${eligible.length} published MCU ${eligible.length === 1 ? "story" : "stories"} from ${window.label}`, sourceText: eligible.map((p, i) => `${i + 1}. ${p.title}\n${p.caption}`).join("\n\n"), roundup: eligible.map(p => ({
+  if (!eligible.length) return { hold: `no ${BRAND.shortName} News or Breaking story was published in ${window.label}, so there is no ICYMI` }
+  return [{ title: "ICYMI roundup", primaryUrl: eligible[0].publishedUrl || BRAND.posts.homeUrl, publisher: BRAND.name, sourceTitle: `${eligible.length} published ${BRAND.shortName} ${eligible.length === 1 ? "story" : "stories"} from ${window.label}`, sourceText: eligible.map((p, i) => `${i + 1}. ${p.title}\n${p.caption}`).join("\n\n"), roundup: eligible.map(p => ({
     postId: p.id, title: p.title, caption: (p.caption || "").split("\n").filter(l => !/^Image: /.test(l) && l !== DOD_NOTICE).join("\n").trim().slice(0, 800), ...(p.publishedUrl ? { publishedUrl: p.publishedUrl } : {}), ...(p.media?.[0] ? { media: p.media[0] } : {}),
   })) }]
 }
@@ -246,7 +248,7 @@ export function icymiStory(posts: PostRow[], window: { startMs: number; endMs: n
 async function researchStories(deps: WorkerDeps, ai: McuAi, job: Pick<McuJob, "kind" | "count" | "topic">, recentTitles: string[], seeds: McuSeeds | null, avoid: string[] = [], avoidUrls: string[] = [], inFlight: { titles: string[]; urls: Set<string> } = { titles: [], urls: new Set() }): Promise<Story[] | { hold: string; tried?: string[]; triedUrls?: string[] }> {
   const today = iso(deps).slice(0, 10)
   const r = await ai.research({ kind: job.kind, count: job.count, ...(job.topic ? { topic: job.topic } : {}), today, recentTitles, seeds, ...(avoid.length ? { avoid } : {}), ...(inFlight.titles.length ? { drafting: inFlight.titles } : {}) })
-  const stories: Story[] = [], dropped: string[] = [], outlets = (seeds?.orgs ?? []).filter(o => o.kind === "outlet").map(o => o.site)
+  const stories: Story[] = [], dropped: string[] = [], outlets = (seeds?.orgs ?? []).filter(o => o.kind === BRAND.seeds.outletKind).map(o => o.site)
   for (const c of r.candidates) {
     if (stories.length >= job.count) break
     // The primary page first, then other primary pages for the same subject (product page, .mil/.gov page, press
@@ -429,10 +431,11 @@ function validate(frames: FrameCopy[], caption: string, story: Story): string[] 
   // The caption ends with its own "Source:" line, and a DT101 caption is the mission brief (gate round 2: a DT101 with
   // a three-paragraph news caption, another with no source line, a News caption with "Source:" mid-paragraph).
   if (!/^Source: \S/m.test(body)) problems.push('the caption needs its source on a line of its own: "Source: <organization>, <date>"')
-  if (frames[0]?.series === "dt101") {
+  const format = frames[0] ? SERIES[frames[0].series]?.caption : undefined
+  if (format) {
     const lines = body.split("\n").map(l => l.trim()).filter(Boolean)
-    if (!/^MISSION BRIEF \/\/ \S/.test(lines[0] ?? "") || !/^\/\/\S/.test(lines[1] ?? "")) problems.push('the DT101 caption must be the mission brief: "MISSION BRIEF // <SUBJECT>", then "//<Company>", then the labelled lines, each on its own line with a blank line between')
-    for (const label of ["Tech:", "Platform:", "Goal:"]) if (!lines.some(l => l.startsWith(label))) problems.push(`the mission brief has no "${label}" line`)
+    if (format.firstLines.some((re, i) => !new RegExp(re).test(lines[i] ?? ""))) problems.push(format.format)
+    for (const label of format.labels) if (!lines.some(l => l.startsWith(label))) problems.push(format.missingLabel.replace("{label}", label))
   }
   // The copy must be about this draft's story (gate round 3: after a subject switch, DT101-10 and -12 carried the
   // previous subject's mission brief). A roundup's copy is about five stories, so it is not checked here.
@@ -530,10 +533,10 @@ export function publishedPhoto(item: NonNullable<Story["roundup"]>[number]): Med
 export function frameStory(d: Pick<McuDraft, "story">, frame: FrameCopy, index: number): Story {
   if (frame.series !== "icymi_story") return d.story
   const p = d.story.roundup?.[index - 1]
-  return p ? { title: p.title.replace(/^MCU-[A-Z0-9]+-\d{8}-\d{2}\s+v\d+\s+—\s+/, ""), primaryUrl: p.publishedUrl ?? "", publisher: "MilCityUSA", sourceTitle: p.title, sourceText: p.caption } : d.story
+  return p ? { title: p.title.replace(new RegExp(`^${BRAND.draftPrefix}-[A-Z0-9]+-\\d{8}-\\d{2}\\s+v\\d+\\s+—\\s+`), ""), primaryUrl: p.publishedUrl ?? "", publisher: BRAND.name, sourceTitle: p.title, sourceText: p.caption } : d.story
 }
-/** News, Breaking and the ICYMI story cards may use a representative photo; DT101 always shows the system itself. */
-export const allowsRepresentative = (frame: FrameCopy) => frame.series === "news" || frame.series === "breaking" || frame.series === "icymi_story"
+/** Series the brand profile marks representative (for MCU: News, Breaking and the ICYMI story cards; never DT101). */
+export const allowsRepresentative = (frame: FrameCopy) => SERIES[frame.series]?.representative === true
 const FRAME_ASPECT: Record<Placement, number> = { feed: 4 / 5, reels: 9 / 16 }
 /**
  * Where a photo's subject lands on the card. Canva fills the template's full-bleed frame like CSS "cover": scaled to
@@ -760,7 +763,7 @@ async function reviewStep(deps: WorkerDeps, ai: McuAi, d: McuDraft): Promise<voi
 
 /** The content post's review notes: sources, photo rights, checks and what was not done. Plain text, ≤4,000 characters. */
 export function reviewNotes(d: McuDraft): string {
-  const sections: string[] = [`${d.id} · v${d.version} · ${label(d.kind)} — drafted by the content pipeline (${MCU_RULES_VERSION}). Review the card and caption, then approve through the publisher.`]
+  const sections: string[] = [`${d.id} · v${d.version} · ${label(d.kind)} — drafted by the content pipeline (${BRAND.rulesVersion}). Review the card and caption, then approve through the publisher.`]
   d.frames.forEach((f, i) => {
     const vals = SERIES[f.series].fields.filter(x => f.fields[x.name]).map(x => `- ${x.label}: ${f.fields[x.name]}`)
     sections.push(`Graphic copy${d.frames.length > 1 ? ` — ${i + 1}. ${SERIES[f.series].label}` : ""} (on the card)\n${vals.join("\n")}`)
