@@ -1,0 +1,40 @@
+# Content pipeline replay: passbar-candidates-2026-10-19
+
+Rules mcu-rules-2026-10-18.2 · head be3d23c · 2026-10-19T01:25:58.724Z → 2026-10-19T01:33:56.518Z
+Models: research anthropic/claude-haiku-5.5, write anthropic/claude-haiku-5.5, photoSearch anthropic/claude-haiku-5.5, photoPick anthropic/claude-sonnet-5.5, artworkCheck anthropic/claude-sonnet-5.5 · fact check anthropic/claude-sonnet-5.5 · seeds mcu-seeds-2026-10-17.json (0e7a9a32de345d02)
+
+**Score: 2 of 18 pass** (reach Review safe and within limits). Reached the Canva step: 4; of those unsafe: 2. Held: 14 (0 for reasons v9 no longer holds for). Failed: 0. No draft: 0.
+Hold reasons: photo 10, writer 4.
+**Cost: $0.5686** (Gateway credits, total used before and after).
+
+Not scored offline: the Canva fill, the artwork check and the rendered layout (the replay stops before the fill).
+
+| Story | Series | Replay | Why | Card copy | Gate rounds |
+|---|---|---|---|---|---|
+| raid-hunter | dt101 | held | photo: no relevant, licensed photo was found ("Raid Hunter 50mm gun-based air defense system Northrop Grumman"): no candidate shows the subject itself (No candidate shows the actual Raid Hunter gun system. #0 and #1 are CGI promotional imagery of a drone being engaged at dusk, with explosions and HU | STOPS MIXED AIR / RAIDS ON BASES · RAID HUNTER / NORTHROP GRUMMAN | round 3 (nemotron): replaced; round 4 (nemotron): held |
+| anduril-thunder | dt101 | held | photo: no relevant, licensed photo was found ("Anduril Thunder autonomous attack rotorcraft"): no photo of the subject fits the 4:5 card (#1: the 4:5 crop cuts off the subject · #0: the subject sits low, under the text block) (Candidate 1 is a close side view of the Thunder rotorcraft with the Army  | FLIES UNMANNED / IN CLOSE FIGHTS · THUNDER / ANDURIL | round 3 (nemotron): held |
+| anduril-submarine | dt101 | held | writer: The source supports only a general description of an investment, not the specific Defense Tech 101 system details needed for a mission brief (no named system, platform, tech specifics, or traction status), and the headline claims about build delays are not stated in the source; hold this ite |  | round 3 (nemotron): held |
+| pac3-edge | dt101 | held | photo: no relevant, licensed photo was found ("Lockheed Martin PAC-3 interceptor Army Future Interceptor"): no candidate shows the subject itself (No candidate shows the PAC-3 Edge interceptor. The closest is #0, a concept-art image of a PAC-3 MSE launching from a destroyer. It is a different missil | REACHES THREATS / AT LONGER RANGE · PAC-3 EDGE / LOCKHEED MARTIN | round 3 (nemotron): replaced; round 4 (nemotron): replaced |
+| skydio-f10 | dt101 | held | writer: Not held. The headline and hook are drawn from Skydio's F10 announcement; the source does not state a headquarters city, so the location line should be verified before publishing. No replacement subject qualified: replay: research is fixed to the captured story, so no replacement subject is  |  | round 3 (nemotron): held |
+| l3harris-navy-vampire | dt101 | **pass** |  | IT DOWNS DRONES / FROM A TRUCK · VAMPIRE / L3HARRIS | round 4 (nemotron): in_review |
+| morfius-release | dt101 | held | photo: no relevant, licensed photo was found ("Lockheed Martin MORFIUS X-Rotor airborne high power microwave counter-drone system"): no candidate shows the subject itself (None of the candidates shows the MORFIUS X-Rotor. They show an F-22, C-130 transports, a cockpit and Lockheed buildings, which a | ONE LAUNCH COULD / DOWN 50 DRONES · MORFIUS X-ROTOR / LOCKHEED MARTIN | round 4 (nemotron): replaced |
+| morfius-product | dt101 | held | photo: no relevant, licensed photo was found ("Lockheed Martin MORFIUS counter-UAS high-power microwave interceptor product imagery"): no candidate shows the subject itself (No candidate visibly shows the MORFIUS interceptor. #0 is a Lockheed promo graphic with only faint aircraft shadows on desert, | IT BRINGS DOWN / DRONE SWARMS · MORFIUS / LOCKHEED MARTIN | round 4 (nemotron): held |
+| paravision-state | news | **pass** |  | PARAVISION WINS UP TO $6.5M STATE CONTRACT · The firm-fixed-price award was made September 23 and covers digital identity assurance. · BIOMETRIC UPDATE | round 4 (nemotron): held |
+| seasats-lightfish | dt101 | held | writer: Hold: none. No replacement subject qualified: replay: research is fixed to the captured story, so no replacement subject is searched |  | round 5 (haiku): held |
+| l3harris-drone-guardian | dt101 | held | photo: no relevant, licensed photo was found ("Drone Guardian counter-UAS L3Harris"): no candidate shows the subject itself (None of the candidates shows the Drone Guardian system or any L3Harris counter-UAS equipment. #0 is a generic quadcopter at a fence. #1–#7 are MQ-9 Reaper aircraft, which are  | IT CUTS NUISANCE / ALERTS FOR TEAMS · DRONE GUARDIAN / L3HARRIS | round 5 (haiku): held |
+| anduril-eagleeye | dt101 | held | writer: Held: the source is an undated product page with no publish date, no test, purchase or fielding status, and it does not state the company's headquarters location, which the caption requires. No replacement subject qualified: replay: research is fixed to the captured story, so no replacement  |  | round 5 (haiku): held |
+| xtend-striker | news | held | photo: no relevant, licensed photo was found ("XTEND STRIKER drone"): no photo of the subject fits the 4:5 card (#0: the cropped photo is under 500 px wide) (The photo is a close-up of an XTEND drone with a Drone Dominance Program challenge coin. It matches the story's subject and gives a dominant h | XTEND BOOKS 6,000 STRIKER DRONE ORDER · The $40.5M order follows a top Close Quarters Battle result in Gauntlet II. · BUSINESS WIRE | round 5 (haiku): in_review |
+| skydio-x10d | dt101 | reached, unsafe | 📍San Mateo, CA — The source never states Skydio's headquarters or location, so this location is not supported.; Private company — The source doesn't say whether Skydio is privately held, so this ownership status is not supported. | FINDS ITS WAY / HOME WITHOUT GPS · SKYDIO X10D / SKYDIO | round 6 (haiku): replaced |
+| rtx-coyote | dt101 | reached, unsafe | Private company → Backers: Not applicable — The source says Raytheon is a business of RTX, a publicly traded company (NYSE: RTX). Calling it a private company is wrong. | ROCKET MOTOR / FOR FASTER SHOTS · COYOTE BLOCK 2C+RM / RAYTHEON | round 6 (haiku): in_review |
+| setaf-gtead | news | held | photo: no relevant, licensed photo was found: no photo of the subject fits the 4:5 card (#0: the 4:5 crop cuts off the subject; the subject sits low, under the text block) (Close, dominant view of a Soldier handling a Bumblebee counter-drone system in Morocco during African Lion 26. It matches the s | ARMY TO TEST COUNTER-DRONE TECH IN AFRICA · The Army plans to deliver tested solutions to Soldiers within 180 days. · ARMY.MIL | round 6 (haiku): held |
+| antheia-osc | breaking | held | photo: no relevant, licensed photo was found: no candidate shows the subject itself (no licensed candidates); a representative photo (the people, unit or equipment the story is about) was searched for too, and none was found. No replacement subject qualified: replay: research is fixed to the capture | OSC OFFERS ANTHEIA UP TO $80M LOAN · The conditional loan would support Antheia's U.S. drug ingredient manufacturing. · PR NEWSWIRE | round 6 (haiku): held |
+| icymi-week-2026-10-05 | icymi | held | photo: no relevant, licensed photo was found: no candidate shows the subject itself (no licensed candidates). | TOP DEFENSE DEVELOPMENTS · Microchip buys VORAGO rad-hard chips · Lockheed unveils PAC-3 Edge · Florida Guard tests drones at Blanding | round 3 (nemotron): held; round 4 (nemotron): held; round 5 (haiku): held; round 6 (haiku): held |
+
+## Tokens
+
+| Step : model | Calls | Input | Output |
+|---|---|---|---|
+| write:anthropic/claude-haiku-5.5 | 45 | 394834 | 25175 |
+| photoSearch:anthropic/claude-haiku-5.5 | 34 | 376416 | 25699 |
+| photoPick:anthropic/claude-sonnet-5.5 | 13 | 125384 | 5078 |
+| write:anthropic/claude-sonnet-5.5 (fact check) | 4 | 14617 | 1277 |

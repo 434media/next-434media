@@ -18,6 +18,8 @@ import { PIPELINE_MODELS, FALLBACK_MODELS, CALL_FALLBACK, callOptions, outputBud
 import { seedBrief, seedProblems, type McuSeeds } from "../content-pipeline/seeds"
 import { PIPELINE_PROPERTIES, PROPERTY_TEMPLATES, contentPropertyOf, propertyCanGenerate } from "../content-pipeline/properties"
 import { BRANDS, CONTENT_PROPERTIES } from "../../components/crm/types"
+import { candidateFields, cutOffWords } from "../content-pipeline/series"
+import { candidateProblems, copyProblems, MAX_CANDIDATE_BATCHES } from "../content-pipeline/worker"
 
 // ── in-memory store with the Firestore store's lease semantics ──
 class MemStore implements McuStore {
@@ -1384,4 +1386,103 @@ test("round 6 review: a replacement subject gets its own label refit (sourceHold
   const d = onlyDraft(w)
   assert.equal(d.status, "in_review", d.holdReason); assert.equal(d.autoReplaced, 1); assert.equal(d.labelRefit, 1)
   assert.deepEqual(w.designs.map(x => x.requestId.replace(/^admin:MCU-DT101-20261016-01:v1:f1/, "")), ["", ":l1", ":r1", ":r1:l1"])
+})
+
+// ── Plan v9, Phase 1 direction (b): the safety-only hold bar, copy candidates, and the cut-off word ──
+// The replay baseline (2026-10-19) put the VAMPIRE hook "STOPS DRONES AT / SEA WITH PREC" on a card: no engine code
+// cuts copy, so the writer's shortening answer was taken because it was shorter, and the clipped-word list didn't know it.
+const VAMPIRE_TEXT = "MELBOURNE, Fla. — L3Harris VAMPIRE is a self-contained weapons system that stops drones at sea with precision strike. The U.S. Navy selected VAMPIRE to defend ships near the coast. ".repeat(4)
+const VAMPIRE = { title: "L3Harris VAMPIRE counter-drone system", text: VAMPIRE_TEXT, brief: "MISSION BRIEF // VAMPIRE\n\n//L3Harris\n\n📍Melbourne, FL\n\nTech: Precision strike\n\nPlatform: Weapons system\n\nGoal: Stop drones at sea for the U.S. Navy.\n\nSource: L3Harris, 2026-10-16", line: "VAMPIRE / L3HARRIS" }
+
+test("v9 (b), cut-off word: a line ending in the start of a source word is caught; a whole word that begins a name is not", () => {
+  assert.deepEqual(cutOffWords({ benefit_headline: "STOPS DRONES AT\nSEA WITH PREC" }, VAMPIRE_TEXT), ["PREC"])
+  assert.deepEqual(cutOffWords({ headline: "NAVY PICKS PREC" }, VAMPIRE_TEXT), ["PREC"])
+  // Only a line's last word: "PREC" mid-line is not where a line ran out.
+  assert.deepEqual(cutOffWords({ benefit_headline: "PREC STRIKES\nAT SEA" }, VAMPIRE_TEXT), [])
+  // "SEAS" begins "Seasats", a name, not a common word the source prints in lower case.
+  assert.deepEqual(cutOffWords({ benefit_headline: "IT PATROLS SEAS\nWITH NO CREW" }, LIGHTFISH_TEXT), [])
+  // The subject line, the source and the dates are names and labels, never checked.
+  assert.deepEqual(cutOffWords({ subject_identifier: "VAMPIRE / PREC", source: "PREC" }, VAMPIRE_TEXT), [])
+  const p = copyProblems([{ series: "dt101", fields: { benefit_headline: "STOPS DRONES AT\nSEA WITH PREC", subject_identifier: "VAMPIRE / L3HARRIS" } }], VAMPIRE.brief, { title: VAMPIRE.title, primaryUrl: "https://www.l3harris.com/vampire", publisher: "L3Harris", sourceTitle: VAMPIRE.title, sourceText: VAMPIRE_TEXT })
+  assert.ok(p.safety.includes("cut-off words on the card (PREC): a line ends in part of a word; use whole words, and shorter ones if it must fit"), p.safety.join(" | "))
+})
+
+test("v9 (b), cut-off word: the fit pass turns down a shorter hook that ends in part of a word, and never puts it on the card", async () => {
+  const w = dt101World(VAMPIRE, (i, n) => !i.fit ? "Stops drones at sea\nwith precision" : n === 4 ? "Stops drones at\nsea with prec" : "Stops drones\nat sea")
+  await w.start({ kind: "dt101" })
+  const d = onlyDraft(w)
+  assert.equal(d.status, "in_review", d.holdReason)
+  assert.match(w.writes[4].fit!.slice(-1)[0], /^the last shorter version was turned down because it broke these rules: cut-off words on the card \(PREC\)/)
+  assert.equal(d.frames[0].fields.benefit_headline, "STOPS DRONES\nAT SEA"); assert.equal(w.designs[0].text.benefit_headline, "STOPS DRONES\nAT SEA")
+  // A writer that keeps cutting a word off is held on it, a safety problem, and nothing reaches Canva.
+  const cut = dt101World(VAMPIRE, () => "Stops drones at\nsea with prec")
+  await cut.start({ kind: "dt101" })
+  assert.equal(onlyDraft(cut).status, "held"); assert.match(onlyDraft(cut).holdReason!, /cut-off words on the card \(PREC\)/); assert.equal(cut.designs.length, 0)
+})
+
+test("v9 (b), hold bar: safety problems hold, style problems go to Review with a note for Canva", async () => {
+  const story = { title: "Army picks nine C2 software vendors", primaryUrl: "https://www.army.mil/article/1", publisher: "U.S. Army", sourceTitle: "New contract awards support Army C2", sourceText: ARMY_TEXT }
+  const caption = "The Army awarded $93.6 million to nine companies for command and control software.\n\nSource: U.S. Army, 2026-10-15"
+  const p = copyProblems([{ series: "news", fields: { headline: "ARMY: 9 C2 VENDORS WIN $500 MILLION", deck: "Awards fund I Corps command software", date: "15OCT26", source: "ARMY.MIL" } }], caption, story)
+  assert.deepEqual(p.safety, ["these figures are not in the source: $500 MILLION"])
+  assert.ok(p.style.some(x => /^the headline takes no slash, colon/.test(x)) && p.style.some(x => /^the deck must be one complete sentence ending with a period/.test(x)), p.style.join(" | "))
+  // A headline whose colon survives both rewrites: the draft reaches Review, the note travels to the board's notes.
+  const w = world({ ai: { write: async () => ({ frames: [{ series: "news" as SeriesKey, fields: { headline: "Army: 9 C2 vendors picked", deck: NEWS_CARD.deck, source: "ARMY.MIL" } }], caption }) } })
+  await w.start({ kind: "news" })
+  const d = onlyDraft(w)
+  assert.equal(d.status, "in_review", d.holdReason); assert.equal(w.designs.length, 1)
+  assert.equal(d.copyNotes!.length, 1); assert.match(d.copyNotes![0], /^the headline takes no slash, colon/)
+  assert.match(w.posts[0].notes, /Style notes \(not held: fix through Open in Canva\)\n- the headline takes no slash, colon/)
+  assert.ok(d.history.some(h => /copy written \(v1\); to Review with 1 style note/.test(h.event)))
+  assert.match(reviewNotes(d), /Style notes/)
+})
+
+test("v9 (b), candidates: code measures every candidate and a model picks among those that fit", async () => {
+  assert.deepEqual(candidateFields("news"), ["headline", "deck"]); assert.deepEqual(candidateFields("dt101"), ["benefit_headline"]); assert.deepEqual(candidateFields("icymi_cover"), [])
+  const picks: Record<string, string>[][] = [], writes: Parameters<McuAi["write"]>[0][] = []
+  const w = world({ ai: {
+    write: async i => { writes.push(structuredClone(i)); return { frames: [{ series: "news" as SeriesKey, fields: { headline: "Army backs nine command and control software vendors for I Corps", deck: NEWS_CARD.deck, source: "ARMY.MIL" } }], caption: "The Army awarded $93.6 million to nine companies for command and control software.\n\nSource: U.S. Army, 2026-10-15",
+      options: [[{ headline: "Army backs 9 C2 software vendors", deck: NEWS_CARD.deck }, { headline: "Army spends $500 million on C2", deck: NEWS_CARD.deck }, { headline: "Army picks nine vendors for C2 work", deck: "Nine firms will build I Corps command software." }]] } },
+    pickCopy: async ({ options, fields }) => { picks.push(options); assert.deepEqual(fields, ["headline", "deck"]); return { index: 1, reason: "the clearest verb" } },
+  } })
+  await w.start({ kind: "news" })
+  const d = onlyDraft(w)
+  assert.equal(d.status, "in_review", d.holdReason); assert.equal(writes.length, 1) // no rewrite, no fit pass
+  // The writer's own (past 3 lines) and the unsourced $500 million are left out; the picker saw the two that fit.
+  assert.deepEqual(picks, [[{ headline: "ARMY BACKS 9 C2 SOFTWARE VENDORS", deck: NEWS_CARD.deck }, { headline: "ARMY PICKS NINE VENDORS FOR C2 WORK", deck: "Nine firms will build I Corps command software." }]])
+  assert.equal(d.frames[0].fields.headline, "ARMY PICKS NINE VENDORS FOR C2 WORK"); assert.equal(d.frames[0].fields.source, "ARMY.MIL")
+  assert.ok(d.history.some(h => /^copy candidates: 4 candidates, 2 fit; chose 4 \("ARMY PICKS NINE VENDORS FOR C2 WORK", "Nine firms/.test(h.event)), d.history.map(h => h.event).join(" | "))
+  // A hook offered on one line is set across its two, as the card sets it, before it is measured; a cut word never fits.
+  const frame = { series: "dt101" as SeriesKey, fields: { benefit_headline: "x", subject_identifier: "VAMPIRE / L3HARRIS" } }
+  const story = { title: VAMPIRE.title, primaryUrl: "https://www.l3harris.com/vampire", publisher: "L3Harris", sourceTitle: VAMPIRE.title, sourceText: VAMPIRE_TEXT }
+  const norm = (f: McuDraft["frames"][number]) => ({ ...f, fields: normalizeFields(SERIES.dt101, f.fields) })
+  assert.deepEqual(candidateProblems(frame, { benefit_headline: "It stops drones at sea" }, ["benefit_headline"], story, norm), { frame: { ...frame, fields: { benefit_headline: "IT STOPS\nDRONES AT SEA", subject_identifier: "VAMPIRE / L3HARRIS" } }, problems: [] })
+  assert.deepEqual(candidateProblems(frame, { benefit_headline: "Stops drones at\nsea with prec" }, ["benefit_headline"], story, norm).problems, ["abbreviated or cut-off words (PREC): use whole words"])
+  assert.deepEqual(candidateProblems(frame, { benefit_headline: "It stops every drone\nat sea with precision" }, ["benefit_headline"], story, norm).problems, ['Benefit hook: each line at most 16 characters, counting letters, spaces and punctuation; line 1 "IT STOPS EVERY DRONE" is 20, 4 over; line 2 "AT SEA WITH PRECISION" is 21, 5 over'])
+})
+
+test("v9 (b), candidates: when none fits, a new batch is asked for with each one's exact overflow; never a cut word", async () => {
+  const writes: Parameters<McuAi["write"]>[0][] = []
+  const long = { headline: "Army backs nine command and control software vendors for I Corps", deck: NEWS_CARD.deck }
+  const w = world({ ai: { write: async i => { writes.push(structuredClone(i)); const fit = !!i.batch
+    return { frames: [{ series: "news" as SeriesKey, fields: { ...(fit ? { headline: "Army backs 9 C2 software vendors", deck: NEWS_CARD.deck } : long), source: "ARMY.MIL" } }], caption: "The Army awarded $93.6 million to nine companies for command and control software.\n\nSource: U.S. Army, 2026-10-15", options: [[fit ? { headline: "Army picks 9 C2 vendors", deck: NEWS_CARD.deck } : { ...long, headline: "Army names nine command and control software vendors for I Corps" }]] } } } })
+  await w.start({ kind: "news" })
+  const d = onlyDraft(w)
+  assert.equal(d.status, "in_review", d.holdReason); assert.equal(writes.length, 2); assert.equal(writes[0].batch, undefined)
+  assert.equal(writes[1].batch!.length, 2)
+  assert.match(writes[1].batch![0], /^candidate 1 \("ARMY BACKS NINE COMMAND AND CONTROL SOFTWARE VENDORS FOR I CORPS", "Awards worth \$93\.6 million fund I Corps command software\."\): Headline runs past 3 lines \(about 45 characters\); shorten it: ".*" is 64 characters and wraps to \d lines of at most 15$/)
+  // Only the candidate fields come from the batch; with no picker, the writer's order stands.
+  assert.equal(d.frames[0].fields.headline, "ARMY BACKS 9 C2 SOFTWARE VENDORS"); assert.equal(d.frames[0].fields.source, "ARMY.MIL")
+  assert.ok(d.history.some(h => /^copy candidates: 2 candidates after 1 new batch, 2 fit; chose 1 .*the writer's order \(no pick\)$/.test(h.event)), d.history.map(h => h.event).join(" | "))
+  // Batches are bounded per write step; past them the writer's first choice goes on to the rewrites and the fit pass.
+  const stuck: Parameters<McuAi["write"]>[0][] = []
+  const s = world({ ai: { write: async i => { stuck.push(structuredClone(i)); return { frames: [{ series: "news" as SeriesKey, fields: { ...(i.fit ? { headline: "Army backs 9 C2 software vendors" } : long), deck: NEWS_CARD.deck, source: "ARMY.MIL" } }], caption: "The Army awarded $93.6 million to nine companies for command and control software.\n\nSource: U.S. Army, 2026-10-15", ...(i.fit ? {} : { options: [[long]] }) } } } })
+  await s.start({ kind: "news" })
+  assert.equal(stuck.filter(x => x.batch).length, MAX_CANDIDATE_BATCHES)
+  assert.equal(onlyDraft(s).status, "in_review", onlyDraft(s).holdReason); assert.equal(onlyDraft(s).frames[0].fields.headline, "ARMY BACKS 9 C2 SOFTWARE VENDORS")
+})
+
+test("v9 (b), writer hold: a hold field that says there is no hold is none, and a real reason still holds (replay, 2026-10-19)", () => {
+  for (const v of ["Hold: none.", "Hold: None", "Not held. The headline and hook are drawn from Skydio's F10 announcement; the location line should be verified before publishing.", "No hold — the source supports every field.", "None", "N/A"]) assert.equal(meaningful(v), undefined, v)
+  for (const v of ["None of the figures can be verified from the source.", "The source states no headquarters, which the brief requires.", "Not enough detail in the source for a mission brief."]) assert.equal(meaningful(v), v, v)
 })

@@ -156,6 +156,35 @@ export function clippedWords(fields: Record<string, string>, source = ""): strin
 }
 
 /**
+ * The fields the writer offers candidates for (plan v9, Phase 1 direction 2): the headline or hook and the
+ * sub-headline, as the profile names them (checks.headline: fields, hookFields, deckField), on the series' own
+ * template. Fixed, server-filled and fixed-list fields are never candidates. None for a profile that names none.
+ */
+export function candidateFields(series: SeriesKey): string[] {
+  const h = BRAND.checks?.headline
+  if (!h) return []
+  const names = new Set([...h.fields, ...h.hookFields, h.deckField])
+  return (SERIES[series]?.fields ?? []).filter(f => names.has(f.name) && !f.fixed && !f.serverFilled && !f.allowed && !f.date).map(f => f.name)
+}
+
+/**
+ * Cut-off words: a line's last word that the source doesn't use and that begins a source word at least three letters
+ * longer ("STOPS DRONES AT / SEA WITH PREC" for "precision": the replay baseline, 2026-10-19). No engine code cuts copy
+ * (fitLines and normalizeFields only move whole words), so the cut came from the writer, in a shortening answer the fit
+ * pass took because it was shorter; CLIPPED lists only the usual abbreviations, so it passed. A word is cut off where a
+ * line runs out, so only each line's last word is checked ("WAIT FOR EYES" is not); the fields NOT_CHECKED skips are
+ * names, dates and labels. The replay's scorer (scripts/content-replay/core.ts cutOffWords) keeps its own, broader rule.
+ */
+export function cutOffWords(fields: Record<string, string>, source: string): string[] {
+  const inSource = new Set(source.toLowerCase().match(/[a-z]+/g) ?? [])
+  // The longer word must be one the source prints in lower case, a common word: a name ("Seasats") isn't one, so a
+  // whole word that begins a name ("SEAS") isn't read as cut off.
+  const longer = [...new Set(source.match(/\b[a-z]{6,}\b/g) ?? [])]
+  const last = Object.entries(fields).filter(([k]) => !NOT_CHECKED.has(k) && k !== "story_numbers").flatMap(([, v]) => v.split("\n").map(l => (l.toLowerCase().match(/[a-z]+/g) ?? []).pop() ?? ""))
+  return [...new Set(last.filter(w => w.length >= 3 && !inSource.has(w) && longer.some(l => l.length >= w.length + 3 && l.startsWith(w))).map(w => w.toUpperCase()))]
+}
+
+/**
  * Uppercase fields are typed uppercase so the card and the review text match. A fixed-line field whose words fit its
  * lines with a different break is re-broken to fit (fitLines); its words are kept as written.
  */

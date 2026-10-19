@@ -3,7 +3,7 @@ import { z } from "zod4"
 import { BRAND } from "./brand"
 import { CALL_FALLBACK, callOptions, outputBudget, type PipelineStep } from "./models"
 import { seedBrief, type McuSeeds } from "./seeds"
-import { SERIES, type FieldSpec, type RequestKind, type SeriesKey } from "./series"
+import { SERIES, candidateFields, type FieldSpec, type RequestKind, type SeriesKey } from "./series"
 import type { MediaCandidate, SourcePage } from "./sources"
 import type { FrameCopy, Story } from "./store"
 
@@ -24,7 +24,17 @@ export interface McuAi {
    * fit: a shortening-only request for the fields named (worker.ts fitStep). fresh: a rewording-only request for the
    * fields that copy a run of the source's words, each shown with the copied run (worker.ts freshStep).
    */
-  write(input: { kind: RequestKind; story: Story; today: string; previous?: { frames: FrameCopy[]; caption: string }; instructions?: string; problems?: string[]; direction?: string; seeds?: McuSeeds | null; fit?: string[]; fresh?: string[] }): Promise<{ frames: FrameCopy[]; caption: string; hold?: string }>
+  /**
+   * options: per frame, the writer's 3–5 alternative versions of its candidate fields (series.ts candidateFields), beside
+   * its first choice in the fields themselves (plan v9, Phase 1 direction 2); none on a fit or fresh request. batch: none
+   * of the last versions fit, each problem named with its field, limit and length: a new batch is asked for.
+   */
+  write(input: { kind: RequestKind; story: Story; today: string; previous?: { frames: FrameCopy[]; caption: string }; instructions?: string; problems?: string[]; direction?: string; seeds?: McuSeeds | null; fit?: string[]; fresh?: string[]; batch?: string[] }): Promise<{ frames: FrameCopy[]; caption: string; hold?: string; options?: Record<string, string>[][] }>
+  /**
+   * The most compelling of the candidates that fit (every one already measured by the server), by the journalism rule and
+   * the founder's hook ruling: one complete hook read across the lines. Runs on the write step's model.
+   */
+  pickCopy?(input: { kind: RequestKind; story: Story; frame: FrameCopy; fields: string[]; options: Record<string, string>[] }): Promise<{ index: number; reason: string }>
   /**
    * An official page that refused the fetch, read from the search tool's extracted content (founder, 2026-10-18).
    * Null unless the search returns that exact page. Never used for an outlet.
@@ -84,13 +94,19 @@ function fieldsSchema(series: SeriesKey, stories = 5) {
   return z.object(Object.fromEntries(SERIES[series].fields.filter(f => !SERVER_FILLED.has(f.name) && !f.serverFilled && !f.fixed && !unusedStorySlot(f.name, stories)).map(f => [f.name, f.allowed ? z.enum(f.allowed as [string, ...string[]]).describe(fieldBrief(f)) : z.string().describe(fieldBrief(f))])))
 }
 const frameSchema = (series: SeriesKey, stories = 5) => z.object({ fields: fieldsSchema(series, stories), mediaQuery: z.string().describe("3–6 words naming the actual subject, for finding a photo") })
-function writeSchema(kind: RequestKind, stories = 5) {
+/** The candidate fields of one version (series.ts candidateFields), each with its limits as fieldBrief states them. */
+function optionSchema(series: SeriesKey) {
+  return z.object(Object.fromEntries(SERIES[series].fields.filter(f => candidateFields(series).includes(f.name)).map(f => [f.name, z.string().describe(fieldBrief(f))])))
+}
+const OPTIONS = "3 to 5 alternative versions of these fields, most compelling first, beside your first choice in fields: each complete on its own, within the same limits, in whole words (never abbreviated or cut off), and different in angle or verb, not in one word"
+function writeSchema(kind: RequestKind, stories = 5, options = false) {
   const caption = { caption: z.string().describe("the one master caption") }
   // A roundup has no hold: the engine has already decided which stories qualify (gate round 6), so the writer is never
   // offered one to decide it again.
-  return kind === "icymi"
-    ? z.object({ cover: frameSchema("icymi_cover", stories), ...caption })
-    : z.object({ card: frameSchema(kind as SeriesKey), ...caption, hold: z.string().optional().describe("only if the source cannot support the post: the one-sentence reason") })
+  if (kind === "icymi") return z.object({ cover: frameSchema("icymi_cover", stories), ...caption })
+  const series = kind as SeriesKey
+  const card = options && candidateFields(series).length ? frameSchema(series).extend({ options: z.array(optionSchema(series)).describe(`${candidateFields(series).join(", ")}: ${OPTIONS}`) }) : frameSchema(series)
+  return z.object({ card, ...caption, hold: z.string().optional().describe("only if the source cannot support the post: the one-sentence reason") })
 }
 async function submitted<T>(r: { toolCalls: { toolName: string; input: unknown }[] }, name: string): Promise<T> {
   const call = r.toolCalls.find(c => c.toolName === name)
@@ -124,7 +140,10 @@ export function isPhotoDefect(area: string, defect: string): boolean {
  */
 export function meaningful(v: string | undefined | null): string | undefined {
   const t = (v ?? "").trim()
-  return t && !/^(none|n\/?a|null|nil|no|no hold|no notes?|not applicable|-+)\.?$/i.test(t) ? t : undefined
+  if (!t || /^(none|n\/?a|null|nil|no|no hold|no notes?|not applicable|-+)\.?$/i.test(t)) return undefined
+  // A writer that says it isn't holding, then explains (replay, 2026-10-19: Seasats "Hold: none." and Skydio F10
+  // "Not held. The headline … should be verified"), is no hold; a reason that starts "None of …" still is one.
+  return /^(hold:\s*(none|no|n\/?a)\b\.?|not held\b|no hold\b)\s*([.,;:—-]|$)/i.test(t) ? undefined : t
 }
 
 /** The provider the Gateway routed to, read defensively from its response metadata. */
@@ -238,16 +257,21 @@ export function createMcuAi(deps: { models: Record<PipelineStep, string>; search
       return { candidates, ...(note ? { note } : {}) }
     },
 
-    async write({ kind, story, today, previous, instructions, problems, direction, seeds, fit, fresh }) {
+    async write({ kind, story, today, previous, instructions, problems, direction, seeds, fit, fresh, batch }) {
       const frames = framesFor(kind)
       const spec = frames.map((s, i) => `Frame ${i + 1} — ${SERIES[s].label}: ${SERIES[s].fields.filter(f => !f.fixed && !unusedStorySlot(f.name, icymiCount(story))).map(fieldBrief).join("; ") || "(media only)"}`).join("\n")
       const n = icymiCount(story), nn = `0${n}`
       const icymi = kind === "icymi" ? `\nICYMI: ${n} published ${n === 1 ? "story" : "stories"}. The server has already checked that each one was published with its card, so every story below goes in the roundup: never judge or question whether a story qualifies. You write only the cover: its headline is fixed and filled by the server; story_01${n > 1 ? `..story_${nn}` : ""} = one short row per story, in order; date = today as DDMMMYY. After the cover, each story's own published card is posted exactly as it was, so you write nothing for them. The stories:\n${(story.roundup ?? []).map((p, i) => `${i + 1}. ${p.title}\n${p.caption}`).join("\n\n")}` : ""
-      const schema = writeSchema(kind, icymiCount(story))
+      // Candidates are asked for on a first write, a rewrite and a new batch; a fit or fresh request changes named fields only.
+      const offer = kind !== "icymi" && !fit?.length && !fresh?.length && candidateFields(kind as SeriesKey).length > 0
+      const schema = writeSchema(kind, icymiCount(story), offer)
+      const named = offer ? candidateFields(kind as SeriesKey).join(" and ") : ""
       const asPrevious = (p: { frames: FrameCopy[]; caption: string }) => JSON.stringify(kind === "icymi" ? { cover: { fields: p.frames[0]?.fields }, caption: p.caption } : { card: { fields: p.frames[0]?.fields }, caption: p.caption })
       // A fit request (worker.ts fitStep): only the named fields are shortened; the server keeps everything else as it was.
       // A fresh-wording request (worker.ts freshStep): only the named fields are reworded; the rest stays as it was.
-      const ask = fresh?.length
+      const ask = batch?.length
+        ? `None of your versions of ${named} fits the template, as the server measured them: ${batch.join("; ")}. Write a new batch: your first choice in ${named} and ${OPTIONS}. Fit each limit exactly as it is measured (every character counts) with shorter words or another phrasing, never an abbreviation or a cut-off word. Keep the facts and every rule above. Leave every other field and the caption exactly as they are.`
+        : fresh?.length
         ? `These fields copy a run of words from the source: ${fresh.join("; ")}. Rewrite only these fields in fresh wording of your own: the same facts and claim, said differently, never the copied run or most of it. A direct quote belongs only in quotation marks, attributed. Keep every rule above, including each field's length limits, and every figure exactly as the source gives it. Leave every other field and, unless it is named here, the caption exactly as they are.`
         : fit?.length
         ? `These fields run past the template's limits: ${fit.join("; ")}. Shorten only these fields: fewer or shorter whole words, or rephrase. Never abbreviate a word or cut one off. Keep the claim, the facts and every rule above; the result must still be a complete, specific, active statement. Leave every other field and the caption exactly as they are.`
@@ -255,15 +279,28 @@ export function createMcuAi(deps: { models: Record<PipelineStep, string>; search
       const r = await run("write", model => generateText({
         model, maxOutputTokens: outputBudget(model, 16_000), providerOptions: callOptions(model, "medium"), allowSystemInMessages: true,
         tools: { submit_post: tool({ description: "Submit the finished card copy and caption.", inputSchema: schema as z.ZodType<Record<string, unknown>> }) }, toolChoice: { type: "tool", toolName: "submit_post" },
-        messages: [...system(`${brandDirection(seeds)}Today is ${today}. Write the on-card copy and the one master caption for this ${BRAND.name} ${kind === "icymi" ? "ICYMI roundup" : SERIES[kind as SeriesKey].label} post from the source below, and submit them with submit_post. Use only facts in the source. Fill every field.${kind === "icymi" ? "" : " If the source cannot support a post under the rules (unverifiable figure, not Breaking-worthy, etc.), set hold to the one-sentence reason. Never hold for the photo or its credit (a later step chooses it)"}${BRAND.research.writeNote}.\n${spec}${icymi}`),
+        messages: [...system(`${brandDirection(seeds)}Today is ${today}. Write the on-card copy and the one master caption for this ${BRAND.name} ${kind === "icymi" ? "ICYMI roundup" : SERIES[kind as SeriesKey].label} post from the source below, and submit them with submit_post. Use only facts in the source. Fill every field.${offer ? ` CANDIDATES: the server measures ${named} against the template and puts the most compelling version that fits on the card, so in options give ${OPTIONS}.` : ""}${kind === "icymi" ? "" : " If the source cannot support a post under the rules (unverifiable figure, not Breaking-worthy, etc.), set hold to the one-sentence reason. Never hold for the photo or its credit (a later step chooses it)"}${BRAND.research.writeNote}.\n${spec}${icymi}`),
           { role: "user", content: `SOURCE: ${story.sourceTitle}\nURL: ${story.primaryUrl}\nPublisher: ${story.publisher}\nPublished: ${story.publishedAt ?? "not stated on the page"}${story.reportedAt ? `\nReported: ${story.reportedAt}, by a news outlet's report of the same event (the card's date; never cite the outlet)` : ""}${story.whyNow ? `\nWhy now (Breaking): ${story.whyNow}` : ""}${story.supporting?.length ? `\nSupporting sources (their text follows the primary's, each under its own heading; use them only for what the primary leaves out, such as the maker and its headquarters): ${story.supporting.map(x => x.url).join(" ; ")}` : ""}\n\n${story.sourceText.slice(0, 24_000)}${direction ? `\n\nREQUESTER'S DIRECTION (steer the angle and emphasis with it; it never overrides the rules above or the facts in the source): ${direction}` : ""}${instructions && !previous ? `\n\nREVIEWER'S DIRECTION: ${instructions}` : ""}` },
           ...(previous ? [{ role: "assistant" as const, content: `Previous version: ${asPrevious(previous)}` }, { role: "user" as const, content: ask }] : [])],
       }))
-      const out = await submitted<{ card?: { fields: Record<string, string>; mediaQuery?: string }; cover?: { fields: Record<string, string>; mediaQuery?: string }; caption: string; hold?: string }>(r, "submit_post")
+      const out = await submitted<{ card?: { fields: Record<string, string>; mediaQuery?: string; options?: Record<string, string>[] }; cover?: { fields: Record<string, string>; mediaQuery?: string }; caption: string; hold?: string }>(r, "submit_post")
       const parts = kind === "icymi" ? [out.cover] : [out.card]
       console.info("[content-pipeline] write", JSON.stringify({ kind, frames: parts.filter(Boolean).length, fields: parts.map(p => Object.keys(p?.fields ?? {}).filter(k => (p?.fields[k] ?? "").trim())), hold: out.hold?.slice(0, 200) ?? null }))
       const hold = meaningful(out.hold)
-      return { frames: frames.map((series, i) => ({ series, fields: { ...(parts[i]?.fields ?? {}) }, ...(parts[i]?.mediaQuery ? { mediaQuery: parts[i]!.mediaQuery } : {}) })), caption: (out.caption ?? "").trim(), ...(hold ? { hold } : {}) }
+      const options = offer && Array.isArray(out.card?.options) ? [out.card.options.filter(o => o && typeof o === "object").slice(0, 5)] : undefined
+      return { frames: frames.map((series, i) => ({ series, fields: { ...(parts[i]?.fields ?? {}) }, ...(parts[i]?.mediaQuery ? { mediaQuery: parts[i]!.mediaQuery } : {}) })), caption: (out.caption ?? "").trim(), ...(hold ? { hold } : {}), ...(options?.[0]?.length ? { options } : {}) }
+    },
+
+    async pickCopy({ kind, story, frame, fields, options }) {
+      const kindLabel = kind === "icymi" ? "ICYMI roundup" : SERIES[kind as SeriesKey].label
+      const r = await run("write", model => generateText({
+        // A short answer, but Claude 5 thinks by default and the cap counts the thinking too (CLAUDE.md, "The token trap").
+        model, maxOutputTokens: outputBudget(model, 8_000), providerOptions: callOptions(model, "low"), allowSystemInMessages: true,
+        tools: { choose_copy: tool({ description: "Choose the most compelling candidate.", inputSchema: z.object({ index: z.number().int().describe("the chosen candidate's number"), reason: z.string().describe("one sentence: why it is the most compelling") }) }) }, toolChoice: { type: "tool", toolName: "choose_copy" },
+        messages: [...system(`You choose the on-card copy (${fields.join(", ")}) for a ${BRAND.name} ${kindLabel} post. The server has measured every candidate below against the template, and each one fits. Choose the single most compelling one by the rules above: a complete, specific, active statement a reader understands at a glance, which the source supports. A hook set across two lines is one complete hook read across both: the line break is layout, never two fragments. Prefer a concrete subject and verb to a label or a slogan; never choose one that says anything the source doesn't. Answer with choose_copy.`),
+          { role: "user", content: `SOURCE: ${story.sourceTitle}\nPublisher: ${story.publisher}\n\n${story.sourceText.slice(0, 6_000)}\n\nTHE REST OF THE CARD: ${JSON.stringify(Object.fromEntries(Object.entries(frame.fields).filter(([k]) => !fields.includes(k))))}\n\nCANDIDATES:\n${options.map((o, i) => `${i}: ${fields.map(f => `${f}: ${JSON.stringify(o[f] ?? "")}`).join("; ")}`).join("\n")}` }],
+      }), r => submitted<{ index: number; reason: string }>(r, "choose_copy"))
+      return { index: Number.isInteger(r.index) && r.index >= 0 && r.index < options.length ? r.index : 0, reason: meaningful(r.reason) ?? "" }
     },
 
     async readRefusedPage(url) {

@@ -88,6 +88,8 @@ export interface StoryRun {
   history: string[]; calls: ModelCall[]; ms: number
   /** An ICYMI roundup's stories, as the engine chose them. */
   roundup?: string[]
+  /** Style problems the draft went to Review with (plan v9: notes, not holds). */
+  notes?: string[]
   story?: Story
 }
 
@@ -145,6 +147,7 @@ export async function replayStory(s: ReplayStory, captured: CapturedPages | null
     media: d.media.map(m => m ? { pageUrl: m.pageUrl, license: m.license, credit: m.credit, ...(m.rightsNote ? { rightsNote: m.rightsNote } : {}), ...(m.note ? { note: m.note } : {}) } : null),
     history: d.history.map(h => h.event), calls, ms: Date.now() - started,
     ...(d.story.roundup ? { roundup: d.story.roundup.map(p => p.title) } : {}),
+    ...(d.copyNotes?.length ? { notes: d.copyNotes } : {}),
     story: d.story,
   }
 }
