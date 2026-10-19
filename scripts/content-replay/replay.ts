@@ -173,7 +173,7 @@ function summarize(meta: Meta, scored: Scored[]) {
   }
 }
 function markdown(r: ReturnType<typeof summarize>): string {
-  const cell = (v: string) => v.replace(/\|/g, "\\|").replace(/\n/g, " / ")
+  const cell = (v: string) => v.replace(/\\/g, "\\\\").replace(/\|/g, "\\|").replace(/\n/g, " / ")
   const rows = r.stories.map(s => `| ${s.id} | ${s.kind} | ${s.pass ? "**pass**" : s.end === "review" ? "reached, unsafe" : s.end} | ${cell(s.pass ? "" : s.end === "review" ? [...(s.safety?.limits ?? []), ...(s.safety?.unsourced ?? []).map(n => `unsourced ${n}`), ...(s.safety?.clipped ?? []).map(w => `cut-off word ${w}`), ...(s.safety?.factErrors ?? []), ...(s.safety?.rights.includes("missing") ? ["photo missing"] : [])].join("; ") : `${s.holdKinds.join(", ")}: ${s.reason ?? ""}`).slice(0, 300)} | ${cell(s.frames.map(f => Object.entries(f.fields).filter(([k]) => !["date", "image_context", "counter", "story_numbers"].includes(k)).map(([, v]) => v).join(" · ")).join(" ‖ ").slice(0, 160))} | ${cell(s.observed.map(o => o.replace(/ — .*/, "")).join("; "))} |`)
   return [
     `# Content pipeline replay: ${r.meta.label}`, "",
