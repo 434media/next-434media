@@ -24,3 +24,29 @@ Run one after another (branch, main, branch, main) on one shared photo cache: a 
 **Still losing among the 7 kept stories:** invented mission-brief lines ("📍San Mateo, CA", "📍Redwood City, CA", "📍Costa Mesa, CA", "Private company") on Skydio X10D, Skydio F10 and Anduril EagleEye, which is step (d), fact extraction; writer holds (Skydio F10 in a, Paravision in a, VAMPIRE in b).
 
 **The stopping point (about 10 of 18 after steps c and d):** on this set, with photo first on, at most 7 single stories and the ICYMI week can reach Review, because 10 of the 17 have no usable photo in any source searched. If fact extraction fixed every one of the 7, the score would be about 7–8 of 18. The replay as built can't reach 10 with photo first, by construction, so the stopping point needs a measure that counts a skipped story's replacement (a live round, or a replay set that records a research pass's other candidates).
+
+## After the coordinator's review (branch `1aa0f04`), rerun the same way
+
+The fixes: each photo check is its own saved step; a DVIDS photo is offered only with a U.S. government credit line and nothing saying otherwise; the confirmed photo is placed only when the card names the subject it was confirmed for. The DVIDS part of the cache was cleared first, so the branch searched DVIDS again under the new rights rule. The rest of the cache is the one above.
+
+| Run | Engine | Pass | Reached Canva | Unsafe there | Holds | Photo first: kept / skipped | Cost | Write calls | Photo calls (search / pick) |
+|---|---|---|---|---|---|---|---|---|---|
+| review-pf-branch-a | branch `1aa0f04` | **2** | 5 | 3 | photo 9, writer 3, limits 1 | 8 / 9 | $0.8843 | 22 | 55 / 17 |
+| review-pf-main-a | main `38b94e0` | **4** | 7 | 3 | photo 8, writer 2, limits 1 | — | $0.7643 | 50 | 36 / 15 |
+| review-pf-branch-b | branch `1aa0f04` | **6** | 8 | 2 | photo 10 | 8 / 9 | $0.9609 | 30 | 59 / 18 |
+| review-pf-main-b | main `38b94e0` | **4** | 7 | 3 | photo 9, writer 2 | — | $0.6849 | 60 | 38 / 15 |
+
+- **Scores:** branch 2 and 6 (mean 4.0); main 4 and 4 (mean 4.0). Inside the noise again.
+  - Every main run on this set: 4, 2, 1, 3, 4, 2, 4, 4 (mean 3.0).
+  - Every branch run of this step: 3, 3, 2, 6 (mean 3.5).
+- **Photo first** kept 8 and skipped 9 in both runs. setaf-gtead is now kept, because the subject re-check let its card get its own pick. The 9 skipped stories failed on main in all four main runs.
+- **Unsafe at the Canva step:** almost all fact errors in the mission briefs, which is step (d):
+  - "📍San Mateo, CA" and "Costa Mesa, CA" lines;
+  - a "Private company" line on Raytheon;
+  - one "Goal:" line that widens the source's "Gulf of America" to "U.S. waters".
+- **DVIDS through the API:**
+  - Branch-a has one card with an API-found photo: Seasats, "U.S. Army photo by Spc. Jacob D. Harrell".
+  - Branch-b has two: Skydio X10D (U.S. Air Force) and setaf-gtead (U.S. Army).
+  - Main's DVIDS photos come from DVIDS pages its web photo search found, the old path, which the branch keeps.
+- **Cost:** $0.88 and $0.96 against $0.76 and $0.68, about $0.20 more a run. Write calls are about half (22 and 30, against 50 and 60).
+- **Stopping point:** photo first keeps 8 single stories on this set, plus the ICYMI week. 10 of 18 stays out of reach offline, by construction, as above.
