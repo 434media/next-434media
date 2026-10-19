@@ -1,0 +1,40 @@
+# Content pipeline replay: review-branch-a
+
+Rules mcu-rules-2026-10-18.2 · head 8ace0c5 · 2026-10-19T01:52:13.178Z → 2026-10-19T02:00:57.630Z
+Models: research anthropic/claude-haiku-5.5, write anthropic/claude-haiku-5.5, photoSearch anthropic/claude-haiku-5.5, photoPick anthropic/claude-sonnet-5.5, artworkCheck anthropic/claude-sonnet-5.5 · fact check anthropic/claude-sonnet-5.5 · seeds mcu-seeds-2026-10-17.json (0e7a9a32de345d02)
+
+**Score: 2 of 18 pass** (reach Review safe and within limits). Reached the Canva step: 6; of those unsafe: 4. Held: 12 (0 for reasons v9 no longer holds for). Failed: 0. No draft: 0.
+Hold reasons: writer 5, photo 7.
+**Cost: $0.6374** (Gateway credits, total used before and after).
+
+Not scored offline: the Canva fill, the artwork check and the rendered layout (the replay stops before the fill).
+
+| Story | Series | Replay | Why | Card copy | Gate rounds |
+|---|---|---|---|---|---|
+| raid-hunter | dt101 | held | writer: Hold: The source gives no defined test or fielding status beyond planned testing, and the publish date must be treated with care; the caption records the date as stated on the release. No replacement subject qualified: replay: research is fixed to the captured story, so no replacement subjec |  | round 3 (nemotron): replaced; round 4 (nemotron): held |
+| anduril-thunder | dt101 | held | writer: Hold: the source is a general Anduril page with boilerplate and product-family descriptions only. It does not name the Thunder system's capabilities, variant, test or fielding status, or any figures, so no verifiable Defense Tech 101 mission brief can be built from it. No replacement subject |  | round 3 (nemotron): held |
+| anduril-submarine | dt101 | held | photo: no relevant, licensed photo was found: no candidate shows the subject itself (Only candidate that shows the story's subject, a large waterfront submarine-industrial facility with numbered bays. The NASCAR photos only show sponsor branding and sailors at a race, not the base or the investment. | ANDURIL WIDENS / SUB SUPPLY LINES · ANDURIL / SUBMARINE BASE | round 3 (nemotron): held |
+| pac3-edge | dt101 | held | photo: no relevant, licensed photo was found ("PAC-3 Edge interceptor Lockheed Martin"): no candidate shows the subject itself (None of the candidates shows the PAC-3 Edge interceptor. The Patriot M903 launchers (#2, #3, #4) are related, but they are launcher vehicles from an exercise, not the PAC-3 | REACHES HIGHER / TO STOP MISSILES · PAC-3 EDGE / LOCKHEED MARTIN | round 3 (nemotron): replaced; round 4 (nemotron): replaced |
+| skydio-f10 | dt101 | reached, unsafe | fact check failed: out.map is not a function | REACHES COUNTY / LINES AT 100 MPH · F10 LIGHTRUNNER / SKYDIO | round 3 (nemotron): held |
+| l3harris-navy-vampire | dt101 | held | writer: Hold: the fielding status is a selection and delivery plan, and the release does not give a delivery count or date, so the Traction line is limited to the stated selection. No replacement subject qualified: replay: research is fixed to the captured story, so no replacement subject is searche |  | round 4 (nemotron): in_review |
+| morfius-release | dt101 | held | writer: Hold: Source-supported ticker, HQ and backers are not given in the release; the mission brief HQ line is not verifiable from the source, so this item should not publish until the HQ location is confirmed. No replacement subject qualified: replay: research is fixed to the captured story, so n |  | round 4 (nemotron): replaced |
+| morfius-product | dt101 | held | photo: no relevant, licensed photo was found ("Lockheed Martin MORFIUS high-power microwave counter-UAS interceptor"): no candidate shows the subject itself (No candidate clearly shows the MORFIUS interceptor. #0 is a marketing graphic with text and only faint shadows of an aircraft. The other candi | A REUSABLE BEAM / COUNTERS DRONES · MORFIUS / LOCKHEED MARTIN | round 4 (nemotron): held |
+| paravision-state | news | **pass** |  | STATE SIGNS UP TO $6.5M ID DEAL · A five-year contract could reach $6.5 million, with $1.3 million obligated first. · BIOMETRIC UPDATE | round 4 (nemotron): held |
+| seasats-lightfish | dt101 | reached, unsafe | The work is backed by the Pentagon's homeland defense office, which the company says runs under the Assistant Secretary of War... — The source says the program is under the Office of the Assistant Secretary of War for Homeland Defense and Americas Security Affairs. It doesn't say that office funds o | SOLAR BOATS STAY / ON STATION LONG · LIGHTFISH / SEASATS | round 5 (haiku): held |
+| l3harris-drone-guardian | dt101 | held | writer: Hold: the L3Harris product page is undated, and its "operationally proven" claim and the headquarters, ticker and fielding details are not verifiable from the source text alone, so this card cannot run under the accuracy rules. No replacement subject qualified: replay: research is fixed to t |  | round 5 (haiku): held |
+| anduril-eagleeye | dt101 | reached, unsafe | 📍Costa Mesa, CA — The source gives no location or headquarters for Anduril, so this is an invented detail.; Private company — The source never says whether Anduril is private or public, so this is unsupported. | IT SHOWS THREATS / BEFORE OPERATORS · EAGLEEYE / ANDURIL | round 5 (haiku): held |
+| xtend-striker | news | held | photo: no relevant, licensed photo was found: no candidate shows the subject itself (The only candidate shows a civilian woman in a badge lanyard standing under a camo net at the Gauntlet 2 event, with soldiers behind her. It shows no XTEND Striker drone and no XTEND personnel or equipment, so it is | XTEND TO SUPPLY 6,000 STRIKER DRONES · The order comes after XTEND ranked top in a Gauntlet II close quarters segment. · XTEND | round 5 (haiku): in_review |
+| skydio-x10d | dt101 | reached, unsafe | 📍San Mateo, CA — The source never states Skydio's headquarters or any location.; Private company — The source says nothing about Skydio's ownership or funding status, so calling it private is unsupported. | FLIES ON VISION / WHEN GPS FAILS · SKYDIO X10D / SKYDIO | round 6 (haiku): replaced |
+| rtx-coyote | dt101 | **pass** |  | FASTER SHOTS / AGAINST DRONES · COYOTE BLOCK 2C+RM / RAYTHEON | round 6 (haiku): in_review |
+| setaf-gtead | news | held | photo: no relevant, licensed photo was found: no photo of the subject fits the 4:5 card (#0: the 4:5 crop cuts off the subject) (The photo shows U.S. soldiers with small drones during African Lion 26 counter-UAS training in Agadir, Morocco. That matches the story's setting and topic, so it is a repr | ARMY TO TEST DRONE DEFENSES IN MOROCCO · The first accelerated event targets protection for early-entry command posts. · U.S. ARMY | round 6 (haiku): held |
+| antheia-osc | breaking | held | photo: no relevant, licensed photo was found: no candidate shows the subject itself (no licensed candidates); a representative photo (the people, unit or equipment the story is about) was searched for too, and none was found. No replacement subject qualified: replay: research is fixed to the capture | OSC OFFERS ANTHEIA UP TO $80M LOAN · The conditional loan would help Antheia onshore critical pharmaceutical ingredients. · DEPT OF WAR | round 6 (haiku): held |
+| icymi-week-2026-10-05 | icymi | held | photo: no relevant, licensed photo was found ("ICYMI"): no candidate shows the subject itself (All eight candidates show F-35B aircraft on the JS Kaga deck. None shows anything in the card's three stories: Microchip/VORAGO rad-hard chips, Lockheed's PAC-3 Edge, or the Florida Guard drone picture tes | TOP DEFENSE DEVELOPMENTS · Microchip buys VORAGO rad-hard chips · Lockheed unveils PAC-3 Edge · Florida Guard tests drone picture | round 3 (nemotron): held; round 4 (nemotron): held; round 5 (haiku): held; round 6 (haiku): held |
+
+## Tokens
+
+| Step : model | Calls | Input | Output |
+|---|---|---|---|
+| write:anthropic/claude-haiku-5.5 | 56 | 501264 | 31939 |
+| photoSearch:anthropic/claude-haiku-5.5 | 32 | 324946 | 22506 |
+| photoPick:anthropic/claude-sonnet-5.5 | 14 | 142595 | 6438 |
+| write:anthropic/claude-sonnet-5.5 (fact check) | 6 | 25142 | 1883 |
