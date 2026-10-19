@@ -20,7 +20,7 @@ import { PIPELINE_PROPERTIES, PROPERTY_TEMPLATES, contentPropertyOf, propertyCan
 import { BRANDS, CONTENT_PROPERTIES } from "../../components/crm/types"
 import { candidateFields, cutOffWords } from "../content-pipeline/series"
 import { candidateProblems, copyProblems, MAX_CANDIDATE_BATCHES } from "../content-pipeline/worker"
-import { sourcedFacts, MIN_FACTS, placeholderLines } from "../content-pipeline/worker"
+import { sourcedFacts, MIN_FACTS, placeholderLines, unsourcedClaims } from "../content-pipeline/worker"
 import { factsBrief, FACTS_RULE } from "../content-pipeline/model"
 
 // ── in-memory store with the Firestore store's lease semantics ──
@@ -1818,4 +1818,18 @@ test("a caption line that fills in what the source doesn't state is a safety pro
   const story = { title: "EagleEye", sourceTitle: "EagleEye", publisher: "Anduril", primaryUrl: "https://www.anduril.com/eagleeye", sourceText: "EagleEye gives operators AI vision. Anduril Industries builds EagleEye." }
   const p = copyProblems([{ series: "dt101" as SeriesKey, fields: { benefit_headline: "SEE THREATS\nSOONER", subject_identifier: "EAGLEEYE / ANDURIL" } }], brief, story as never)
   assert.ok(p.safety.some(x => /^the caption fills lines the source doesn't support \("📍Location not stated in source", .*leave each such line out entirely$/.test(x)))
+})
+
+test("a place or ownership the source doesn't state is a safety problem, like an unsourced figure", () => {
+  const source = "Skydio's F10 Lightrunner launches in seconds. The Army tested it at Fort Bragg. Lockheed Martin (NYSE: LMT) of Bethesda, Md., builds HIMARS."
+  assert.deepEqual(unsourcedClaims(["📍San Mateo, CA\n\nPrivate company → Backers: a16z"], source), ["San Mateo, CA", "Private company"])
+  assert.deepEqual(unsourcedClaims(["📍Bethesda, MD\n\nPublic company → Ticker: NYSE: LMT"], source), [])
+  // Not a place: "Goal: Find drones, US forces" has no city; a non-state code is no place either.
+  assert.deepEqual(unsourcedClaims(["Tech: Autonomy, AI\n\nGoal: Find drones at sea."], source), [])
+  assert.deepEqual(unsourcedClaims(["Private company"], "Anduril is a privately held defense company."), [])
+  const story = { title: "F10 Lightrunner", sourceTitle: "F10 Lightrunner", publisher: "Skydio", primaryUrl: "https://www.skydio.com/f10", sourceText: source, facts: [{ fact: "The F10 launches in seconds.", quote: "Skydio's F10 Lightrunner launches in seconds." }] }
+  const p = copyProblems([{ series: "dt101" as SeriesKey, fields: { benefit_headline: "A PLANE THAT\nLAUNCHES ITSELF", subject_identifier: "F10 LIGHTRUNNER / SKYDIO" } }], "MISSION BRIEF // F10\n\n//Skydio\n\n📍San Mateo, CA\n\nSource: Skydio, 24SEP26", story as never)
+  assert.ok(p.safety.includes(`the caption states what the source doesn't ("San Mateo, CA"): leave each such line or detail out entirely`))
+  // Copy written from the source text, not from extracted facts, is checked as before.
+  assert.ok(!copyProblems([{ series: "dt101" as SeriesKey, fields: { benefit_headline: "A PLANE THAT\nLAUNCHES ITSELF", subject_identifier: "F10 LIGHTRUNNER / SKYDIO" } }], "MISSION BRIEF // F10\n\n//Skydio\n\n📍San Mateo, CA\n\nSource: Skydio, 24SEP26", { ...story, facts: undefined } as never).safety.some(x => /states what the source doesn't/.test(x)))
 })

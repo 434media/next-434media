@@ -682,6 +682,23 @@ async function extractFacts(deps: WorkerDeps, ai: McuAi, d: McuDraft): Promise<v
   d.history.push({ at: iso(deps), event: `facts extracted: ${kept.length}${note}`.slice(0, 600) })
 }
 
+const STATES = new Set("AL AK AZ AR CA CO CT DE FL GA HI ID IL IN IA KS KY LA ME MD MA MI MN MS MO MT NE NV NH NJ NM NY NC ND OH OK OR PA RI SC SD TN TX UT VT VA WA WV WI WY DC".split(" "))
+/**
+ * Places and ownership the copy states that the source doesn't, checked like figures (unsourcedNumbers). A "City, ST"
+ * place counts as sourced when the city's name is in the source; "private company" or "public company" when the source
+ * says private or public (or names a stock exchange or ticker for public). Replay, 2026-10-19: with 28 sourced facts
+ * the writer still added "📍San Mateo, CA" to Skydio's mission brief from what it knew.
+ */
+export function unsourcedClaims(texts: string[], source: string): string[] {
+  const text = texts.join("\n"), hay = source.toLowerCase(), out: string[] = []
+  for (const m of text.matchAll(/\b((?:[A-Z][a-z]+\.? ){0,3}[A-Z][a-z]+), ([A-Z]{2})\b/g)) if (STATES.has(m[2]) && !hay.includes(m[1].toLowerCase())) out.push(`${m[1]}, ${m[2]}`)
+  for (const m of text.matchAll(/\b(private|public)(?:ly)?(?:[- ](?:held|traded))? (?:company|firm)\b/gi)) {
+    const pub = m[1].toLowerCase() === "public"
+    if (!(pub ? /\bpublic(ly)?\b|\b(nyse|nasdaq)\b|stock exchange|ticker/i : /\bprivate(ly)?\b|privately held|venture[- ]backed/i).test(source)) out.push(m[0])
+  }
+  return [...new Set(out)]
+}
+
 async function writeStep(deps: WorkerDeps, ai: McuAi, d: McuDraft): Promise<void> {
   const today = iso(deps).slice(0, 10)
   await extractFacts(deps, ai, d)
@@ -952,6 +969,9 @@ export function copyProblems(frames: FrameCopy[], caption: string, story: Story)
   const checks = BRAND.checks
   if (checks?.headline) style.push(...headlineProblems(frames, checks.headline))
   if (checks?.originality) safety.push(...originalityProblems(frames, caption, story, checks.originality, [...(checks.headline?.fields ?? []), ...(checks.headline?.hookFields ?? [])]))
+  // Run on copy written from extracted facts (writeStep), the path that promises no unstated line.
+  const claims = story.facts?.length ? unsourcedClaims([body], story.sourceText) : []
+  if (claims.length) safety.push(`the caption states what the source doesn't (${claims.map(c => `"${c}"`).join(", ")}): leave each such line or detail out entirely`)
   const filled = placeholderLines(body)
   if (filled.length) safety.push(`the caption fills lines the source doesn't support (${filled.slice(0, 3).map(l => `"${l}"`).join(", ")}): leave each such line out entirely`)
   const clipped = [...new Set(frames.flatMap(f => clippedWords(f.fields, story.sourceText)))]
