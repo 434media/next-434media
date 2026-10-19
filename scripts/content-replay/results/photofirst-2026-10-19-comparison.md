@@ -39,7 +39,7 @@ The fixes: each photo check is its own saved step; a DVIDS photo is offered only
 - **Scores:** branch 2 and 6 (mean 4.0); main 4 and 4 (mean 4.0). Inside the noise again.
   - Every main run on this set: 4, 2, 1, 3, 4, 2, 4, 4 (mean 3.0).
   - Every branch run of this step: 3, 3, 2, 6 (mean 3.5).
-- **Photo first** kept 8 and skipped 9 in both runs. setaf-gtead is now kept, because the subject re-check let its card get its own pick. The 9 skipped stories failed on main in all four main runs.
+- **Photo first** kept 8 and skipped 9 in both runs. setaf-gtead is now kept, with a DVIDS API photo from the fresh DVIDS search (African Lion 26, U.S. Army). It passed in branch-b and was held by the writer in branch-a. The 9 skipped stories failed on main in all four main runs.
 - **Unsafe at the Canva step:** almost all fact errors in the mission briefs, which is step (d):
   - "📍San Mateo, CA" and "Costa Mesa, CA" lines;
   - a "Private company" line on Raytheon;
