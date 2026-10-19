@@ -68,7 +68,7 @@ To apply a scoring change to a recorded run without calling a model again, use `
 
 - `stories.json`: the replay set. For each story it records the source URL, the series, when it was drafted, the photo candidates seen (from the round's `[content-pipeline] media` logs) and what each round did. `notRebuilt` lists the attempts that can't be replayed, and why.
 - `pages/`: each story's source pages, captured once with the pipeline's own fetcher (`capture.ts`; `--refresh` recaptures). Public pages only.
-- `results/`: recorded runs. `baseline-2026-10-19` is the baseline on main `f306279`. `passbar-candidates-2026-10-19-comparison.md` sets plan v9 step (b) against it and against a rerun of main on the same photo cache: one run varies by about ±2 stories. `review-2026-10-19-comparison.md` reruns the reviewed branch and main twice each, run one after another, with each run's cost.
+- `results/`: recorded runs. `baseline-2026-10-19` is the baseline on main `f306279`. `passbar-candidates-2026-10-19-comparison.md` sets plan v9 step (b) against it and against a rerun of main on the same photo cache: one run varies by about ±2 stories. `review-2026-10-19-comparison.md` reruns the reviewed branch and main twice each, run one after another, with each run's cost. `facts-2026-10-19-comparison.md` scores plan v10 step (d), fact extraction before writing, against main.
 - `.replay-cache/` (repo root, gitignored) holds what the photo step fetched: the pages, the images and the archive searches. A rerun on the same machine sees the same candidates. The photos aren't 434's to publish, so they're never committed. Delete the folder to search afresh.
 
 ## How the set was built (2026-10-19, read-only)

@@ -1,0 +1,703 @@
+{
+  "meta": {
+    "label": "facts3-branch-e",
+    "started": "2026-10-19T12:38:14.719Z",
+    "finished": "2026-10-19T12:47:16.252Z",
+    "rules": "mcu-rules-2026-10-18.2",
+    "models": {
+      "research": "anthropic/claude-haiku-5.5",
+      "write": "anthropic/claude-haiku-5.5",
+      "photoSearch": "anthropic/claude-haiku-5.5",
+      "photoPick": "anthropic/claude-sonnet-5.5",
+      "artworkCheck": "anthropic/claude-sonnet-5.5"
+    },
+    "factModel": "anthropic/claude-sonnet-5.5",
+    "seeds": {
+      "file": "mcu-seeds-2026-10-17.json",
+      "sha256": "0e7a9a32de345d02",
+      "snapshot": "Tracker (1nFFBzcDvY9ZhP0uJuAfGKGSJZdLQm7fAEE3Ajaoa39s, modified 2026-10-14), Operating Model and MCU Canon Handoff v0.3, founder's named primes (2026-10-16); copied from the pilot's seeds.ts at b36e7be; backlog home-page URLs replaced with the official product or announcement pages, 2026-10-17"
+    },
+    "head": "9937091",
+    "costUsd": 0.9748,
+    "photoFirst": true,
+    "dvids": true
+  },
+  "score": {
+    "stories": 18,
+    "pass": 3,
+    "reachedReview": 6,
+    "unsafeAtReview": 3,
+    "held": 12,
+    "failed": 0,
+    "noDraft": 0,
+    "heldForStyleOnly": 0,
+    "holdKinds": {
+      "photo": 10,
+      "limits": 2,
+      "originality": 1,
+      "format": 1
+    },
+    "photoFirstSkipped": 10,
+    "photoFirstKept": 7,
+    "photoFromDvids": 0
+  },
+  "tokens": {
+    "photoSearch:anthropic/claude-haiku-5.5": {
+      "calls": 57,
+      "input": 426283,
+      "output": 30006
+    },
+    "photoPick:anthropic/claude-sonnet-5.5": {
+      "calls": 18,
+      "input": 279148,
+      "output": 7983
+    },
+    "write:anthropic/claude-haiku-5.5": {
+      "calls": 42,
+      "input": 309655,
+      "output": 28224
+    },
+    "write:anthropic/claude-sonnet-5.5 (fact check)": {
+      "calls": 6,
+      "input": 23833,
+      "output": 2442
+    }
+  },
+  "stories": [
+    {
+      "id": "raid-hunter",
+      "kind": "dt101",
+      "end": "held",
+      "pass": false,
+      "reason": "no relevant, licensed photo of the subject was found before writing, so the next story was tried: no candidate shows the subject itself (None of the candidates shows the Raid Hunter gun system. #0 and #1 are CGI scenes of a drone and explosions, and #1 also has a text overlay. The gun system itself never appears. #2–#7 show RQ-4 Global Hawk aircraft, which are unrelated.)",
+      "holdKinds": [
+        "photo"
+      ],
+      "v9WouldHold": true,
+      "safety": null,
+      "frames": [],
+      "caption": null,
+      "media": [],
+      "photoFirst": "skipped",
+      "history": [],
+      "calls": 4,
+      "inputTokens": 24927,
+      "outputTokens": 1496,
+      "seconds": 14,
+      "observed": [
+        "round 3 (nemotron): replaced — no relevant, licensed photo: no candidate shows the Raid Hunter gun system (CGI promo frames, unrelated 'raid'/'Hunter' archive matches)",
+        "round 4 (nemotron): held — copy still breaks the template after two rewrites: the DT101 caption must be the mission brief (no Tech:/Platform:/Goal: lines)"
+      ]
+    },
+    {
+      "id": "anduril-thunder",
+      "kind": "dt101",
+      "end": "held",
+      "pass": false,
+      "reason": "no relevant, licensed photo of the subject was found before writing, so the next story was tried: no photo of the subject fits the 4:5 card (#1: the 4:5 crop cuts off the subject · #0: the subject sits low, under the text block) (Photo #1 shows the Thunder rotorcraft in a close side view that fills the frame. It is recognizable and clearly the subject. #0 is also exact, but it is wide and symmetric, so the 4:5 crop would lose the rotor discs. The remaining candidates show other subjects or are tiny.)",
+      "holdKinds": [
+        "photo"
+      ],
+      "v9WouldHold": true,
+      "safety": null,
+      "frames": [],
+      "caption": null,
+      "media": [],
+      "photoFirst": "skipped",
+      "history": [],
+      "calls": 4,
+      "inputTokens": 19355,
+      "outputTokens": 1672,
+      "seconds": 15,
+      "observed": [
+        "round 3 (nemotron): held — copy still breaks the template after two rewrites: the caption needs its source on a line of its own (and the caption first carried Raid Hunter's mission brief: the subject-switch bug fixed after round 3)"
+      ]
+    },
+    {
+      "id": "anduril-submarine",
+      "kind": "dt101",
+      "end": "held",
+      "pass": false,
+      "reason": "no relevant, licensed photo of the subject was found before writing, so the next story was tried: no candidate shows the subject itself (Only candidate tied to the story. It's a rendering of a large waterfront shipyard facility with numbered berths, which fits a submarine industrial base expansion. The other candidates are Ghost-X drones, which have nothing to do with submarines or shipbuilding. The building is wide, so the 4:5 crop will lose its ends, but the numbered bays stay recognizable.)",
+      "holdKinds": [
+        "photo"
+      ],
+      "v9WouldHold": true,
+      "safety": null,
+      "frames": [],
+      "caption": null,
+      "media": [],
+      "photoFirst": "skipped",
+      "history": [],
+      "calls": 4,
+      "inputTokens": 37655,
+      "outputTokens": 2261,
+      "seconds": 21,
+      "observed": [
+        "round 3 (nemotron): held — no relevant, licensed photo: no candidate shows Anduril's undersea vehicle (shipyard rendering, Altius 600, a Teledyne glider, Boeing Orca, Lockheed facilities)"
+      ]
+    },
+    {
+      "id": "pac3-edge",
+      "kind": "dt101",
+      "end": "held",
+      "pass": false,
+      "reason": "no relevant, licensed photo of the subject was found before writing, so the next story was tried: no candidate shows the subject itself (None of the candidates shows the PAC-3 Edge interceptor or any PAC-3 missile. They show F-16s at an Arctic Edge exercise, an F-22, a C-130J, and Lockheed Martin buildings. These are unrelated aircraft or generic corporate scenes.)",
+      "holdKinds": [
+        "photo"
+      ],
+      "v9WouldHold": true,
+      "safety": null,
+      "frames": [],
+      "caption": null,
+      "media": [],
+      "photoFirst": "skipped",
+      "history": [],
+      "calls": 4,
+      "inputTokens": 29157,
+      "outputTokens": 1369,
+      "seconds": 23,
+      "observed": [
+        "round 3 (nemotron): replaced — no relevant, licensed photo: Patriot launcher photos are related but not PAC-3 Edge",
+        "round 4 (nemotron): replaced — no photo of the subject fits the 4:5 card (#0, the PAC-3 Edge render: the 4:5 crop cuts off the subject)"
+      ]
+    },
+    {
+      "id": "skydio-f10",
+      "kind": "dt101",
+      "end": "review",
+      "pass": true,
+      "reason": null,
+      "holdKinds": [],
+      "v9WouldHold": null,
+      "safety": {
+        "limits": [],
+        "unsourced": [],
+        "rights": [
+          "company"
+        ],
+        "clipped": [],
+        "factErrors": []
+      },
+      "frames": [
+        {
+          "series": "dt101",
+          "fields": {
+            "benefit_headline": "GIVES LEADERS A\nLIVE AERIAL VIEW",
+            "subject_identifier": "F10 LIGHTRUNNER / SKYDIO"
+          },
+          "mediaQuery": "Skydio F10 Lightrunner fixed-wing aircraft"
+        }
+      ],
+      "caption": "MISSION BRIEF // F10 LIGHTRUNNER / SKYDIO\n\n//Skydio\n\nTech: Autonomous flight\n\nPlatform: Fixed-wing aircraft\n\nGoal: Give responders a live aerial view across long distances, where time counts more than the ground they must cover.\n\nWhy: With a 30-mile flight radius, one MegaDock can put nearly 3,000 square miles within reach of a single launch location.\n\nTraction: F10 is set to deploy to customers in 2027, per Skydio.\n\nSkydio was founded in 2014. F10 Lightrunner is the company's first fixed-wing aircraft. Its robotic takeoff and landing system uses a suction-based gripper to launch and catch the aircraft. Skydio says each MegaDock can house up to five F10s, letting one team run several missions at once.\n\nSource: Skydio, September 24, 2026\n\nImage: skydio.com (courtesy)",
+      "media": [
+        {
+          "pageUrl": "https://www.skydio.com/f10",
+          "license": "Official company media",
+          "credit": "skydio.com (courtesy)",
+          "rightsNote": "Company media from www.skydio.com: confirm its terms allow editorial use before approving",
+          "note": "Company media from www.skydio.com: confirm its terms allow editorial use before approving"
+        }
+      ],
+      "photoFirst": "kept",
+      "history": [
+        "opened under mcu-rules-2026-10-18.2 (replay)",
+        "facts extracted: 26",
+        "copy candidates: 5 candidates after 1 new batch, 3 fit; chose 4 (\"FLIES 30 MILES / TO THE SCENE\"): Candidate 2 states the source's main point, a fixed-wing aircraft that flies 30 miles to a scene, in a complete active sentence that solves the stated gap of slow response in rural areas. Candidate 0 is a label-like fragment about dock coverage, a side detail. Candidate 1 leads with a speed spec and drops the distance problem the source centers on.",
+        "copy candidates: 4 candidates, 2 fit; chose 4 (\"GIVES LEADERS A / LIVE AERIAL VIEW\"): Candidate 1 states the source's main point: F10 gives leadership a live aerial view while ground units are still en route, with the subject and consequence in one complete hook. Candidate 0 is a partial claim (\"flies 30 miles to the scene\") that reads as a range spec and implies a one-way flight rather than the live view that is the core benefit. Both fit the two-line container and avoid fragments.",
+        "copy candidates: 4 candidates, 1 fit; chose 1 (\"GIVES LEADERS A / LIVE AERIAL VIEW\"): the only one that fits",
+        "copy written (v1)",
+        "media chosen"
+      ],
+      "calls": 13,
+      "inputTokens": 98094,
+      "outputTokens": 7888,
+      "seconds": 44,
+      "observed": [
+        "round 3 (nemotron): held — the writer returned hold \"None\" (read as a hold: fixed after round 3), then no replacement subject qualified"
+      ]
+    },
+    {
+      "id": "l3harris-navy-vampire",
+      "kind": "dt101",
+      "end": "review",
+      "pass": false,
+      "reason": null,
+      "holdKinds": [],
+      "v9WouldHold": null,
+      "safety": {
+        "limits": [],
+        "unsourced": [],
+        "rights": [
+          "company"
+        ],
+        "clipped": [],
+        "factErrors": [
+          "Card headline: \"IT DOWNS DRONES / NEAR SHIPS\" — The source says VAMPIRE was selected for littoral (coastal) C-UxS defense and offers reconnaissance and precision strike against drones. It says nothing about use near ships. It also doesn't say the system has downed drones."
+        ]
+      },
+      "frames": [
+        {
+          "series": "dt101",
+          "fields": {
+            "benefit_headline": "IT DOWNS DRONES\nNEAR SHIPS",
+            "subject_identifier": "VAMPIRE / L3HARRIS"
+          },
+          "mediaQuery": "L3Harris VAMPIRE counter-unmanned system"
+        }
+      ],
+      "caption": "MISSION BRIEF // VAMPIRE\n\n//L3Harris\n\nTech: Counter-drone weapons\n\nPlatform: Self-contained weapons system\n\nGoal: Defeat drones and remotely piloted platforms across domains with reconnaissance and precision strike.\n\nWhy: The U.S. Navy selected the system for littoral counter-unmanned systems defense, and L3Harris says it is being engineered for new mission needs and maritime conditions.\n\nTicker: NYSE: LHX\n\nTraction: Selected by the U.S. Navy to deliver VAMPIRE counter-unmanned systems, per L3Harris. L3Harris is also delivering VAMPIRE systems to the U.S. Army.\n\nL3Harris said it unveiled Wraith Shield software earlier in 2026. It provides a radio-as-a-sensor capability against small drones and can be paired with VAMPIRE and Drone Guardian systems for layered defense. Drone Guardian is described by the company as an operationally proven counter-UAS system.\n\nSource: L3Harris Technologies, 08SEP26\n\nImage: L3Harris (courtesy)",
+      "media": [
+        {
+          "pageUrl": "https://www.l3harris.com/all-capabilities/vampire",
+          "license": "Official company media",
+          "credit": "L3Harris (courtesy)",
+          "rightsNote": "Company media from www.l3harris.com: confirm its terms allow editorial use before approving",
+          "note": "Company media from www.l3harris.com: confirm its terms allow editorial use before approving"
+        }
+      ],
+      "photoFirst": "kept",
+      "history": [
+        "opened under mcu-rules-2026-10-18.2 (replay)",
+        "facts extracted: 9",
+        "copy candidates: 4 candidates, 1 fit; chose 4 (\"IT DOWNS DRONES / NEAR SHIPS\"): the only one that fits",
+        "copy written (v1)",
+        "media chosen"
+      ],
+      "calls": 7,
+      "inputTokens": 47976,
+      "outputTokens": 4840,
+      "seconds": 28,
+      "observed": [
+        "round 4 (nemotron): in_review — In Review as VAMPIRE / L3HARRIS with DVIDS 9608168 (public domain); hook \"RAPID STRIKE / AGAINST DRONES\" is a verbless fragment"
+      ]
+    },
+    {
+      "id": "morfius-release",
+      "kind": "dt101",
+      "end": "held",
+      "pass": false,
+      "reason": "no relevant, licensed photo of the subject was found before writing, so the next story was tried: no candidate shows the subject itself (None of the candidates show the MORFIUS X-Rotor. They show an F-22, C-130 transports, a cockpit and Lockheed Martin buildings. All are generic Lockheed Martin imagery, not the counter-drone system.)",
+      "holdKinds": [
+        "photo"
+      ],
+      "v9WouldHold": true,
+      "safety": null,
+      "frames": [],
+      "caption": null,
+      "media": [],
+      "photoFirst": "skipped",
+      "history": [],
+      "calls": 4,
+      "inputTokens": 19836,
+      "outputTokens": 1372,
+      "seconds": 14,
+      "observed": [
+        "round 4 (nemotron): replaced — no relevant, licensed photo (query \"multi-domain\"): coats of arms, an autonomous launcher, a solar image"
+      ]
+    },
+    {
+      "id": "morfius-product",
+      "kind": "dt101",
+      "end": "held",
+      "pass": false,
+      "reason": "no relevant, licensed photo of the subject was found before writing, so the next story was tried: no candidate shows the subject itself (No candidate clearly shows the MORFIUS interceptor. #0 is a promotional graphic with text, empty haze and only faint shadows of an aircraft, so the product isn't visible. The other candidates show F-22, C-130 and Lockheed buildings, which are unrelated to MORFIUS.)",
+      "holdKinds": [
+        "photo"
+      ],
+      "v9WouldHold": true,
+      "safety": null,
+      "frames": [],
+      "caption": null,
+      "media": [],
+      "photoFirst": "skipped",
+      "history": [],
+      "calls": 4,
+      "inputTokens": 31447,
+      "outputTokens": 1828,
+      "seconds": 21,
+      "observed": [
+        "round 4 (nemotron): held — no relevant, licensed photo: #0 is the MORFIUS page banner (text over desert, faint aircraft shadow); the rest show other drones and soldiers"
+      ]
+    },
+    {
+      "id": "paravision-state",
+      "kind": "news",
+      "end": "held",
+      "pass": false,
+      "reason": "the copy still breaks the template rules after two rewrites: Headline runs past 3 lines (about 45 characters); shorten it: \"STATE DEPT. AWARDS PARAVISION UP TO $6.5M\" is 41 characters and wraps to 4 lines of at most 15; the headline copies 5 words in a row from the source's headline (\"awards paravision up to 6.5m\"): write it fresh, in your own words, from the facts; the caption copies 17 words in a row from the source (\"the u.s state department has awarded facial recognition developer paravision a contract worth up to 6.5 …\"): write it fresh, and quote only in quotation marks, attributed; abbreviated words on the card (DEPT); use whole words, and shorter ones if it must fit",
+      "holdKinds": [
+        "limits",
+        "originality",
+        "format"
+      ],
+      "v9WouldHold": true,
+      "safety": null,
+      "frames": [],
+      "caption": null,
+      "media": [],
+      "photoFirst": "kept",
+      "history": [
+        "opened under mcu-rules-2026-10-18.2 (replay)",
+        "facts extracted: 11",
+        "copy candidates: 5 candidates after 1 new batch, 4 fit; chose 2 (\"PARAVISION WINS UP TO $6.5M\", \"A single offer won the State Department contract.\"): Candidate 0 is the most specific and accurate option: it names the actor (Paravision), the action (wins), and a sourced figure ($6.5M, the potential value). Its deck states a sourced fact (single offer received) without overstating. Candidates 1 and 3 are vaguer, and 2 names no company. The headline's \"wins up to $6.5M\" correctly reflects that the figure is a potential value, not a guaranteed sum.",
+        "held: the copy still breaks the template rules after two rewrites: Headline runs past 3 lines (about 45 characters); shorten it: \"STATE DEPT. AWARDS PARAVISION UP TO $6.5M\" is 41 characters and wraps to 4 lines of at most 15; the headline copies 5 words in a row from the source's headline (\"awards paravision up to 6.5m\"): write it fresh, in your own words, from the facts; the caption copies 17 words in a row from the source (\"the u.s state department has awarded facial recognition developer paravision a contract worth up to 6.5 …\"): write it fresh, and quote only in quotation marks, attributed; abbreviated words on the card (DEPT); use whole words, and shorter ones if it must fit"
+      ],
+      "calls": 10,
+      "inputTokens": 107293,
+      "outputTokens": 6133,
+      "seconds": 40,
+      "observed": [
+        "round 4 (nemotron): held — copy still breaks the template after two rewrites: headline runs past 3 lines"
+      ]
+    },
+    {
+      "id": "seasats-lightfish",
+      "kind": "dt101",
+      "end": "review",
+      "pass": false,
+      "reason": null,
+      "holdKinds": [],
+      "v9WouldHold": null,
+      "safety": {
+        "limits": [],
+        "unsourced": [],
+        "rights": [
+          "company"
+        ],
+        "clipped": [],
+        "factErrors": [
+          "Mike Flanigan, CEO of Seasats, has said the company has over $100 million in U.S. government contracts. — The $100 million figure comes from the unattributed 'About Seasats' boilerplate. Flanigan's quote in the source says nothing about contracts, so the caption wrongly attributes the claim to him."
+        ]
+      },
+      "frames": [
+        {
+          "series": "dt101",
+          "fields": {
+            "benefit_headline": "IT DETECTS DRUG\nRUNNERS AT SEA",
+            "subject_identifier": "LIGHTFISH / SEASATS"
+          }
+        }
+      ],
+      "caption": "MISSION BRIEF // LIGHTFISH\n\n//Seasats\n\n📍San Diego, CA\n\nTech: Autonomous surveillance\n\nPlatform: Unmanned surface vessel\n\nGoal: Detect illegal maritime activity, including drug trafficking and unauthorized vessel entry, in the Gulf of America.\n\nWhy: The vessels are solar powered and can stay on station for multiple months.\n\nTraction: Lightfish vessels have operated on the Rio Grande since January 2026 in support of federal border security efforts, and a Lightfish fleet has now been deployed to the Gulf of America, per Seasats.\n\nSeasats announced that a Lightfish fleet has been deployed for U.S. maritime border security. The vessels were launched from the Texas coast and extend an autonomous maritime surveillance program Seasats already runs for the Homeland Defense office within the Assistant Secretary of War portfolio.\n\nEach Lightfish is roughly 11 feet long and weighs about 340 pounds, and two people can launch and recover one from a boat ramp or a pickup truck bed. Earlier missions have fitted its cameras, signals gear and sonar into a swappable equipment bay.\n\nThe Gulf deployment follows Seasats' earlier support of Operation River Wall on the southern border. Mike Flanigan, CEO of Seasats, has said the company has over $100 million in U.S. government contracts.\n\nSource: Seasats via PR Newswire, 2026-10-02\n\nImage: prnewswire.com (courtesy)",
+      "media": [
+        {
+          "pageUrl": "https://www.prnewswire.com/news-releases/seasats-deploys-fleet-of-lightfish-usvs-for-maritime-border-security-in-the-gulf-of-america-302896922.html",
+          "license": "Official company media",
+          "credit": "prnewswire.com (courtesy)",
+          "rightsNote": "Company media from www.prnewswire.com: confirm its terms allow editorial use before approving",
+          "note": "Company media from www.prnewswire.com: confirm its terms allow editorial use before approving"
+        }
+      ],
+      "photoFirst": "kept",
+      "history": [
+        "opened under mcu-rules-2026-10-18.2 (replay)",
+        "facts extracted: 16",
+        "copy candidates: 5 candidates after 2 new batches, 0 fit; the writer's first choice goes on to the rewrites",
+        "copy candidates: 4 candidates, 0 fit; the writer's first choice goes on to the rewrites",
+        "copy candidates: 4 candidates, 2 fit; chose 4 (\"IT DETECTS DRUG / RUNNERS AT SEA\"): Candidate 1 states the source's main point: the Lightfish fleet detects drug trafficking at sea, which the source names as the fleet's purpose. It is a concrete subject and verb, and it stays accurate because the source says the fleet detects illegal maritime activity including drug trafficking. Candidate 0 is broader and less specific, and \"flags\" is weaker than \"detects\" for the surveillance function described.",
+        "copy written (v1)",
+        "media chosen"
+      ],
+      "calls": 14,
+      "inputTokens": 126112,
+      "outputTokens": 9692,
+      "seconds": 49,
+      "observed": [
+        "round 5 (haiku): held — copy still breaks the template after two rewrites: benefit hook lines over 16 characters"
+      ]
+    },
+    {
+      "id": "l3harris-drone-guardian",
+      "kind": "dt101",
+      "end": "held",
+      "pass": false,
+      "reason": "no relevant, licensed photo of the subject was found before writing, so the next story was tried: no candidate shows the subject itself (No candidate shows the Drone Guardian operator console or a multi-sensor radar/RF/EO-IR picture. They show a generic drone at a fence, a briefing with a handheld jammer case, and DroneBuster handheld jammers. These are related counter-UAS items, not the L3Harris Drone Guardian system.)",
+      "holdKinds": [
+        "photo"
+      ],
+      "v9WouldHold": true,
+      "safety": null,
+      "frames": [],
+      "caption": null,
+      "media": [],
+      "photoFirst": "skipped",
+      "history": [],
+      "calls": 4,
+      "inputTokens": 46988,
+      "outputTokens": 2382,
+      "seconds": 25,
+      "observed": [
+        "round 5 (haiku): held — no relevant, licensed photo: none shows Drone Guardian (a commercial quadcopter, MQ-9 Reapers); replacements failed (FLIR 403, Skydio pages older than 90 days)"
+      ]
+    },
+    {
+      "id": "anduril-eagleeye",
+      "kind": "dt101",
+      "end": "review",
+      "pass": false,
+      "reason": null,
+      "holdKinds": [],
+      "v9WouldHold": null,
+      "safety": {
+        "limits": [],
+        "unsourced": [],
+        "rights": [
+          "company"
+        ],
+        "clipped": [],
+        "factErrors": [
+          "The ballistic shell is rated NIJ IIIA Level. — The source says \"NIJ IIA Level Ballistic Shell\", not IIIA."
+        ]
+      },
+      "frames": [
+        {
+          "series": "dt101",
+          "fields": {
+            "benefit_headline": "WARFIGHTERS SEE\nTHREATS FIRST",
+            "subject_identifier": "EAGLEEYE / ANDURIL"
+          }
+        }
+      ],
+      "caption": "MISSION BRIEF // EAGLEEYE / ANDURIL\n\n//Anduril Industries\n\nTech: AI-enhanced digital vision\n\nPlatform: Warfighter augment\n\nGoal: Give warfighters threat detection, Blue Force tracking and battlefield awareness in one wearable system.\n\nWhy: Operators keep their eyes up and on the move while tasking unmanned vehicles, calling for fires and controlling robotic teammates.\n\nTraction: Described on Anduril's EagleEye product page as a family of warfighter augments powered by Lattice. The page does not give a fielding or test status.\n\nEagleEye overlays AI-enhanced digital vision, Blue Force tracking and 6DOF spatial awareness onto the real world. Its sensing mix spans RF detection, rearview cameras, non-emissive lasers, biometric and environmental monitoring, and instant battlefield alerts. A 1km threat detection capability uses optical zoom EO and LWIR cameras, and an 8 microphone array detects and localizes gunshots and drones.\n\nThe display runs at a 90 Hz refresh with a 200° HFOV x 90° VFOV field of view. The ballistic shell is rated NIJ IIIA Level. A high-resolution collaborative 3D sand table supports mission command, remote mission planning sessions and mission rehearsals.\n\nAnduril describes Lattice as the software platform that powers its software-defined weapons and connects with third-party and government-owned capabilities. Anduril Industries, Inc. is an American defense technology company focused on advanced autonomous systems, according to the company's page.\n\nSource: Anduril Industries, date not stated on page\n\nImage: Anduril (courtesy)",
+      "media": [
+        {
+          "pageUrl": "https://www.anduril.com/news/anduril-s-eagleeye-puts-mission-command-and-ai-directly-into-the-warfighter-s-helmet",
+          "license": "Official company media",
+          "credit": "Anduril (courtesy)",
+          "rightsNote": "Company media from www.anduril.com: confirm its terms allow editorial use before approving",
+          "note": "Company media from www.anduril.com: confirm its terms allow editorial use before approving"
+        }
+      ],
+      "photoFirst": "kept",
+      "history": [
+        "opened under mcu-rules-2026-10-18.2 (replay)",
+        "facts extracted: 11; dropped 1 whose sentence isn't in the source: \"EagleEye's headset weighs 105-115g.\"",
+        "copy candidates: 4 candidates, 1 fit; chose 3 (\"WARFIGHTERS SEE / THREATS FIRST\"): the only one that fits",
+        "copy candidates: 3 candidates, 1 fit; chose 1 (\"WARFIGHTERS SEE / THREATS FIRST\"): the only one that fits",
+        "copy written (v1)",
+        "media chosen"
+      ],
+      "calls": 8,
+      "inputTokens": 69229,
+      "outputTokens": 4815,
+      "seconds": 29,
+      "observed": [
+        "round 5 (haiku): held — copy still breaks the template after two rewrites: benefit hook lines over 16 characters"
+      ]
+    },
+    {
+      "id": "xtend-striker",
+      "kind": "news",
+      "end": "held",
+      "pass": false,
+      "reason": "no relevant, licensed photo of the subject was found before writing, so the next story was tried: no photo of the subject fits the 4:5 card (#0: the cropped photo is under 500 px wide) (Close-up of the XTEND drone, with cameras and a protective cage, next to a Drone Dominance Program challenge coin. It is on-subject and dominant. The coin and logo add some graphic clutter, but the drone is still recognizable.); a representative photo was searched for too, and none was found",
+      "holdKinds": [
+        "photo"
+      ],
+      "v9WouldHold": true,
+      "safety": null,
+      "frames": [],
+      "caption": null,
+      "media": [],
+      "photoFirst": "skipped",
+      "history": [],
+      "calls": 6,
+      "inputTokens": 72540,
+      "outputTokens": 3959,
+      "seconds": 34,
+      "observed": [
+        "round 5 (haiku): in_review — In Review: \"XTEND LANDS $40.5M DRONE BUY FOR STRIKER\"; grey placeholder photo (the News template had no photo field yet)"
+      ]
+    },
+    {
+      "id": "skydio-x10d",
+      "kind": "dt101",
+      "end": "review",
+      "pass": true,
+      "reason": null,
+      "holdKinds": [],
+      "v9WouldHold": null,
+      "safety": {
+        "limits": [],
+        "unsourced": [],
+        "rights": [
+          "company"
+        ],
+        "clipped": [],
+        "factErrors": []
+      },
+      "frames": [
+        {
+          "series": "dt101",
+          "fields": {
+            "benefit_headline": "FLIES WITHOUT A\nCLOUD CONNECTION",
+            "subject_identifier": "X10D / SKYDIO"
+          },
+          "mediaQuery": "Skydio X10D small UAS"
+        }
+      ],
+      "caption": "MISSION BRIEF // X10D / SKYDIO\n\n//Skydio\n\nTech: Thermal imaging\n\nPlatform: Small UAS\n\nGoal: Provide electronic warfare resilience and survivability for small unmanned aircraft on the toughest battlefields.\n\nWhy: The drone folds into the most compact size of any drone with similar sensors, supporting distributed and dispersed operations.\n\nTraction: Listed on the Blue UAS Cleared list, per Skydio.\n\nSource: Skydio, undated page at skydio.com/x10d\n\nImage: skydio.com (courtesy)",
+      "media": [
+        {
+          "pageUrl": "https://www.skydio.com/x10d",
+          "license": "Official company media",
+          "credit": "skydio.com (courtesy)",
+          "rightsNote": "Company media from www.skydio.com: confirm its terms allow editorial use before approving",
+          "note": "Company media from www.skydio.com: confirm its terms allow editorial use before approving"
+        }
+      ],
+      "photoFirst": "kept",
+      "history": [
+        "opened under mcu-rules-2026-10-18.2 (replay)",
+        "facts extracted: 23",
+        "copy candidates: 4 candidates, 2 fit; chose 4 (\"WORKS WITHOUT / CLOUD OR NETWORK\"): Candidate 1 is a complete, specific statement the source supports: the X10D navigates and returns using vision-based methods when GPS and communications are jammed, and the source describes vision-only return flights and Anchor Points for GPS-denied navigation. It states the system's main capability (operating when connectivity is contested) rather than a side detail. Candidate 0 (\"SEES THROUGH DARKNESS AT 24/7\") is less accurate to the source's main point, since the source's \"24/7\" claim refers to NightSense o",
+        "copy candidates: 4 candidates, 2 fit; chose 2 (\"FLIES WITHOUT A / CLOUD CONNECTION\"): Candidate 0 states the source's main point: the X10D keeps operating under GPS and communication jamming, using vision-only return flights and anchor points, which the source supports. Candidate 1 (\"folds small\") is not supported by the source text, which does not describe folding or dispersed teams. Candidate 0 is also a complete sentence across both lines, though its wording (\"without a cloud connection\") is a loose paraphrase of the source's jamming and GPS-denied claims rather than its exact point.",
+        "copy written (v1)",
+        "media chosen"
+      ],
+      "calls": 10,
+      "inputTokens": 87144,
+      "outputTokens": 5243,
+      "seconds": 35,
+      "observed": [
+        "round 6 (haiku): replaced — the writer held: the Traction line came from Skydio's order announcement, not the product page, and the date line relied on an undated primary page"
+      ]
+    },
+    {
+      "id": "rtx-coyote",
+      "kind": "dt101",
+      "end": "review",
+      "pass": true,
+      "reason": null,
+      "holdKinds": [],
+      "v9WouldHold": null,
+      "safety": {
+        "limits": [],
+        "unsourced": [],
+        "rights": [
+          "company"
+        ],
+        "clipped": [],
+        "factErrors": []
+      },
+      "frames": [
+        {
+          "series": "dt101",
+          "fields": {
+            "benefit_headline": "NEW MOTOR SPEEDS\nCOYOTE LAUNCHES",
+            "subject_identifier": "COYOTE / RAYTHEON"
+          },
+          "mediaQuery": "Coyote interceptor Raytheon counter-drone"
+        }
+      ],
+      "caption": "MISSION BRIEF // COYOTE\n\n//Raytheon\n\n📍Arlington, VA\n\nTech: Counter-drone interceptor\n\nPlatform: Interceptor upgrade\n\nGoal: Counter current and emerging drone threats with a new seeker and warhead.\n\nWhy: The upgrade builds on current Coyote variants, which have intercepted hundreds of drones in combat.\n\nTicker: NYSE: RTX\n\nTraction: Three Raytheon-funded developmental tests of the Coyote Block 2C+RM upgrade were completed, with the first launches of a Coyote effector fitted with a tactical rocket motor, per Raytheon. The program moved from concept to testing in 15 months, per Raytheon.\n\nSource: RTX, 12OCT26\n\nImage: RTX (courtesy)",
+      "media": [
+        {
+          "pageUrl": "https://www.rtx.com/news/news-center/2026/10/12/rtxs-raytheon-completes-three-successful-tests-of-new-coyote-upgrades",
+          "license": "Official company media",
+          "credit": "RTX (courtesy)",
+          "rightsNote": "Company media from www.rtx.com: confirm its terms allow editorial use before approving",
+          "note": "Company media from www.rtx.com: confirm its terms allow editorial use before approving"
+        }
+      ],
+      "photoFirst": "kept",
+      "history": [
+        "opened under mcu-rules-2026-10-18.2 (replay)",
+        "facts extracted: 11",
+        "copy candidates: 5 candidates after 1 new batch, 1 fit; chose 2 (\"NEW MOTOR SPEEDS / COYOTE LAUNCHES\"): the only one that fits",
+        "copy written (v1)",
+        "media chosen"
+      ],
+      "calls": 8,
+      "inputTokens": 40813,
+      "outputTokens": 4293,
+      "seconds": 24,
+      "observed": [
+        "round 6 (haiku): in_review — In Review: \"ADDS A ROCKET / MOTOR FOR SPEED\", RTX release photo (company media); credit read \"UNITED TECHNOLOGIES\" and crossed the exhaust (fixed in #205)"
+      ]
+    },
+    {
+      "id": "setaf-gtead",
+      "kind": "news",
+      "end": "held",
+      "pass": false,
+      "reason": "no relevant, licensed photo of the subject was found before writing, so the next story was tried: no photo of the subject fits the 4:5 card (#1: the subject sits low, under the text block · #2: the subject sits low, under the text block) (Photos 1 and 2 are the same shot, with captions that tie them to the SETAF-AF/G-TEAD story. They show a soldier carrying a small ground robot or vehicle in the Moroccan desert. This is representative of the testing. Photo 0 is a close view of a soldier with a drone controller at Tan-Tan, but its caption is about African Lion autonomous systems and a different unit, so it's less directly tied to the story. I picked 1 because its caption matches the story, and it's the higher-resolution copy of the shot.); a representative photo was searched for too, and none of the photos found qualified",
+      "holdKinds": [
+        "photo"
+      ],
+      "v9WouldHold": true,
+      "safety": null,
+      "frames": [],
+      "caption": null,
+      "media": [],
+      "photoFirst": "skipped",
+      "history": [],
+      "calls": 7,
+      "inputTokens": 64801,
+      "outputTokens": 4215,
+      "seconds": 38,
+      "observed": [
+        "round 6 (haiku): held — copy still breaks the template after two rewrites: the caption copies 16 words in a row from the source (originality)"
+      ]
+    },
+    {
+      "id": "antheia-osc",
+      "kind": "breaking",
+      "end": "held",
+      "pass": false,
+      "reason": "no relevant, licensed photo of the subject was found before writing, so the next story was tried: no candidate shows the subject itself (None of the candidates shows Dr. Christina Smolke, Antheia, or the Office of Strategic Capital loan. They show a firefighter portrait, a funeral at Arlington, a Mars rover concept and a kids' science camp, and none of these is relevant.); a representative photo was searched for too, and none was found",
+      "holdKinds": [
+        "photo"
+      ],
+      "v9WouldHold": true,
+      "safety": null,
+      "frames": [],
+      "caption": null,
+      "media": [],
+      "photoFirst": "skipped",
+      "history": [],
+      "calls": 6,
+      "inputTokens": 66075,
+      "outputTokens": 3305,
+      "seconds": 35,
+      "observed": [
+        "round 6 (haiku): held — no relevant, licensed photo: no candidate at all; the replacement (Navy E-130J) was refused by war.gov (403)"
+      ]
+    },
+    {
+      "id": "icymi-week-2026-10-05",
+      "kind": "icymi",
+      "end": "held",
+      "pass": false,
+      "reason": "the copy still breaks the template rules after two rewrites and 3 shortening attempts: Story 2 runs past 1 line (about 38 characters); shorten it: \"Lockheed unveils PAC-3 Edge interceptor\" is 39 characters and wraps to 2 lines of at most 38; Story 3 runs past 1 line (about 38 characters); shorten it: \"Florida Guard tests connected drone picture\" is 43 characters and wraps to 2 lines of at most 38",
+      "holdKinds": [
+        "limits"
+      ],
+      "v9WouldHold": true,
+      "safety": null,
+      "frames": [],
+      "caption": null,
+      "media": [],
+      "roundup": [
+        "MCU-BN-20261010-02 | Microchip acquires VORAGO | Approved",
+        "MCU-BN-20261010-01 | Lockheed Martin PAC-3 Edge | Approved",
+        "MCU-P03 Drone Crucible 26.3"
+      ],
+      "history": [
+        "opened under mcu-rules-2026-10-18.2",
+        "held: the copy still breaks the template rules after two rewrites and 3 shortening attempts: Story 2 runs past 1 line (about 38 characters); shorten it: \"Lockheed unveils PAC-3 Edge interceptor\" is 39 characters and wraps to 2 lines of at most 38; Story 3 runs past 1 line (about 38 characters); shorten it: \"Florida Guard tests connected drone picture\" is 43 characters and wraps to 2 lines of at most 38"
+      ],
+      "calls": 6,
+      "inputTokens": 49477,
+      "outputTokens": 1892,
+      "seconds": 12,
+      "observed": [
+        "round 3 (nemotron): held — no licensed photo for frame 2 (the roundup then searched new photos for each story: fixed after round 3)",
+        "round 4 (nemotron): held — copy still breaks the template after two rewrites: decks over 2 lines and not one sentence",
+        "round 5 (haiku): held — copy still breaks the template after two rewrites: headlines and decks over their 2-line limits on frames 2-4",
+        "round 6 (haiku): held — the writer held the roundup on eligibility (Marconi titled REVIEW DRAFT): eligibility moved into the engine in #205"
+      ]
+    }
+  ]
+}
