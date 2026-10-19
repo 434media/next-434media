@@ -685,13 +685,18 @@ async function extractFacts(deps: WorkerDeps, ai: McuAi, d: McuDraft): Promise<v
 const STATES = new Set("AL AK AZ AR CA CO CT DE FL GA HI ID IL IN IA KS KY LA ME MD MA MI MN MS MO MT NE NV NH NJ NM NY NC ND OH OK OR PA RI SC SD TN TX UT VT VA WA WV WI WY DC".split(" "))
 /**
  * Places and ownership the copy states that the source doesn't, checked like figures (unsourcedNumbers). A "City, ST"
- * place counts as sourced when the city's name is in the source; "private company" or "public company" when the source
+ * place counts as sourced when the last word or two of its name is in the source; "private company" or "public company" when the source
  * says private or public (or names a stock exchange or ticker for public). Replay, 2026-10-19: with 28 sourced facts
  * the writer still added "📍San Mateo, CA" to Skydio's mission brief from what it knew.
  */
 export function unsourcedClaims(texts: string[], source: string): string[] {
   const text = texts.join("\n"), hay = source.toLowerCase(), out: string[] = []
-  for (const m of text.matchAll(/\b((?:[A-Z][a-z]+\.? ){0,3}[A-Z][a-z]+), ([A-Z]{2})\b/g)) if (STATES.has(m[2]) && !hay.includes(m[1].toLowerCase())) out.push(`${m[1]}, ${m[2]}`)
+  // The capitalised run before ", ST" may take in words that aren't the place ("Tested Fort Bragg, NC"), so the place
+  // counts as sourced when its last word or last two words are in the source ("Fort Bragg, N.C."; coordinator review).
+  for (const m of text.matchAll(/\b((?:[A-Z][a-z]+\.? ){0,3}[A-Z][a-z]+), ([A-Z]{2})\b/g)) {
+    const words = m[1].split(" ")
+    if (STATES.has(m[2]) && ![words.slice(-1), words.slice(-2)].some(w => hay.includes(w.join(" ").toLowerCase()))) out.push(`${words.slice(-2).join(" ")}, ${m[2]}`)
+  }
   for (const m of text.matchAll(/\b(private|public)(?:ly)?(?:[- ](?:held|traded))? (?:company|firm)\b/gi)) {
     const pub = m[1].toLowerCase() === "public"
     if (!(pub ? /\bpublic(ly)?\b|\b(nyse|nasdaq)\b|stock exchange|ticker/i : /\bprivate(ly)?\b|privately held|venture[- ]backed/i).test(source)) out.push(m[0])
@@ -983,12 +988,17 @@ export function copyProblems(frames: FrameCopy[], caption: string, story: Story)
 /**
  * Caption lines that fill in what the source doesn't state rather than leave the line out (replay, 2026-10-19: a
  * mission brief with "📍Location not stated in source" and "Private company → Backers: not stated in source"). Only a
- * short line that ends in such a placeholder, or says the source doesn't state it, counts: "The award's value was not
- * disclosed by the Army in its release" in a paragraph is a sourced fact, not a placeholder.
+ * label-style line counts: its value (after the last ":" or "→", or after a leading symbol such as "📍") is a
+ * placeholder, with at most two words before it. A sentence such as "Financial terms were not disclosed." or "The
+ * cause of the crash is unknown." is a sourced fact, not a placeholder (coordinator review of #210).
  */
 export function placeholderLines(caption: string): string[] {
-  const ends = /(?:^|[\s:→—-])(?:not (?:stated|disclosed|specified|given|provided|available|confirmed|known)(?: (?:in|by) (?:the )?(?:source|facts|page))?|unknown|n\/a|tbd|none stated)\.?$/i
-  return caption.split("\n").map(l => l.trim()).filter(l => l && (/not stated (?:in|by) (?:the )?(?:source|facts|page)/i.test(l) || l.length <= 80 && ends.test(l)))
+  const placeholder = /^(?:\S+ ){0,2}?(?:not (?:stated|disclosed|specified|given|provided|available|confirmed|known)(?: (?:in|by) (?:the )?(?:source|facts|page))?|unknown|n\/a|tbd|none stated)\.?$/i
+  return caption.split("\n").map(l => l.trim()).filter(l => {
+    const marker = Math.max(l.lastIndexOf(":"), l.lastIndexOf("→"))
+    const value = marker >= 0 ? l.slice(marker + 1) : /^[^\p{L}\p{N}\s]/u.test(l) ? l.replace(/^[^\p{L}\p{N}]+/u, "") : null
+    return value !== null && placeholder.test(value.trim())
+  })
 }
 /** Every problem, safety first: what a rewrite is asked to fix. */
 function validate(frames: FrameCopy[], caption: string, story: Story): string[] {

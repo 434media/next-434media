@@ -1833,3 +1833,12 @@ test("a place or ownership the source doesn't state is a safety problem, like an
   // Copy written from the source text, not from extracted facts, is checked as before.
   assert.ok(!copyProblems([{ series: "dt101" as SeriesKey, fields: { benefit_headline: "A PLANE THAT\nLAUNCHES ITSELF", subject_identifier: "F10 LIGHTRUNNER / SKYDIO" } }], "MISSION BRIEF // F10\n\n//Skydio\n\n📍San Mateo, CA\n\nSource: Skydio, 24SEP26", { ...story, facts: undefined } as never).safety.some(x => /states what the source doesn't/.test(x)))
 })
+
+test("coordinator review of #210: sentences aren't placeholders, places match by their last words, and \"unused\" is no hold", () => {
+  for (const sentence of ["Financial terms were not disclosed.", "The cause of the crash is unknown.", "The contract value was not specified."]) assert.deepEqual(placeholderLines(`MISSION BRIEF // X\n\n${sentence}`), [])
+  assert.deepEqual(placeholderLines("Backers: not disclosed\n\nPublic company → Ticker: unknown"), ["Backers: not disclosed", "Public company → Ticker: unknown"])
+  const source = "The Army tested it at Fort Bragg, N.C., in March. Skydio, of San Mateo, Calif., builds the X10D."
+  assert.deepEqual(unsourcedClaims(["Traction: Tested Fort Bragg, NC", "📍Skydio San Mateo, CA"], source), [])
+  assert.deepEqual(unsourcedClaims(["Traction: Tested Fort Hood, TX"], source), ["Fort Hood, TX"])
+  assert.equal(meaningful("unused"), undefined); assert.equal(meaningful("Unused."), undefined)
+})

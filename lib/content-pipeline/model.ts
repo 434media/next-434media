@@ -165,7 +165,7 @@ export function isPhotoDefect(area: string, defect: string): boolean {
  */
 export function meaningful(v: string | undefined | null): string | undefined {
   const t = (v ?? "").trim()
-  if (!t || /^(none|n\/?a|null|nil|no|no hold|no notes?|not applicable|-+)\.?$/i.test(t)) return undefined
+  if (!t || /^(none|n\/?a|null|nil|no|no hold|no notes?|not applicable|unused|-+)\.?$/i.test(t)) return undefined // "unused": replay, 2026-10-19
   // A writer that says it isn't holding, then explains (replay, 2026-10-19: Seasats "Hold: none." and Skydio F10
   // "Not held. The headline … should be verified"), is no hold; a reason that starts "None of …" still is one.
   // "Not held for a single reason to hold; submitted as News" (replay, 2026-10-19) is no hold either.
