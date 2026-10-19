@@ -60,3 +60,6 @@ docs/context-backup-*/
 
 # Lighthouse CI local output
 .lighthouseci/
+
+# content pipeline replay: photos and pages the photo step fetched (not ours to publish)
+/.replay-cache
