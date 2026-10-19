@@ -6,7 +6,7 @@ import { contentPropertyOf } from "./properties"
 import type { ContentProperty, PipelineMedia } from "@/components/crm/types"
 import type { McuSeeds } from "./seeds"
 import { MIN_SHORT_SIDE, archiveRelevant, federalHost, imageSize, isDvidsImagePage, isOutlet, pageImageCandidate, type MediaCandidate, type SourcePage } from "./sources"
-import { MAX_ATTEMPTS, WORKING, type CheckedPhoto, type ChosenMedia, type CropBox, type FrameCopy, type FrameDesign, type McuDraft, type McuJob, type McuStore, type RoundupItem, type Story } from "./store"
+import { MAX_ATTEMPTS, WORKING, type CheckedPhoto, type ChosenMedia, type CropBox, type FrameCopy, type FrameDesign, type McuDraft, type McuJob, type McuStore, type RoundupItem, type SourcedFact, type Story } from "./store"
 
 /**
  * The pipeline worker: advances due jobs and drafts one step at a time, saving after every step, so an interrupted run
@@ -645,8 +645,46 @@ export function unsourcedNumbers(texts: string[], source: string): string[] {
   })
 }
 
+/** Text as it is compared for a quote: lowercase letters and digits, every other run of characters one space. */
+const quoteText = (s: string) => s.toLowerCase().normalize("NFKD").replace(/[^a-z0-9]+/g, " ").trim()
+/**
+ * The extracted facts the source bears out: each fact's quoted sentence must be found in the source text, compared as
+ * quoteText (case, punctuation and spacing aside). A fact whose quote isn't there, or is too short to show anything
+ * (under four words), is dropped. Duplicates are dropped too.
+ */
+export function sourcedFacts(facts: readonly { fact?: unknown; quote?: unknown }[], source: string): { kept: SourcedFact[]; dropped: string[] } {
+  const hay = ` ${quoteText(source)} `, kept: SourcedFact[] = [], dropped: string[] = []
+  for (const f of facts) {
+    const fact = typeof f.fact === "string" ? f.fact.trim() : "", quote = typeof f.quote === "string" ? f.quote.trim() : ""
+    if (!fact) continue
+    const q = quoteText(quote)
+    if (q.split(" ").length < 4 || !hay.includes(` ${q} `)) { dropped.push(fact); continue }
+    if (!kept.some(k => k.fact === fact)) kept.push({ fact, quote })
+  }
+  return { kept, dropped }
+}
+/** Fewer sourced facts than this and the writer writes from the source text, as before fact extraction. */
+export const MIN_FACTS = 2
+/**
+ * Fact extraction before the first write of a story (plan v10, Phase 1 direction 3). The facts are kept on the story,
+ * so the rewrites, the fit and the fresh wording write from the same facts, and a switched story extracts its own. An
+ * extraction that fails, or finds fewer than MIN_FACTS sourced facts, leaves the writer on the source text as before,
+ * and the history says so. A roundup is written from its published posts, so it extracts nothing.
+ */
+async function extractFacts(deps: WorkerDeps, ai: McuAi, d: McuDraft): Promise<void> {
+  if (d.story.roundup || d.story.facts || !ai.extractFacts) return
+  const r = await ai.extractFacts({ story: d.story }).catch(err => { console.error("[content-pipeline] fact extraction failed", d.id, err instanceof Error ? err.message : err); return null })
+  if (!r) { d.history.push({ at: iso(deps), event: "fact extraction failed; writing from the source text" }); return }
+  const { kept, dropped } = sourcedFacts(Array.isArray(r.facts) ? r.facts : [], d.story.sourceText)
+  const note = dropped.length ? `; dropped ${dropped.length} whose sentence isn't in the source: ${dropped.slice(0, 4).map(f => `"${f.slice(0, 80)}"`).join(", ")}` : ""
+  if (kept.length < MIN_FACTS) { d.history.push({ at: iso(deps), event: `fact extraction found ${kept.length} sourced fact${kept.length === 1 ? "" : "s"}${note}; writing from the source text` }); return }
+  d.story.facts = kept
+  d.history.push({ at: iso(deps), event: `facts extracted: ${kept.length}${note}`.slice(0, 600) })
+}
+
 async function writeStep(deps: WorkerDeps, ai: McuAi, d: McuDraft): Promise<void> {
   const today = iso(deps).slice(0, 10)
+  await extractFacts(deps, ai, d)
   let problems: string[] = []
   const seeds = await deps.seeds(), steer = { seeds, ...(d.direction ? { direction: d.direction } : {}) }
   // A roundup's stories were chosen by the engine (icymiStory: published, with a staged card), so a writer that holds
