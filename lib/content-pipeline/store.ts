@@ -36,6 +36,13 @@ export interface McuJob {
    * story is chosen (photo first, worker.ts confirmPhoto).
    */
   skipPhotoFirst?: true
+  /**
+   * Photo first in progress (worker.ts photoFirstStep), saved after every check so each check is its own step:
+   * candidates still to check, those kept (photo confirmed, or unchecked once the checks ran out), why others were
+   * passed over, checks left, research passes run, what research tried, and the model calls so far (copied onto the
+   * drafts). Cleared when the drafts open.
+   */
+  photoFirst?: { pending: Story[]; kept: Story[]; dropped: string[]; left: number; passes: number; tried: string[]; triedUrls: string[]; calls: ModelCall[] }
   /** Who confirmed "no new content", and when (the card's close action). */
   closedAt?: string
   closedBy?: string
@@ -112,6 +119,8 @@ export interface McuDraft {
   /** Subjects the skill replaced on its own because the source could not support the post. */
   rejected?: string[]
   autoReplaced?: number
+  /** Photo first for a replacement subject in progress (worker.ts replaceStep): candidates to check, checks left, why the draft is being replaced, and why candidates were passed over. */
+  replacing?: { pending: Story[]; left: number; reason: string; dropped: string[]; rejected: string[] }
   /** Photos the artwork check turned down for this draft (item pages); the media step skips them. */
   avoidMedia?: string[]
   /** How many times the artwork check sent the draft back for a different photo. */

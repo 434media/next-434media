@@ -163,17 +163,27 @@ async function jobStep(deps: WorkerDeps, id: string, attempt: number): Promise<v
     if (job.kind === "icymi") for (const waiting of await deps.store.choosingDrafts().catch(() => [])) {
       await closeRoundup(deps.store, waiting, "the content pipeline", iso(deps), `regenerated: a new ICYMI request (${id}) replaced it`, deps.closeChoiceTask ? { close: deps.closeChoiceTask } : undefined)
     }
-    const photoChecks = { left: photoChecksFor(job.count) }
-    let stories: Story[] | { hold: string; tried?: string[]; triedUrls?: string[] } = job.kind === "icymi" ? icymiStory(posts, icymiWindow(deps.nowMs(), (await deps.icymiWindow?.().catch(() => null))?.lookbackDays ?? null), roundupSize()) : await researchStories(deps, ai, job, titles, seeds, [], [], inFlight, photoChecks)
     // Every candidate dropped (a blocked or script-only source page, no readable article, outside the Breaking window):
     // research once more, steering away from what was tried, before the job holds (production, 2026-10-17).
     // Zero candidates too: that pass found nothing to try, so the second pass is the search's one retry, not a loop.
-    if ("hold" in stories && "tried" in stories) {
-      console.info("[content-pipeline] research again", JSON.stringify({ job: id, dropped: stories.hold.slice(0, 600) }))
-      const first = stories
-      const again = await researchStories(deps, ai, job, titles, seeds, first.tried ?? [], first.triedUrls ?? [], inFlight, photoChecks)
-      stories = "hold" in again ? { hold: `${first.hold}; then: ${again.hold}`, tried: again.tried, triedUrls: again.triedUrls } : again
+    const research = async (limit = job.count) => {
+      const first = await researchStories(deps, ai, job, titles, seeds, [], [], inFlight, limit)
+      if (!("hold" in first && "tried" in first)) return first
+      console.info("[content-pipeline] research again", JSON.stringify({ job: id, dropped: first.hold.slice(0, 600) }))
+      const again = await researchStories(deps, ai, job, titles, seeds, first.tried ?? [], first.triedUrls ?? [], inFlight, limit)
+      return "hold" in again ? { hold: `${first.hold}; then: ${again.hold}`, tried: again.tried, triedUrls: again.triedUrls } : again
     }
+    let stories: Story[] | { hold: string; tried?: string[]; triedUrls?: string[] }
+    let draftCalls = calls
+    if (job.kind === "icymi") stories = icymiStory(posts, icymiWindow(deps.nowMs(), (await deps.icymiWindow?.().catch(() => null))?.lookbackDays ?? null), roundupSize())
+    else if (photoFirstOn(deps, job)) {
+      // Photo first, one saved step at a time (each check is its own step, so the run's time budget and the job's
+      // lease hold): research keeps every readable candidate, then each step checks the next one's photo.
+      const r = await photoFirstStep(deps, ai, job, calls, research, titles, seeds, inFlight)
+      if (r === "continue") { job.updatedAt = iso(deps); await deps.store.saveJob(job); await deps.store.release("job", id, true); return }
+      stories = r.stories; draftCalls = r.calls
+      job.photoFirst = undefined
+    } else stories = await research()
     if (calls.length) console.info("[content-pipeline] calls", JSON.stringify({ job: id, calls }))
     if ("hold" in stories || !stories.length) {
       // One thorough search found nothing usable: the request ends here with a "no new content" card in Review,
@@ -211,7 +221,7 @@ async function jobStep(deps: WorkerDeps, id: string, attempt: number): Promise<v
       job.drafts.push(draftId)
       // More published stories than a roundup takes: the draft waits for the requester to choose (founder, 2026-10-18).
       const choose = job.kind === "icymi" && (story.roundup?.length ?? 0) > size.max
-      const draft: McuDraft = { id: draftId, jobId: id, kind: job.kind, placement: job.placement, request: job.request, status: choose ? "choosing" : "queued", version: 1, ...(job.topic ? { direction: job.topic } : {}), ...(job.kind === "icymi" ? { choice: { min: size.min, max: size.max } } : {}), story, frames: [], media: [], designs: [], qa: [], notices: [], calls: calls.map(c => ({ ...c, at: now })), history: [{ at: now, event: `opened under ${BRAND.rulesVersion}${choose ? `; ${story.roundup!.length} stories qualify, waiting for the requester to choose ${size.min}–${size.max}` : ""}` }], createdAt: now, updatedAt: now }
+      const draft: McuDraft = { id: draftId, jobId: id, kind: job.kind, placement: job.placement, request: job.request, status: choose ? "choosing" : "queued", version: 1, ...(job.topic ? { direction: job.topic } : {}), ...(job.kind === "icymi" ? { choice: { min: size.min, max: size.max } } : {}), story, frames: [], media: [], designs: [], qa: [], notices: [], calls: draftCalls.map(c => ({ ...c, at: now })), history: [{ at: now, event: `opened under ${BRAND.rulesVersion}${choose ? `; ${story.roundup!.length} stories qualify, waiting for the requester to choose ${size.min}–${size.max}` : ""}` }], createdAt: now, updatedAt: now }
       await deps.store.createDraft(draft)
       if (choose) { await deps.store.release("draft", draftId, false); choosing.push(draft) }
     }
@@ -240,6 +250,60 @@ async function jobStep(deps: WorkerDeps, id: string, attempt: number): Promise<v
   }
 }
 
+/** Whether a job's stories are chosen photo first: deps.photoFirst, not ICYMI, and not a job whose stories bring their own photo. */
+const photoFirstOn = (deps: Pick<WorkerDeps, "photoFirst">, job: Pick<McuJob, "kind" | "skipPhotoFirst">) => !!deps.photoFirst && job.kind !== "icymi" && !job.skipPhotoFirst
+type Researched = Story[] | { hold: string; tried?: string[]; triedUrls?: string[] }
+/**
+ * Photo first for a job, one step at a time (coordinator review of #209: every check inside one research step ran past
+ * the cron's 300 s and the job's lease). The first step researches, keeping every readable candidate (count + 2), and
+ * saves them on the job. Each later step checks one candidate's photo (confirmPhoto) and saves what it found. When the
+ * job has its count, or the candidates or the checks (photoChecksFor) run out, the job opens its drafts: the kept
+ * stories, then unchecked ones once the checks are spent. When every candidate was passed over, research runs once more
+ * (as it does when every candidate's page fails), and its candidates are checked the same way.
+ */
+async function photoFirstStep(deps: WorkerDeps, ai: McuAi, job: McuJob, calls: ModelCall[], research: (limit?: number) => Promise<Researched>, titles: string[], seeds: McuSeeds | null, inFlight: { titles: string[]; urls: Set<string> }): Promise<"continue" | { stories: Researched; calls: ModelCall[] }> {
+  const limit = photoChecksFor(job.count)
+  if (!job.photoFirst) {
+    const found = await research(limit)
+    if ("hold" in found) return { stories: found, calls }
+    job.photoFirst = { pending: found, kept: [], dropped: [], left: limit, passes: 1, tried: found.map(s => s.title), triedUrls: found.map(s => s.primaryUrl), calls }
+    job.note = `Checking ${found.length} ${found.length === 1 ? "story" : "stories"} for a usable photo`
+    return "continue"
+  }
+  const pf = job.photoFirst
+  pf.calls = [...pf.calls, ...calls]
+  const story = pf.pending.shift()
+  if (story && pf.left > 0) {
+    pf.left--
+    // A check that errors (a provider down) leaves the story unchecked rather than dropping it.
+    const found = await confirmPhoto(deps, ai, story, job.kind, job.placement).catch(err => { console.error("[content-pipeline] photo first failed", story.primaryUrl, err instanceof Error ? err.message : err); return null })
+    pf.calls = [...pf.calls, ...calls.filter(c => !pf.calls.includes(c))]
+    if (found && "why" in found) pf.dropped.push(`${story.title}: ${NO_PHOTO_FIRST} (${found.why.slice(0, 300)})`)
+    else { if (found) story.photo = found.photo; pf.kept.push(story) }
+  } else if (story) pf.pending.unshift(story)
+  pf.calls = pf.calls.slice(-60)
+  if (pf.kept.length < job.count && pf.pending.length && pf.left > 0) { job.note = `Checked ${limit - pf.left} of up to ${limit} stories for a usable photo`; return "continue" }
+  // The checks are spent: stories go on unchecked, and the media step searches as before.
+  if (pf.kept.length < job.count && pf.pending.length) {
+    const unchecked = pf.pending.splice(0, job.count - pf.kept.length)
+    console.info("[content-pipeline] photo first", JSON.stringify({ job: job.id, unchecked: unchecked.map(s => s.primaryUrl), why: "the job's photo checks are spent" }))
+    pf.kept.push(...unchecked)
+  }
+  if (!pf.kept.length && pf.passes < 2) {
+    const again = await researchStories(deps, ai, job, titles, seeds, pf.tried, pf.triedUrls, inFlight, limit)
+    pf.calls = [...pf.calls, ...calls.filter(c => !pf.calls.includes(c))]
+    pf.passes = 2
+    if (!("hold" in again)) {
+      console.info("[content-pipeline] research again", JSON.stringify({ job: job.id, dropped: pf.dropped.join("; ").slice(0, 600) }))
+      pf.pending = again; pf.tried.push(...again.map(s => s.title)); pf.triedUrls.push(...again.map(s => s.primaryUrl))
+      return "continue"
+    }
+    pf.dropped.push(`then: ${again.hold}`)
+  }
+  pf.calls = pf.calls.slice(-60)
+  if (pf.kept.length) return { stories: pf.kept, calls: pf.calls }
+  return { stories: { hold: pf.dropped.join("; ").slice(0, 1000) || "no candidates found", tried: pf.tried, triedUrls: pf.triedUrls }, calls: pf.calls }
+}
 /** Midnight in America/Chicago on a calendar day, as UTC milliseconds (CDT or CST, whichever applies that day). */
 function chicagoMidnight(y: number, m: number, d: number): number {
   for (const offset of [5, 6]) {
@@ -355,12 +419,12 @@ export async function closeRoundup(store: McuStore, draftId: string, by: string,
 }
 
 /** On a hold, `tried` and `triedUrls` name the candidates that were dropped, so a second pass can avoid them. */
-async function researchStories(deps: WorkerDeps, ai: McuAi, job: Pick<McuJob, "kind" | "count" | "topic"> & Partial<Pick<McuJob, "placement" | "skipPhotoFirst">>, recentTitles: string[], seeds: McuSeeds | null, avoid: string[] = [], avoidUrls: string[] = [], inFlight: { titles: string[]; urls: Set<string> } = { titles: [], urls: new Set() }, photoChecks?: { left: number }): Promise<Story[] | { hold: string; tried?: string[]; triedUrls?: string[] }> {
+async function researchStories(deps: WorkerDeps, ai: McuAi, job: Pick<McuJob, "kind" | "count" | "topic">, recentTitles: string[], seeds: McuSeeds | null, avoid: string[] = [], avoidUrls: string[] = [], inFlight: { titles: string[]; urls: Set<string> } = { titles: [], urls: new Set() }, limit = job.count): Promise<Story[] | { hold: string; tried?: string[]; triedUrls?: string[] }> {
   const today = iso(deps).slice(0, 10)
   const r = await ai.research({ kind: job.kind, count: job.count, ...(job.topic ? { topic: job.topic } : {}), today, recentTitles, seeds, ...(avoid.length ? { avoid } : {}), ...(inFlight.titles.length ? { drafting: inFlight.titles } : {}) })
   const stories: Story[] = [], dropped: string[] = [], outlets = (seeds?.orgs ?? []).filter(o => o.kind === BRAND.seeds.outletKind).map(o => o.site)
   for (const c of r.candidates) {
-    if (stories.length >= job.count) break
+    if (stories.length >= limit) break
     // The primary page first, then other primary pages for the same subject (product page, .mil/.gov page, press
     // release), so one unreadable page doesn't drop the subject. Each miss keeps its reason for the hold note.
     if (avoidUrls.includes(c.primaryUrl)) { dropped.push(`${c.title}: already tried`); continue }
@@ -415,17 +479,6 @@ async function researchStories(deps: WorkerDeps, ai: McuAi, job: Pick<McuJob, "k
     }
     const sourceText = storySourceText(page, supporting)
     const story: Story = { title: c.title, primaryUrl: page.url, publisher: c.publisher || page.siteName || new URL(page.url).hostname, ...(publishedAt ? { publishedAt } : {}), ...(dating ?? {}), ...(fresh ? { fresh } : {}), ...(readVia.length ? { readViaSearch: readVia } : {}), ...(job.kind === "breaking" && c.whyNow ? { whyNow: c.whyNow } : {}), sourceTitle: page.title || c.title, sourceText, ...(supporting.length ? { supporting: supporting.map(sp => ({ url: sp.url, title: sp.title || sp.url })) } : {}) }
-    // Photo first: a story whose subject has no usable, licensed photo is passed over for the next candidate, before
-    // anything is written. The checks are bounded per job; once spent, a story goes on unchecked and the media step
-    // searches as before. A check that errors (a provider down) leaves the story unchecked too, rather than dropping it.
-    if (photoChecks && deps.photoFirst && job.kind !== "icymi" && !job.skipPhotoFirst) {
-      if (photoChecks.left > 0) {
-        photoChecks.left--
-        const found = await confirmPhoto(deps, ai, story, job.kind, job.placement ?? "feed").catch(err => { console.error("[content-pipeline] photo first failed", story.primaryUrl, err instanceof Error ? err.message : err); return null })
-        if (found && "why" in found) { dropped.push(`${c.title}: ${NO_PHOTO_FIRST} (${found.why.slice(0, 300)})`); continue }
-        if (found) story.photo = found.photo
-      } else console.info("[content-pipeline] photo first", JSON.stringify({ story: story.primaryUrl, unchecked: "the job's photo checks are spent" }))
-    }
     stories.push(story)
   }
   // The model's note is chatter about how it chose ("Candidates selected based on relevance…", round 2) unless it is
@@ -534,7 +587,7 @@ async function draftStep(deps: WorkerDeps, id: string, attempt: number): Promise
   const ai = deps.ai(c => { d.calls = [...(d.calls ?? []), { ...c, at: iso(deps) }].slice(-40) })
   try {
     switch (d.status) {
-      case "queued": case "writing": await writeStep(deps, ai, d); break
+      case "queued": case "writing": if (d.replacing) await replaceStep(deps, ai, d); else await writeStep(deps, ai, d); break
       case "media": await mediaStep(deps, ai, d); break
       case "designing": await designStep(deps, d); break
       case "reviewing": await reviewStep(deps, ai, d); break
@@ -1100,6 +1153,21 @@ function chosenMedia(c: MediaCandidate, ranked: RankedPhoto, crop: CropBox, fres
   return { url: c.url, pageUrl: c.pageUrl, title: c.title, license: c.license, creator: c.creator, credit: c.credit, usGovernment: c.usGovernment, ...(c.date ? { date: c.date } : {}), ...(c.rightsNote ? { rightsNote: c.rightsNote } : {}), ...(c.rightsNote || rep || fresh ? { note: [c.rightsNote, rep, fresh].filter(Boolean).join(". ") } : {}), crop, subject: { box: ranked.box, ...(ranked.core ? { core: ranked.core } : {}), context: ranked.context !== false, width: c.width, height: c.height } }
 }
 
+/** Words that name a kind of thing, not a subject: a card that shares only these with the checked subject isn't the same subject. */
+const KIND_WORDS = new Set(["interceptor", "interceptors", "drone", "drones", "missile", "missiles", "rotorcraft", "vehicle", "vehicles", "aircraft", "uas", "suas", "usv", "usvs", "uav", "helmet", "gun", "radar", "counter", "platform", "launcher", "rocket", "satellite", "vessel", "ship", "boat", "robot", "software", "network", "kit", "pod", "jet", "loan", "award", "order", "base", "industrial", "submarine", "autonomous", "unmanned", "uncrewed", "attack", "air", "sea", "land", "space", "defense", "system", "systems"])
+/**
+ * Whether the card's written subject is the subject photo first confirmed a photo for: the card's fields (DT101's
+ * "COYOTE / RAYTHEON", a News headline and deck) carry one of its designations (PAC-3, X10D) or one of its distinctive
+ * name words (Coyote, Lightfish), the maker's and kind words aside. With nothing distinctive to compare, it matches.
+ */
+export function subjectMatches(checked: string, frame: FrameCopy): boolean {
+  const written = Object.entries(frame.fields).filter(([k]) => !["date", "source", "image_context", "counter"].includes(k)).map(([, v]) => v).join(" ").toLowerCase()
+  const maker = (frame.fields.subject_identifier ?? "").split("/")[1]?.toLowerCase() ?? ""
+  const tokens = [...new Set(checked.toLowerCase().match(/[a-z0-9][a-z0-9.\-+]*[a-z0-9+]|[a-z0-9]/g) ?? [])]
+  const distinct = tokens.filter(t => /\d/.test(t) ? /[a-z]/.test(t) : t.length >= 3 && !COMMON.has(t) && !KIND_WORDS.has(t) && !maker.includes(t))
+  if (!distinct.length) return true
+  return distinct.some(t => new RegExp(`(^|[^a-z0-9])${t.replace(/[.*+?^${}()|[\]\\-]/g, "\\$&")}([^a-z0-9]|$)`).test(written))
+}
 /** How a story passed over by photo first is described in research's drop list (and the no-content card). */
 export const NO_PHOTO_FIRST = "no relevant, licensed photo of the subject was found before writing, so the next story was tried"
 /** Photo checks per job (photo first): one for each candidate a research pass returns (count + 2). */
@@ -1140,9 +1208,12 @@ async function mediaStep(deps: WorkerDeps, ai: McuAi, d: McuDraft): Promise<void
     const story = frameStory(d, frame), representative = allowsRepresentative(frame)
     const avoid = [...used, ...(d.avoidMedia ?? [])]
     // Photo first: the photo research confirmed goes on the story's card, unless it must be avoided (another draft of
-    // the job uses it, or the artwork check turned it down); then the search runs as before.
+    // the job uses it, or the artwork check turned it down) or the card names another subject than the one it was
+    // confirmed for (coordinator review of #209); then the search runs as before.
     const pre = i === 0 && frame.series !== "icymi_cover" ? d.story.photo : undefined
-    if (pre && pre.placement === d.placement && !avoid.includes(pre.candidate.pageUrl) && !avoid.includes(pre.candidate.url)) {
+    const sameAsChecked = !!pre && subjectMatches(pre.subject, frame)
+    if (pre && !sameAsChecked) console.info("[content-pipeline] media", JSON.stringify({ draft: d.id, v: d.version, frame: i + 1, pass: "photo first", skipped: `the card's subject is not the one the photo was confirmed for (${pre.subject})` }))
+    if (pre && sameAsChecked && pre.placement === d.placement && !avoid.includes(pre.candidate.pageUrl) && !avoid.includes(pre.candidate.url)) {
       console.info("[content-pipeline] media", JSON.stringify({ draft: d.id, v: d.version, frame: i + 1, retry: d.mediaRetries ?? 0, pass: "photo first", chosen: pre.candidate.pageUrl, crop: pre.crop }))
       media[i] = chosenMedia(pre.candidate, pre.ranked, pre.crop)
       used.add(pre.candidate.pageUrl)
@@ -1346,11 +1417,22 @@ async function sourceHold(deps: WorkerDeps, ai: McuAi, d: McuDraft, reason: stri
   d.autoReplaced = (d.autoReplaced ?? 0) + 1
   const rejected = [...new Set([d.story.title, ...(d.rejected ?? [])])]
   const inFlight = await storiesInFlight(deps, d.id)
-  // The replacement is chosen photo first too, with its own bound (a replacement research pass is one story's).
-  const found = await researchStories(deps, ai, { ...job, count: 1 }, (await deps.content.recentPosts()).map(x => x.title), await deps.seeds(), rejected, [d.story.primaryUrl], inFlight, { left: photoChecksFor(1) })
+  // Photo first: the replacement's candidates (one story's worth) are kept and checked one per step (replaceStep).
+  const photo = photoFirstOn(deps, job)
+  const found = await researchStories(deps, ai, { ...job, count: 1 }, (await deps.content.recentPosts()).map(x => x.title), await deps.seeds(), rejected, [d.story.primaryUrl], inFlight, photo ? photoChecksFor(1) : 1)
   if ("hold" in found || !found.length) return hold(deps, d, `${reason} No replacement subject qualified: ${"hold" in found ? found.hold : "none found"}`)
+  if (photo) {
+    d.replacing = { pending: found, left: photoChecksFor(1), reason, dropped: [], rejected }
+    d.status = "writing"
+    return save(deps, d, `"${d.story.title}" couldn't be sourced (${reason.replace(/\.$/, "")}); checking ${found.length} replacement ${found.length === 1 ? "story" : "stories"} for a usable photo first`)
+  }
+  await switchStory(deps, d, found[0], rejected, reason)
+  return writeStep(deps, ai, d)
+}
+/** The draft takes a replacement subject, starting again at writing. */
+async function switchStory(deps: WorkerDeps, d: McuDraft, story: Story, rejected: string[], reason: string): Promise<void> {
   const was = d.story.title
-  d.rejected = rejected; d.story = found[0]
+  d.rejected = rejected; d.story = story
   // A new subject starts its photo search afresh; its designs get their own Canva request ids (":r<n>"), since a
   // photo hold can come after the first subject's design was created.
   d.frames = []; d.caption = undefined; d.copyNotes = undefined; d.media = []; d.designs = []; d.qa = []; d.holdReason = undefined; d.mediaRetries = undefined; d.avoidMedia = undefined; d.labelRefit = undefined
@@ -1358,7 +1440,28 @@ async function sourceHold(deps: WorkerDeps, ai: McuAi, d: McuDraft, reason: stri
   // photo step on nothing (gate round 3).
   d.status = "writing"
   await save(deps, d, `"${was}" couldn't be sourced (${reason.replace(/\.$/, "")}); switched to ${d.story.title}`)
-  return writeStep(deps, ai, d)
+}
+/**
+ * Photo first for a replacement subject, one check per step (coordinator review of #209): the next candidate's photo
+ * is checked; the first with one becomes the draft's subject, and writing follows in the next step. Once the checks
+ * are spent the next candidate goes on unchecked; when none is left, the draft holds with every reason.
+ */
+async function replaceStep(deps: WorkerDeps, ai: McuAi, d: McuDraft): Promise<void> {
+  const r = d.replacing!
+  const next = r.pending.shift()
+  if (next && r.left > 0) {
+    r.left--
+    const found = await confirmPhoto(deps, ai, next, d.kind, d.placement).catch(err => { console.error("[content-pipeline] photo first failed", next.primaryUrl, err instanceof Error ? err.message : err); return null })
+    if (!found || !("why" in found)) {
+      if (found) next.photo = found.photo
+      d.replacing = undefined
+      return switchStory(deps, d, next, r.rejected, r.reason)
+    }
+    r.dropped.push(`${next.title}: ${NO_PHOTO_FIRST} (${found.why.slice(0, 300)})`)
+    if (r.pending.length) return save(deps, d, `replacement "${next.title}" has no usable photo; checking the next`)
+  } else if (next) { d.replacing = undefined; return switchStory(deps, d, next, r.rejected, r.reason) }
+  d.replacing = undefined
+  return hold(deps, d, `${r.reason} No replacement subject qualified: ${r.dropped.join("; ").slice(0, 1200) || "none found"}`)
 }
 
 export type { Placement }

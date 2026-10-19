@@ -1516,22 +1516,29 @@ test("v9 (b), review 2: a paraphrase that ends a line on a whole word is not a c
 
 // ── plan v10, Phase 1 direction 6: the DVIDS API and photo first ──
 import { dvidsCandidate, searchDvids, DVIDS_RENDITION } from "../content-pipeline/sources"
-import { confirmPhoto, dvidsQueries, photoChecksFor, NO_PHOTO_FIRST } from "../content-pipeline/worker"
+import { confirmPhoto, dvidsQueries, photoChecksFor, subjectMatches, NO_PHOTO_FIRST } from "../content-pipeline/worker"
 
 const DVIDS_ASSET = { id: "image:9500068", title: "Coyote launch at Yuma", description: "A Coyote interceptor launches during a test at Yuma Proving Ground, Ariz., Jan. 29, 2026. (U.S. Army photo by Mark Schauer)", date: "2026-01-29T00:00:00-05:00", url: "https://www.dvidshub.net/image/9500068/coyote-launch-yuma", thumbnail: "https://d1ldvf68ux039x.cloudfront.net/thumbs/photos/2601/9500068/2000w_q95.jpg", unit_name: "U.S. Army Yuma Proving Ground", credit: [{ name: "Mark Schauer", rank: "" }] }
 
-test("DVIDS API: an asset is a public-domain candidate credited as its page credits it, unless DVIDS marks it otherwise", () => {
+test("DVIDS API: only an asset with a U.S. government credit line, and nothing saying otherwise, is offered, as public domain with that credit", () => {
   const c = dvidsCandidate(DVIDS_ASSET)!
   assert.equal(c.origin, "dvids"); assert.equal(c.pageUrl, DVIDS_ASSET.url); assert.equal(c.url, DVIDS_ASSET.thumbnail)
   assert.equal(c.license, "Public domain (U.S. government work)"); assert.equal(c.usGovernment, true)
   assert.equal(c.credit, "U.S. Army photo by Mark Schauer"); assert.equal(c.date, "2026-01-29"); assert.equal(c.rightsNote, undefined)
-  // No credit line in the description: the credited person and unit.
-  assert.equal(dvidsCandidate({ ...DVIDS_ASSET, description: "A Coyote launch.", credit: [{ name: "Fred Brown", rank: "SSG" }] })!.credit, "SSG Fred Brown, U.S. Army Yuma Proving Ground")
-  // Courtesy, by its credit or its description, and a copyright notice: for the reviewer to confirm.
-  for (const a of [{ ...DVIDS_ASSET, credit: "Courtesy" }, { ...DVIDS_ASSET, description: "A Coyote launch. (Photo courtesy of Raytheon)" }, { ...DVIDS_ASSET, description: "A Coyote launch. © 2026 Raytheon" }]) {
-    const x = dvidsCandidate(a)!
-    assert.equal(x.usGovernment, false); assert.equal(x.license, "Courtesy photo"); assert.match(x.rightsNote!, /not a public-domain government work/)
-  }
+  assert.equal(dvidsCandidate({ ...DVIDS_ASSET, description: "Sailors stand watch. (U.S. Navy photo by Mass Communication Specialist 2nd Class B)" })!.credit, "U.S. Navy photo by Mass Communication Specialist 2nd Class B")
+  // Coordinator review of #209: none of these is plainly a federal work, so none is offered.
+  for (const description of [
+    "A Coyote launch. Photo courtesy of Raytheon",
+    "A PAC-3 interceptor in flight. (Lockheed Martin photo)",
+    "A PAC-3 interceptor in flight. (Photo by Lockheed Martin)",
+    "HMS Prince of Wales at sea. (Royal Navy photo)",
+    "Soldiers on a range. (Australian Defence Force photo by Cpl. C)",
+    "A Coyote launch. (U.S. Army photo by Mark Schauer) © 2026 Raytheon",
+    "A Coyote launch.",
+  ]) assert.equal(dvidsCandidate({ ...DVIDS_ASSET, description }), null, description)
+  assert.equal(dvidsCandidate({ ...DVIDS_ASSET, credit: "Courtesy" }), null)
+  // A foreign force named beside a U.S. credit line is still a U.S. work.
+  assert.ok(dvidsCandidate({ ...DVIDS_ASSET, description: "U.S. Marines train with Royal Navy sailors. (U.S. Marine Corps photo by Lance Cpl. D)" }))
   // Only a DVIDS image page with its photo on DVIDS's own image hosts.
   assert.equal(dvidsCandidate({ ...DVIDS_ASSET, thumbnail: "https://cdn.example.com/a.jpg" }), null)
   assert.equal(dvidsCandidate({ ...DVIDS_ASSET, url: "https://www.dvidshub.net/video/1/x" }), null)
@@ -1660,4 +1667,67 @@ test("confirmPhoto names the subject from the story, falling back to its title a
   const story = { title: "Coyote Block 2: three tests", primaryUrl: "https://www.rtx.com/news/1", publisher: "RTX", sourceTitle: "t", sourceText: ARMY_TEXT }
   const r = await confirmPhoto(w.deps, ai, story, "dt101", "feed")
   assert.ok("photo" in r); assert.equal(subject, "Coyote Block 2 / RTX")
+})
+
+test("photo first runs one check per step and saves between them, so a run that stops resumes where it left off", async () => {
+  const picks: string[] = []
+  const w = world({ ai: {
+    research: async () => ({ candidates: [1, 2, 3].map(i => ({ title: `Story ${i}`, primaryUrl: `https://www.army.mil/article/${i}`, publisher: "U.S. Army", why: "news" })) }),
+    photoSubject: async () => ({ subject: "C2 software", maker: "U.S. Army", query: "Army C2" }),
+    pickMedia: async ({ story }) => { picks.push(story.title); return story.title === "Story 3" ? { index: 0, reason: "the subject", ranked: [{ index: 0, box: HERO }] } : { index: null, reason: "only unrelated images" } },
+  } })
+  w.deps.photoFirst = true
+  const saved: (McuJob["photoFirst"] | undefined)[] = []
+  const save = w.store.saveJob.bind(w.store)
+  w.store.saveJob = async j => { saved.push(structuredClone(j.photoFirst)); return save(j) }
+  // The run stops after two steps (research, then one check), as a cron run killed at its time limit would.
+  let claims = 0
+  const claim = w.store.claim.bind(w.store)
+  w.store.claim = async (...a: Parameters<MemStore["claim"]>) => ++claims > 2 ? 0 : claim(...a)
+  await w.start({ kind: "news" })
+  const mid = (await w.store.getJob("job-news-1"))!
+  assert.equal(mid.status, "researching"); assert.equal(mid.photoFirst?.left, 2); assert.equal(mid.photoFirst?.pending.length, 2); assert.equal(mid.photoFirst?.dropped.length, 1)
+  assert.deepEqual(picks, ["Story 1"]); assert.equal(w.store.drafts.size, 0)
+  // The next run picks it up: the remaining checks, one per step, and no check repeated.
+  w.store.claim = claim
+  await runDue(w.deps, 1e9)
+  assert.deepEqual(picks, ["Story 1", "Story 2", "Story 3"])
+  const d = onlyDraft(w)
+  assert.equal(d.story.title, "Story 3"); assert.ok(d.story.photo); assert.equal(d.status, "in_review")
+  assert.equal((await w.store.getJob("job-news-1"))!.photoFirst, undefined, "cleared once the drafts open")
+  assert.deepEqual(saved.filter(Boolean).map(p => p!.left), [3, 2, 1], "saved after research and after every check")
+})
+
+test("photo first for a replacement subject: one check per step, then writing", async () => {
+  let picks = 0
+  const w = world({ ai: {
+    research: async ({ avoid }) => ({ candidates: avoid?.length ? [{ title: "Replacement A", primaryUrl: "https://www.army.mil/article/a", publisher: "U.S. Army", why: "news" }, { title: "Replacement B", primaryUrl: "https://www.army.mil/article/b", publisher: "U.S. Army", why: "news" }] : [{ title: "First story", primaryUrl: "https://www.army.mil/article/1", publisher: "U.S. Army", why: "news" }] }),
+    write: async ({ story, kind }) => story.title === "First story" ? { frames: [], caption: "", hold: "the source can't support the post" } : { frames: [{ series: kind as SeriesKey, fields: { headline: "Army backs 9 C2 software vendors", deck: "Awards worth $93.6 million fund I Corps command software.", source: "ARMY.MIL" }, mediaQuery: "Army command post" }], caption: "The Army awarded $93.6 million to nine companies for command and control software.\n\nSource: U.S. Army, 2026-10-15" },
+    photoSubject: async () => ({ subject: "C2 software", maker: "U.S. Army", query: "Army C2" }),
+    pickMedia: async ({ story }) => { picks++; return story.title === "Replacement A" ? { index: null, reason: "only unrelated images" } : { index: 0, reason: "the subject", ranked: [{ index: 0, box: HERO }] } },
+  } })
+  w.deps.photoFirst = true
+  await w.start({ kind: "news" })
+  const d = onlyDraft(w)
+  assert.equal(d.story.title, "Replacement B"); assert.ok(d.story.photo); assert.equal(d.status, "in_review"); assert.equal(d.replacing, undefined)
+  assert.ok(d.history.some(h => /checking 2 replacement stories for a usable photo first/.test(h.event)))
+  assert.ok(d.history.some(h => /replacement "Replacement A" has no usable photo; checking the next/.test(h.event)))
+  assert.equal(picks, 3, "first story, then A and B: B's confirmed photo goes on the card without another pick")
+})
+
+test("photo first: the confirmed photo is placed only when the card names the subject it was confirmed for", async () => {
+  const picks: string[] = []
+  const w = world({ ai: {
+    photoSubject: async () => ({ subject: "Lightfish USV", maker: "Seasats", query: "Lightfish" }),
+    pickMedia: async ({ frame }) => { picks.push(frame.fields.subject_identifier); return { index: 0, reason: "ok", ranked: [{ index: 0, box: HERO }] } },
+  } })
+  w.deps.photoFirst = true
+  await w.start({ kind: "dt101" }) // the writer's card names "Next-gen C2 / Lockheed Martin"
+  const d = onlyDraft(w)
+  assert.equal(d.story.photo?.subject, "Lightfish USV")
+  assert.deepEqual(picks, ["Lightfish USV / Seasats", "NEXT-GEN C2 / LOCKHEED MARTIN"], "a second pick for the subject the card names")
+  assert.equal(d.status, "in_review")
+  assert.equal(subjectMatches("Raytheon Coyote Block 2 interceptor", { series: "dt101" as SeriesKey, fields: { subject_identifier: "COYOTE / RAYTHEON" } }), true)
+  assert.equal(subjectMatches("PAC-3 Edge", { series: "news" as SeriesKey, fields: { headline: "LOCKHEED DEBUTS PAC-3 EDGE", deck: "x" } }), true)
+  assert.equal(subjectMatches("Raytheon Coyote interceptor", { series: "dt101" as SeriesKey, fields: { subject_identifier: "LIGHTFISH / SEASATS" } }), false)
 })

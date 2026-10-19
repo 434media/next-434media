@@ -338,32 +338,35 @@ export interface DvidsAsset {
   dimensions?: { width?: string | number; height?: string | number }
 }
 /**
- * A DVIDS asset as a photo candidate, with the rights read as a DVIDS page's are (pageImageCandidate): DVIDS media is
- * produced by the DoD or a federal agency and public domain "unless other copyright status is indicated" (DVIDS's
- * copyright terms), so a courtesy or copyright notice in its description, or a credit of "Courtesy", makes it a
- * courtesy photo for the reviewer to confirm. The credit is the "(U.S. Army photo by …)" line from the description,
- * as on a DVIDS page; without one, the credited person and unit. The photo is the asset's rendition at `width` px,
- * never wider than the original (no upscaling), from DVIDS's own image host.
+ * A DVIDS asset as a photo candidate, only when it is plainly a U.S. government work (coordinator review of #209):
+ * its description carries the "(U.S. Army photo by …)" credit line, and nothing on it says otherwise, no courtesy or
+ * "provided by" notice, no copyright notice, no credit of "Courtesy", no foreign forces' credit. DVIDS's own terms make
+ * its media public domain only "unless other copyright status is indicated", and a contractor's or an ally's photo on
+ * DVIDS is not a federal work, so anything short of that is not offered: its rights could not be read from the record.
+ * The credit is that line, as on a DVIDS page. The photo is the asset's rendition at no more than the original's width
+ * (no upscaling), from DVIDS's own image host.
  */
 export function dvidsCandidate(a: DvidsAsset): MediaCandidate | null {
   const thumb = typeof a.thumbnail === "string" ? a.thumbnail : a.thumbnail?.url
   if (!a.url || !isDvidsImagePage(a.url) || !thumb || !/^https:\/\//.test(thumb) || !GOV_MEDIA_HOSTS.includes(new URL(thumb).hostname.toLowerCase())) return null
-  const description = strip(a.description), people = Array.isArray(a.credit) ? a.credit.map(c => strip(`${c.rank ?? ""} ${c.name ?? ""}`)).filter(Boolean) : []
-  const courtesy = /\((?:[^)]*?)courtesy(?: of)? ([^)]{2,80})\)/i.exec(description)?.[1] ?? (typeof a.credit === "string" && /courtesy/i.test(a.credit) ? a.unit_name || "the provider" : undefined)
-  const copyright = /©|\(c\)\s*(19|20)\d{2}|\bcopyright(ed)?\s+(\(c\)|(19|20)\d{2}|by\b)|all rights reserved/i.test(description)
-  const gov = !courtesy && !copyright
-  const govCredit = /\(((?:U\.S\.|US) [A-Za-z .]+? (?:photo|illustration|graphic)(?: by [^)]{2,80})?)\)/.exec(description)?.[1]
-  const creator = (gov ? govCredit : courtesy) ?? ([people.join(", "), strip(a.unit_name)].filter(Boolean).join(", ") || "DVIDS")
+  const description = strip(a.description), credit = typeof a.credit === "string" ? a.credit : (a.credit ?? []).map(c => `${c.rank ?? ""} ${c.name ?? ""}`).join(" ")
+  const govCredit = DVIDS_GOV_CREDIT.exec(description)?.[1]
+  if (!govCredit || DVIDS_NOT_FEDERAL.test(`${description} ${credit}`)) return null
   const date = /^\d{4}-\d{2}-\d{2}/.exec(a.date ?? "")?.[0]
   return {
     origin: "dvids", url: thumb, thumbUrl: thumb, pageUrl: a.url, title: strip(a.title).slice(0, 200) || "DVIDS image", description: description.slice(0, 400),
-    width: 0, height: 0, creator: creator.slice(0, 200),
-    license: gov ? "Public domain (U.S. government work)" : "Courtesy photo",
-    credit: gov ? creator.slice(0, 200) : `${creator.slice(0, 160)} (courtesy)`, usGovernment: gov,
+    width: 0, height: 0, creator: govCredit.slice(0, 200), license: "Public domain (U.S. government work)", credit: govCredit.slice(0, 200), usGovernment: true,
     ...(date ? { date } : {}),
-    ...(gov ? {} : { rightsNote: `DVIDS marks this photo ${courtesy ? `courtesy of ${courtesy}` : "with a copyright notice"}, so it is not a public-domain government work: confirm its terms allow editorial use before approving` }),
   }
 }
+/** The U.S. government credit line in a DVIDS description: "(U.S. Army photo by Sgt. A)", "(U.S. Air Force graphic)". */
+const DVIDS_GOV_CREDIT = /\(((?:U\.S\.|US) (?:Army|Navy|Air Force|Marine Corps|Space Force|Coast Guard|Army National Guard|Air National Guard|National Guard|Army Reserve|Navy Reserve|Air Force Reserve|Marine Corps Reserve|Department of (?:Defense|War)|Defense Department)[A-Za-z .-]{0,60}? (?:photo|illustration|graphic|image)(?: by [^)]{2,80})?)\)/
+/**
+ * Anything that says a photo isn't a federal work: courtesy, "provided by", a copyright notice, or a foreign forces'
+ * photo credit ("Royal Navy photo", "(Australian Defence Force photo by …)"). A foreign force merely named in the
+ * description, beside a U.S. credit line, is not one.
+ */
+const DVIDS_NOT_FEDERAL = /\bcourtesy\b|\bprovided by\b|\bused with permission\b|©|\(c\)\s*(19|20)\d{2}|\bcopyright(ed)?\b|all rights reserved|\b(Royal|British|Australian|Canadian|German|French|Italian|Polish|Japan(ese)?|Korean|Ukrainian|Israeli|NATO|Bundeswehr|Philippine|Taiwan(ese)?|Dutch|Norwegian|Spanish)\b[A-Za-z .-]{0,40}\b(photo|image|graphic|illustration)\b/i
 /** The rendition width asked of DVIDS: its largest thumbnail (2000 px), or the original's width when smaller. */
 export const DVIDS_RENDITION = 2000
 /**
