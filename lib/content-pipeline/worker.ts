@@ -952,11 +952,23 @@ export function copyProblems(frames: FrameCopy[], caption: string, story: Story)
   const checks = BRAND.checks
   if (checks?.headline) style.push(...headlineProblems(frames, checks.headline))
   if (checks?.originality) safety.push(...originalityProblems(frames, caption, story, checks.originality, [...(checks.headline?.fields ?? []), ...(checks.headline?.hookFields ?? [])]))
+  const filled = placeholderLines(body)
+  if (filled.length) safety.push(`the caption fills lines the source doesn't support (${filled.slice(0, 3).map(l => `"${l}"`).join(", ")}): leave each such line out entirely`)
   const clipped = [...new Set(frames.flatMap(f => clippedWords(f.fields, story.sourceText)))]
   if (clipped.length) safety.push(`abbreviated words on the card (${clipped.join(", ")}); use whole words, and shorter ones if it must fit`)
   const cut = [...new Set(frames.flatMap(f => cutOffWords(f.fields, story.sourceText)))].filter(w => !clipped.includes(w))
   if (cut.length) safety.push(`cut-off words on the card (${cut.join(", ")}): a line ends in part of a word; use whole words, and shorter ones if it must fit`)
   return { safety, style }
+}
+/**
+ * Caption lines that fill in what the source doesn't state rather than leave the line out (replay, 2026-10-19: a
+ * mission brief with "📍Location not stated in source" and "Private company → Backers: not stated in source"). Only a
+ * short line that ends in such a placeholder, or says the source doesn't state it, counts: "The award's value was not
+ * disclosed by the Army in its release" in a paragraph is a sourced fact, not a placeholder.
+ */
+export function placeholderLines(caption: string): string[] {
+  const ends = /(?:^|[\s:→—-])(?:not (?:stated|disclosed|specified|given|provided|available|confirmed|known)(?: (?:in|by) (?:the )?(?:source|facts|page))?|unknown|n\/a|tbd|none stated)\.?$/i
+  return caption.split("\n").map(l => l.trim()).filter(l => l && (/not stated (?:in|by) (?:the )?(?:source|facts|page)/i.test(l) || l.length <= 80 && ends.test(l)))
 }
 /** Every problem, safety first: what a rewrite is asked to fix. */
 function validate(frames: FrameCopy[], caption: string, story: Story): string[] {

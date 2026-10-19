@@ -139,7 +139,7 @@ export function brandDirection(seeds: McuSeeds | null | undefined): string {
  * the facts don't support is left out, never filled in (replay, 2026-10-19: mission briefs added "📍San Mateo, CA" and
  * "Private company", which no source stated, because the brief's format lists those lines).
  */
-export const FACTS_RULE = "Write only from the FACTS: every statement on the card and in the caption must be one of them, in your own words. A line, label or detail that no fact states is left out entirely, never filled in from what you know or infer: no place, headquarters, ownership, investors, ticker, status or date that the facts don't state, even where the format lists that line. A required field that no fact can fill is a reason to hold, never to guess."
+export const FACTS_RULE = "Write only from the FACTS: every statement on the card and in the caption must be one of them, in your own words. A line, label or detail that no fact states is left out entirely, never filled in from what you know or infer: no place, headquarters, ownership, investors, ticker, status or date that the facts don't state, even where the format lists that line. Never write a line saying something is not stated, unknown or not disclosed: leave the line out. A line left out is never a reason to hold; hold only when the facts can't support the post itself."
 export function factsBrief(facts: readonly SourcedFact[]): string {
   return `FACTS (each with the source sentence it came from; these are the only facts you may use):\n${facts.map((f, i) => `${i + 1}. ${f.fact}\n   Source: "${f.quote}"`).join("\n")}`
 }

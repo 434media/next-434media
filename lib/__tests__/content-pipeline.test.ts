@@ -20,7 +20,7 @@ import { PIPELINE_PROPERTIES, PROPERTY_TEMPLATES, contentPropertyOf, propertyCan
 import { BRANDS, CONTENT_PROPERTIES } from "../../components/crm/types"
 import { candidateFields, cutOffWords } from "../content-pipeline/series"
 import { candidateProblems, copyProblems, MAX_CANDIDATE_BATCHES } from "../content-pipeline/worker"
-import { sourcedFacts, MIN_FACTS } from "../content-pipeline/worker"
+import { sourcedFacts, MIN_FACTS, placeholderLines } from "../content-pipeline/worker"
 import { factsBrief, FACTS_RULE } from "../content-pipeline/model"
 
 // ── in-memory store with the Firestore store's lease semantics ──
@@ -1807,4 +1807,15 @@ test("fact extraction: a roundup extracts nothing, and a replacement story extra
 test("a writer's \"Not held for …\" is no hold", () => {
   assert.equal(meaningful("Not held for a single reason to hold; submitted as News with the source's figures."), undefined)
   assert.equal(meaningful("None of the figures can be verified."), "None of the figures can be verified.")
+})
+
+test("a caption line that fills in what the source doesn't state is a safety problem, so the rewrite leaves it out", () => {
+  const brief = "MISSION BRIEF // EAGLEEYE\n\n//Anduril Industries\n\n📍Location not stated in source\n\nTech: AI vision\n\nPrivate company → Backers: not stated in source\n\nTraction: Not stated in source.\n\nTicker: N/A\n\nSource: Anduril Industries, page undated"
+  assert.deepEqual(placeholderLines(brief), ["📍Location not stated in source", "Private company → Backers: not stated in source", "Traction: Not stated in source.", "Ticker: N/A"])
+  // A sourced sentence about what wasn't disclosed is a fact, not a placeholder; nor is a word like "unknown" mid-line.
+  assert.deepEqual(placeholderLines("The Army did not disclose the award's value, and the delivery date was not disclosed by the service in its release.\n\nGoal: Find unknown drones at sea."), [])
+  assert.deepEqual(placeholderLines(BRIEF), [])
+  const story = { title: "EagleEye", sourceTitle: "EagleEye", publisher: "Anduril", primaryUrl: "https://www.anduril.com/eagleeye", sourceText: "EagleEye gives operators AI vision. Anduril Industries builds EagleEye." }
+  const p = copyProblems([{ series: "dt101" as SeriesKey, fields: { benefit_headline: "SEE THREATS\nSOONER", subject_identifier: "EAGLEEYE / ANDURIL" } }], brief, story as never)
+  assert.ok(p.safety.some(x => /^the caption fills lines the source doesn't support \("📍Location not stated in source", .*leave each such line out entirely$/.test(x)))
 })
