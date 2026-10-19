@@ -298,7 +298,7 @@ export function SocialCalendarView({ contentPosts, onOpenPost, onAddPost, onMove
   const [viewMode, setViewMode] = useState<CalendarViewMode>("month")
   const [hoveredDay, setHoveredDay] = useState<string | null>(null)
   const [selectedUsers, setSelectedUsers] = useState<Set<string>>(new Set())
-  // Brand slicer (post.platform is the Property dropdown, typed ContentProperty | "").
+  // Brand slicer (post.platform is the Brand dropdown, typed ContentProperty | "").
   const [selectedBrands, setSelectedBrands] = useState<Set<string>>(new Set())
   // Social-platform slicer (post.social_platforms: IG / TikTok / …).
   const [selectedSocials, setSelectedSocials] = useState<Set<string>>(new Set())
@@ -651,7 +651,7 @@ export function SocialCalendarView({ contentPosts, onOpenPost, onAddPost, onMove
               </div>
               <div className="p-3 space-y-4 max-h-[60vh] overflow-y-auto">
                 <FilterSection title="User" options={userOptions} selectedValues={selectedUsers} onToggle={toggleUser} />
-                <FilterSection title="Property" options={brandOptions} selectedValues={selectedBrands} onToggle={toggleBrand} />
+                <FilterSection title="Brand" options={brandOptions} selectedValues={selectedBrands} onToggle={toggleBrand} />
                 <FilterSection title="Platform" options={socialOptions} selectedValues={selectedSocials} onToggle={toggleSocial} />
               </div>
             </div>

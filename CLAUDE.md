@@ -107,22 +107,29 @@ Any new outbound surface must gate on it rather than re-listing countries.
 hand-tagging in the Mailchimp UI shows up as drift. Never invent a tag string
 outside that module.
 
-**"Properties" — and still "platforms" — means the CRM brand roster.** TXMX
-Boxing, VemosVamos, MilCityUSA, DEVSA, Digital Canvas. The admin UI says
-**Property** ("Property Goals", "Property fit", "All properties"); the code
-still says `brand` and `platform` — field names, the `Brand` type, `BRANDS`,
+**"Brands" (formerly "Properties") — and still "platforms" — means the CRM brand
+roster.** TXMX Boxing, VemosVamos, MilCityUSA, DEVSA, Digital Canvas. The admin
+UI now says **Brand** ("Brand Goals", "Brand fit", "All brands"; founder,
+2026-10-19). It said "Property" before. The code still says `brand`,
+`platform` and, in places, `property` — field names, the `Brand` type,
+`BRANDS`, `ContentProperty`, `CONTENT_PROPERTIES`, `PIPELINE_PROPERTIES`,
 `PLATFORM_OPTIONS`, the `brand-goals` tab key. That mismatch is deliberate:
 renaming identifiers would break stored Firestore values for no user benefit.
-So expect either word in a request, and never rename the identifiers to match.
+So expect any of these words in a request, and never rename the identifiers to
+match the display word.
 
-It was renamed away from "platforms" because that collided with **"Platforms
-for Brands"**, which in Section 4.3 is a commercial model for *client* work —
-close to the opposite of 434-owned IP.
+"Brand" is one word for any brand the admin and content engine serve, 434-owned
+or client (founder, 2026-10-19): the Brands area, brand page, brand profile and
+onboarding SOP cover both, so nobody has to remember two names for the same
+thing. Today's CRM roster above holds 434's own brands; client brands join
+through the same Brands area. **"Platforms for Brands"** and **"Productions for
+Brands"** (master Section 4.3) are names of commercial engagement models, not a
+second meaning of brand — don't use them as labels for a brand.
 
 **Not to be confused with a GA4 property.** `propertyId` and `?property=` in
 `analytics-web` and `analytics-portfolio` are Google Analytics properties, an
 unrelated sense of the word. `components/analytics/BrandPeekDrawerWeb.tsx`
-already renders "Property" in that sense.
+already renders "Property" in that sense, and that stays.
 
 This roster is the internal taxonomy, not public display text, and is
 intentionally separate from the master's Section 4 names.

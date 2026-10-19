@@ -181,7 +181,7 @@ export function ContentGenerate({ onDraftsReady }: { onDraftsReady?: () => void 
 
           <div className="space-y-3">
             <div className="space-y-1">
-              <label className="text-xs font-medium text-neutral-700" htmlFor="gen-property">Property</label>
+              <label className="text-xs font-medium text-neutral-700" htmlFor="gen-property">Brand</label>
               <select id="gen-property" value={property} onChange={e => setProperty(e.target.value)} className="w-full h-8 rounded-md ring-1 ring-neutral-200 bg-white px-2 text-sm">
                 {PIPELINE_PROPERTIES.map(p => (
                   <option key={p.id} value={p.id} disabled={!p.active}>{p.label}{p.active ? "" : ` — ${p.reason}`}</option>

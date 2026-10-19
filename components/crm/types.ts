@@ -395,7 +395,7 @@ export interface ContentPost {
   id: string
   user: string  // Assigned user (dropdown)
   date_created: string  // Hard-coded creation date
-  platform?: ContentProperty | ""  // Platform/brand dropdown (the drawer's "Property")
+  platform?: ContentProperty | ""  // Platform/brand dropdown (the drawer's "Brand")
   status: ContentPostStatus
   title: string
   date_to_post?: string  // Scheduled post date
@@ -499,8 +499,8 @@ export const TASK_STATUS_COLORS: Record<string, string> = {
 // Brand options
 export const BRANDS: Brand[] = ["434 Media", "Vemos Vamos", "DEVSA", "Digital Canvas", "TXMX Boxing", "AIMSATX"]
 
-// A content post's Property: the CRM brands plus MilCityUSA, which has content (the pipeline's drafts, the published
-// MCU posts) but no Brand member. Added here rather than to Brand so opportunities, tasks and Property Goals are
+// A content post's Brand: the CRM brands plus MilCityUSA, which has content (the pipeline's drafts, the published
+// MCU posts) but no Brand member. Added here rather than to Brand so opportunities, tasks and Brand Goals are
 // unchanged; no stored value is renamed.
 export type ContentProperty = Brand | "MilCityUSA"
 export const CONTENT_PROPERTIES: ContentProperty[] = [...BRANDS, "MilCityUSA"]

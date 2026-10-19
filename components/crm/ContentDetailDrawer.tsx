@@ -557,13 +557,13 @@ export function ContentDetailDrawer({
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">Property</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1.5">Brand</label>
                   <select
                     value={formData.platform}
                     onChange={(e) => setFormData(prev => ({ ...prev, platform: e.target.value as ContentProperty | "" }))}
                     className="w-full px-3 py-2.5 rounded-lg bg-gray-50 border border-gray-200 text-sm text-gray-900 focus:outline-none focus:border-blue-500 focus:bg-white"
                   >
-                    <option value="">Select property...</option>
+                    <option value="">Select brand...</option>
                     {CONTENT_PROPERTIES.map((brand) => (
                       <option key={brand} value={brand}>{brand}</option>
                     ))}
