@@ -384,6 +384,12 @@ export interface ContentPost {
   // Set by the content pipeline on every post it writes: the published brand-profile version it ran under
   // ("milcity@v1", lib/firestore-brand-profiles.ts). Optional; posts written before it have none.
   profile_version_id?: string
+  // Set by the Create table's Run job (plan v11 Step 2): the row the post came from (its feed and Reels posts share it,
+  // for Step 3's drawer), the format of its design, and the profile version Human+ wrote its copy under when that
+  // differs from the one the design was filled under. Optional; other posts have none.
+  create_row_id?: string
+  create_format?: "feed" | "reels"
+  copy_profile_version_id?: string
   // Set when the publisher's connector created the post; requestId makes creation idempotent. source marks a post
   // the content pipeline created (only run.ts sets it); the pipeline adopts no other post for its request ids.
   intake?: { requestId: string; metaBrand: string; requestedBy: string; at: string; source?: "content-pipeline" }

@@ -648,7 +648,7 @@ test("finding 3: the pipeline's admin: request ids are reserved; create_post and
   // The Canva ledger: a reserved id never reaches Canva; any other id does.
   const asked: string[] = []
   const tools = deps(new Store(), provider(), { canvaCreate: async i => { asked.push(i.requestId); return { design: { designId: "DAGnew1234", editUrl: "e", viewUrl: "v", previewUrls: [] }, reused: false } as never } })
-  const fill = { templateId: "EAHXWo1LiF8", title: "Card", text: { headline: "X" } }
+  const fill = { templateId: "FXtpl01fe", title: "Card", text: { headline: "X" } }
   const refused = await runOwnedMetaTool("canva_create_design", { requestId: "admin:MCU-NEWS-20261018-03:v1:f1", ...fill }, PRINCIPAL, tools)
   assert.equal(refused.status, 409); assert.match(String(refused.body.error), /reserved for the content pipeline/)
   assert.equal((await runOwnedMetaTool("canva_create_design", { requestId: "slack:C1:1792145804.1:f1", ...fill }, PRINCIPAL, tools)).status, 200)

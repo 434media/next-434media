@@ -20,7 +20,7 @@ import { seedBrief, seedProblems, type McuSeeds } from "../content-pipeline/seed
 import { PIPELINE_PROPERTIES, contentPropertyOf, propertyCanGenerate, templatesOf } from "../content-pipeline/properties"
 import { published as publishedProfile, loadPublishedProfileFirst } from "./published-profile"
 import { BRANDS, CONTENT_PROPERTIES } from "../../components/crm/types"
-import { candidateFields, cutOffWords } from "../content-pipeline/series"
+import { candidateFields, cardSubject, cutOffWords } from "../content-pipeline/series"
 import { candidateProblems, copyProblems, MAX_CANDIDATE_BATCHES } from "../content-pipeline/worker"
 import { sourcedFacts, MIN_FACTS, placeholderLines, unsourcedClaims } from "../content-pipeline/worker"
 import { factsBrief, FACTS_RULE } from "../content-pipeline/model"
@@ -99,6 +99,9 @@ function world(over: { ai?: Partial<McuAi>; pagePublished?: string; newsFeedHasM
   return { store, deps, designs, posts, notices, alerts, calls, start, advance: (ms: number) => { now += ms } }
 }
 const onlyDraft = (w: ReturnType<typeof world>) => [...w.store.drafts.values()][0].draft
+
+/** The subject a card names, as one string ("Coyote Block 2 / RTX"), whichever DT101 shape wrote it. */
+const named = (fields: Record<string, string>) => { const c = cardSubject(fields); return `${c.subject} / ${c.maker}` }
 
 test("series limits: DT101 fixed lists, deck two lines, DDMMMYY, unknown fields", () => {
   assert.equal(ddmmmyy("2026-09-14"), "14SEP26")
@@ -1673,7 +1676,7 @@ test("photo first: an artwork defect on the confirmed photo brings the next phot
 test("confirmPhoto names the subject from the story, falling back to its title and publisher", async () => {
   const w = world()
   let subject = ""
-  const ai = { ...w.deps.ai(() => {}), pickMedia: async ({ frame }: { frame: { fields: Record<string, string> } }) => { subject = frame.fields.subject_identifier; return { index: 0, reason: "ok", ranked: [{ index: 0, box: HERO }] } } } as unknown as McuAi
+  const ai = { ...w.deps.ai(() => {}), pickMedia: async ({ frame }: { frame: { fields: Record<string, string> } }) => { subject = named(frame.fields); return { index: 0, reason: "ok", ranked: [{ index: 0, box: HERO }] } } } as unknown as McuAi
   const story = { title: "Coyote Block 2: three tests", primaryUrl: "https://www.rtx.com/news/1", publisher: "RTX", sourceTitle: "t", sourceText: ARMY_TEXT }
   const r = await confirmPhoto(w.deps, ai, story, "dt101", "feed")
   assert.ok("photo" in r); assert.equal(subject, "Coyote Block 2 / RTX")
@@ -1729,7 +1732,7 @@ test("photo first: the confirmed photo is placed only when the card names the su
   const picks: string[] = []
   const w = world({ ai: {
     photoSubject: async () => ({ subject: "Lightfish USV", maker: "Seasats", query: "Lightfish" }),
-    pickMedia: async ({ frame }) => { picks.push(frame.fields.subject_identifier); return { index: 0, reason: "ok", ranked: [{ index: 0, box: HERO }] } },
+    pickMedia: async ({ frame }) => { picks.push(named(frame.fields)); return { index: 0, reason: "ok", ranked: [{ index: 0, box: HERO }] } },
   } })
   w.deps.photoFirst = true
   await w.start({ kind: "dt101" }) // the writer's card names "Next-gen C2 / Lockheed Martin"
@@ -1740,6 +1743,9 @@ test("photo first: the confirmed photo is placed only when the card names the su
   assert.equal(subjectMatches("Raytheon Coyote Block 2 interceptor", { series: "dt101" as SeriesKey, fields: { subject_identifier: "COYOTE / RAYTHEON" } }), true)
   assert.equal(subjectMatches("PAC-3 Edge", { series: "news" as SeriesKey, fields: { headline: "LOCKHEED DEBUTS PAC-3 EDGE", deck: "x" } }), true)
   assert.equal(subjectMatches("Raytheon Coyote interceptor", { series: "dt101" as SeriesKey, fields: { subject_identifier: "LIGHTFISH / SEASATS" } }), false)
+  // The DT101 masters: the deck names the subject, the maker field the company.
+  assert.equal(subjectMatches("Raytheon Coyote Block 2 interceptor", { series: "dt101" as SeriesKey, fields: { headline: "STOPS DRONES MID-AIR", deck: "Coyote Block 2, a drone interceptor.", maker: "Raytheon", domain: "Air", status: "Fielded" } }), true)
+  assert.equal(subjectMatches("Raytheon Coyote interceptor", { series: "dt101" as SeriesKey, fields: { headline: "SAILS ITSELF", deck: "Lightfish, a small uncrewed boat.", maker: "Seasats", domain: "Sea", status: "Testing" } }), false)
 })
 
 // ── fact extraction before writing (plan v10, Phase 1 direction 3) ──

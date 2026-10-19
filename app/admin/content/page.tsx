@@ -5,6 +5,7 @@ import { useSearchParams, useRouter, usePathname } from "next/navigation"
 import { AdminRoleGuard } from "@/components/AdminRoleGuard"
 import { Toast, SocialCalendarView, ContentDetailDrawer } from "@/components/crm"
 import { ContentGenerate } from "@/components/crm/ContentGenerate"
+import { CreateTable } from "@/components/crm/CreateTable"
 import type { Toast as ToastType } from "@/components/crm/types"
 import { useContentPostHandlers } from "@/hooks/useContentPostHandlers"
 
@@ -26,6 +27,7 @@ export default function ContentPage() {
   // Whether the current user can approve/reject (super-admin only). The decision
   // API enforces this server-side; this just gates the UI affordance.
   const [canReview, setCanReview] = useState(false)
+  const [isSuperAdmin, setIsSuperAdmin] = useState(false)
 
   // Holds the latest loadContentPosts so the stable onSaved callback can re-sync
   // without depending on the hook's return (which is defined below).
@@ -103,7 +105,9 @@ export default function ContentPage() {
         const email = (data.user.email || "").toLowerCase()
         const isSuper =
           SUPER_ADMIN_EMAILS.includes(email) || data.user.role === "crm_super_admin"
-        setCanReview(isSuper)
+        // The content permission (lib/auth.ts canRunContent) opens Create and the review actions too.
+        setCanReview(isSuper || data.contentRunner === true)
+        setIsSuperAdmin(isSuper)
       })
       .catch(() => {
         /* non-fatal — defaults to no review actions */
@@ -231,7 +235,11 @@ export default function ContentPage() {
               onAddPost={handleAddContentPost}
               onMovePost={handleMoveContentPost}
               onBulkDelete={handleBulkDeleteContentPosts}
-              headerAction={canReview ? <ContentGenerate onDraftsReady={loadContentPosts} /> : undefined}
+              // The global Create button opens the Create table (plan v11 Step 2), replacing Add post and the Generate
+              // panel for the people who run it. The parked Generate panel still opens for a pipeline draft's ICYMI choice,
+              // for super-admins only (its routes are super-admin; a content runner would only meet a 403).
+              headerAction={canReview ? <>{isSuperAdmin && searchParams?.get("icymiDraft") && <ContentGenerate onDraftsReady={loadContentPosts} />}<CreateTable onPostsReady={loadContentPosts} /></> : undefined}
+              hideAddPost={canReview}
               onCloseOutcome={canReview ? closeNoContent : undefined}
             />
           )}

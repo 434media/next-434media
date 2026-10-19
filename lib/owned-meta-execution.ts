@@ -163,11 +163,16 @@ export async function ownedMetaConnectorDeps(): Promise<import("@/lib/owned-meta
       return exportDesignJpg(deps, { designId, ...(pages ? { pages } : {}) })
     },
     canvaCreate: async input => {
-      const { createFromTemplate, MCU_BRAND_TEMPLATES } = await import("@/lib/canva-create")
-      const { CanvaError } = await import("@/lib/canva-export")
+      const [{ createFromTemplate }, { CanvaError }, { publishedTemplateIds }] = await Promise.all([import("@/lib/canva-create"), import("@/lib/canva-export"), import("@/lib/firestore-brand-profiles")])
       const { deps } = await canvaDeps()
       if (!deps) throw new CanvaError("Canva integration is not configured")
-      return createFromTemplate({ canva: deps, ledger: crm.canvaCreateLedger(), allowedTemplates: MCU_BRAND_TEMPLATES, cropImage: async (bytes, box) => (await import("@/lib/image-crop")).cropImage(bytes, box), fetchImage: async url => {
+      return createFromTemplate({ canva: deps, ledger: crm.canvaCreateLedger(), allowedTemplates: await publishedTemplateIds(), streamVideo: async url => {
+        const safe = url.startsWith("https://") ? await isSafeRemoteUrl(url) : null
+        if (!safe) throw new CanvaError("Video must be a public https URL", "video_url")
+        const res = await fetchAllowingSafeRedirects(safe.url, safe.addresses)
+        if (!res.ok || !res.body) throw new CanvaError("The video source did not return the file", `http_${res.status}`)
+        return { body: res.body as ReadableStream<Uint8Array>, bytes: Number(res.headers.get("content-length") || 0) }
+      }, cropImage: async (bytes, box) => (await import("@/lib/image-crop")).cropImage(bytes, box), fetchImage: async url => {
         const safe = url.startsWith("https://") ? await isSafeRemoteUrl(url) : null
         if (!safe) throw new CanvaError("Image must be a public https URL", "image_url")
         // Wikimedia and similar archives refuse anonymous clients; identify the fetcher honestly.
@@ -179,11 +184,10 @@ export async function ownedMetaConnectorDeps(): Promise<import("@/lib/owned-meta
       } }, input)
     },
     canvaFields: async templateId => {
-      const { templateFields, MCU_BRAND_TEMPLATES } = await import("@/lib/canva-create")
-      const { CanvaError } = await import("@/lib/canva-export")
+      const [{ templateFields }, { CanvaError }, { publishedTemplateIds }] = await Promise.all([import("@/lib/canva-create"), import("@/lib/canva-export"), import("@/lib/firestore-brand-profiles")])
       const { deps } = await canvaDeps()
       if (!deps) throw new CanvaError("Canva integration is not configured")
-      return templateFields({ canva: deps, allowedTemplates: MCU_BRAND_TEMPLATES }, templateId)
+      return templateFields({ canva: deps, allowedTemplates: await publishedTemplateIds() }, templateId)
     },
     randomId: randomUUID,
     now: () => new Date().toISOString(),

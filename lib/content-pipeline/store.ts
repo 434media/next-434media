@@ -135,6 +135,11 @@ export interface McuDraft {
   /** How many times the photo was re-zoomed and filled again because the card's image label crossed the subject (at most once). */
   labelRefit?: number
   holdReason?: string
+  /**
+   * Human+ (plan v11 Step 2): the person chose this story by its reference link, so a writer hold is reported back to
+   * them as it is and never answered by researching a replacement subject (sourceHold).
+   */
+  fixedStory?: boolean
   /** Style problems left after the rewrites (plan v9: not a hold); the review notes list them for a fix in Canva. */
   copyNotes?: string[]
   /** An ICYMI roundup's size, and who chose its stories when more qualified than it takes. */

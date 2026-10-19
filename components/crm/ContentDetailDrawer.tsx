@@ -45,7 +45,7 @@ interface ContentDetailDrawerProps {
   onAddComment?: (comment: TaskComment) => void
   onDeleteComment?: (commentId: string) => void
   onEditComment?: (commentId: string, newContent: string) => void
-  // Approve/reject — only super-admins get the action bar (server enforces too).
+  // Approve/reject — super-admins and the content permission (lib/auth.ts canRunContent) get the action bar (server enforces too).
   canReview?: boolean
   // Called after a decision is recorded so the parent can reload + close.
   onDecided?: () => void
@@ -896,7 +896,7 @@ export function ContentDetailDrawer({
                     </div>
                   )}
 
-                  {/* Reviewer action bar — only super-admins, only when awaiting approval */}
+                  {/* Reviewer action bar — super-admins and the content permission, only when awaiting approval */}
                   {canReview && !post.owned_meta && post.status === "needs_approval" && (
                     <div className="space-y-2">
                       {showRejectNote && (

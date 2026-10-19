@@ -6,6 +6,14 @@ const nextConfig: NextConfig = {
     ignoreBuildErrors: true,
   },
   // Increase body size limit for file uploads (App Router uses route config, not this)
+  // The Create table's video conversion (lib/content-pipeline/transcode.ts) runs the ffmpeg-static binary: kept out of
+  // the bundle and traced into that one route.
+  serverExternalPackages: ['ffmpeg-static'],
+  outputFileTracingIncludes: {
+    // The binary's real path under pnpm's store: node_modules/ffmpeg-static is a symlink, and a traced path through a
+    // symlinked directory makes Vercel refuse the function ("files in symlinked directories").
+    '/api/admin/content/media-optimize': ['./node_modules/.pnpm/ffmpeg-static@*/node_modules/ffmpeg-static/ffmpeg'],
+  },
   experimental: {
     serverActions: {
       bodySizeLimit: '50mb',

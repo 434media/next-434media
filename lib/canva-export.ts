@@ -98,6 +98,17 @@ export async function canvaAccessToken(deps: CanvaDeps): Promise<string> {
 
 /** Exports pages as JPG and returns their download URLs in page order (valid 24 h). Bounded polling. */
 export async function exportDesignJpg(deps: CanvaDeps, input: { designId: string; pages?: number[]; quality?: number }, limits = { polls: 20, intervalMs: 2_000 }): Promise<string[]> {
+  return exportDesign(deps, { designId: input.designId, pages: input.pages, format: { type: "jpg", quality: input.quality ?? 95 } }, limits)
+}
+/**
+ * Exports a design as MP4 (a design with a video, and every Reels design: Meta publishes a Reel only as video). The
+ * quality names the resolution only; the design keeps its own aspect ratio (canva.dev, read 2026-10-19). A video takes
+ * longer to render, so the polling is longer: up to five minutes.
+ */
+export async function exportDesignMp4(deps: CanvaDeps, input: { designId: string }, limits = { polls: 150, intervalMs: 2_000 }): Promise<string[]> {
+  return exportDesign(deps, { designId: input.designId, format: { type: "mp4", quality: "vertical_1080p" } }, limits)
+}
+async function exportDesign(deps: CanvaDeps, input: { designId: string; pages?: number[]; format: { type: "jpg"; quality: number } | { type: "mp4"; quality: string } }, limits: { polls: number; intervalMs: number }): Promise<string[]> {
   if (!/^[A-Za-z0-9_-]{6,64}$/.test(input.designId)) throw new CanvaError("Invalid Canva design id")
   if (input.pages && (!input.pages.length || input.pages.length > 10 || input.pages.some(p => !Number.isSafeInteger(p) || p < 1))) throw new CanvaError("Pages must be 1–10 page numbers")
   const token = await canvaAccessToken(deps)
@@ -108,7 +119,7 @@ export async function exportDesignJpg(deps: CanvaDeps, input: { designId: string
     if (!response.ok || !data.job?.id) throw new CanvaError("Canva export request failed", data.code || `http_${response.status}`)
     return data.job
   }
-  let job = await call("/exports", { method: "POST", body: JSON.stringify({ design_id: input.designId, format: { type: "jpg", quality: input.quality ?? 95, ...(input.pages ? { pages: input.pages } : {}) } }) })
+  let job = await call("/exports", { method: "POST", body: JSON.stringify({ design_id: input.designId, format: { ...input.format, ...(input.pages ? { pages: input.pages } : {}) } }) })
   for (let i = 0; job.status === "in_progress" && i < limits.polls; i++) {
     await deps.sleep(limits.intervalMs)
     job = await call(`/exports/${encodeURIComponent(job.id!)}`)

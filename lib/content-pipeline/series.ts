@@ -148,7 +148,7 @@ export function checkFields(series: Series, values: Record<string, string>): str
  * is allowed.
  */
 const CLIPPED = new Set(["PROD", "PRODS", "PRODN", "MFG", "MFR", "MFRS", "MGMT", "MGT", "GOVT", "GOV'T", "DEPT", "DEPTS", "ASSY", "EQPT", "EQUIP", "MAINT", "SYS", "SVC", "SVCS", "TRANSP", "CAPAB", "DEV", "DEVS", "INTL", "INT'L", "NATL", "NAT'L", "APPROX", "ADV", "PERF", "RESP", "AVAIL", "ENGR", "VEH", "VEHS", "ACFT", "MSN", "MSNS", "TRNG", "TNG", "QTY", "AMT", "YR", "YRS", "ENVT", "DPLY", "OPNL", "OPER", "TECHS", "LOGI", "RECOG", "ID'D"])
-const NOT_CHECKED = new Set(["source", "date", "counter", "image_context", "subject_identifier", "kicker"])
+const NOT_CHECKED = new Set(["source", "date", "counter", "image_context", "subject_identifier", "kicker", "maker", "domain", "status"])
 export function clippedWords(fields: Record<string, string>, source = ""): string[] {
   const inSource = new Set((source.match(/[A-Za-z][A-Za-z']*/g) ?? []).map(w => w.toUpperCase()))
   const words = Object.entries(fields).filter(([k]) => !NOT_CHECKED.has(k)).flatMap(([, v]) => v.toUpperCase().match(/[A-Z][A-Z']*/g) ?? [])
@@ -212,4 +212,16 @@ export function normalizeFields(series: Series, values: Record<string, string>):
   const clean = (f: FieldSpec, v: string) => f.exactLines ? v.split("\n").map(l => l.trim().replace(/\s+/g, " ")).filter(Boolean).join("\n") : v.trim().replace(/\s+/g, " ")
   const fit = (f: FieldSpec, v: string) => f.exactLines && f.perLine && overLimits(f, v).length + Number(v.split("\n").length !== f.exactLines) ? fitLines(v, f.perLine, f.exactLines) ?? v : v
   return Object.fromEntries(series.fields.filter(f => typeof values[f.name] === "string").map(f => [f.name, fit(f, f.uppercase ? clean(f, values[f.name]).toUpperCase() : clean(f, values[f.name]))]))
+}
+
+/**
+ * The subject and maker a card names, for the photo search and its checks. The DT101 masters (profile 1.3.0) name the
+ * subject first in the deck ("Skydio X10D, a small reconnaissance drone.") and the company in the maker field; cards
+ * written to the earlier benefit-led template (stored drafts, the replay set) carried both in subject_identifier
+ * ("COYOTE / RAYTHEON"). Empty strings when the card names neither.
+ */
+export function cardSubject(fields: Record<string, string>): { subject: string; maker: string } {
+  if (fields.maker?.trim()) return { subject: (fields.deck ?? "").split(/,|\s[—–-]\s/)[0].replace(/[.\s]+$/, "").trim(), maker: fields.maker.trim() }
+  const [subject = "", maker = ""] = (fields.subject_identifier ?? "").split("/").map(x => x.trim())
+  return { subject, maker }
 }

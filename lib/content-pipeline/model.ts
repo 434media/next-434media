@@ -3,9 +3,12 @@ import { z } from "zod4"
 import { BRAND } from "./brand"
 import { CALL_FALLBACK, callOptions, outputBudget, type PipelineStep } from "./models"
 import { seedBrief, type McuSeeds } from "./seeds"
-import { SERIES, candidateFields, type FieldSpec, type RequestKind, type SeriesKey } from "./series"
+import { SERIES, cardSubject, candidateFields, type FieldSpec, type RequestKind, type SeriesKey } from "./series"
 import type { MediaCandidate, SourcePage } from "./sources"
 import type { FrameCopy, SourcedFact, Story } from "./store"
+
+/** The card's subject and maker as one name for the photo prompts ("Skydio X10D / Skydio"). */
+const cardName = (fields: Record<string, string>) => { const c = cardSubject(fields); return [c.subject, c.maker].filter(Boolean).join(" / ") }
 
 /**
  * The model calls behind the content pipeline. Each returns structured output checked again in code (series.ts) —
@@ -363,7 +366,7 @@ export function createMcuAi(deps: { models: Record<PipelineStep, string>; search
     },
 
     async findPhotoPages({ story, frame, representative }) {
-      const subject = frame.fields.subject_identifier || frame.fields.headline || story.title
+      const subject = cardName(frame.fields) || frame.fields.headline || story.title
       // Search, then pick from what the search returned (the same two-call pattern as research, for the same reason).
       const searched = await run("photoSearch", model => generateText({
         model, tools: deps.searchTools, stopWhen: stepCountIs(6), maxOutputTokens: outputBudget(model, 8_000), providerOptions: callOptions(model, "low"),
@@ -397,7 +400,7 @@ export function createMcuAi(deps: { models: Record<PipelineStep, string>; search
         model, maxOutputTokens: outputBudget(model, 8_000), providerOptions: callOptions(model, "low"),
         messages: [{ role: "system", content: (representative ? REPRESENTATIVE : "") + `You choose the photo for ${BRAND.photos.card}. The approved look is a close, dominant hero subject that fills the upper part of the frame and stays recognizable at phone size. Judge each candidate by what its pixels show, never by its title, page or description: a page about a product often carries an unrelated share image (another aircraft, a hangar, a logo, an event photo). For each candidate you rank, first say in a few words what the photo itself shows, then whether that is the exact subject named below (match: exact), something related but not it (another variant, another vehicle, a generic scene: related), or not it at all (unrelated). Rank only candidates that visibly show the actual system, product, vehicle, unit or organization in the story, best first; a photo of something or someone that merely shares a name with it (a person, a band, a book, a convention panel, a logo or a graphic) is NOT relevant, and when you can't tell, leave it out. A blurry, dark or partial view of the subject is not a match either. Give each one's subject bounding box as fractions of that photo (x0, y0 top-left to x1, y1 bottom-right; 0–1), and its core: the part that must stay in frame for the subject to be recognized. The card is a tall 4:5 crop, so a wide subject loses its ends; the core is what it can't lose. Also say whether its background adds context (terrain, a setting, operators or other equipment that make the photo more interesting, like a forest behind an off-road vehicle) or is empty space (open sky, plain water, a blank wall or pier) that the subject should fill instead. Reject mostly-sky or empty frames, tail-only or cropped-off subjects, tiny distant subjects, and unrelated archive imagery presented as the event. index is your single best choice, or null if none is relevant and strong.` },
           { role: "user", content: [
-            { type: "text", text: `Story: ${story.title}\nThe subject to show: ${frame.fields.subject_identifier || frame.fields.headline || story.title}\nCard: ${JSON.stringify(frame.fields)}\nAvoid repeating: ${avoid.join(", ") || "none"}\nCandidates follow, numbered from 0.` },
+            { type: "text", text: `Story: ${story.title}\nThe subject to show: ${cardName(frame.fields) || frame.fields.headline || story.title}\nCard: ${JSON.stringify(frame.fields)}\nAvoid repeating: ${avoid.join(", ") || "none"}\nCandidates follow, numbered from 0.` },
             ...candidates.flatMap((c, i) => [{ type: "text" as const, text: `#${i}: ${c.candidate.title} — ${c.candidate.description} (${c.candidate.width}×${c.candidate.height}, ${c.candidate.date ?? "date unknown"})` }, { type: "image" as const, image: c.image, mediaType: c.mime }]),
           ] }],
         tools: { choose_photo: tool({ description: "Choose the photo, or null when none is relevant and strong.", inputSchema: z.object({ index: z.number().int().nullable(), reason: z.string(), ranked: z.array(z.object({ index: z.number().int(), shows: z.string().describe("what the photo itself shows, in a few words, read from the image"), match: z.enum(["exact", "representative", "related", "unrelated"]).describe("exact: it is the subject named on the card; representative: the people, unit or equipment the story is about, using or showing it, as the photo's own caption says; related: similar but not it; unrelated: not it"), x0: z.number(), y0: z.number(), x1: z.number(), y1: z.number(), core: z.object({ x0: z.number(), y0: z.number(), x1: z.number(), y1: z.number() }).describe("the part of the subject that must stay in frame for it to be recognized (a vehicle's body, a missile's main body, the person and the screen they work at); inside the subject box, smaller when the subject is wide"), context: z.boolean().describe("true when the background adds context; false when it is empty space the subject should fill") })).describe("every candidate you judged, best first, with what it shows, its match and its subject box") }) }) }, toolChoice: "required", // the only tool: the same contract as naming it, accepted by more providers

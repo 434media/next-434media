@@ -1,5 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { getSession, isAuthorizedAdmin, canSend, isCrmSuperAdmin } from "@/lib/auth"
+import { getSession, isAuthorizedAdmin, canSend, canRunContent } from "@/lib/auth"
 import {
   getContentPosts,
   getContentPostById,
@@ -162,7 +162,7 @@ export async function PUT(request: NextRequest) {
       body.status !== prevStatus &&
       RESTRICTED_STATUSES.includes(body.status) &&
       !canSend(authResult.session.role) &&
-      !(await isCrmSuperAdmin(authResult.session.email))
+      !(await canRunContent(authResult.session.email))
     ) {
       return NextResponse.json(
         { error: "Forbidden: your role can edit drafts but not approve, schedule, or publish content" },
