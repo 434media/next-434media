@@ -10,7 +10,9 @@ const nextConfig: NextConfig = {
   // the bundle and traced into that one route.
   serverExternalPackages: ['ffmpeg-static'],
   outputFileTracingIncludes: {
-    '/api/admin/content/media-optimize': ['./node_modules/ffmpeg-static/ffmpeg', './node_modules/.pnpm/ffmpeg-static@*/node_modules/ffmpeg-static/ffmpeg'],
+    // The binary's real path under pnpm's store: node_modules/ffmpeg-static is a symlink, and a traced path through a
+    // symlinked directory makes Vercel refuse the function ("files in symlinked directories").
+    '/api/admin/content/media-optimize': ['./node_modules/.pnpm/ffmpeg-static@*/node_modules/ffmpeg-static/ffmpeg'],
   },
   experimental: {
     serverActions: {

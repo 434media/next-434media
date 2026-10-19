@@ -35,6 +35,12 @@ export async function POST(req: NextRequest) {
   if (!parsed.success) return NextResponse.json({ error: "The row is incomplete or malformed" }, { status: 400 })
   const r = parsed.data
   if (r.media && !isCreateUpload(r.media.url)) return NextResponse.json({ error: "Media must be added through the table" }, { status: 400 })
+  // The size picks Canva's video upload path; it is read from the store, never taken from the browser.
+  if (r.media) {
+    const stored = await (await import("@vercel/blob")).head(r.media.url).catch(() => null)
+    if (!stored) return NextResponse.json({ error: "The row's media is no longer in storage; add it again" }, { status: 400 })
+    r.media.bytes = stored.size
+  }
   const p = await createProfile(r.brand)
   if ("error" in p) return NextResponse.json({ error: p.error }, { status: p.status })
   const [{ withProfile }, { runCreateRow, createRunDeps, CreateRowError }] = await Promise.all([import("@/lib/content-pipeline/brand"), import("@/lib/content-pipeline/create-run")])

@@ -2,7 +2,7 @@ import { NextResponse, type NextRequest } from "next/server"
 import { randomUUID } from "node:crypto"
 import { z } from "zod4"
 import { requireContentRunner } from "../../content-pipeline/auth"
-import { IMAGE_MAX_BYTES, IMAGE_MAX_PX, UPLOAD_PREFIX, VIDEO_MAX_BYTES, isCreateUpload, mediaKind, videoPlan } from "@/lib/content-pipeline/create-media"
+import { IMAGE_MAX_BYTES, IMAGE_MAX_PX, TRANSCODE_MAX_BYTES, UPLOAD_PREFIX, VIDEO_MAX_BYTES, isCreateUpload, mediaKind, videoPlan } from "@/lib/content-pipeline/create-media"
 
 export const runtime = "nodejs"
 // A conversion pass streams the clip to disk, converts it and stores the result.
@@ -18,6 +18,8 @@ const MAX_PASTED_VIDEO = 100 * 1024 * 1024
  * guarded) and stored first. Returns the media the row keeps.
  */
 export async function POST(req: NextRequest) {
+  // Leaves time inside maxDuration to store the result after a conversion.
+  const deadline = Date.now() + (maxDuration - 45) * 1000
   const auth = await requireContentRunner()
   if ("error" in auth) return NextResponse.json({ error: auth.error }, { status: auth.status })
   const parsed = input.safeParse(await req.json().catch(() => null))
@@ -51,9 +53,10 @@ export async function POST(req: NextRequest) {
     })
     const safeName = name.replace(/[^\w.-]+/g, "-").slice(0, 60)
     if (plan.action === "transcode") {
+      if (declared > TRANSCODE_MAX_BYTES) { await reader.cancel().catch(() => {}); return NextResponse.json({ error: `This video (${plan.why}) is over ${TRANSCODE_MAX_BYTES / 1048576} MB, too long to convert here; save it as MP4 and drop it again` }, { status: 400 }) }
       try {
         const { transcodeToMp4 } = await import("@/lib/content-pipeline/transcode")
-        const out = await transcodeToMp4(rest, { timeoutMs: 240_000 })
+        const out = await transcodeToMp4(rest, { deadline, maxBytes: Math.min(cap, TRANSCODE_MAX_BYTES) })
         const blob = await put(`${UPLOAD_PREFIX}${randomUUID()}-${safeName.replace(/\.[^.]*$/, "")}.mp4`, out.bytes, { access: "public", addRandomSuffix: false, contentType: "video/mp4" })
         console.info("[content/media-optimize] converted", JSON.stringify({ by: auth.session.email, why: plan.why, inBytes: bytes, outBytes: out.bytes.byteLength, ms: out.ms }))
         return NextResponse.json({ media: { url: blob.url, kind: "video", name, bytes: out.bytes.byteLength, optimized: "done" }, action: "converted", ms: out.ms })

@@ -7,9 +7,9 @@ import { test } from "node:test"
 import assert from "node:assert/strict"
 import { published, loadPublishedProfileFirst } from "./published-profile"
 import { CREATE_PLATFORMS, cellRoles, createTemplates, ddmmmyy, designText, formatsOf, rowProblems, type CreateRow } from "../content-pipeline/create-table"
-import { isCreateUpload, mediaKind, transcodeArgs, videoContainer, videoPlan } from "../content-pipeline/create-media"
+import { blobStoreHost, isCreateUpload, mediaKind, transcodeArgs, videoContainer, videoPlan } from "../content-pipeline/create-media"
 import { humanPlus, HumanPlusError, type HumanPlusDeps } from "../content-pipeline/human-plus"
-import { createRequestId, runCreateRow, serverRowProblems, type CreateRunDeps } from "../content-pipeline/create-run"
+import { CreateRowError, createRequestId, runCreateRow, serverRowProblems, type CreateRunDeps } from "../content-pipeline/create-run"
 import type { McuAi } from "../content-pipeline/model"
 import type { ContentPost } from "../../components/crm/types"
 
@@ -87,9 +87,13 @@ test("media: photos and Canva's video containers are taken; a phone MP4 or MOV p
   assert.equal(videoPlan(ftyp("isom"), 600 * 1024 * 1024).action, "refuse")
   assert.ok(transcodeArgs("in.mov", "out.mp4").join(" ").includes("scale='min(1080,iw)':-2,fps=30 -c:v libx264"))
   assert.ok(transcodeArgs("in.mov", "out.mp4").includes("+faststart"))
-  assert.ok(isCreateUpload("https://abc.public.blob.vercel-storage.com/content-create/x.mp4"))
-  assert.ok(!isCreateUpload("https://abc.public.blob.vercel-storage.com/content-posts/x.mp4"))
-  assert.ok(!isCreateUpload("https://evil.example.com/content-create/x.mp4"))
+  const host = blobStoreHost("vercel_blob_rw_AbC123_secret")
+  assert.equal(host, "abc123.public.blob.vercel-storage.com")
+  assert.ok(isCreateUpload("https://abc123.public.blob.vercel-storage.com/content-create/x.mp4", host))
+  assert.ok(!isCreateUpload("https://abc123.public.blob.vercel-storage.com/content-posts/x.mp4", host))
+  assert.ok(!isCreateUpload("https://other.public.blob.vercel-storage.com/content-create/x.mp4", host), "another Blob store is refused")
+  assert.ok(!isCreateUpload("https://evil.example.com/content-create/x.mp4", host))
+  assert.ok(!isCreateUpload("https://abc123.public.blob.vercel-storage.com/content-create/x.mp4", null), "no store configured, nothing is ours")
 })
 
 // ── Human+ ──
@@ -133,6 +137,7 @@ test("Human+ refuses an unreadable link with a reason the person can act on", as
 
 // ── Run job ──
 function runDeps() {
+  const running = new Set<string>()
   const posts = new Map<string, ContentPost>(), made: { requestId: string; templateId: string; text: Record<string, string>; video?: unknown; image?: unknown }[] = [], exports: string[] = []
   const deps: CreateRunDeps = {
     templateFields: async () => ({ headline: "text", deck: "text", date: "text", source: "text", media: "image" }),
@@ -141,9 +146,11 @@ function runDeps() {
     findByRequestId: async id => [...posts.values()].find(p => p.intake?.requestId === id) ?? null,
     createPost: async p => { const post = { ...p, id: `post${posts.size + 1}`, created_at: "t", updated_at: "t" } as ContentPost; posts.set(post.id, post); return post },
     attachExports: async ({ postId, items, canva }) => { const p = posts.get(postId)!; posts.set(postId, { ...p, assets: items.map(i => ({ url: i.url, kind: i.url.endsWith(".mp4") ? "video" : "image" })), export_fingerprint: "fp", canva_design_id: canva.designId } as ContentPost); return { holds: [] } },
+    claimRow: async id => { if (running.has(id)) return false; running.add(id); return true },
+    releaseRow: async id => { running.delete(id) },
     now: () => "2026-10-19T15:00:00.000Z",
   }
-  return { deps, posts, made, exports }
+  return { deps, posts, made, exports, running }
 }
 
 test("Run job: one design and one Review post per format, stamped, keyed by the row, with video exported as MP4", async () => {
@@ -175,4 +182,16 @@ test("Run job: a video row puts the video in the image field and exports MP4 for
   assert.equal(s.made[0].image, undefined)
   assert.ok(s.exports[0].endsWith(":mp4"))
   await assert.rejects(runCreateRow(s.deps, row({ caption: "" }), { email: "a@x.co", name: "A" }), /Write the Caption/)
+})
+
+test("Run job: two runs of one row at once make one set of designs; the second is refused while the first holds it", async () => {
+  const s = runDeps()
+  const [a, b] = await Promise.allSettled([
+    runCreateRow(s.deps, row(), { email: "a@x.co", name: "A" }),
+    runCreateRow(s.deps, row(), { email: "a@x.co", name: "A" }),
+  ])
+  assert.equal(a.status, "fulfilled")
+  assert.ok(b.status === "rejected" && b.reason instanceof CreateRowError && b.reason.status === 409)
+  assert.equal(s.made.length, (a as PromiseFulfilledResult<{ posts: unknown[] }>).value.posts.length)
+  assert.equal(s.running.size, 0, "the claim is released when the run ends")
 })

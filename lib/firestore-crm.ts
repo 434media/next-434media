@@ -1796,6 +1796,24 @@ export function canvaCreateLedger(): import("./canva-create").CreateLedger {
     async put(requestId, design) { await col().doc(key(requestId)).set({ requestId, design, at: new Date().toISOString() }) },
   }
 }
+/**
+ * The Create table's per-row run claim (lib/content-pipeline/create-run.ts claimRow), beside the Canva ledger. The lease
+ * outlives the create-run route's maxDuration (800 s), so a run that died without releasing frees the row on its own.
+ */
+const CREATE_RUN_LEASE_MS = 15 * 60_000
+const createRuns = () => getDb().collection("crm_meta").doc("owned_meta_canva").collection("create_runs")
+export async function claimCreateRun(rowId: string, by: string, nowMs: number): Promise<boolean> {
+  const ref = createRuns().doc(rowId)
+  return getDb().runTransaction(async tx => {
+    const d = (await tx.get(ref)).data()
+    if (d?.running === true && typeof d.leaseUntilMs === "number" && d.leaseUntilMs > nowMs) return false
+    tx.set(ref, { running: true, by, at: new Date(nowMs).toISOString(), leaseUntilMs: nowMs + CREATE_RUN_LEASE_MS })
+    return true
+  })
+}
+export async function releaseCreateRun(rowId: string): Promise<void> {
+  await createRuns().doc(rowId).set({ running: false, releasedAt: new Date().toISOString() }, { merge: true })
+}
 export async function saveCanvaConnectState(stateHash: string, verifier: string, by: string, expiresAtMs: number): Promise<void> {
   await getDb().collection("crm_meta").doc("owned_meta_canva_pending").collection("states").doc(stateHash).create({ verifier, by, expiresAtMs })
 }

@@ -21,11 +21,18 @@ export interface CreateRunDeps {
   findByRequestId(requestId: string): Promise<ContentPost | null>
   createPost(post: Omit<ContentPost, "id" | "created_at" | "updated_at">): Promise<ContentPost>
   attachExports(input: { postId: string; items: { url: string; label: string }[]; canva: { designId: string } }): Promise<{ holds: string[] }>
+  /**
+   * Claims the row for one run, atomically (a Firestore transaction): false while another run of it holds an unexpired
+   * lease. Two tabs or a double click can't then fill two designs and stage two Review posts, since the Canva ledger
+   * and the post lookup are read-then-write.
+   */
+  claimRow(rowId: string, by: string): Promise<boolean>
+  releaseRow(rowId: string): Promise<void>
   now(): string
 }
 export interface CreatedPost { format: CreateFormat; postId: string; designId: string; editUrl: string; previewUrl?: string; holds: string[]; reused: boolean }
 export class CreateRowError extends Error {
-  constructor(readonly problems: string[], readonly status: 400 | 502 = 400) { super(problems.join("; ")) }
+  constructor(readonly problems: string[], readonly status: 400 | 409 | 502 = 400) { super(problems.join("; ")) }
 }
 
 export const createRequestId = (rowId: string, format: CreateFormat) => `${PIPELINE_KEY_PREFIX}create:${rowId}:${format}`
@@ -51,6 +58,12 @@ export async function runCreateRow(deps: CreateRunDeps, row: CreateRow, actor: {
   const { versionId } = activeProfile()
   const { template, problems } = serverRowProblems(row)
   if (!template || problems.length) throw new CreateRowError(problems)
+  if (!await deps.claimRow(row.id, actor.email)) throw new CreateRowError(["This row is already running (another tab or click); wait for it to finish"], 409)
+  try { return { posts: await runClaimedRow(deps, row, template, actor, versionId), profileVersionId: versionId } }
+  finally { await deps.releaseRow(row.id).catch(err => console.error("[create-run] release failed:", row.id, err)) }
+}
+
+async function runClaimedRow(deps: CreateRunDeps, row: CreateRow, template: CreateTemplate, actor: { email: string; name: string }, versionId: string): Promise<CreatedPost[]> {
   const posts: CreatedPost[] = []
   for (const { format, platforms } of formatsOf(row.platforms)) {
     const templateId = template.templates[format]!, requestId = createRequestId(row.id, format)
@@ -88,7 +101,7 @@ export async function runCreateRow(deps: CreateRunDeps, row: CreateRow, actor: {
     const attached = await deps.attachExports({ postId: post.id, items, canva: { designId: design.designId } })
     posts.push({ format, postId: post.id, designId: design.designId, editUrl: design.editUrl, previewUrl: design.previewUrls[0], holds: attached.holds, reused: false })
   }
-  return { posts, profileVersionId: versionId }
+  return posts
 }
 
 /** Production wiring: the publisher connector's Canva fill, export staging and post lookup (as run.ts uses them). */
@@ -109,6 +122,8 @@ export async function createRunDeps(): Promise<CreateRunDeps> {
     findByRequestId: id => tools.intake.findByRequestId(id),
     createPost: post => crm.createContentPost(post),
     attachExports: input => attachExports(tools.intake, { ...input, randomId: tools.randomId }),
+    claimRow: (rowId, by) => crm.claimCreateRun(rowId, by, Date.now()),
+    releaseRow: rowId => crm.releaseCreateRun(rowId),
     now: () => new Date().toISOString(),
   }
 }

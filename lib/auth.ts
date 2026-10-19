@@ -371,12 +371,16 @@ export async function isCrmSuperAdmin(email?: string | null): Promise<boolean> {
 export const CONTENT_PERMISSION = 'content'
 export async function canRunContent(email?: string | null): Promise<boolean> {
   if (!email) return false
-  if (await isCrmSuperAdmin(email)) return true
+  const lower = email.toLowerCase()
+  if (isCrmSuperAdminFromFallback(lower)) return true
   try {
+    // One read answers both: a super-admin by role (as isCrmSuperAdmin), or an active member holding "content".
     const { getDb } = await import('./firebase-admin')
-    const snap = await getDb().collection('crm_team_members').where('email', '==', email.toLowerCase()).limit(1).get()
-    const permissions = snap.empty ? [] : snap.docs[0].data().permissions
-    return Array.isArray(permissions) && permissions.includes(CONTENT_PERMISSION)
+    const snap = await getDb().collection('crm_team_members').where('email', '==', lower).limit(1).get()
+    if (snap.empty) return false
+    const data = snap.docs[0].data()
+    if (data.role === 'crm_super_admin') return true
+    return data.isActive !== false && Array.isArray(data.permissions) && data.permissions.includes(CONTENT_PERMISSION)
   } catch (error) {
     console.error('[auth] canRunContent Firestore lookup failed:', error)
     return false

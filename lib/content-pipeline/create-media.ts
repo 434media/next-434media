@@ -10,6 +10,12 @@
 export const IMAGE_MAX_PX = 2160
 export const IMAGE_MAX_BYTES = 50 * 1024 * 1024
 export const VIDEO_MAX_BYTES = 500 * 1024 * 1024
+/**
+ * The largest clip converted in the function: input and output share /tmp (about 512 MB on Vercel). Real phone clips
+ * converted at seconds per minute of video (step-2 evidence); a longer clip is saved as MP4 by the person, which passes
+ * through up to VIDEO_MAX_BYTES. A longer-running worker is the plan's next resort, if real use needs it.
+ */
+export const TRANSCODE_MAX_BYTES = 200 * 1024 * 1024
 export const UPLOAD_PREFIX = "content-create/"
 export const IMAGE_TYPES = ["image/jpeg", "image/png"] as const
 /** Containers Canva imports as video (canva.dev, read 2026-10-19). */
@@ -42,11 +48,20 @@ export function transcodeArgs(input: string, output: string): string[] {
   return ["-hide_banner", "-y", "-i", input, "-vf", "scale='min(1080,iw)':-2,fps=30", "-c:v", "libx264", "-preset", "veryfast", "-crf", "23", "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "128k", "-movflags", "+faststart", output]
 }
 
-/** Only the table's own uploads are optimized and filled: a public Blob URL under UPLOAD_PREFIX. */
-export function isCreateUpload(url: string): boolean {
+/**
+ * This project's Blob store host: the token is `vercel_blob_rw_<storeId>_<secret>` (as @vercel/blob reads it) and the
+ * store serves at `<storeid>.public.blob.vercel-storage.com`. Null when no store is configured.
+ */
+export function blobStoreHost(token = process.env.BLOB_READ_WRITE_TOKEN): string | null {
+  const storeId = token?.split("_")[3]
+  return storeId && /^[A-Za-z0-9]+$/.test(storeId) ? `${storeId.toLowerCase()}.public.blob.vercel-storage.com` : null
+}
+
+/** Only the table's own uploads are optimized and filled: a public URL on this project's Blob store, under UPLOAD_PREFIX. */
+export function isCreateUpload(url: string, host = blobStoreHost()): boolean {
   try {
     const u = new URL(url)
-    return u.protocol === "https:" && /\.public\.blob\.vercel-storage\.com$/.test(u.hostname) && u.pathname.startsWith(`/${UPLOAD_PREFIX}`)
+    return !!host && u.protocol === "https:" && u.hostname === host && u.pathname.startsWith(`/${UPLOAD_PREFIX}`)
   } catch { return false }
 }
 
