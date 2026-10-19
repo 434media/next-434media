@@ -3,12 +3,12 @@ import type { LeadPlatform } from "@/types/crm-types"
 import { loadProfile, profileProblems, type RequestKind } from "./profile"
 
 /**
- * The properties the Generate panel offers (the CRM roster; the UI word is "Property", the code keeps "brand" and
+ * The properties the Generate panel offers (the CRM roster; the UI word is "Brand", the code keeps "brand" and
  * "platform"). Only MilCityUSA has templates and editorial rules connected, so it is the only one that can be
  * chosen; generating for the others is not in Phase 1. `id` is what a job stores: the publisher's brand id where
  * one exists ("milcity", as content posts already carry in intake.metaBrand and tags). `roster` names the existing
  * identifier in code (LeadPlatform for four of them, the CRM Brand for Digital Canvas); nothing is renamed.
- * `contentProperty` is the value a draft's content post stores in `platform`, which the drawer shows as its Property
+ * `contentProperty` is the value a draft's content post stores in `platform`, which the drawer shows as its Brand
  * (the -05 draft of 2026-10-17 had it empty).
  */
 export interface PipelineProperty { id: string; label: string; roster: LeadPlatform | Brand; contentProperty: ContentProperty; active: boolean; reason?: string }

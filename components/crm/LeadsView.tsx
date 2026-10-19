@@ -364,7 +364,7 @@ export function LeadsView({
             </div>
             <div>Lead</div>
             <div>Status</div>
-            <div>Source / Property</div>
+            <div>Source / Brand</div>
             <div>Follow-up</div>
             <div className="text-right">Updated</div>
           </div>

@@ -287,13 +287,13 @@ export function TaskDetailDrawer({
                     </select>
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-neutral-700 mb-1.5">Property</label>
+                    <label className="block text-sm font-medium text-neutral-700 mb-1.5">Brand</label>
                     <select
                       value={formData.brand}
                       onChange={(e) => onFormChange({ ...formData, brand: e.target.value as Brand | "" })}
                       className="w-full px-3 py-2 rounded-lg bg-neutral-50 border border-neutral-200 text-sm text-neutral-900 focus:outline-none focus:border-neutral-400 focus:bg-white"
                     >
-                      <option value="">No property</option>
+                      <option value="">No brand</option>
                       {BRANDS.map((brand) => (
                         <option key={brand} value={brand}>{brand}</option>
                       ))}
