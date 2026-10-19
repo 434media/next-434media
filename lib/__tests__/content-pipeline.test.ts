@@ -1513,3 +1513,151 @@ test("v9 (b), review 2: a paraphrase that ends a line on a whole word is not a c
   assert.deepEqual(cutOffWords({ benefit_headline: "STOPS DRONES AT\nSEA WITH PREC" }, src), ["PREC"])
   assert.deepEqual(cutOffWords({ headline: "BUILT FOR ENDUR" }, src), ["ENDUR"])
 })
+
+// ── plan v10, Phase 1 direction 6: the DVIDS API and photo first ──
+import { dvidsCandidate, searchDvids, DVIDS_RENDITION } from "../content-pipeline/sources"
+import { confirmPhoto, dvidsQueries, photoChecksFor, NO_PHOTO_FIRST } from "../content-pipeline/worker"
+
+const DVIDS_ASSET = { id: "image:9500068", title: "Coyote launch at Yuma", description: "A Coyote interceptor launches during a test at Yuma Proving Ground, Ariz., Jan. 29, 2026. (U.S. Army photo by Mark Schauer)", date: "2026-01-29T00:00:00-05:00", url: "https://www.dvidshub.net/image/9500068/coyote-launch-yuma", thumbnail: "https://d1ldvf68ux039x.cloudfront.net/thumbs/photos/2601/9500068/2000w_q95.jpg", unit_name: "U.S. Army Yuma Proving Ground", credit: [{ name: "Mark Schauer", rank: "" }] }
+
+test("DVIDS API: an asset is a public-domain candidate credited as its page credits it, unless DVIDS marks it otherwise", () => {
+  const c = dvidsCandidate(DVIDS_ASSET)!
+  assert.equal(c.origin, "dvids"); assert.equal(c.pageUrl, DVIDS_ASSET.url); assert.equal(c.url, DVIDS_ASSET.thumbnail)
+  assert.equal(c.license, "Public domain (U.S. government work)"); assert.equal(c.usGovernment, true)
+  assert.equal(c.credit, "U.S. Army photo by Mark Schauer"); assert.equal(c.date, "2026-01-29"); assert.equal(c.rightsNote, undefined)
+  // No credit line in the description: the credited person and unit.
+  assert.equal(dvidsCandidate({ ...DVIDS_ASSET, description: "A Coyote launch.", credit: [{ name: "Fred Brown", rank: "SSG" }] })!.credit, "SSG Fred Brown, U.S. Army Yuma Proving Ground")
+  // Courtesy, by its credit or its description, and a copyright notice: for the reviewer to confirm.
+  for (const a of [{ ...DVIDS_ASSET, credit: "Courtesy" }, { ...DVIDS_ASSET, description: "A Coyote launch. (Photo courtesy of Raytheon)" }, { ...DVIDS_ASSET, description: "A Coyote launch. © 2026 Raytheon" }]) {
+    const x = dvidsCandidate(a)!
+    assert.equal(x.usGovernment, false); assert.equal(x.license, "Courtesy photo"); assert.match(x.rightsNote!, /not a public-domain government work/)
+  }
+  // Only a DVIDS image page with its photo on DVIDS's own image hosts.
+  assert.equal(dvidsCandidate({ ...DVIDS_ASSET, thumbnail: "https://cdn.example.com/a.jpg" }), null)
+  assert.equal(dvidsCandidate({ ...DVIDS_ASSET, url: "https://www.dvidshub.net/video/1/x" }), null)
+})
+
+test("DVIDS API: search, then each asset at a rendition no wider than the original; small, unpublished and failed assets are skipped; the key never leaks", async () => {
+  const KEY = "key-test0000000000"
+  const asked: URL[] = []
+  const fetcher = async (u: URL) => {
+    asked.push(u)
+    if (u.pathname === "/search") return new Response(JSON.stringify({ results: [
+      { id: "image:1", type: "image", width: 5000, height: 3000 }, { id: "image:2", type: "image", width: 800, height: 500 }, { id: "video:3", type: "video" },
+      { id: "image:4", type: "image", width: 1200, height: 900 }, { id: "image:5", type: "image", width: 4000, height: 3000 },
+    ] }))
+    const id = u.searchParams.get("id")!
+    if (id === "image:5") return new Response("{}", { status: 403 }) // no longer published
+    return new Response(JSON.stringify({ results: { ...DVIDS_ASSET, id, url: `https://www.dvidshub.net/image/${id.slice(6)}/x`, thumbnail: `https://d1ldvf68ux039x.cloudfront.net/thumbs/photos/1/${id.slice(6)}/${u.searchParams.get("thumb_width")}w_q95.jpg` } }))
+  }
+  const out = await searchDvids("Coyote", KEY, fetcher as never, 4)
+  assert.deepEqual(out.map(c => c.pageUrl), ["https://www.dvidshub.net/image/1/x", "https://www.dvidshub.net/image/4/x"])
+  assert.deepEqual(asked.filter(u => u.pathname === "/asset").map(u => [u.searchParams.get("id"), u.searchParams.get("thumb_width")]), [["image:1", String(DVIDS_RENDITION)], ["image:4", "1200"], ["image:5", "2000"]])
+  assert.ok(asked.every(u => u.hostname === "api.dvidshub.net" && u.searchParams.get("api_key") === KEY))
+  assert.equal(asked[0].searchParams.get("type"), "image"); assert.equal(asked[0].searchParams.get("q"), "Coyote")
+  // A failure names no URL, so the key can't reach a log.
+  await assert.rejects(searchDvids("Coyote", KEY, (async () => { throw new Error(`fetch failed https://api.dvidshub.net/search?api_key=${KEY}`) }) as never), (e: Error) => !e.message.includes(KEY))
+  await assert.rejects(searchDvids("Coyote", KEY, (async () => new Response("", { status: 403 })) as never), /dvids_search_http_403/)
+  assert.deepEqual(await searchDvids("Coyote", "", fetcher as never), [], "no key, no search")
+})
+
+test("DVIDS API searches are short: the subject's name, never the maker alone or a long phrase", () => {
+  const frame = { series: "dt101" as SeriesKey, fields: { subject_identifier: "Coyote Block 2 / Raytheon" }, mediaQuery: "Raytheon Coyote Block 2 counter-drone interceptor launch at Yuma" }
+  const q = dvidsQueries(frame, { title: "RTX's Raytheon completes three Coyote tests", publisher: "RTX" })
+  assert.ok(q.length <= 3 && q.length > 0)
+  assert.ok(q.every(x => x.split(" ").length <= 4), q.join(" | "))
+  assert.ok(!q.some(x => x.toLowerCase() === "raytheon"), q.join(" | "))
+  assert.ok(q.includes("Coyote Block 2"))
+})
+
+test("photos: DVIDS API photos are offered after the story's own pages, at most four of them", async () => {
+  let shown: string[] = []
+  const queries: string[] = []
+  const w = world({ ai: { pickMedia: async ({ candidates }) => { shown = candidates.map(c => `${c.candidate.origin}:${c.candidate.pageUrl}`); return { index: 1, reason: "the subject", ranked: [{ index: 1, box: HERO }] } } } })
+  w.deps.searchDvids = async q => { queries.push(q); return [1, 2, 3, 4, 5].map(i => dvidsCandidate({ ...DVIDS_ASSET, url: `https://www.dvidshub.net/image/${i}${queries.length}/x`, thumbnail: `https://d1ldvf68ux039x.cloudfront.net/thumbs/${i}${queries.length}/2000w_q95.jpg` })!) }
+  w.deps.fetchImage = async () => ({ bytes: new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x04, 0, 0, 0xff, 0xc0, 0x00, 0x11, 0x08, 0x05, 0x34, 0x07, 0xd0, 0x03, 0, 0, 0, 0]), mime: "image/jpeg" })
+  await w.start({ kind: "dt101" })
+  const d = onlyDraft(w)
+  assert.equal(shown.filter(s => s.startsWith("dvids:")).length, 4)
+  assert.ok(shown.indexOf(shown.find(s => s.startsWith("dvids:"))!) <= 1, "after the story's own pages")
+  assert.equal(queries.length, 1, "four photos from the first search: no more searches")
+  assert.equal(d.status, "in_review"); assert.match(d.media[0]!.pageUrl, /dvidshub\.net\/image\//)
+  assert.match(d.caption!, /Image: U\.S\. Army photo by Mark Schauer/)
+})
+
+test("photo first: a story with no usable photo is passed over before writing, and the next story's confirmed photo goes on its card", async () => {
+  const picks: string[] = [], writes: string[] = []
+  const w = world({ ai: {
+    pickMedia: async ({ story }) => { picks.push(story.title); return story.title === "Second story" ? { index: 0, reason: "the subject", ranked: [{ index: 0, box: HERO }] } : { index: null, reason: "only unrelated images" } },
+    photoSubject: async ({ story }) => ({ subject: story.title === "Second story" ? "Next-gen C2" : "C2 software", maker: "U.S. Army", query: "Army C2" }),
+  } })
+  const write = w.deps.ai
+  w.deps.ai = onCall => { const ai = write(onCall); return { ...ai, write: async i => { writes.push(i.story.title); return ai.write(i) } } }
+  w.deps.photoFirst = true
+  await w.start({ kind: "news" })
+  const d = onlyDraft(w)
+  assert.deepEqual(picks, ["Army picks nine C2 software vendors", "Second story"], "one pick per story, before writing; none again in the media step")
+  assert.deepEqual(writes, ["Second story"], "the passed-over story is never written")
+  assert.equal(d.story.title, "Second story"); assert.equal(d.story.photo?.subject, "Next-gen C2"); assert.equal(d.story.photo?.placement, "feed")
+  assert.equal(d.status, "in_review"); assert.equal(d.media[0]!.pageUrl, CANDIDATE.pageUrl); assert.deepEqual(d.media[0]!.crop, d.story.photo!.crop)
+  assert.ok(d.calls!.some(c => c.step === "photoPick"))
+})
+
+test("photo first: when no story has a photo, nothing is written and the request ends with its reason", async () => {
+  let wrote = 0
+  const w = world({ ai: { pickMedia: async () => ({ index: null, reason: "only unrelated images" }), write: async () => { wrote++; return { frames: [], caption: "" } } } })
+  w.deps.photoFirst = true
+  await w.start({ kind: "news" })
+  assert.equal(w.store.drafts.size, 0); assert.equal(wrote, 0)
+  assert.equal(w.notices.length, 1); assert.ok(w.notices[0].reason.includes(NO_PHOTO_FIRST), w.notices[0].reason)
+  assert.equal((await w.store.getJob("job-news-1"))!.status, "held")
+})
+
+test("photo first is bounded per job, skippable, and off for ICYMI; a check that errors leaves the story unchecked", async () => {
+  // Five candidates, none with a photo: count + 2 checks, then a story goes on unchecked and the media step searches.
+  let picks = 0
+  const many = world({ ai: {
+    research: async () => ({ candidates: [1, 2, 3, 4, 5].map(i => ({ title: `Story ${i}`, primaryUrl: `https://www.army.mil/article/${i}`, publisher: "U.S. Army", why: "news" })) }),
+    pickMedia: async () => { picks++; return { index: null, reason: "only unrelated images" } },
+  } })
+  many.deps.photoFirst = true
+  await many.start({ kind: "news" })
+  assert.equal(photoChecksFor(1), 3)
+  const d = onlyDraft(many)
+  assert.equal(d.story.title, "Story 4"); assert.equal(d.story.photo, undefined)
+  assert.equal(d.status, "held"); assert.match(d.holdReason!, /no relevant, licensed photo/) // the media step's own search, after writing
+  assert.ok(picks >= 4)
+  // A job whose stories bring their own photo (Human+, later) is not checked.
+  let checked = 0
+  const own = world({ ai: { photoSubject: async () => { checked++; return { subject: "x", maker: "y", query: "x" } } } })
+  own.deps.photoFirst = true
+  await own.start({ kind: "news", skipPhotoFirst: true })
+  assert.equal(checked, 0); assert.equal(onlyDraft(own).status, "in_review"); assert.equal(onlyDraft(own).story.photo, undefined)
+  // A check that errors (every vision provider down) doesn't drop the story.
+  let fails = 1
+  const down = world({ ai: { pickMedia: async () => { if (fails-- > 0) throw new Error("every provider at capacity"); return { index: 0, reason: "ok", ranked: [{ index: 0, box: HERO }] } } } })
+  down.deps.photoFirst = true
+  await down.start({ kind: "news" })
+  assert.equal(onlyDraft(down).story.title, "Army picks nine C2 software vendors"); assert.equal(onlyDraft(down).status, "in_review")
+})
+
+test("photo first: an artwork defect on the confirmed photo brings the next photo, as before", async () => {
+  let checks = 0
+  const second = { ...CANDIDATE, url: "https://upload.wikimedia.org/b.jpg", thumbUrl: "https://upload.wikimedia.org/thumb/b.jpg", pageUrl: "https://commons.wikimedia.org/wiki/File:B.jpg", title: "Vehicle close up" }
+  const w = world({ ai: { checkArtwork: async () => checks++ === 0 ? [{ defect: "the subject is hidden under the text block", photo: true }] : [] } })
+  w.deps.searchCommons = async () => [CANDIDATE, second]
+  w.deps.photoFirst = true
+  await w.start({ kind: "dt101" })
+  const d = onlyDraft(w)
+  assert.equal(d.story.photo?.candidate.pageUrl, CANDIDATE.pageUrl)
+  assert.equal(d.status, "in_review"); assert.equal(d.mediaRetries, 1); assert.equal(d.media[0]!.pageUrl, second.pageUrl)
+})
+
+test("confirmPhoto names the subject from the story, falling back to its title and publisher", async () => {
+  const w = world()
+  let subject = ""
+  const ai = { ...w.deps.ai(() => {}), pickMedia: async ({ frame }: { frame: { fields: Record<string, string> } }) => { subject = frame.fields.subject_identifier; return { index: 0, reason: "ok", ranked: [{ index: 0, box: HERO }] } } } as unknown as McuAi
+  const story = { title: "Coyote Block 2: three tests", primaryUrl: "https://www.rtx.com/news/1", publisher: "RTX", sourceTitle: "t", sourceText: ARMY_TEXT }
+  const r = await confirmPhoto(w.deps, ai, story, "dt101", "feed")
+  assert.ok("photo" in r); assert.equal(subject, "Coyote Block 2 / RTX")
+})

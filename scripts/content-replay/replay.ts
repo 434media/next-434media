@@ -2,13 +2,15 @@
  * Replays the content pipeline over the replay set with the real models through the Vercel AI Gateway, and scores each
  * story on the plan v9 pass bar (Phase 1 direction 4: a change that lowers this score does not go to a live round).
  *
- *   npx tsx --env-file=<.env with the Gateway credential> scripts/content-replay/replay.ts [--label <name>] [--only <id,id>] [--seeds <file>] [--no-fact-check]
+ *   npx tsx --env-file=<.env with the Gateway credential> scripts/content-replay/replay.ts [--label <name>] [--only <id,id>] [--seeds <file>] [--no-fact-check] [--no-photo-first] [--no-dvids]
  *
  * The models are production's (lib/content-pipeline/models.ts PIPELINE_MODELS), with production's routing. Research is
  * fixed to each captured story (pages/); the writing, the copy checks, the fit and fresh-wording passes, the photo
  * search and the photo pick run as they do in production. The photo search's pages, the images and the archive
  * searches are cached in .replay-cache/ (gitignored: photos are not ours to publish), so a rerun sees the candidates
- * the first run saw. No Canva fill, no artwork check (it needs the fill), no Firestore, no board, no Slack.
+ * the first run saw. DVIDS is searched through its API when DVIDS_API_KEY is in the env file (its results are cached
+ * by query, never by key). Photo first runs as research would run it, before writing; --no-photo-first skips it.
+ * No Canva fill, no artwork check (it needs the fill), no Firestore, no board, no Slack.
  * Cost is the Gateway's own: its credits' total used, before and after.
  * Output: results/<label>.json and results/<label>.md.
  */
@@ -23,7 +25,7 @@ import { BRAND } from "../../lib/content-pipeline/brand"
 import { createMcuAi, servedCall, type ModelCall } from "../../lib/content-pipeline/model"
 import { PIPELINE_MODELS, FALLBACK_MODELS, callOptions, outputBudget } from "../../lib/content-pipeline/models"
 import type { McuSeeds } from "../../lib/content-pipeline/seeds"
-import { fetchImage, fetchSourcePage, searchCommons, searchNasa, searchOpenverse, type SourcePage } from "../../lib/content-pipeline/sources"
+import { fetchImage, fetchSourcePage, searchCommons, searchDvids, searchNasa, searchOpenverse, type SourcePage } from "../../lib/content-pipeline/sources"
 import type { Story } from "../../lib/content-pipeline/store"
 import { holdKinds, passes, replayStory, safetyOf, SAFETY_HOLDS, type ReplayDeps, type Safety, type StoryRun } from "./core"
 import { loadPages, loadStories, REPLAY_DIR, storyOf, type ReplayStory } from "./fixtures"
@@ -103,7 +105,7 @@ function rescore(file: string): void {
   const scored: Scored[] = old.stories.map(o => {
     const s = set.stories.find(x => x.id === o.id)!
     const captured = s.kind === "icymi" ? null : loadPages(s.id)
-    const run: StoryRun = { id: o.id, kind: o.kind, end: o.end, status: o.end === "review" ? "designing" : "held", reason: o.reason, frames: o.frames, caption: o.caption, media: o.media, ...(o.notes ? { notes: o.notes } : {}), history: o.history, calls: [], ms: o.seconds * 1000, ...(o.roundup ? { roundup: o.roundup } : {}), ...(captured ? { story: storyOf(s, captured) } : {}) }
+    const run: StoryRun = { id: o.id, kind: o.kind, end: o.end, status: o.end === "review" ? "designing" : "held", reason: o.reason, frames: o.frames, caption: o.caption, media: o.media, ...(o.notes ? { notes: o.notes } : {}), ...(o.photoFirst ? { photoFirst: o.photoFirst } : {}), history: o.history, calls: [], ms: o.seconds * 1000, ...(o.roundup ? { roundup: o.roundup } : {}), ...(captured ? { story: storyOf(s, captured) } : {}) }
     const safety = o.end === "review" ? { ...safetyOf(run), factErrors: o.safety?.factErrors ?? null } : null
     const kinds = o.end === "review" ? [] : holdKinds(o.reason ?? "", o.end)
     return { run, safety, pass: !!safety && passes(run, safety), holdKinds: kinds, v9Hold: o.end === "review" ? null : kinds.some(k => SAFETY_HOLDS.includes(k as never) || k === "error"), observed: s.observed }
@@ -121,6 +123,8 @@ async function main() {
   checkCredential()
   const label = arg("--label") ?? `run-${new Date().toISOString().slice(0, 16).replace(/[-:T]/g, "")}`
   const only = arg("--only")?.split(","), seedsFile = arg("--seeds") ?? process.env.REPLAY_SEEDS, doFacts = !process.argv.includes("--no-fact-check")
+  const photoFirst = !process.argv.includes("--no-photo-first"), dvidsKey = process.argv.includes("--no-dvids") ? "" : process.env.DVIDS_API_KEY ?? ""
+  if (!dvidsKey) console.warn("DVIDS is not searched through its API (no DVIDS_API_KEY, or --no-dvids).")
   const seeds = seedsFile ? JSON.parse(readFileSync(seedsFile, "utf8")) as McuSeeds : null
   if (!seeds) console.warn("No seeds given (--seeds or REPLAY_SEEDS): the writer gets no brand direction. Production loads them from Firestore.")
   const set = loadStories(), stories = set.stories.filter(s => !only || only.includes(s.id))
@@ -134,6 +138,8 @@ async function main() {
       seeds, fetchPage: pageFetcher(captured?.pages ?? {}), fetchImage: imageFetcher,
       searchCommons: q => cached("commons", q, () => searchCommons(q)),
       searchMore: q => cached("archives", q, async () => (await Promise.all([searchOpenverse(q).catch(() => []), searchNasa(q).catch(() => [])])).flat()),
+      ...(dvidsKey ? { searchDvids: (q: string) => cached("dvids", q, () => searchDvids(q, dvidsKey)) } : {}),
+      photoFirst,
     }
     process.stdout.write(`${s.id} … `)
     let run: StoryRun
@@ -155,14 +161,14 @@ async function main() {
   const after = await gateway.getCredits()
   const cost = Number(after.totalUsed) - Number(before.totalUsed)
   const commit = (() => { try { return execSync("git rev-parse --short HEAD", { cwd: REPLAY_DIR }).toString().trim() } catch { return "unknown" } })()
-  const result = summarize({ label, started, finished: new Date().toISOString(), rules: BRAND.rulesVersion, models: PIPELINE_MODELS, factModel: doFacts ? FACT_MODEL : null, seeds: seedsFile ? { file: seedsFile.split("/").pop(), sha256: createHash("sha256").update(readFileSync(seedsFile)).digest("hex").slice(0, 16), snapshot: seeds?.snapshot ?? null } : null, head: commit, costUsd: Math.round(cost * 10_000) / 10_000 }, scored)
+  const result = summarize({ label, started, finished: new Date().toISOString(), rules: BRAND.rulesVersion, models: PIPELINE_MODELS, factModel: doFacts ? FACT_MODEL : null, seeds: seedsFile ? { file: seedsFile.split("/").pop(), sha256: createHash("sha256").update(readFileSync(seedsFile)).digest("hex").slice(0, 16), snapshot: seeds?.snapshot ?? null } : null, head: commit, costUsd: Math.round(cost * 10_000) / 10_000, photoFirst, dvids: !!dvidsKey }, scored)
   mkdirSync(RESULTS, { recursive: true })
   writeFileSync(join(RESULTS, `${label}.json`), `${JSON.stringify(result, null, 2)}\n`)
   writeFileSync(join(RESULTS, `${label}.md`), markdown(result))
   console.log(`\n${result.score.pass} of ${result.score.stories} pass (${result.score.reachedReview} reached the Canva step). Cost $${result.meta.costUsd}. Written: results/${label}.json, .md`)
 }
 
-type Meta = { rescored?: string; label: string; started: string; finished: string; rules: string; models: Record<string, string>; factModel: string | null; seeds: { file?: string; sha256: string; snapshot: string | null } | null; head: string; costUsd: number }
+type Meta = { rescored?: string; label: string; started: string; finished: string; rules: string; models: Record<string, string>; factModel: string | null; seeds: { file?: string; sha256: string; snapshot: string | null } | null; head: string; costUsd: number; photoFirst?: boolean; dvids?: boolean }
 function summarize(meta: Meta, scored: Scored[]) {
   const tokens: Record<string, { calls: number; input: number; output: number }> = {}
   for (const s of scored) for (const c of s.run.calls) { const t = tokens[`${c.step}:${c.model}`] ??= { calls: 0, input: 0, output: 0 }; t.calls++; t.input += c.inputTokens ?? 0; t.output += c.outputTokens ?? 0 }
@@ -171,9 +177,9 @@ function summarize(meta: Meta, scored: Scored[]) {
   for (const s of scored) for (const k of s.holdKinds) byKind[k] = (byKind[k] ?? 0) + 1
   return {
     meta,
-    score: { stories: scored.length, pass: count(s => s.pass), reachedReview: count(s => s.run.end === "review"), unsafeAtReview: count(s => s.run.end === "review" && !s.pass), held: count(s => s.run.end === "held"), failed: count(s => s.run.end === "failed"), noDraft: count(s => s.run.end === "none"), heldForStyleOnly: count(s => s.v9Hold === false), holdKinds: byKind },
+    score: { stories: scored.length, pass: count(s => s.pass), reachedReview: count(s => s.run.end === "review"), unsafeAtReview: count(s => s.run.end === "review" && !s.pass), held: count(s => s.run.end === "held"), failed: count(s => s.run.end === "failed"), noDraft: count(s => s.run.end === "none"), heldForStyleOnly: count(s => s.v9Hold === false), holdKinds: byKind, photoFirstSkipped: count(s => s.run.photoFirst === "skipped"), photoFirstKept: count(s => s.run.photoFirst === "kept"), photoFromDvids: count(s => s.run.media.some(m => !!m && /dvidshub\.net\/image\//.test(m.pageUrl))) },
     tokens,
-    stories: scored.map(s => ({ id: s.run.id, kind: s.run.kind, end: s.run.end, pass: s.pass, reason: s.run.reason, holdKinds: s.holdKinds, v9WouldHold: s.v9Hold, safety: s.safety, frames: s.run.frames, caption: s.run.caption, media: s.run.media, roundup: s.run.roundup, ...(s.run.notes ? { notes: s.run.notes } : {}), history: s.run.history, calls: s.run.calls.length, inputTokens: s.run.calls.reduce((n, c) => n + (c.inputTokens ?? 0), 0), outputTokens: s.run.calls.reduce((n, c) => n + (c.outputTokens ?? 0), 0), seconds: Math.round(s.run.ms / 1000), observed: s.observed.map(o => `round ${o.round} (${o.models}): ${o.outcome} — ${o.reason}`) })),
+    stories: scored.map(s => ({ id: s.run.id, kind: s.run.kind, end: s.run.end, pass: s.pass, reason: s.run.reason, holdKinds: s.holdKinds, v9WouldHold: s.v9Hold, safety: s.safety, frames: s.run.frames, caption: s.run.caption, media: s.run.media, roundup: s.run.roundup, ...(s.run.notes ? { notes: s.run.notes } : {}), ...(s.run.photoFirst ? { photoFirst: s.run.photoFirst } : {}), history: s.run.history, calls: s.run.calls.length, inputTokens: s.run.calls.reduce((n, c) => n + (c.inputTokens ?? 0), 0), outputTokens: s.run.calls.reduce((n, c) => n + (c.outputTokens ?? 0), 0), seconds: Math.round(s.run.ms / 1000), observed: s.observed.map(o => `round ${o.round} (${o.models}): ${o.outcome} — ${o.reason}`) })),
   }
 }
 function markdown(r: ReturnType<typeof summarize>): string {
@@ -185,6 +191,7 @@ function markdown(r: ReturnType<typeof summarize>): string {
     `Models: ${Object.entries(r.meta.models).map(([k, v]) => `${k} ${v}`).join(", ")}${r.meta.factModel ? ` · fact check ${r.meta.factModel}` : " · no fact check"} · seeds ${r.meta.seeds ? `${r.meta.seeds.file} (${r.meta.seeds.sha256})` : "none"}`, "",
     `**Score: ${r.score.pass} of ${r.score.stories} pass** (reach Review safe and within limits). Reached the Canva step: ${r.score.reachedReview}; of those unsafe: ${r.score.unsafeAtReview}. Held: ${r.score.held} (${r.score.heldForStyleOnly} for reasons v9 no longer holds for). Failed: ${r.score.failed}. No draft: ${r.score.noDraft}.`,
     `Hold reasons: ${Object.entries(r.score.holdKinds).map(([k, n]) => `${k} ${n}`).join(", ") || "none"}.`,
+    ...(r.meta.photoFirst !== undefined ? [`Photo first: ${r.meta.photoFirst ? `on; ${r.score.photoFirstKept ?? 0} stories had their photo confirmed before writing, ${r.score.photoFirstSkipped ?? 0} were skipped for want of one (production would try its next story; the replay can't)` : "off"}. DVIDS API: ${r.meta.dvids ? "on" : "off"}; cards with a DVIDS photo: ${r.score.photoFromDvids ?? 0}.`] : []),
     `**Cost: $${r.meta.costUsd.toFixed(4)}** (Gateway credits, total used before and after).`, "",
     "Not scored offline: the Canva fill, the artwork check and the rendered layout (the replay stops before the fill).", "",
     "| Story | Series | Replay | Why | Card copy | Gate rounds |", "|---|---|---|---|---|---|", ...rows, "",

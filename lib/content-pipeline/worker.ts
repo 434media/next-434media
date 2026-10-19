@@ -1,12 +1,12 @@
 import { SERIES, candidateFields, checkFields, clippedWords, cutOffWords, ddmmmyy, measure, normalizeFields, overLimits, type Placement, type RequestKind } from "./series"
 import { BRAND } from "./brand"
 import { headlineProblems, originalityFindings, originalityProblems, type Copied } from "./copy-checks"
-import { icymiCount, meaningful, normalizeUrl, unusedStorySlot, type Candidate, type McuAi, type ModelCall, type RankedPhoto, type SubjectBox } from "./model"
+import { framesFor, icymiCount, meaningful, normalizeUrl, unusedStorySlot, type Candidate, type McuAi, type ModelCall, type RankedPhoto, type SubjectBox } from "./model"
 import { contentPropertyOf } from "./properties"
 import type { ContentProperty, PipelineMedia } from "@/components/crm/types"
 import type { McuSeeds } from "./seeds"
 import { MIN_SHORT_SIDE, archiveRelevant, federalHost, imageSize, isDvidsImagePage, isOutlet, pageImageCandidate, type MediaCandidate, type SourcePage } from "./sources"
-import { MAX_ATTEMPTS, WORKING, type ChosenMedia, type CropBox, type FrameCopy, type FrameDesign, type McuDraft, type McuJob, type McuStore, type RoundupItem, type Story } from "./store"
+import { MAX_ATTEMPTS, WORKING, type CheckedPhoto, type ChosenMedia, type CropBox, type FrameCopy, type FrameDesign, type McuDraft, type McuJob, type McuStore, type RoundupItem, type Story } from "./store"
 
 /**
  * The pipeline worker: advances due jobs and drafts one step at a time, saving after every step, so an interrupted run
@@ -53,6 +53,14 @@ export interface WorkerDeps {
   searchCommons(query: string): Promise<MediaCandidate[]>
   /** Other open archives searched beside Commons (Openverse, NASA); each keeps only usable licenses. */
   searchMore?(query: string): Promise<MediaCandidate[]>
+  /** DVIDS image search through its API (sources.ts searchDvids, with DVIDS_API_KEY); absent without a key. */
+  searchDvids?(query: string): Promise<MediaCandidate[]>
+  /**
+   * Photo first (plan v10, Phase 1 direction 6): research confirms a usable, licensed photo of a story's subject before
+   * the story is chosen, and moves to the next candidate when there is none (confirmPhoto). Production and the replay
+   * set it; a job whose stories bring their own photo (skipPhotoFirst) is not checked.
+   */
+  photoFirst?: boolean
   /** The ICYMI lookback (content_pipeline_config/icymi_window): null days = the previous Monday-to-Sunday week. */
   icymiWindow?(): Promise<{ lookbackDays: number | null }>
   /** The one "N drafts ready" alert for a finished job. */
@@ -107,6 +115,9 @@ const MAX_SUPPORTING = 2
 const MAX_AUTO_REPLACE = 2
 const MAX_MEDIA_RETRIES = 2
 const MAX_SHOWN = 8
+/** DVIDS API searches per photo search, and the most of its photos shown to the vision pick beside the others. */
+const MAX_DVIDS_QUERIES = 3
+const MAX_DVIDS_SHOWN = 4
 const MAX_VISION_BYTES = 4_500_000
 
 const iso = (deps: Pick<WorkerDeps, "nowMs">) => new Date(deps.nowMs()).toISOString()
@@ -152,14 +163,15 @@ async function jobStep(deps: WorkerDeps, id: string, attempt: number): Promise<v
     if (job.kind === "icymi") for (const waiting of await deps.store.choosingDrafts().catch(() => [])) {
       await closeRoundup(deps.store, waiting, "the content pipeline", iso(deps), `regenerated: a new ICYMI request (${id}) replaced it`, deps.closeChoiceTask ? { close: deps.closeChoiceTask } : undefined)
     }
-    let stories: Story[] | { hold: string; tried?: string[]; triedUrls?: string[] } = job.kind === "icymi" ? icymiStory(posts, icymiWindow(deps.nowMs(), (await deps.icymiWindow?.().catch(() => null))?.lookbackDays ?? null), roundupSize()) : await researchStories(deps, ai, job, titles, seeds, [], [], inFlight)
+    const photoChecks = { left: photoChecksFor(job.count) }
+    let stories: Story[] | { hold: string; tried?: string[]; triedUrls?: string[] } = job.kind === "icymi" ? icymiStory(posts, icymiWindow(deps.nowMs(), (await deps.icymiWindow?.().catch(() => null))?.lookbackDays ?? null), roundupSize()) : await researchStories(deps, ai, job, titles, seeds, [], [], inFlight, photoChecks)
     // Every candidate dropped (a blocked or script-only source page, no readable article, outside the Breaking window):
     // research once more, steering away from what was tried, before the job holds (production, 2026-10-17).
     // Zero candidates too: that pass found nothing to try, so the second pass is the search's one retry, not a loop.
     if ("hold" in stories && "tried" in stories) {
       console.info("[content-pipeline] research again", JSON.stringify({ job: id, dropped: stories.hold.slice(0, 600) }))
       const first = stories
-      const again = await researchStories(deps, ai, job, titles, seeds, first.tried ?? [], first.triedUrls ?? [], inFlight)
+      const again = await researchStories(deps, ai, job, titles, seeds, first.tried ?? [], first.triedUrls ?? [], inFlight, photoChecks)
       stories = "hold" in again ? { hold: `${first.hold}; then: ${again.hold}`, tried: again.tried, triedUrls: again.triedUrls } : again
     }
     if (calls.length) console.info("[content-pipeline] calls", JSON.stringify({ job: id, calls }))
@@ -343,7 +355,7 @@ export async function closeRoundup(store: McuStore, draftId: string, by: string,
 }
 
 /** On a hold, `tried` and `triedUrls` name the candidates that were dropped, so a second pass can avoid them. */
-async function researchStories(deps: WorkerDeps, ai: McuAi, job: Pick<McuJob, "kind" | "count" | "topic">, recentTitles: string[], seeds: McuSeeds | null, avoid: string[] = [], avoidUrls: string[] = [], inFlight: { titles: string[]; urls: Set<string> } = { titles: [], urls: new Set() }): Promise<Story[] | { hold: string; tried?: string[]; triedUrls?: string[] }> {
+async function researchStories(deps: WorkerDeps, ai: McuAi, job: Pick<McuJob, "kind" | "count" | "topic"> & Partial<Pick<McuJob, "placement" | "skipPhotoFirst">>, recentTitles: string[], seeds: McuSeeds | null, avoid: string[] = [], avoidUrls: string[] = [], inFlight: { titles: string[]; urls: Set<string> } = { titles: [], urls: new Set() }, photoChecks?: { left: number }): Promise<Story[] | { hold: string; tried?: string[]; triedUrls?: string[] }> {
   const today = iso(deps).slice(0, 10)
   const r = await ai.research({ kind: job.kind, count: job.count, ...(job.topic ? { topic: job.topic } : {}), today, recentTitles, seeds, ...(avoid.length ? { avoid } : {}), ...(inFlight.titles.length ? { drafting: inFlight.titles } : {}) })
   const stories: Story[] = [], dropped: string[] = [], outlets = (seeds?.orgs ?? []).filter(o => o.kind === BRAND.seeds.outletKind).map(o => o.site)
@@ -402,7 +414,19 @@ async function researchStories(deps: WorkerDeps, ai: McuAi, job: Pick<McuJob, "k
       try { const sp = await deps.fetchPage(u); if (sp.text.length >= 200 && sp.url !== page.url && (COMPANY_PAGE.test(new URL(sp.url).pathname) || sameSubject(c.title, `${sp.title} ${sp.text.slice(0, 6000)}`))) supporting.push(sp) } catch { /* skipped */ }
     }
     const sourceText = storySourceText(page, supporting)
-    stories.push({ title: c.title, primaryUrl: page.url, publisher: c.publisher || page.siteName || new URL(page.url).hostname, ...(publishedAt ? { publishedAt } : {}), ...(dating ?? {}), ...(fresh ? { fresh } : {}), ...(readVia.length ? { readViaSearch: readVia } : {}), ...(job.kind === "breaking" && c.whyNow ? { whyNow: c.whyNow } : {}), sourceTitle: page.title || c.title, sourceText, ...(supporting.length ? { supporting: supporting.map(sp => ({ url: sp.url, title: sp.title || sp.url })) } : {}) })
+    const story: Story = { title: c.title, primaryUrl: page.url, publisher: c.publisher || page.siteName || new URL(page.url).hostname, ...(publishedAt ? { publishedAt } : {}), ...(dating ?? {}), ...(fresh ? { fresh } : {}), ...(readVia.length ? { readViaSearch: readVia } : {}), ...(job.kind === "breaking" && c.whyNow ? { whyNow: c.whyNow } : {}), sourceTitle: page.title || c.title, sourceText, ...(supporting.length ? { supporting: supporting.map(sp => ({ url: sp.url, title: sp.title || sp.url })) } : {}) }
+    // Photo first: a story whose subject has no usable, licensed photo is passed over for the next candidate, before
+    // anything is written. The checks are bounded per job; once spent, a story goes on unchecked and the media step
+    // searches as before. A check that errors (a provider down) leaves the story unchecked too, rather than dropping it.
+    if (photoChecks && deps.photoFirst && job.kind !== "icymi" && !job.skipPhotoFirst) {
+      if (photoChecks.left > 0) {
+        photoChecks.left--
+        const found = await confirmPhoto(deps, ai, story, job.kind, job.placement ?? "feed").catch(err => { console.error("[content-pipeline] photo first failed", story.primaryUrl, err instanceof Error ? err.message : err); return null })
+        if (found && "why" in found) { dropped.push(`${c.title}: ${NO_PHOTO_FIRST} (${found.why.slice(0, 300)})`); continue }
+        if (found) story.photo = found.photo
+      } else console.info("[content-pipeline] photo first", JSON.stringify({ story: story.primaryUrl, unchecked: "the job's photo checks are spent" }))
+    }
+    stories.push(story)
   }
   // The model's note is chatter about how it chose ("Candidates selected based on relevance…", round 2) unless it is
   // the only explanation, when nothing was found.
@@ -874,7 +898,8 @@ export function searchedPageUsable(url: string, maker: string, outlets: readonly
  * then pages the photo search found (DVIDS, other U.S. government sites, the maker's newsroom or press kit), then the
  * open archives (Wikimedia Commons, Openverse, NASA). Archive hits must tie themselves to the story (archiveRelevant).
  * Each is fetched once, sized from its own header and dropped below MIN_SHORT_SIDE; at most MAX_SHOWN go to the
- * vision pick. Sources that need a key or account (the DVIDS API) are not used until the founder adds one.
+ * vision pick. DVIDS is searched through its API when a key is set (searchDvids), and its pages found by the web
+ * search are still read as pages.
  */
 async function gatherMedia(deps: WorkerDeps, ai: McuAi, story: Story, frame: FrameCopy, avoid: string[], reuse?: MediaCandidate[], representativeOnly = false): Promise<{ candidate: MediaCandidate; image: Uint8Array; mime: string }[]> {
   const out: { candidate: MediaCandidate; image: Uint8Array; mime: string }[] = [], seen = new Set<string>(avoid)
@@ -911,6 +936,15 @@ async function gatherMedia(deps: WorkerDeps, ai: McuAi, story: Story, frame: Fra
   // is licensed to the outlet: neither is a photo source.
   for (const u of [story.primaryUrl, ...(story.supporting ?? []).map(x => x.url)].filter(u => /^https:\/\//.test(u) && !SOCIAL_HOST.test(u) && !isOutlet(u, outlets))) { try { pages.push(await deps.fetchPage(u)) } catch { /* skipped */ } }
   for (const pg of pages) await add(pageImageCandidate(pg, isDvidsImagePage(pg.url) ? "dvids" : "source"))
+  // DVIDS through its API (plan v10, Phase 1 direction 6), searched for the subject by name: a few short searches, at
+  // most MAX_DVIDS_SHOWN of its photos, so the maker's pages and the archives still have room.
+  if (deps.searchDvids) {
+    const before = out.length
+    for (const q of dvidsQueries(frame, story)) {
+      if (out.length >= MAX_SHOWN || out.length - before >= MAX_DVIDS_SHOWN) break
+      for (const c of await deps.searchDvids(q).catch(() => [])) { if (out.length - before >= MAX_DVIDS_SHOWN) break; await add(c) }
+    }
+  }
   const maker = makerOf(frame, story)
   for (const u of await ai.findPhotoPages({ story, frame }).catch(() => [])) {
     if (out.length >= MAX_SHOWN) break
@@ -1029,6 +1063,64 @@ export function choosePhoto(pick: { index: number | null; ranked?: RankedPhoto[]
   return { index: null, why: `no photo of the subject fits the ${placement === "feed" ? "4:5" : "9:16"} card (${misses.join(" · ") || "no usable candidate"})` }
 }
 
+type Shown = { candidate: MediaCandidate; image: Uint8Array; mime: string }
+interface PhotoSearch { shown: Shown[]; pick: Awaited<ReturnType<McuAi["pickMedia"]>>; chosen: ReturnType<typeof choosePhoto>; searched: boolean; repTried: boolean }
+/**
+ * One frame's photo search and pick, as the media step and photo first run it: a published post's recorded photo when
+ * one is given (reuse), else the search; the vision pick and the crop rule; then, where the series allows a
+ * representative photo and nothing qualified (gate round 6: a Breaking story about an Office of Strategic Capital loan
+ * had no candidate at all), one more search for the people, unit or equipment the story is about.
+ */
+async function searchPhoto(deps: WorkerDeps, ai: McuAi, story: Story, frame: FrameCopy, placement: Placement, avoid: string[], reuse: MediaCandidate[], log: (pass: string, r: Pick<PhotoSearch, "shown" | "pick" | "chosen">) => void): Promise<PhotoSearch> {
+  const representative = allowsRepresentative(frame)
+  let shown = reuse.length ? await gatherMedia(deps, ai, story, frame, avoid, reuse) : []
+  // Nothing recoverable from the published post: search.
+  const searched = !shown.length
+  if (searched) shown = await gatherMedia(deps, ai, story, frame, avoid)
+  let pick = await ai.pickMedia({ story, frame, candidates: shown, avoid: [...avoid], representative })
+  let chosen = choosePhoto(pick, shown.map(x => x.candidate), placement)
+  log("subject", { shown, pick, chosen })
+  let repTried = false
+  if (chosen.index === null && searched && representative) {
+    repTried = true
+    const first = shown
+    shown = await gatherMedia(deps, ai, story, frame, [...avoid, ...first.flatMap(x => [x.candidate.pageUrl, x.candidate.url])], undefined, true)
+    if (shown.length) {
+      pick = await ai.pickMedia({ story, frame, candidates: shown, avoid: [...avoid], representative })
+      chosen = choosePhoto(pick, shown.map(x => x.candidate), placement)
+    }
+    log("representative", { shown, pick, chosen })
+  }
+  return { shown, pick, chosen, searched, repTried }
+}
+const shownLog = (shown: Shown[]) => shown.map(x => `${x.candidate.origin ?? "?"}:${x.candidate.width}x${x.candidate.height}:${x.candidate.title.slice(0, 60)}`)
+/** A chosen photo as the draft records it, with the reviewer's notes: its rights, a representative photo, a fresh cover search. */
+function chosenMedia(c: MediaCandidate, ranked: RankedPhoto, crop: CropBox, fresh = ""): ChosenMedia {
+  const rep = ranked.representative ? `Representative photo${ranked.shows ? ` (${ranked.shows})` : ""}, not the event itself: check the caption doesn't present it as the event` : ""
+  return { url: c.url, pageUrl: c.pageUrl, title: c.title, license: c.license, creator: c.creator, credit: c.credit, usGovernment: c.usGovernment, ...(c.date ? { date: c.date } : {}), ...(c.rightsNote ? { rightsNote: c.rightsNote } : {}), ...(c.rightsNote || rep || fresh ? { note: [c.rightsNote, rep, fresh].filter(Boolean).join(". ") } : {}), crop, subject: { box: ranked.box, ...(ranked.core ? { core: ranked.core } : {}), context: ranked.context !== false, width: c.width, height: c.height } }
+}
+
+/** How a story passed over by photo first is described in research's drop list (and the no-content card). */
+export const NO_PHOTO_FIRST = "no relevant, licensed photo of the subject was found before writing, so the next story was tried"
+/** Photo checks per job (photo first): one for each candidate a research pass returns (count + 2). */
+export const photoChecksFor = (count: number) => count + 2
+/**
+ * Photo first (plan v10, Phase 1 direction 6): whether a usable, licensed photo of the story's subject exists before
+ * the story is written. The subject is read from the story (photoSubject; else its title and publisher), then the
+ * media step's own search and pick run on it: the story's pages, DVIDS, the photo search and the archives; the vision
+ * pick with a subject box; the crop rule (the subject whole and large, the crop at least 500 px wide, no upscaling); and
+ * a representative photo where the series allows one. The photo found is kept on the story for its card. Costs per
+ * check: one subject call and the photo search's calls on the text model, and one or two vision calls.
+ */
+export async function confirmPhoto(deps: WorkerDeps, ai: McuAi, story: Story, kind: RequestKind, placement: Placement, avoid: string[] = []): Promise<{ photo: CheckedPhoto } | { why: string }> {
+  const named = ai.photoSubject ? await ai.photoSubject({ story }).catch(() => null) : null
+  const subject = named?.subject?.trim() || story.title.split(":")[0].trim(), maker = named?.maker?.trim() || story.publisher
+  const frame: FrameCopy = { series: framesFor(kind)[0], fields: { subject_identifier: `${subject} / ${maker}` }, ...(named?.query?.trim() ? { mediaQuery: named.query.trim() } : {}) }
+  const r = await searchPhoto(deps, ai, story, frame, placement, avoid, [], (pass, x) => console.info("[content-pipeline] photo first", JSON.stringify({ story: story.primaryUrl, subject, query: frame.mediaQuery ?? null, pass, shown: shownLog(x.shown), ranked: x.pick.ranked ?? null, chosen: x.chosen.index, why: x.chosen.index === null ? x.chosen.why : null })))
+  if (r.chosen.index === null) return { why: `${r.chosen.why} (${r.pick.reason})${r.repTried ? `; a representative photo was searched for too, and ${r.shown.length ? "none of the photos found qualified" : "none was found"}` : ""}` }
+  return { photo: { candidate: r.shown[r.chosen.index].candidate, ranked: r.chosen.ranked, crop: r.chosen.crop, placement, subject } }
+}
+
 async function mediaStep(deps: WorkerDeps, ai: McuAi, d: McuDraft): Promise<void> {
   const job = await deps.store.getJob(d.jobId)
   const used = new Set<string>()
@@ -1047,33 +1139,21 @@ async function mediaStep(deps: WorkerDeps, ai: McuAi, d: McuDraft): Promise<void
     }
     const story = frameStory(d, frame), representative = allowsRepresentative(frame)
     const avoid = [...used, ...(d.avoidMedia ?? [])]
+    // Photo first: the photo research confirmed goes on the story's card, unless it must be avoided (another draft of
+    // the job uses it, or the artwork check turned it down); then the search runs as before.
+    const pre = i === 0 && frame.series !== "icymi_cover" ? d.story.photo : undefined
+    if (pre && pre.placement === d.placement && !avoid.includes(pre.candidate.pageUrl) && !avoid.includes(pre.candidate.url)) {
+      console.info("[content-pipeline] media", JSON.stringify({ draft: d.id, v: d.version, frame: i + 1, retry: d.mediaRetries ?? 0, pass: "photo first", chosen: pre.candidate.pageUrl, crop: pre.crop }))
+      media[i] = chosenMedia(pre.candidate, pre.ranked, pre.crop)
+      used.add(pre.candidate.pageUrl)
+      continue
+    }
     // The ICYMI cover reuses a story's recorded photo, the lead story's first; only when none can be recovered is the
     // lead story's photo searched for.
     const roundup = frame.series === "icymi_cover" ? d.story.roundup ?? [] : []
     const reuse = roundup.flatMap(publishedPhoto)
     const item = roundup.length ? roundup.find(p => publishedPhoto(p).length) ?? roundup[0] : undefined
-    let shown = reuse.length ? await gatherMedia(deps, ai, story, frame, avoid, reuse) : []
-    // Nothing recoverable from the published post: search, and say so.
-    const searched = !shown.length
-    if (searched) shown = await gatherMedia(deps, ai, story, frame, avoid)
-    let pick = await ai.pickMedia({ story, frame, candidates: shown, avoid: [...avoid], representative })
-    let chosen = choosePhoto(pick, shown.map(x => x.candidate), d.placement)
-    const log = (pass: string) => console.info("[content-pipeline] media", JSON.stringify({ draft: d.id, v: d.version, frame: i + 1, retry: d.mediaRetries ?? 0, representative, pass, shown: shown.map(x => `${x.candidate.origin ?? "?"}:${x.candidate.width}x${x.candidate.height}:${x.candidate.title.slice(0, 60)}`), ranked: pick.ranked ?? null, turnedDown: pick.turnedDown ?? null, chosen: chosen.index, crop: chosen.index === null ? null : chosen.crop, why: chosen.index === null ? chosen.why : null }))
-    log("subject")
-    // No photo of the subject, where the series allows a representative one (gate round 6: a Breaking story about an
-    // Office of Strategic Capital loan had no candidate at all): one more search, for the people, unit or equipment the
-    // story is about, before the draft gives up on the subject.
-    let repTried = false
-    if (chosen.index === null && searched && representative) {
-      repTried = true
-      const first = shown
-      shown = await gatherMedia(deps, ai, story, frame, [...avoid, ...first.flatMap(x => [x.candidate.pageUrl, x.candidate.url])], undefined, true)
-      if (shown.length) {
-        pick = await ai.pickMedia({ story, frame, candidates: shown, avoid: [...avoid], representative })
-        chosen = choosePhoto(pick, shown.map(x => x.candidate), d.placement)
-      }
-      log("representative")
-    }
+    const { shown, pick, chosen, searched, repTried } = await searchPhoto(deps, ai, story, frame, d.placement, avoid, reuse, (pass, x) => console.info("[content-pipeline] media", JSON.stringify({ draft: d.id, v: d.version, frame: i + 1, retry: d.mediaRetries ?? 0, representative, pass, shown: shownLog(x.shown), ranked: x.pick.ranked ?? null, turnedDown: x.pick.turnedDown ?? null, chosen: x.chosen.index, crop: x.chosen.index === null ? null : x.chosen.crop, why: x.chosen.index === null ? x.chosen.why : null })))
     if (chosen.index === null) {
       d.media = media
       // No photo of the subject: like a source that can't support the post, the subject is replaced (MAX_AUTO_REPLACE).
@@ -1083,8 +1163,7 @@ async function mediaStep(deps: WorkerDeps, ai: McuAi, d: McuDraft): Promise<void
     const c = shown[chosen.index].candidate
     used.add(c.pageUrl)
     const fresh = item && searched ? `No story's published post has a recorded photo${reuse.length ? " that could be fetched" : ""}, so the cover's was searched for: check it against ${item.postId}` : ""
-    const rep = chosen.ranked.representative ? `Representative photo${chosen.ranked.shows ? ` (${chosen.ranked.shows})` : ""}, not the event itself: check the caption doesn't present it as the event` : ""
-    media[i] = { url: c.url, pageUrl: c.pageUrl, title: c.title, license: c.license, creator: c.creator, credit: c.credit, usGovernment: c.usGovernment, ...(c.date ? { date: c.date } : {}), ...(c.rightsNote ? { rightsNote: c.rightsNote } : {}), ...(c.rightsNote || rep || fresh ? { note: [c.rightsNote, rep, fresh].filter(Boolean).join(". ") } : {}), crop: chosen.crop, subject: { box: chosen.ranked.box, ...(chosen.ranked.core ? { core: chosen.ranked.core } : {}), context: chosen.ranked.context !== false, width: c.width, height: c.height } }
+    media[i] = chosenMedia(c, chosen.ranked, chosen.crop, fresh)
   }
   d.media = media
   // Credits and the DoD non-endorsement line belong to the caption the reviewer approves.
@@ -1104,6 +1183,14 @@ export function mediaQueries(frame: FrameCopy, story: Pick<Story, "title">): str
   const [subject = "", maker = ""] = (frame.fields.subject_identifier ?? "").split("/").map(x => x.trim())
   const out = [mq, words(mq.split(",")[0], 6), words(mq, 3), subject && maker ? `${subject} ${maker}` : "", subject, maker, story.title.split(":")[0], story.title]
   return [...new Set(out.map(q => q.replace(/[^\p{L}\p{N}\s.\-'&]/gu, " ").replace(/\s+/g, " ").trim()).filter(q => q.length > 2))]
+}
+/**
+ * DVIDS API searches: the short ones of mediaQueries (at most four words; its search matches every word, and a long
+ * phrase finds nothing), never the maker alone (a prime's name alone returns its every photo), at most MAX_DVIDS_QUERIES.
+ */
+export function dvidsQueries(frame: FrameCopy, story: Pick<Story, "title" | "publisher">): string[] {
+  const maker = makerOf(frame, story).toLowerCase()
+  return mediaQueries(frame, story).filter(q => q.split(" ").length <= 4 && q.toLowerCase() !== maker).slice(0, MAX_DVIDS_QUERIES)
 }
 // Wording as on the approved, published MCU posts (ULTRA, HIMARS).
 const MONTHS3 = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"]
@@ -1259,7 +1346,8 @@ async function sourceHold(deps: WorkerDeps, ai: McuAi, d: McuDraft, reason: stri
   d.autoReplaced = (d.autoReplaced ?? 0) + 1
   const rejected = [...new Set([d.story.title, ...(d.rejected ?? [])])]
   const inFlight = await storiesInFlight(deps, d.id)
-  const found = await researchStories(deps, ai, { ...job, count: 1 }, (await deps.content.recentPosts()).map(x => x.title), await deps.seeds(), rejected, [d.story.primaryUrl], inFlight)
+  // The replacement is chosen photo first too, with its own bound (a replacement research pass is one story's).
+  const found = await researchStories(deps, ai, { ...job, count: 1 }, (await deps.content.recentPosts()).map(x => x.title), await deps.seeds(), rejected, [d.story.primaryUrl], inFlight, { left: photoChecksFor(1) })
   if ("hold" in found || !found.length) return hold(deps, d, `${reason} No replacement subject qualified: ${"hold" in found ? found.hold : "none found"}`)
   const was = d.story.title
   d.rejected = rejected; d.story = found[0]

@@ -107,3 +107,17 @@ test("holds are sorted as plan v9 sorts them: safety reasons stay holds, style r
   for (const k of ["photo", "limits", "figures", "subject"] as const) assert.ok(SAFETY_HOLDS.includes(k))
   for (const k of ["originality", "headline", "format"] as const) assert.ok(!SAFETY_HOLDS.includes(k))
 })
+
+test("photo first in a replay: a story with no usable photo is held before writing and counted as skipped; one with a photo keeps it on its card", async () => {
+  let wrote = 0
+  const skipped = await replayStory(byId("xtend-striker"), loadPages("xtend-striker"), { ...deps({ pickMedia: async () => ({ index: null, reason: "only unrelated images" }), write: async () => { wrote++; throw new Error("must not write") } }), photoFirst: true })
+  assert.equal(skipped.end, "held"); assert.equal(skipped.photoFirst, "skipped"); assert.equal(wrote, 0)
+  assert.deepEqual(holdKinds(skipped.reason!, skipped.end), ["photo"])
+  let picks = 0
+  const kept = await replayStory(byId("xtend-striker"), loadPages("xtend-striker"), { ...deps({
+    pickMedia: async () => { picks++; return { index: 0, reason: "the subject", ranked: [{ index: 0, box: { x0: 0.3, y0: 0.15, x1: 0.7, y1: 0.65 } }] } },
+    write: async () => ({ frames: [{ series: "news" as SeriesKey, fields: { headline: "XTEND WINS A BIG ARMY DRONE ORDER", deck: "The award follows a top finish in a Pentagon drone competition.", source: "XTEND" }, mediaQuery: "XTEND STRIKER drone" }], caption: "XTEND will supply STRIKER drone systems under the new order.\n\nSource: XTEND, 13OCT26" }),
+  }), photoFirst: true })
+  assert.equal(kept.end, "review", kept.reason ?? ""); assert.equal(kept.photoFirst, "kept"); assert.equal(picks, 1, "the photo picked before writing is the card's")
+  assert.equal(kept.media[0]?.pageUrl, PHOTO.pageUrl)
+})

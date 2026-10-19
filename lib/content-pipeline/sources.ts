@@ -327,3 +327,73 @@ export function pageImageCandidate(page: SourcePage, origin: "source" | "dvids")
     ...(gov ? {} : { rightsNote: govNote ?? `Company media from ${host}: confirm its terms allow editorial use before approving` }),
   }
 }
+
+// ── DVIDS, through its API (plan v10, Phase 1 direction 6) ──
+/** An image asset as the DVIDS asset API returns it (api.dvidshub.net/docs/asset_api). */
+export interface DvidsAsset {
+  id?: string; title?: string; description?: string; date?: string; url?: string; image?: string; thumbnail?: string | { url?: string }
+  unit_name?: string; branch?: string
+  /** Who created the asset, or "Courtesy" when unknown (the docs: "[array|string]"). */
+  credit?: { name?: string; rank?: string }[] | string
+  dimensions?: { width?: string | number; height?: string | number }
+}
+/**
+ * A DVIDS asset as a photo candidate, with the rights read as a DVIDS page's are (pageImageCandidate): DVIDS media is
+ * produced by the DoD or a federal agency and public domain "unless other copyright status is indicated" (DVIDS's
+ * copyright terms), so a courtesy or copyright notice in its description, or a credit of "Courtesy", makes it a
+ * courtesy photo for the reviewer to confirm. The credit is the "(U.S. Army photo by …)" line from the description,
+ * as on a DVIDS page; without one, the credited person and unit. The photo is the asset's rendition at `width` px,
+ * never wider than the original (no upscaling), from DVIDS's own image host.
+ */
+export function dvidsCandidate(a: DvidsAsset): MediaCandidate | null {
+  const thumb = typeof a.thumbnail === "string" ? a.thumbnail : a.thumbnail?.url
+  if (!a.url || !isDvidsImagePage(a.url) || !thumb || !/^https:\/\//.test(thumb) || !GOV_MEDIA_HOSTS.includes(new URL(thumb).hostname.toLowerCase())) return null
+  const description = strip(a.description), people = Array.isArray(a.credit) ? a.credit.map(c => strip(`${c.rank ?? ""} ${c.name ?? ""}`)).filter(Boolean) : []
+  const courtesy = /\((?:[^)]*?)courtesy(?: of)? ([^)]{2,80})\)/i.exec(description)?.[1] ?? (typeof a.credit === "string" && /courtesy/i.test(a.credit) ? a.unit_name || "the provider" : undefined)
+  const copyright = /©|\(c\)\s*(19|20)\d{2}|\bcopyright(ed)?\s+(\(c\)|(19|20)\d{2}|by\b)|all rights reserved/i.test(description)
+  const gov = !courtesy && !copyright
+  const govCredit = /\(((?:U\.S\.|US) [A-Za-z .]+? (?:photo|illustration|graphic)(?: by [^)]{2,80})?)\)/.exec(description)?.[1]
+  const creator = (gov ? govCredit : courtesy) ?? ([people.join(", "), strip(a.unit_name)].filter(Boolean).join(", ") || "DVIDS")
+  const date = /^\d{4}-\d{2}-\d{2}/.exec(a.date ?? "")?.[0]
+  return {
+    origin: "dvids", url: thumb, thumbUrl: thumb, pageUrl: a.url, title: strip(a.title).slice(0, 200) || "DVIDS image", description: description.slice(0, 400),
+    width: 0, height: 0, creator: creator.slice(0, 200),
+    license: gov ? "Public domain (U.S. government work)" : "Courtesy photo",
+    credit: gov ? creator.slice(0, 200) : `${creator.slice(0, 160)} (courtesy)`, usGovernment: gov,
+    ...(date ? { date } : {}),
+    ...(gov ? {} : { rightsNote: `DVIDS marks this photo ${courtesy ? `courtesy of ${courtesy}` : "with a copyright notice"}, so it is not a public-domain government work: confirm its terms allow editorial use before approving` }),
+  }
+}
+/** The rendition width asked of DVIDS: its largest thumbnail (2000 px), or the original's width when smaller. */
+export const DVIDS_RENDITION = 2000
+/**
+ * DVIDS image search through its API with the public key (api.dvidshub.net/docs/search_api), then each hit's asset
+ * record (asset_api) for its full description, credit and a rendition. A hit whose short side is under MIN_SHORT_SIDE
+ * is skipped before its asset is read. An asset the API reports as not published (403) is skipped: DVIDS's terms
+ * oblige users to stop using it. The key is sent only to api.dvidshub.net and never appears in an error or a log.
+ */
+export async function searchDvids(query: string, apiKey: string, fetcher: Fetcher = fetch as Fetcher, limit = 4): Promise<MediaCandidate[]> {
+  if (!apiKey) return []
+  const get = async (path: string, params: Record<string, string>) => {
+    const u = new URL(`https://api.dvidshub.net/${path}`)
+    u.search = new URLSearchParams({ ...params, api_key: apiKey }).toString()
+    let res: Response
+    // A network error names no URL here, so the key can't reach a log through it.
+    try { res = await fetcher(u, { headers: { "user-agent": USER_AGENT, accept: "application/json" }, cache: "no-store", signal: AbortSignal.timeout(15_000) }) } catch { throw new Error(`dvids_${path}_unreachable`) }
+    if (!res.ok) throw new Error(`dvids_${path}_http_${res.status}`)
+    return res.json() as Promise<unknown>
+  }
+  const found = await get("search", { q: query, type: "image", max_results: String(Math.min(limit * 3, 50)) }) as { results?: { id?: string; type?: string; width?: number; height?: number }[] }
+  const out: MediaCandidate[] = [], seen = new Set<string>()
+  for (const r of found.results ?? []) {
+    if (out.length >= limit) break
+    if (r.type !== "image" || !r.id || !/^image:\d+$/.test(r.id) || seen.has(r.id)) continue
+    seen.add(r.id)
+    if (r.width && r.height && Math.min(r.width, r.height) < MIN_SHORT_SIDE) continue
+    const width = Math.min(DVIDS_RENDITION, r.width || DVIDS_RENDITION)
+    const asset = await get("asset", { id: r.id, thumb_width: String(width) }).catch(() => null) as { results?: DvidsAsset } | null
+    const c = asset?.results ? dvidsCandidate(asset.results) : null
+    if (c && !out.some(o => o.pageUrl === c.pageUrl)) out.push(c)
+  }
+  return out
+}

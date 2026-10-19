@@ -45,6 +45,11 @@ export interface McuAi {
   /** DVIDS image pages (and official .mil/.gov photo pages) showing the card's subject, found by web search. */
   /** representative: also pages showing the people, unit or equipment the story is about (News, Breaking; never DT101). */
   findPhotoPages(input: { story: Story; frame: FrameCopy; representative?: boolean }): Promise<string[]>
+  /**
+   * Photo first (plan v10, Phase 1 direction 6): before a story is written, what its card would show, read from the
+   * story: the subject's name and maker as a card names them, and a short archive search for it (1–4 words).
+   */
+  photoSubject?(input: { story: Story }): Promise<{ subject: string; maker: string; query: string }>
   /** The best candidate, and for each relevant one (best first) where its subject sits, so the server can test the 4:5 crop. */
   /** representative: the story may use a representative photo (News, Breaking, ICYMI stories; never DT101). */
   pickMedia(input: { story: Story; frame: FrameCopy; candidates: { candidate: MediaCandidate; image: Uint8Array; mime: string }[]; avoid: string[]; representative?: boolean }): Promise<{ index: number | null; reason: string; ranked?: RankedPhoto[]; turnedDown?: string[] }>
@@ -343,6 +348,15 @@ export function createMcuAi(deps: { models: Record<PipelineStep, string>; search
       }), r => submitted<{ pages: string[] }>(r, "submit_pages"))
       const listed = new Set(searched.urls.map(normalizeUrl))
       return [...new Set((picked.pages ?? []).filter(u => /^https:\/\//.test(u) && listed.has(normalizeUrl(u))))].slice(0, 8)
+    },
+
+    async photoSubject({ story }) {
+      return run("photoSearch", model => generateText({
+        model, maxOutputTokens: outputBudget(model, 4_000), providerOptions: callOptions(model, "low"),
+        tools: { name_subject: tool({ description: "Name what the story's card would show.", inputSchema: z.object({ subject: z.string().describe("the system, product, vehicle, unit or program the story is about, by its own name or designation, as the source writes it (PAC-3 MSE, Coyote Block 2, 1st Cavalry Division); never a sentence"), maker: z.string().describe("the company or agency that makes or runs it, as the source names it"), query: z.string().describe("a 1–4 word photo-archive search for the subject itself: its designation or name, with no maker, verbs or adjectives") }) }) }, toolChoice: { type: "tool", toolName: "name_subject" },
+        messages: [{ role: "system", content: `You read the story behind ${BRAND.photos.searchSubject} and name what its photo would show. Use only names the source uses. Answer through the tool.` },
+          { role: "user", content: `Story: ${story.title}\nPublisher: ${story.publisher}\nSource: ${story.sourceTitle}\n${story.sourceText.slice(0, 4_000)}` }],
+      }), r => submitted<{ subject: string; maker: string; query: string }>(r, "name_subject"))
     },
 
     async pickMedia({ story, frame, candidates, avoid, representative }) {
