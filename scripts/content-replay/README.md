@@ -13,6 +13,7 @@ npx tsx --env-file=.env.local scripts/content-replay/replay.ts --label <name> --
 - `--only raid-hunter,rtx-coyote` replays some stories; `--no-fact-check` skips the scorer's fact check.
 - **DVIDS** is searched through its API when `DVIDS_API_KEY` is in the env file (`vercel env pull` brings it); `--no-dvids` leaves it out. Its results are cached by query, never by key.
 - **Photo first** (plan v10) runs before writing, as research runs it; `--no-photo-first` leaves it out. Research is fixed to the captured story, so a story with no usable photo can't move to the next candidate here: it is held, and the table counts it as skipped by photo first. What production gains from trying the next story is not measured offline.
+- **The brand profile** is MilCityUSA's published profile, read from Firestore (`brand_profiles/milcity`; set `FIRESTORE_EMULATOR_HOST` to read the emulator), or `--profile <file>` / `REPLAY_PROFILE`: a private copy outside this repository, such as a version's 434-context backup record. The run prints the version it used.
 - The seeds are the brand direction the writer gets (Firestore `content_pipeline_config/mcu_seeds` in production). They stay out of this public repository, so pass a local export, or set `REPLAY_SEEDS`.
 - Output: `results/<name>.json` (every story's copy, photo, history, safety checks and calls) and `results/<name>.md` (the table).
 - Cost: the Gateway's own figure, its credits' total used before and after the run. It includes the scorer's fact check.

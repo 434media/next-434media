@@ -45,6 +45,10 @@ it. Use the module's `toIsoString()` pattern; never call `.toDate()` bare.
 before returning. Skipping it is the usual cause of "I saved it but the table
 still shows the old value" — the read is served from the 30s cache.
 
+**One exception: brand profiles are never cached.** `lib/firestore-brand-profiles.ts`
+reads the published profile on every request, so a Publish governs the next
+run. Don't add the list cache there.
+
 ## Adding a field
 
 1. Add it to the type in `types/crm-types.ts`.

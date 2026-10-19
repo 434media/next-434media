@@ -41,9 +41,11 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
   const postIds = Array.isArray(body?.postIds) && body.postIds.length <= 20 && body.postIds.every(x => typeof x === "string" && /^[A-Za-z0-9_-]{1,128}$/.test(x)) ? body.postIds as string[] : null
   if (!postIds && !close) return NextResponse.json({ error: "postIds: the chosen stories' post ids, or close: true" }, { status: 400 })
   try {
-    const [{ firestorePipelineStore }, { chooseRoundup, closeRoundup }, { choiceTasks }] = await Promise.all([import("@/lib/firestore-content-pipeline"), import("@/lib/content-pipeline/worker"), import("@/lib/content-pipeline/run")])
+    const [{ firestorePipelineStore }, { chooseRoundup, closeRoundup }, { choiceTasks }, { requirePublishedProfile }, { withProfile }, { DEFAULT_PROPERTY }] = await Promise.all([import("@/lib/firestore-content-pipeline"), import("@/lib/content-pipeline/worker"), import("@/lib/content-pipeline/run"), import("@/lib/firestore-brand-profiles"), import("@/lib/content-pipeline/brand"), import("@/lib/content-pipeline/properties")])
     const by = auth.session.email.toLowerCase(), now = new Date().toISOString()
-    const r = postIds ? await chooseRoundup(firestorePipelineStore(), id, postIds, by, now, choiceTasks) : await closeRoundup(firestorePipelineStore(), id, by, now, "closed in the Admin", choiceTasks)
+    // The published profile, read from the database for this request (no cache).
+    const active = await requirePublishedProfile(DEFAULT_PROPERTY)
+    const r = await withProfile(active, () => postIds ? chooseRoundup(firestorePipelineStore(), id, postIds, by, now, choiceTasks) : closeRoundup(firestorePipelineStore(), id, by, now, "closed in the Admin", choiceTasks))
     if ("error" in r) return NextResponse.json({ error: r.error }, { status: 400 })
     console.info(`[content-pipeline] roundup ${postIds ? "chosen" : "closed"}`, JSON.stringify({ draft: id, by, stories: postIds?.length ?? 0 }))
     return NextResponse.json({ ok: true })

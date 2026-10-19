@@ -4,12 +4,13 @@ import { useCallback, useEffect, useRef, useState } from "react"
 import Link from "next/link"
 import { useSearchParams } from "next/navigation"
 import { Newspaper, X, Loader2, ArrowUpRight } from "lucide-react"
-import { DEFAULT_PROPERTY, PIPELINE_PROPERTIES, PROPERTY_TEMPLATES } from "@/lib/content-pipeline/properties"
+import { DEFAULT_PROPERTY, PIPELINE_PROPERTIES, type PipelineTemplate } from "@/lib/content-pipeline/properties"
 import type { RequestKind } from "@/lib/content-pipeline/series"
 
 // The board's Generate control (content pipeline, lib/content-pipeline/): choose a property, then one of its
-// templates, then an optional instruction, and start a batch; then see where each draft stands. Only MilCityUSA has
-// templates connected (founder, 2026-10-17). Drafts land in the Review column as content posts with their rendered
+// templates, then an optional instruction, and start a batch; then see where each draft stands. A brand's templates
+// come from its published brand profile, read from the database (GET /api/admin/brand-profiles); only MilCityUSA has
+// one (founder, 2026-10-17), and a brand without a valid published profile is not offered. Drafts land in the Review column as content posts with their rendered
 // Canva card; nothing here approves or publishes. Super-admin only (the API enforces it).
 
 type Kind = RequestKind
@@ -23,7 +24,8 @@ const STATUS_LABEL: Record<string, string> = {
   choosing: "Waiting for your choice", queued: "Queued", writing: "Writing", media: "Finding a photo", designing: "Filling Canva", reviewing: "Checking artwork", posting: "Adding to board", in_review: "In Review",
 }
 const SETTLED = new Set(["done", "held", "failed", "in_review", "choosing"])
-const kindLabel = (k: string, property = DEFAULT_PROPERTY) => PROPERTY_TEMPLATES[property]?.find(t => t.kind === k)?.label ?? k
+interface BrandView { id: string; label: string; active: boolean; versionId: string | null; templates: PipelineTemplate[]; reason: string | null }
+const kindLabel = (brands: BrandView[], k: string, property = DEFAULT_PROPERTY) => brands.find(b => b.id === property)?.templates.find(t => t.kind === k)?.label ?? k
 const propertyLabel = (id: string) => PIPELINE_PROPERTIES.find(p => p.id === id)?.label ?? id
 
 interface RoundupView { postId: string; title: string; publishedAt?: string; card?: { url: string } }
@@ -94,6 +96,7 @@ export function ContentGenerate({ onDraftsReady }: { onDraftsReady?: () => void 
   const [starting, setStarting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [runs, setRuns] = useState<RunsResponse | null>(null)
+  const [brands, setBrands] = useState<BrandView[]>([])
   const ready = useRef<Set<string>>(new Set())
   const ref = useRef<HTMLDivElement>(null)
 
@@ -111,6 +114,11 @@ export function ContentGenerate({ onDraftsReady }: { onDraftsReady?: () => void 
 
   const active = !!runs?.jobs.some(j => !SETTLED.has(j.status) || j.drafts.some(d => !SETTLED.has(d.status)))
   useEffect(() => { void load() }, [load])
+  // The brands and their templates, from the published profiles, each time the panel opens (a Publish shows at once).
+  useEffect(() => {
+    if (!open) return
+    void fetch("/api/admin/brand-profiles", { cache: "no-store" }).then(r => r.ok ? r.json() : null).then((d: { brands?: BrandView[] } | null) => { if (d?.brands) setBrands(d.brands) }).catch(() => {})
+  }, [open])
   // Opened from the choice alert: show the picker for that draft.
   useEffect(() => { if (linked && /^[A-Z0-9-]{10,40}$/.test(linked)) { setChoosing(linked); setOpen(true) } }, [linked])
   useEffect(() => {
@@ -183,15 +191,16 @@ export function ContentGenerate({ onDraftsReady }: { onDraftsReady?: () => void 
             <div className="space-y-1">
               <label className="text-xs font-medium text-neutral-700" htmlFor="gen-property">Brand</label>
               <select id="gen-property" value={property} onChange={e => setProperty(e.target.value)} className="w-full h-8 rounded-md ring-1 ring-neutral-200 bg-white px-2 text-sm">
-                {PIPELINE_PROPERTIES.map(p => (
-                  <option key={p.id} value={p.id} disabled={!p.active}>{p.label}{p.active ? "" : ` — ${p.reason}`}</option>
-                ))}
+                {PIPELINE_PROPERTIES.map(p => {
+                  const b = brands.find(x => x.id === p.id), offered = !!b?.active
+                  return <option key={p.id} value={p.id} disabled={!offered}>{p.label}{offered ? "" : ` — ${b?.reason ?? (brands.length ? p.reason : "Loading…")}`}</option>
+                })}
               </select>
             </div>
             <fieldset className="space-y-1">
               <legend className="text-xs font-medium text-neutral-700">Template</legend>
               <div className="rounded-md ring-1 ring-neutral-200 divide-y divide-neutral-100" role="radiogroup" aria-label="Template">
-                {(PROPERTY_TEMPLATES[property] ?? []).map(t => (
+                {(brands.find(b => b.id === property && b.active)?.templates ?? []).map(t => (
                   <label key={t.kind} className={`flex items-start gap-2 px-2.5 py-2 cursor-pointer ${kind === t.kind ? "bg-neutral-50" : "hover:bg-neutral-50"}`}>
                     <input type="radio" name="gen-template" value={t.kind} checked={kind === t.kind} onChange={() => setKind(t.kind)} className="mt-0.5" />
                     <span className="min-w-0">
@@ -223,10 +232,10 @@ export function ContentGenerate({ onDraftsReady }: { onDraftsReady?: () => void 
               <p className="text-xs text-amber-700 bg-amber-50 ring-1 ring-amber-200 rounded px-2 py-1.5">Source seeds aren&apos;t loaded, so research runs on the editorial rules alone.</p>
             )}
             {error && <p className="text-xs text-red-600">{error}</p>}
-            <button type="button" onClick={start} disabled={starting}
+            <button type="button" onClick={start} disabled={starting || !brands.some(b => b.id === property && b.active)}
               className="w-full inline-flex items-center justify-center gap-2 h-9 rounded-md bg-neutral-900 text-white text-sm font-medium hover:bg-neutral-800 disabled:opacity-50">
               {starting && <Loader2 className="w-4 h-4 animate-spin" />}
-              Start {kindLabel(kind, property)}{kind !== "icymi" && count > 1 ? ` × ${count}` : ""}
+              Start {kindLabel(brands, kind, property)}{kind !== "icymi" && count > 1 ? ` × ${count}` : ""}
             </button>
           </div>
 
@@ -236,7 +245,7 @@ export function ContentGenerate({ onDraftsReady }: { onDraftsReady?: () => void 
               {runs.jobs.map(j => (
                 <div key={j.id} className="space-y-1">
                   <p className="text-xs text-neutral-700">
-                    <span className="font-medium">{propertyLabel(j.property)} · {kindLabel(j.kind, j.property)}{j.count > 1 ? ` × ${j.count}` : ""}</span>
+                    <span className="font-medium">{propertyLabel(j.property)} · {kindLabel(brands, j.kind, j.property)}{j.count > 1 ? ` × ${j.count}` : ""}</span>
                     <span className="text-neutral-400"> · {STATUS_LABEL[j.status] ?? j.status} · {new Date(j.createdAt).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}</span>
                   </p>
                   {j.note && <p className="text-[11px] text-neutral-500">{j.note}</p>}

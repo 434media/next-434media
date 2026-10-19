@@ -4,6 +4,7 @@ import { requireSuperAdmin } from "../auth"
 import { REQUEST_KINDS } from "@/lib/content-pipeline/series"
 import { DEFAULT_PROPERTY, propertyCanGenerate } from "@/lib/content-pipeline/properties"
 import type { McuJob } from "@/lib/content-pipeline/store"
+import type { BrandProfile } from "@/lib/content-pipeline/profile"
 
 export const runtime = "nodejs"
 // The run continues after the response (next/server after()) for up to this long; the cron picks up the rest.
@@ -30,7 +31,18 @@ export async function POST(req: NextRequest) {
   const parsed = input.safeParse(await req.json().catch(() => null))
   if (!parsed.success) return NextResponse.json({ error: "Choose a property, a template (news, breaking, dt101, icymi), a count of 1–5 and an optional instruction" }, { status: 400 })
   const a = parsed.data
-  if (!propertyCanGenerate(a.property, a.kind)) return NextResponse.json({ error: "That property has no templates connected yet; only MilCityUSA can generate" }, { status: 400 })
+  // The brand's published profile, read from the database for this request (no cache): an unpublished or invalid
+  // profile offers nothing.
+  let profile: BrandProfile | null = null
+  try {
+    const { readPublishedProfile } = await import("@/lib/firestore-brand-profiles")
+    const r = await readPublishedProfile(a.property)
+    profile = "active" in r ? r.active.profile : null
+  } catch (err) {
+    console.error("[POST /api/admin/content-pipeline/generate] profile not read:", err)
+    return NextResponse.json({ error: "Could not read the brand profile" }, { status: 500 })
+  }
+  if (!propertyCanGenerate(a.property, a.kind, profile)) return NextResponse.json({ error: "That brand has no published profile with that template yet" }, { status: 400 })
   const job: McuJob = {
     id: `job-${a.requestId}`, property: a.property, kind: a.kind as McuJob["kind"], count: a.kind === "icymi" ? 1 : a.count, ...(a.topic ? { topic: a.topic } : {}),
     placement: "feed", request: { actorEmail: auth.session.email.toLowerCase(), actorName: auth.session.name || "" },

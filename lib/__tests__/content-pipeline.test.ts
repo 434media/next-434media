@@ -1,5 +1,6 @@
 /**
- * Offline. The content pipeline (lib/content-pipeline/) against an in-memory store with the real lease rules; the
+ * The content pipeline (lib/content-pipeline/) against an in-memory store with the real lease rules, under MilCityUSA's
+ * published brand profile read from the database first (./published-profile.ts); the
  * models, Canva, the board write and the web are scripted. Nothing reaches Firestore, Canva, a model or Slack.
  * Ported from the pilot's lib/__tests__/mcu.test.ts (b36e7be): the Slack review and revision tests moved out with
  * those paths; the board write, the one alert per run and the model routing are tested here instead.
@@ -16,12 +17,15 @@ import { archiveRelevant, assertPublicHttps, federalHost, guardedFetch, isOutlet
 import { brandDirection, isPhotoDefect, meaningful, readPick, searchResultUrls, servedBy, servedCall, type McuAi, type ModelCall } from "../content-pipeline/model"
 import { PIPELINE_MODELS, FALLBACK_MODELS, CALL_FALLBACK, callOptions, outputBudget } from "../content-pipeline/models"
 import { seedBrief, seedProblems, type McuSeeds } from "../content-pipeline/seeds"
-import { PIPELINE_PROPERTIES, PROPERTY_TEMPLATES, contentPropertyOf, propertyCanGenerate } from "../content-pipeline/properties"
+import { PIPELINE_PROPERTIES, contentPropertyOf, propertyCanGenerate, templatesOf } from "../content-pipeline/properties"
+import { published as publishedProfile, loadPublishedProfileFirst } from "./published-profile"
 import { BRANDS, CONTENT_PROPERTIES } from "../../components/crm/types"
 import { candidateFields, cutOffWords } from "../content-pipeline/series"
 import { candidateProblems, copyProblems, MAX_CANDIDATE_BATCHES } from "../content-pipeline/worker"
 import { sourcedFacts, MIN_FACTS, placeholderLines, unsourcedClaims } from "../content-pipeline/worker"
 import { factsBrief, FACTS_RULE } from "../content-pipeline/model"
+
+loadPublishedProfileFirst()
 
 // ── in-memory store with the Firestore store's lease semantics ──
 class MemStore implements McuStore {
@@ -600,9 +604,9 @@ test("properties: the roster's five, only MilCityUSA can generate, and only from
   assert.deepEqual(PIPELINE_PROPERTIES.map(p => p.label), ["MilCityUSA", "TXMX Boxing", "VemosVamos", "DEVSA", "Digital Canvas"])
   assert.deepEqual(PIPELINE_PROPERTIES.filter(p => p.active).map(p => p.id), ["milcity"])
   assert.ok(PIPELINE_PROPERTIES.filter(p => !p.active).every(p => p.reason === "No templates connected yet"))
-  assert.deepEqual(PROPERTY_TEMPLATES.milcity.map(t => t.kind), ["news", "breaking", "dt101", "icymi"])
-  assert.deepEqual(PROPERTY_TEMPLATES.milcity.find(t => t.kind === "dt101")!.templates, [SERIES.dt101.templates.feed])
-  assert.ok(propertyCanGenerate("milcity", "dt101")); assert.ok(!propertyCanGenerate("txmx", "news")); assert.ok(!propertyCanGenerate("milcity", "followon_text"))
+  assert.deepEqual(templatesOf(publishedProfile.milcity).map(t => t.kind), ["news", "breaking", "dt101", "icymi"])
+  assert.deepEqual(templatesOf(publishedProfile.milcity).find(t => t.kind === "dt101")!.templates, [SERIES.dt101.templates.feed])
+  assert.ok(propertyCanGenerate("milcity", "dt101", publishedProfile.milcity)); assert.ok(!propertyCanGenerate("txmx", "news", publishedProfile.milcity)); assert.ok(!propertyCanGenerate("milcity", "followon_text", publishedProfile.milcity))
 })
 
 test("photo relevance: archive hits must tie to the story — the Dragon Con 'Hivemind' panel and a logo never reach the pick (production, 2026-10-17)", async () => {

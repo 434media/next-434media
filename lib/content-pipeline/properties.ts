@@ -1,6 +1,6 @@
 import type { Brand, ContentProperty } from "@/components/crm/types"
 import type { LeadPlatform } from "@/types/crm-types"
-import { loadProfile, profileProblems, type RequestKind } from "./profile"
+import type { BrandProfile, RequestKind } from "./profile"
 
 /**
  * The properties the Generate panel offers (the CRM roster; the UI word is "Brand", the code keeps "brand" and
@@ -27,14 +27,14 @@ export function contentPropertyOf(id: string | undefined): ContentProperty {
 }
 
 /**
- * What a property's templates generate: the request kinds in its brand profile, with the brand templates (feed) each
- * fills. A property whose profile is missing or fails validation generates nothing, so Generate never offers it.
+ * What a brand's templates generate: the request kinds in its published brand profile (read from the database), with
+ * the brand templates (feed) each fills. A brand whose profile is missing or fails validation has none, so Generate
+ * never offers it. Client-safe: the profile is passed in, never imported.
  */
 export interface PipelineTemplate { kind: RequestKind; label: string; templates: string[]; detail: string }
-export const PROPERTY_TEMPLATES: Record<string, readonly PipelineTemplate[]> = Object.fromEntries(PIPELINE_PROPERTIES.filter(p => !profileProblems(p.id).length).map(p => {
-  const b = loadProfile(p.id)
-  return [p.id, b.requestKinds.map(k => ({ kind: k.kind, label: k.label, templates: k.series.map(s => b.series[s]!.templates.feed), detail: k.detail }))]
-}))
-export function propertyCanGenerate(id: string, kind: string): boolean {
-  return !!PIPELINE_PROPERTIES.find(p => p.id === id && p.active) && !!PROPERTY_TEMPLATES[id]?.some(t => t.kind === kind)
+export function templatesOf(profile: BrandProfile): PipelineTemplate[] {
+  return profile.requestKinds.map(k => ({ kind: k.kind, label: k.label, templates: k.series.map(s => profile.series[s]!.templates.feed), detail: k.detail }))
+}
+export function propertyCanGenerate(id: string, kind: string, profile: BrandProfile | null): boolean {
+  return !!PIPELINE_PROPERTIES.find(p => p.id === id && p.active) && !!profile && profile.id === id && templatesOf(profile).some(t => t.kind === kind)
 }

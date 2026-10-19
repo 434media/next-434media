@@ -1,10 +1,10 @@
-import { BRAND } from "./brand"
+import { BRAND, live } from "./brand"
 import type { ProfileSeries, SeriesKey } from "./profile"
 
 /**
  * Card formats and their on-card fields: the mechanics of filling a Canva brand template. Which templates a property
- * uses, their fields and limits, are the property's brand profile (./profile.ts), loaded through ./brand.ts; SERIES
- * is the running brand's catalog. Every template's live dataset is checked again before each design is created
+ * uses, their fields and limits, are the property's brand profile (./profile.ts), read from the database through ./brand.ts;
+ * SERIES is the running brand's catalog. Every template's live dataset is checked again before each design is created
  * (fields not on a template's dataset stop the run rather than vanishing).
  *
  * Fixed design (chips, logos, banner, scrim, locks) is never touched: autofill only fills these named slots, and
@@ -43,8 +43,8 @@ export interface Series {
   requestable: boolean
 }
 
-/** The running brand's series, from its profile; a series the profile doesn't bind is absent. */
-export const SERIES = BRAND.series as Record<SeriesKey, ProfileSeries>
+/** The running brand's series, from its published profile (read live); a series the profile doesn't bind is absent. */
+export const SERIES = live(() => BRAND.series as Record<SeriesKey, ProfileSeries>)
 
 const MONTHS = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"]
 /** 2026-09-14 → 14SEP26. */

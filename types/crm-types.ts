@@ -579,6 +579,9 @@ export const CRM_COLLECTIONS = {
   CONTENT_PIPELINE_DRAFTS: "content_pipeline_drafts",
   // Settings the pipeline reads at run time; doc "mcu_seeds" holds the private Tracker seeds (not in this repo).
   CONTENT_PIPELINE_CONFIG: "content_pipeline_config",
+  // Brand profiles (lib/firestore-brand-profiles.ts): one document per brand, draft and published, with every
+  // published version kept in its versions subcollection. The content pipeline reads the published one per request.
+  BRAND_PROFILES: "brand_profiles",
 } as const
 
 // ============================================
