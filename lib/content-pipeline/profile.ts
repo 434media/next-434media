@@ -1,16 +1,16 @@
-import milcity from "@/lib/brand-profiles/milcity.json"
 import type { Series } from "./series"
 
 /**
- * Brand profiles: everything that makes a post one property's post. The engine (lib/content-pipeline/) holds only
- * mechanics; each property's editorial rules, Canva template catalog, research and photo briefs, identifiers and seed
- * shape live in its profile, a reviewed document in 434-context (`06 Standards/Brand Profiles/<Brand>.md`). Its
- * generator (`04 Build/brand_profile_extract.py`) validates it and emits lib/brand-profiles/<id>.json, which is
- * generated output: never edit it by hand (scripts/check_drift.py re-hashes it against lib/brand-profiles/manifest.json).
+ * Brand profiles: everything that makes a post one brand's post. The engine (lib/content-pipeline/) holds only
+ * mechanics; each brand's editorial rules, Canva template catalog, research and photo briefs, identifiers and seed
+ * shape live in its profile, which lives in Firestore (lib/firestore-brand-profiles.ts, `brand_profiles/<id>`), not in
+ * this public repository. Edits are drafts; Publish validates the draft with validateProfile below and keeps every
+ * published version (who, when), restorable in one action. Each published version is backed up to 434-context as a
+ * record; 434-context is no longer where profiles are edited.
  *
- * The emitted file is validated again here, by the same rules, and a brand whose profile fails is refused: loadProfile
- * throws, and the Generate panel does not offer it (properties.ts). Sensitive material (the seeds themselves) is never
- * in a profile; it stays in Firestore.
+ * A profile that fails validation cannot be published, and a published profile is validated again whenever it is
+ * read, so a brand whose profile fails is not offered and the engine refuses to run it. Sensitive material (the seeds
+ * themselves) is never in a profile; it stays in its own Firestore document.
  */
 export const PROFILE_SCHEMA = "434-brand-profile/1"
 
@@ -70,8 +70,6 @@ export interface BrandProfile {
   seeds: { orgKinds: string[]; outletKind: string; lookFirst: { label: string; kinds: string[]; sites: boolean }[]; backlog?: { kind: RequestKind; label: string } }
 }
 
-const EMITTED: Record<string, unknown> = { milcity }
-
 type Obj = Record<string, unknown>
 const isObj = (v: unknown): v is Obj => !!v && typeof v === "object" && !Array.isArray(v)
 const str = (v: unknown, max: number, empty = false) => typeof v === "string" && (empty || v.trim() !== "") && v.length <= max
@@ -84,7 +82,7 @@ function keys(o: unknown, where: string, required: string[], optional: string[],
   return true
 }
 
-/** Problems with an emitted profile (empty = loadable). Mirrors brand_profile_extract.py's validate(). */
+/** Problems with a profile (empty = publishable and runnable). Publish and every read run it. */
 export function validateProfile(v: unknown): string[] {
   const p: string[] = []
   if (!keys(v, "profile", ["schema", "generatedBy", "profile", "profileVersion", "profileDate", "profileSha256", "id", "name", "shortName", "rulesVersion", "draftPrefix", "never", "editorial", "series", "requestKinds", "research", "photos", "posts", "seeds"], ["headlineRules", "checks", "timeZone"], p)) return p
@@ -189,13 +187,16 @@ export function validateProfile(v: unknown): string[] {
   return p
 }
 
-/** Why a property can't be generated from its profile (empty = it can). */
-export function profileProblems(id: string, emitted: Record<string, unknown> = EMITTED): string[] {
-  return id in emitted ? validateProfile(emitted[id]) : [`no brand profile for ${id}`]
+/** Why a brand can't be generated from its profile (empty = it can). `profiles` holds the published profiles read. */
+export function profileProblems(id: string, profiles: Record<string, unknown>): string[] {
+  if (!(id in profiles) || profiles[id] == null) return [`no brand profile for ${id}`]
+  const problems = validateProfile(profiles[id])
+  if (!problems.length && (profiles[id] as { id?: unknown }).id !== id) problems.push(`the profile's id is not ${id}`)
+  return problems
 }
 /** The validated profile, or an error: the engine never runs a brand whose profile fails validation. */
-export function loadProfile(id: string, emitted: Record<string, unknown> = EMITTED): BrandProfile {
-  const problems = profileProblems(id, emitted)
+export function loadProfile(id: string, profiles: Record<string, unknown>): BrandProfile {
+  const problems = profileProblems(id, profiles)
   if (problems.length) throw new Error(`The ${id} brand profile failed validation, so the content pipeline will not run it: ${problems.slice(0, 8).join("; ")}`)
-  return emitted[id] as BrandProfile
+  return profiles[id] as BrandProfile
 }

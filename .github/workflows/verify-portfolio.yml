@@ -90,8 +90,28 @@ jobs:
       - run: tsx --test lib/__tests__/owned-meta-service.test.ts
       # Canva brand-template fill for the Slack app, including the photo crop (sharp runs for real here).
       - run: tsx --test lib/__tests__/canva-create.test.ts
+      # Brand profiles live in Firestore, not in this public repository (plan v11 Step 1): the generated copies
+      # under lib/brand-profiles/ must not come back.
+      - run: test ! -e lib/brand-profiles
+
+      # The content-pipeline and brand-profile tests run on the committed fixture profile
+      # (lib/__tests__/fixtures/brand-profile.fixture.json): an invented brand with made-up text and template ids, since
+      # real profiles are not in this public repository. They always run here, with no secret.
       # Content pipeline in the Admin (moved from the pilot's Slack MCU skill): research → copy → photo → Canva →
       # artwork check → a Review post on the board, the lease rules and the zero-retention model routing. All faked.
       - run: tsx --test lib/__tests__/content-pipeline.test.ts
-      # Brand profiles: the generated MilCityUSA profile validates, matches its manifest hash, and a failing one is refused.
-      - run: tsx --test lib/__tests__/brand-profile.test.ts
+      # Brand profiles: the profile validates and a failing one is refused; Publish refuses an invalid draft or an
+      # unchanged one, Restore republishes without losing draft edits, the engine reads the profile in scope, and posts
+      # are stamped.
+      - run: tsx --test lib/__tests__/brand-profile.test.ts lib/__tests__/brand-profile-store.test.ts
+
+      # Optional: the same suites again on MilCityUSA's real published profile, when the BRAND_PROFILE_FIXTURE Actions
+      # secret holds a published version's 434-context backup record. Secrets are not given to pull requests from
+      # forks and are masked in logs. Without the secret this step says so and passes.
+      - name: Tests on the real MilCityUSA profile (optional)
+        env:
+          BRAND_PROFILE_FIXTURE: ${{ secrets.BRAND_PROFILE_FIXTURE }}
+        run: |
+          if [ -z "$BRAND_PROFILE_FIXTURE" ]; then echo "No BRAND_PROFILE_FIXTURE secret: ran on the fixture profile only."; exit 0; fi
+          printf '%s' "$BRAND_PROFILE_FIXTURE" > "$RUNNER_TEMP/brand-profile.json"
+          BRAND_PROFILE_FILE="$RUNNER_TEMP/brand-profile.json" tsx --test lib/__tests__/content-pipeline.test.ts lib/__tests__/brand-profile.test.ts lib/__tests__/brand-profile-store.test.ts

@@ -12,7 +12,15 @@ export async function PUT(req: NextRequest) {
   const auth = await requireSuperAdmin()
   if ("error" in auth) return NextResponse.json({ error: auth.error }, { status: auth.status })
   const body = await req.json().catch(() => null)
-  const problems = seedProblems(body)
+  let problems: string[]
+  try {
+    // The seed shape comes from the brand's published profile, read from the database for this request.
+    const [{ requirePublishedProfile }, { withProfile }, { DEFAULT_PROPERTY }] = await Promise.all([import("@/lib/firestore-brand-profiles"), import("@/lib/content-pipeline/brand"), import("@/lib/content-pipeline/properties")])
+    problems = withProfile(await requirePublishedProfile(DEFAULT_PROPERTY), () => seedProblems(body))
+  } catch (err) {
+    console.error("[PUT /api/admin/content-pipeline/seeds] profile not read:", err)
+    return NextResponse.json({ error: "Could not read the brand profile" }, { status: 500 })
+  }
   if (problems.length) return NextResponse.json({ error: "Seeds not usable", problems }, { status: 400 })
   const b = body as McuSeeds
   const seeds: McuSeeds = { purpose: b.purpose.trim(), cohorts: b.cohorts, orgs: b.orgs.map(o => ({ name: o.name, site: o.site, kind: o.kind })), dt101Backlog: b.dt101Backlog.map(x => ({ subject: x.subject, maker: x.maker, url: x.url })), dt101Covered: b.dt101Covered, snapshot: b.snapshot.trim(), updatedAt: new Date().toISOString(), updatedBy: auth.session.email.toLowerCase() }

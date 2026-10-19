@@ -71,8 +71,8 @@ export interface Candidate { title: string; primaryUrl: string; publisher: strin
 export interface ModelCall { step: PipelineStep; model: string; provider?: string; finishReason?: string; inputTokens?: number; outputTokens?: number; /** Set when this call is the fallback for a model that could not answer. */ fallbackFrom?: string; fallbackReason?: string }
 
 /** The cached prefix: the profile's editorial rules, then its headline and originality rules when it carries them. */
-const EDITORIAL = BRAND.headlineRules ? `${BRAND.editorial}\n\n${BRAND.headlineRules}` : BRAND.editorial
-const system = (extra: string) => [{ role: "system" as const, content: EDITORIAL, providerOptions: { anthropic: { cacheControl: { type: "ephemeral" as const } } } }, { role: "system" as const, content: extra }]
+const editorial = () => BRAND.headlineRules ? `${BRAND.editorial}\n\n${BRAND.headlineRules}` : BRAND.editorial
+const system = (extra: string) => [{ role: "system" as const, content: editorial(), providerOptions: { anthropic: { cacheControl: { type: "ephemeral" as const } } } }, { role: "system" as const, content: extra }]
 
 /** The writer is told each limit exactly, as the server measures it (series.ts overLimits): every character counts. */
 const COUNTS = "letters, spaces and punctuation all count"

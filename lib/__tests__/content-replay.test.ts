@@ -2,7 +2,8 @@
  * Offline. The content pipeline's replay set and harness (scripts/content-replay/): the fixtures are complete, a
  * replayed story runs the real worker from writing to the Canva step against an in-memory store, research stays fixed
  * to the captured story, ICYMI eligibility is the engine's, and holds are sorted the way plan v9 sorts them. The models,
- * the photo search and the images are scripted; nothing reaches a model, a site, Firestore or Canva.
+ * the photo search and the images are scripted; nothing reaches a model, a site or Canva. The brand profile is read
+ * from the database first (./published-profile.ts).
  * Run: tsx --test lib/__tests__/content-replay.test.ts
  */
 import { test } from "node:test"
@@ -12,6 +13,9 @@ import type { SeriesKey } from "../content-pipeline/series"
 import type { MediaCandidate } from "../content-pipeline/sources"
 import { FIXED_RESEARCH, cutOffWords, holdKinds, passes, replayStory, safetyOf, SAFETY_HOLDS, type ReplayDeps } from "../../scripts/content-replay/core"
 import { loadPages, loadStories, storyOf } from "../../scripts/content-replay/fixtures"
+import { loadPublishedProfileFirst } from "./published-profile"
+
+loadPublishedProfileFirst()
 
 const set = loadStories()
 const byId = (id: string) => set.stories.find(s => s.id === id)!

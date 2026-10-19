@@ -145,6 +145,43 @@ they are deliberately not migrated into the default DB.
 **No `Sparkles` or `Wand2` icons.** Pick something semantically grounded
 instead — these read as generic AI filler.
 
+**Brand profiles live in Firestore, not in this repository** (plan v11 Step 1).
+Each brand's rules for the content engine (editorial and headline rules, series
+and Canva templates, research and photo briefs, seed shape, examples) are one
+document, `brand_profiles/<id>`, with every published version kept in its
+`versions` subcollection. Edit a draft, then Publish: Publish validates with
+`validateProfile` ([lib/content-pipeline/profile.ts](lib/content-pipeline/profile.ts))
+and refuses an invalid profile; Restore republishes an earlier version as a new
+one. Until the Brands area's screens exist (Step 4), a working session edits
+through [scripts/brand-profiles/profile.ts](scripts/brand-profiles/profile.ts)
+or the `/api/admin/brand-profiles` routes, the same publish path. Never commit a
+profile, its rules or its seeds here: the repository is public, and
+`python3 scripts/check_drift.py` fails if `lib/brand-profiles/` comes back.
+Earlier versions of `lib/brand-profiles/milcity.json` remain in git history;
+history is not rewritten.
+
+- **Read fresh, never cached.** Every entry point reads the published profile
+  from the database ([lib/firestore-brand-profiles.ts](lib/firestore-brand-profiles.ts))
+  and runs the engine inside `withProfile()`
+  ([lib/content-pipeline/brand.ts](lib/content-pipeline/brand.ts)). `BRAND`,
+  `SERIES` and `KIND_CODE` are live views of the profile in scope and throw
+  outside one. This is a deliberate exception to the firestore-collection
+  skill's 30-second cache.
+- **Stamped.** Every post the pipeline writes carries `profile_version_id`
+  (`milcity@v1`) on `crm_content_posts`.
+- **Backed up as a record.** Each published version is committed to the
+  `records/brand-profile-backups` branch of 434-context when
+  `BRAND_PROFILE_BACKUP_GITHUB_TOKEN` is set; otherwise its backup stays
+  `pending` and `profile.ts backup-pending` writes it out for a pull request.
+  434-context is no longer where profiles are edited, and its
+  `brand_profile_extract.py` is no longer the way in.
+- **Tests run on an invented fixture.** By default the content-pipeline and
+  brand-profile tests use `lib/__tests__/fixtures/brand-profile.fixture.json`,
+  an invented brand with made-up text and template ids, so they run anywhere,
+  CI included. `BRAND_PROFILE_FILE` (a private copy outside the repository) or
+  `FIRESTORE_EMULATOR_HOST` runs them on the real profile. Tests and scripts
+  never touch production by default: the scripts need `--production`.
+
 ## Working on the AI paths
 
 All model calls route through the Vercel AI Gateway via

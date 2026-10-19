@@ -9,7 +9,7 @@ import type { RequestKind } from "./profile"
  * kinds, the order research looks in, and which kind uses the backlog. The field names (dt101Backlog, dt101Covered)
  * are stored values and are not renamed. Without seeds, research still runs on the editorial rules alone.
  */
-export const SEED_ORG_KINDS: readonly string[] = BRAND.seeds.orgKinds
+export const seedOrgKinds = (): readonly string[] => BRAND.seeds.orgKinds
 export interface SeedOrg { name: string; site: string; kind: string }
 export interface McuSeeds {
   purpose: string
@@ -47,7 +47,7 @@ export function seedProblems(v: unknown): string[] {
   if (!str(s.purpose, 2000)) p.push("purpose: 1–2,000 characters")
   if (!str(s.snapshot, 300)) p.push("snapshot: 1–300 characters")
   if (!Array.isArray(s.cohorts) || s.cohorts.length > 20 || !s.cohorts.every(c => str(c, 500))) p.push("cohorts: up to 20 lines of at most 500 characters")
-  if (!Array.isArray(s.orgs) || s.orgs.length > 200 || !s.orgs.every(o => o && str(o.name, 120) && str(o.site, 120) && (SEED_ORG_KINDS as readonly string[]).includes(o.kind))) p.push(`orgs: up to 200 of {name, site, kind: ${SEED_ORG_KINDS.join(" | ")}}`)
+  if (!Array.isArray(s.orgs) || s.orgs.length > 200 || !s.orgs.every(o => o && str(o.name, 120) && str(o.site, 120) && seedOrgKinds().includes(o.kind))) p.push(`orgs: up to 200 of {name, site, kind: ${seedOrgKinds().join(" | ")}}`)
   if (!Array.isArray(s.dt101Backlog) || s.dt101Backlog.length > 100 || !s.dt101Backlog.every(b => b && str(b.subject, 200) && str(b.maker, 120) && typeof b.url === "string" && /^https:\/\//.test(b.url) && b.url.length <= 500)) p.push("dt101Backlog: up to 100 of {subject, maker, url (https)}")
   if (!Array.isArray(s.dt101Covered) || s.dt101Covered.length > 100 || !s.dt101Covered.every(c => str(c, 200))) p.push("dt101Covered: up to 100 subjects")
   return p

@@ -1,5 +1,5 @@
 import { SERIES, candidateFields, checkFields, clippedWords, cutOffWords, ddmmmyy, measure, normalizeFields, overLimits, type Placement, type RequestKind } from "./series"
-import { BRAND } from "./brand"
+import { BRAND, live } from "./brand"
 import { headlineProblems, originalityFindings, originalityProblems, type Copied } from "./copy-checks"
 import { framesFor, icymiCount, meaningful, normalizeUrl, unusedStorySlot, type Candidate, type McuAi, type ModelCall, type RankedPhoto, type SubjectBox } from "./model"
 import { contentPropertyOf } from "./properties"
@@ -102,7 +102,7 @@ async function storiesInFlight(deps: WorkerDeps, exceptDraft?: string): Promise<
  * product page) counts as current; but a dated page is a news hook, and it must be from the last 90 days. A stale
  * page is a miss like an unreadable one, so the subject's other primary pages are tried before it drops.
  */
-export const RECENCY_DAYS: Partial<Record<RequestKind, number>> = Object.fromEntries(BRAND.requestKinds.filter(k => k.recencyDays).map(k => [k.kind, k.recencyDays]))
+export const RECENCY_DAYS: Partial<Record<RequestKind, number>> = live(() => Object.fromEntries(BRAND.requestKinds.filter(k => k.recencyDays).map(k => [k.kind, k.recencyDays])))
 export function staleSource(kind: RequestKind, publishedAt: string | undefined, nowMs: number, within?: number): string | null {
   const days = within ?? RECENCY_DAYS[kind]
   if (!days) return null
@@ -122,7 +122,7 @@ const MAX_VISION_BYTES = 4_500_000
 
 const iso = (deps: Pick<WorkerDeps, "nowMs">) => new Date(deps.nowMs()).toISOString()
 /** Each request kind's code in draft ids ("MCU-NEWS-20261018-01"), and its label, from the brand profile. */
-export const KIND_CODE = Object.fromEntries(BRAND.requestKinds.map(k => [k.kind, k.code])) as Record<RequestKind, string>
+export const KIND_CODE = live(() => Object.fromEntries(BRAND.requestKinds.map(k => [k.kind, k.code])) as Record<RequestKind, string>)
 export const label = (k: RequestKind) => BRAND.requestKinds.find(x => x.kind === k)?.label ?? k
 
 /** Runs due work until the time budget is spent. Returns how many steps ran. */

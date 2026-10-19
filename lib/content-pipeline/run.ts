@@ -1,11 +1,15 @@
 import { gateway } from "@ai-sdk/gateway"
-import { BRAND } from "./brand"
+import { BRAND, activeProfile, withProfile, type ActiveProfile } from "./brand"
+import { DEFAULT_PROPERTY } from "./properties"
 import { createMcuAi } from "./model"
 import { PIPELINE_MODELS } from "./models"
 import { fetchImage, fetchSourcePage, searchCommons, searchDvids, searchNasa, searchOpenverse } from "./sources"
 import { runDue, label, type ChoiceTasks, type PostRow, type WorkerDeps } from "./worker"
 import type { McuDraft, McuJob } from "./store"
 import { adoptablePost, pipelineMarked } from "./ownership"
+
+/** Every post the pipeline writes carries the published profile version it ran under (crm_content_posts). */
+export const profileStamp = () => ({ profile_version_id: activeProfile().versionId })
 
 /** The ICYMI choice's CRM task: completed, with what happened in its notes (who chose and when, or why it closed). */
 export const choiceTasks: ChoiceTasks = {
@@ -63,7 +67,7 @@ export async function pipelineDeps(): Promise<WorkerDeps> {
         // Idempotent on requestId: a resumed step finds the post it already created, and only a post it created.
         const post = adoptablePost(await tools.intake.findByRequestId(p.requestId)) ?? await crm.createContentPost(pipelineMarked({
           user: p.requestedBy.name, date_created: now.slice(0, 10), platform: p.property, status: "needs_approval", title: p.title,
-          notes: p.notes, social_copy: p.caption, links: p.links, pipeline_media: p.media, assets: [], tags: BRAND.posts.tag, social_platforms: ["instagram", "facebook"],
+          notes: p.notes, social_copy: p.caption, links: p.links, pipeline_media: p.media, assets: [], tags: BRAND.posts.tag, social_platforms: ["instagram", "facebook"], ...profileStamp(),
           intake: { requestId: p.requestId, metaBrand: BRAND.posts.metaBrand, requestedBy: p.requestedBy.email, at: now },
         }))
         if (post.assets.length && post.export_fingerprint) return { postId: post.id, holds: [] }
@@ -89,7 +93,7 @@ export async function pipelineDeps(): Promise<WorkerDeps> {
         const post = await crm.createContentPost(pipelineMarked({
           user: p.requestedBy.name, date_created: now.slice(0, 10), platform: p.property, status: "needs_approval", title: p.title.slice(0, 200),
           notes: `The content pipeline found no new content for this request, so nothing was drafted. Confirm to close it.\n\nWhy: ${p.reason}`.slice(0, 4000),
-          links: p.tried.map(t => t.url), assets: [], tags: BRAND.posts.tag, social_platforms: [],
+          links: p.tried.map(t => t.url), assets: [], tags: BRAND.posts.tag, social_platforms: [], ...profileStamp(),
           intake: { requestId: p.requestId, metaBrand: BRAND.posts.metaBrand, requestedBy: p.requestedBy.email, at: now },
           pipeline_outcome: { kind: "no_new_content", job_id: p.jobId, reason: p.reason, tried: p.tried },
         }))
@@ -126,7 +130,20 @@ export async function pipelineDeps(): Promise<WorkerDeps> {
   }
 }
 
-/** Runs due pipeline work for up to budgetMs. */
-export async function runPipeline(budgetMs: number): Promise<{ steps: number }> {
-  return { steps: await runDue(await pipelineDeps(), budgetMs) }
+/**
+ * Runs due pipeline work for up to budgetMs, under the brand's published profile: the one the caller already read and
+ * checked for this request (Generate passes the version it validated), or else read from the database now (never
+ * cached: a Publish governs the next run). Only MilCityUSA runs today; when a second brand does, each job's property
+ * chooses its profile. With no valid published profile nothing runs, and the reason is returned rather than thrown,
+ * so the minute cron reports a skip, not an error.
+ */
+export async function runPipeline(budgetMs: number, active?: ActiveProfile): Promise<{ steps: number; profileVersionId: string } | { steps: 0; skipped: string }> {
+  if (!active) {
+    const { readPublishedProfile } = await import("@/lib/firestore-brand-profiles")
+    const r = await readPublishedProfile(DEFAULT_PROPERTY)
+    if ("problems" in r) return { steps: 0, skipped: `no runnable ${DEFAULT_PROPERTY} brand profile: ${r.problems.slice(0, 3).join("; ")}` }
+    active = r.active
+  }
+  const run = active
+  return withProfile(run, async () => ({ steps: await runDue(await pipelineDeps(), budgetMs), profileVersionId: run.versionId }))
 }

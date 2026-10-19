@@ -1,43 +1,44 @@
 /**
- * Offline. Brand profiles (lib/content-pipeline/profile.ts): the emitted MilCityUSA profile loads and validates, a
- * profile that fails validation is refused, and nothing the engine needs is missing from it.
+ * Brand profiles (lib/content-pipeline/profile.ts): the profile in scope (./published-profile.ts: the committed,
+ * invented fixture by default, or a real published profile from the database) loads and validates, a profile that
+ * fails validation is refused, and nothing the engine needs is missing from it. No model, Canva or web call.
  * Run: tsx --test lib/__tests__/brand-profile.test.ts
  */
 import { test } from "node:test"
 import assert from "node:assert/strict"
-import { createHash } from "node:crypto"
-import { readFileSync } from "node:fs"
-import milcity from "../brand-profiles/milcity.json"
-import manifest from "../brand-profiles/manifest.json"
+import { existsSync } from "node:fs"
 import { loadProfile, profileProblems, validateProfile } from "../content-pipeline/profile"
-import { PIPELINE_PROPERTIES, PROPERTY_TEMPLATES, propertyCanGenerate } from "../content-pipeline/properties"
+import { PIPELINE_PROPERTIES, propertyCanGenerate, templatesOf } from "../content-pipeline/properties"
 import { SERIES } from "../content-pipeline/series"
 import { MCU_BRAND_TEMPLATES } from "../canva-create"
 import { headlineProblems, longestSharedRun, originalityProblems, words } from "../content-pipeline/copy-checks"
 import type { SeriesKey } from "../content-pipeline/profile"
 import type { FrameCopy } from "../content-pipeline/store"
+import { published, loadPublishedProfileFirst } from "./published-profile"
 
-const clone = () => structuredClone(milcity) as unknown as Record<string, unknown>
+loadPublishedProfileFirst()
+const clone = () => structuredClone(published.milcity) as unknown as Record<string, unknown>
 
-test("the emitted MilCityUSA profile validates, and the engine runs it", () => {
-  assert.deepEqual(validateProfile(milcity), [])
-  const p = loadProfile("milcity")
-  assert.equal(p.name, "MilCityUSA"); assert.equal(p.draftPrefix, "MCU")
-  assert.equal(SERIES.dt101.templates.feed, "EAHYOAJhC_8")
+test("the brand profile in scope (the fixture, or a real one read from the database) validates, and the engine runs it", () => {
+  assert.deepEqual(validateProfile(published.milcity), [])
+  const p = loadProfile("milcity", { milcity: published.milcity })
+  assert.equal(p.id, "milcity"); assert.equal(p.draftPrefix, "MCU")
+  assert.match(published.active.versionId, published.real ? /^(milcity@v\d+|file:[0-9a-f]{16})$/ : /^fixture@v0$/)
+  assert.equal(SERIES.dt101.templates.feed, p.series.dt101!.templates.feed)
 })
 
-test("the generated profile is not hand-edited: it matches the hash its manifest records", () => {
-  const bytes = readFileSync(new URL("../brand-profiles/milcity.json", import.meta.url))
-  assert.equal(createHash("sha256").update(bytes).digest("hex").slice(0, 16), manifest.profiles.milcity.artifactSha256)
-  assert.equal(manifest.profiles.milcity.profileSha256, milcity.profileSha256)
+test("the profile's rules are no longer in this public repository", () => {
+  for (const f of ["../brand-profiles/milcity.json", "../brand-profiles/manifest.json"]) assert.ok(!existsSync(new URL(f, import.meta.url)), f)
 })
 
 test("a profile that fails validation is refused: loadProfile throws and Generate doesn't offer the brand", () => {
   const broken = clone(); delete broken.editorial
   assert.match(validateProfile(broken).join("; "), /editorial is required/)
   assert.throws(() => loadProfile("milcity", { milcity: broken }), /failed validation, so the content pipeline will not run it/)
-  assert.deepEqual(profileProblems("txmx"), ["no brand profile for txmx"])
-  assert.ok(!PROPERTY_TEMPLATES.txmx && !propertyCanGenerate("txmx", "news"))
+  assert.deepEqual(profileProblems("txmx", {}), ["no brand profile for txmx"])
+  assert.ok(!propertyCanGenerate("txmx", "news", null) && !propertyCanGenerate("milcity", "news", null))
+  // A valid profile filed under another brand's id is refused too.
+  assert.deepEqual(profileProblems("txmx", { txmx: published.milcity }), ["the profile's id is not txmx"])
   // Unknown keys, unknown formats and a request kind pointing at a missing series are all refused.
   const extra = clone(); extra.slogan = "x"
   assert.match(validateProfile(extra).join("; "), /profile\.slogan is not a profile key/)
@@ -49,18 +50,17 @@ test("a profile that fails validation is refused: loadProfile throws and Generat
   assert.match(validateProfile(field).join("; "), /series\.news\.fields\[0\]\.perLine: 1–200/)
 })
 
-test("the Generate panel's templates come from the profile, as they were in code", () => {
-  assert.deepEqual(PROPERTY_TEMPLATES.milcity, [
-    { kind: "news", label: "News", templates: ["EAHXWo1LiF8"], detail: "One story, one card" },
-    { kind: "breaking", label: "Breaking News", templates: ["EAHXZAbAA8s"], detail: "Primary source in the last 24 hours" },
-    { kind: "dt101", label: "Defense Tech 101", templates: ["EAHYOAJhC_8"], detail: "Benefit-led card, mission-brief caption" },
-    // Since profile 1.2.0 an ICYMI roundup fills only its cover; its stories are their published cards (founder, 2026-10-18).
-    { kind: "icymi", label: "ICYMI roundup", templates: ["EAHYYaSYfJI"], detail: "Cover + 3–5 published story cards" },
-  ])
-  assert.ok(PIPELINE_PROPERTIES.filter(p => p.active).every(p => !profileProblems(p.id).length))
+test("the Generate panel's templates come from the profile: each request kind with the feed templates its series fill", () => {
+  const p = published.milcity
+  assert.deepEqual(templatesOf(p), p.requestKinds.map(k => ({ kind: k.kind, label: k.label, templates: k.series.map(x => p.series[x]!.templates.feed), detail: k.detail })))
+  // Since profile 1.2.0 an ICYMI roundup fills only its cover; its stories are their published cards (founder, 2026-10-18).
+  assert.deepEqual(templatesOf(p).map(t => [t.kind, t.templates.length]), [["news", 1], ["breaking", 1], ["dt101", 1], ["icymi", 1]])
+  if (!published.real) assert.deepEqual(templatesOf(p).map(t => t.templates[0]), ["FXtpl01fe", "FXtpl03fe", "FXtpl05fe", "FXtpl06fe"])
+  assert.ok(PIPELINE_PROPERTIES.filter(p => p.active).every(p => !profileProblems(p.id, { milcity: published.milcity }).length))
+  assert.ok(propertyCanGenerate("milcity", "dt101", published.milcity) && !propertyCanGenerate("txmx", "news", published.milcity))
 })
 
-test("every template a profile names is inside the publisher's Canva allowlist", () => {
+test("every template a real profile names is inside the publisher's Canva allowlist (the fixture's ids are invented)", { skip: !process.env.BRAND_PROFILE_FILE && !process.env.FIRESTORE_EMULATOR_HOST && "fixture profile" }, () => {
   for (const s of Object.values(SERIES)) for (const id of Object.values(s.templates)) if (id) assert.ok(MCU_BRAND_TEMPLATES.has(id), `${s.key}: ${id}`)
 })
 
@@ -96,30 +96,15 @@ test("the hook is one container for one hook: punctuated by its sentences, never
   assert.match(hook("PROTECT TROOPS!\nDRONE DEFENSE").join(), /no slash, colon, semicolon, exclamation or question mark/)
 })
 
-test("the MilCityUSA profile carries the founder's rulings of 2026-10-18", () => {
-  const p = loadProfile("milcity")
-  // The hook: one container for one hook; nothing teaches a statement or a period per line.
-  assert.match(p.headlineRules ?? "", /The two lines are one container for ONE complete, compelling hook\. The line break is layout, not grammar/)
-  assert.match(p.headlineRules ?? "", /never a pattern per line: no period is forced at the end of a line/)
-  for (const text of [p.editorial, p.headlineRules ?? ""]) {
-    assert.doesNotMatch(text, /SEND SUPPLIES\. \/ NOT A DRIVER\.|FIRE\. \/ RELOCATE\./)
-    assert.doesNotMatch(text, /both lines end with a period|a period at the end of every line|punctuated the same way/)
-  }
-  // The journalism rule, for every template's front card, ICYMI excepted (since 1.2.0: its cover headline is fixed).
-  assert.match(p.headlineRules ?? "", /Every headline and hook on the front of a card, in every template \(ICYMI excepted, below\), is compelling journalism/)
-  assert.match(p.headlineRules ?? "", /Passing the checks is the floor, not the goal/)
-  // The originality limits as built: rewritten at 5+ words (headline) and 13+ (caption).
-  assert.equal(p.checks?.originality?.headlineMaxRun, 4); assert.equal(p.checks?.originality?.captionMaxRun, 12)
-  // Breaking freshness: 24 hours by an exact time, a same-event report allowed, bylines checked in America/Chicago.
-  assert.deepEqual(p.requestKinds.find(k => k.kind === "breaking"), { kind: "breaking", label: "Breaking News", detail: "Primary source in the last 24 hours", series: ["breaking"], code: "BN", freshHours: 24, datedByReport: true })
-  assert.equal(p.timeZone, "America/Chicago")
-  assert.match(p.editorial, /otherwise a news outlet's report of the same event with an exact time .*if neither shows it is within 24 hours, it is not Breaking, and it may run as News/)
-  assert.match(p.editorial, /A visible date-only byline is never enough on its own: it is only a cross-check, and only when it is today in America\/Chicago/)
+test("Breaking freshness is a profile setting: an exact-time window that needs the profile's time zone", () => {
+  const p = published.milcity
+  const breaking = p.requestKinds.find(k => k.kind === "breaking")!
+  assert.ok(Number.isInteger(breaking.freshHours) && breaking.datedByReport === true && typeof p.timeZone === "string")
   // freshHours needs the profile's time zone.
-  const noZone: Record<string, unknown> = { ...milcity }
+  const noZone: Record<string, unknown> = { ...published.milcity }
   delete noZone.timeZone
   assert.ok(validateProfile(noZone).some(x => /freshHours: 1–168, with the profile's timeZone/.test(x)))
-  assert.ok(validateProfile({ ...milcity, timeZone: "Central" }).some(x => /timeZone: an IANA time zone/.test(x)))
+  assert.ok(validateProfile({ ...published.milcity, timeZone: "Central" }).some(x => /timeZone: an IANA time zone/.test(x)))
 })
 
 test("originality: a headline or caption copied from the source is rewritten; quotes, names and ICYMI are not", () => {
@@ -136,22 +121,20 @@ test("originality: a headline or caption copied from the source is rewritten; qu
   assert.deepEqual(originalityProblems([card("icymi_cover", { headline: story.sourceTitle }), card("icymi_story", { headline: story.sourceTitle })], story.sourceText, story, O, ["headline"]), [])
 })
 
-test("the MilCityUSA profile turns the checks on and prompts the writer with the headline rules", () => {
-  const p = loadProfile("milcity")
-  assert.equal(p.checks?.headline?.enabled, true); assert.equal(p.checks?.originality?.headlineMaxRun, 4); assert.equal(p.checks?.originality?.captionMaxRun, 12)
-  assert.match(p.headlineRules ?? "", /^HEADLINES, DECKS AND ORIGINALITY/)
-  assert.match(p.headlineRules ?? "", /ICYMI is the one exception: its cover headline is a fixed line, and each story after the cover is the card MilCityUSA already published, reused as it is/)
+test("the profile turns the headline and originality checks on, and carries headline rules for the writer's prompt", () => {
+  const p = published.milcity
+  assert.equal(p.checks?.headline?.enabled, true); assert.equal(p.checks?.originality?.enabled, true)
+  assert.ok(Number.isInteger(p.checks?.originality?.headlineMaxRun) && Number.isInteger(p.checks?.originality?.captionMaxRun))
+  assert.ok((p.headlineRules ?? "").trim().length > 0)
 })
 
-test("the simpler ICYMI is in the profile: a fixed cover headline, 3 to 5 stories, and both keys validated (founder, 2026-10-18)", () => {
-  const p = loadProfile("milcity")
-  assert.equal(p.profileVersion, "1.2.0"); assert.equal(p.rulesVersion, "mcu-rules-2026-10-18.2")
+test("ICYMI is a profile setting: a fixed cover headline, 3 to 5 stories, and both keys validated (founder, 2026-10-18)", () => {
+  const p = published.milcity
   const headline = SERIES.icymi_cover.fields.find(f => f.name === "headline")!
-  assert.equal(headline.fixed, "TOP DEFENSE DEVELOPMENTS"); assert.equal(headline.serverFilled, undefined)
+  assert.ok(typeof headline.fixed === "string" && headline.fixed.length <= 60); assert.equal(headline.serverFilled, undefined)
   const icymi = p.requestKinds.find(k => k.kind === "icymi")!
   assert.deepEqual([icymi.series, icymi.minStories, icymi.maxStories], [["icymi_cover"], 3, 5])
   assert.ok(SERIES.icymi_story) // kept for drafts made before 1.2.0
-  assert.match(p.editorial, /three to five MCU News or Breaking stories already published in the previous week/)
   // A fixed value is text, set by the server: never with serverFilled, allowed or date, and at most 60 characters.
   const fixedBad = clone(); ((fixedBad.series as Record<string, { fields: Record<string, unknown>[] }>).icymi_cover.fields[0]).serverFilled = true
   assert.match(validateProfile(fixedBad).join("; "), /series\.icymi_cover\.fields\[0\]\.fixed: 1–60 characters, not with serverFilled, allowed or date/)
