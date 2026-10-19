@@ -1,0 +1,40 @@
+# Content pipeline replay: main-be3d23c-rerun-2026-10-19
+
+Rules mcu-rules-2026-10-18.2 · head be3d23c · 2026-10-19T01:34:57.028Z → 2026-10-19T01:44:11.530Z
+Models: research anthropic/claude-haiku-5.5, write anthropic/claude-haiku-5.5, photoSearch anthropic/claude-haiku-5.5, photoPick anthropic/claude-sonnet-5.5, artworkCheck anthropic/claude-sonnet-5.5 · fact check anthropic/claude-sonnet-5.5 · seeds mcu-seeds-2026-10-17.json (0e7a9a32de345d02)
+
+**Score: 2 of 18 pass** (reach Review safe and within limits). Reached the Canva step: 5; of those unsafe: 3. Held: 13 (0 for reasons v9 no longer holds for). Failed: 0. No draft: 0.
+Hold reasons: limits 3, photo 10.
+**Cost: not separable.** This run overlapped another replay (the branch and main ran in parallel), so the Gateway credits used before and after, $1.3520, cover both runs together.
+
+Not scored offline: the Canva fill, the artwork check and the rendered layout (the replay stops before the fill).
+
+| Story | Series | Replay | Why | Card copy | Gate rounds |
+|---|---|---|---|---|---|
+| raid-hunter | dt101 | held | limits: the copy still breaks the template rules after two rewrites and 3 shortening attempts: Benefit hook: each line at most 16 characters, counting letters, spaces and punctuation; line 2 "STOPPING MASS RAIDS" is 19, 3 over |  | round 3 (nemotron): replaced; round 4 (nemotron): held |
+| anduril-thunder | dt101 | held | photo: no relevant, licensed photo was found ("Thunder autonomous attack rotorcraft Anduril"): no photo of the subject fits the 4:5 card (#1: the 4:5 crop cuts off the subject · #0: the subject sits low, under the text block) (Candidate 1 is a close side view of the Thunder rotorcraft with Army A001 | IT FLIES WITHOUT / A PILOT TO HIT · THUNDER / ANDURIL | round 3 (nemotron): held |
+| anduril-submarine | dt101 | held | photo: no relevant, licensed photo was found ("Anduril submarine industrial base"): no photo of the subject fits the 4:5 card (#0: the 4:5 crop cuts off the subject) (Candidate 0 is a rendering of a large waterfront submarine production facility. That is the submarine industrial base the story descr | NAVY AND ANDURIL / WIDEN SUB OUTPUT · SUBMARINE BASE / ANDURIL | round 3 (nemotron): held |
+| pac3-edge | dt101 | held | limits: the copy still breaks the template rules after two rewrites and 3 shortening attempts: Benefit hook: each line at most 16 characters, counting letters, spaces and punctuation; line 2 "HYPERSONIC THREATS" is 18, 2 over |  | round 3 (nemotron): replaced; round 4 (nemotron): replaced |
+| skydio-f10 | dt101 | reached, unsafe | cut-off word MIN; 📍San Mateo, CA — The source never gives Skydio's headquarters or any location, so this is unsupported. | PUTS A COUNTY IN / REACH IN 15 MIN · F10 LIGHTRUNNER / SKYDIO | round 3 (nemotron): held |
+| l3harris-navy-vampire | dt101 | held | photo: no relevant, licensed photo was found ("VAMPIRE counter-drone system Navy"): no photo of the subject fits the 4:5 card (#1: the 4:5 crop cuts off the subject) (Photo #1 shows the VAMPIRE rocket launcher kit on a military truck, firing a rocket in a forest setting. It's a large, dominant subje | STOPS DRONES / AT SEA · VAMPIRE / L3HARRIS | round 4 (nemotron): in_review |
+| morfius-release | dt101 | held | photo: no relevant, licensed photo was found ("Lockheed Martin MORFIUS X-Rotor airborne high power microwave counter-drone system photo, public domain or openly licensed, with credit"): no candidate shows the subject itself (None of the candidates shows the MORFIUS X-Rotor. They show an F-22, C-130  | ONE FLIGHT CAN / DOWN 50+ DRONES · MORFIUS X-ROTOR / LOCKHEED MARTIN | round 4 (nemotron): replaced |
+| morfius-product | dt101 | held | photo: no relevant, licensed photo was found ("Lockheed Martin MORFIUS high-power microwave interceptor counter-UAS"): no candidate shows the subject itself (No candidate clearly shows the MORFIUS interceptor. #0 is a Lockheed promo graphic with text and only faint aircraft shadows on terrain, so th | IT CAN DISABLE / DRONE SWARMS · MORFIUS / LOCKHEED MARTIN | round 4 (nemotron): held |
+| paravision-state | news | **pass** |  | STATE PICKS PARAVISION FOR IDENTITY CHECKS · The contract can reach $6.5 million, with $1.3 million obligated at award. · BIOMETRIC UPDATE | round 4 (nemotron): held |
+| seasats-lightfish | dt101 | held | limits: the copy still breaks the template rules after two rewrites and 3 shortening attempts: Benefit hook: each line at most 16 characters, counting letters, spaces and punctuation; line 1 "SOLAR BOATS WATCH" is 17, 1 over |  | round 5 (haiku): held |
+| l3harris-drone-guardian | dt101 | held | photo: no relevant, licensed photo was found ("Drone Guardian counter-UAS L3Harris"): no candidate shows the subject itself (None of the candidates shows the L3Harris Drone Guardian system. Candidate 0 is a generic small quadcopter at a fence, which is the kind of target a counter-drone system track | IT SORTS RADAR / AND CAMERA TIPS · DRONE GUARDIAN / L3HARRIS | round 5 (haiku): held |
+| anduril-eagleeye | dt101 | reached, unsafe | 📍Costa Mesa, CA — The source never states Anduril's headquarters or any location, so Costa Mesa, CA is unsupported.; Private company — The source does not say whether Anduril is private or public. It calls Anduril only a defense technology company. | SEE THREATS / BEFORE THEY SEE · EAGLEEYE / ANDURIL | round 5 (haiku): held |
+| xtend-striker | news | held | photo: no relevant, licensed photo was found ("XTEND STRIKER drone"): no photo of the subject fits the 4:5 card (#0: the cropped photo is under 500 px wide) (Close-up of the XTEND drone with cameras and cage, with the Drone Dominance Program challenge coin. It matches the story and fills the frame.  | XTEND LANDS $40.5M STRIKER DRONE BUY · The order follows a top-performer result in Gauntlet II of the Drone Dominance Program. · XTEND (BUSINESS WIRE) | round 5 (haiku): in_review |
+| skydio-x10d | dt101 | reached, unsafe | 📍San Mateo, CA — The source never states Skydio's headquarters or location. It says only that X10D is designed, assembled and supported in the U.S.; Private company — The source says nothing about Skydio's ownership or whether it is private. | KEEPS FLYING / WHEN GPS FAILS · SKYDIO X10D / SKYDIO | round 6 (haiku): replaced |
+| rtx-coyote | dt101 | **pass** |  | ROCKET MOTOR / SPEEDS SHOTS · COYOTE / RAYTHEON | round 6 (haiku): in_review |
+| setaf-gtead | news | held | photo: no relevant, licensed photo was found ("counter-drone Africa Army SETAF-AF G-TEAD"): no photo of the subject fits the 4:5 card (#0: the 4:5 crop cuts off the subject) (A Soldier holds a Bumblebee counter-drone system in Morocco during African Lion 26. It shows counter-drone tech in Africa, an | ARMY TO TEST COUNTER-DRONE TECH IN AFRICA · The Army plans to field tested solutions to Soldiers within 180 days. · ARMY.MIL | round 6 (haiku): held |
+| antheia-osc | breaking | held | photo: no relevant, licensed photo was found ("Antheia biosynthesis manufacturing; official company or U.S. government imagery of pharmaceutical manufacturing, licensed for editorial use"): no candidate shows the subject itself (no licensed candidates); a representative photo (the people, unit or eq | PENTAGON LOAN OFFER BACKS DRUG INGREDIENT PLANT · Antheia gets a conditional $80 million OSC loan offer. · PR NEWSWIRE | round 6 (haiku): held |
+| icymi-week-2026-10-05 | icymi | held | photo: no relevant, licensed photo was found: no candidate shows the subject itself (no licensed candidates). | TOP DEFENSE DEVELOPMENTS · Microchip buys VORAGO chip maker · Lockheed unveils PAC-3 Edge · Florida Guard tests drone network | round 3 (nemotron): held; round 4 (nemotron): held; round 5 (haiku): held; round 6 (haiku): held |
+
+## Tokens
+
+| Step : model | Calls | Input | Output |
+|---|---|---|---|
+| write:anthropic/claude-haiku-5.5 | 61 | 556446 | 28016 |
+| photoSearch:anthropic/claude-haiku-5.5 | 36 | 393702 | 26573 |
+| photoPick:anthropic/claude-sonnet-5.5 | 14 | 149372 | 7982 |
+| write:anthropic/claude-sonnet-5.5 (fact check) | 5 | 18951 | 1664 |

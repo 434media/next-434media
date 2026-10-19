@@ -1,4 +1,4 @@
-import { SERIES, checkFields, clippedWords, ddmmmyy, measure, normalizeFields, overLimits, type Placement, type RequestKind } from "./series"
+import { SERIES, candidateFields, checkFields, clippedWords, cutOffWords, ddmmmyy, measure, normalizeFields, overLimits, type Placement, type RequestKind } from "./series"
 import { BRAND } from "./brand"
 import { headlineProblems, originalityFindings, originalityProblems, type Copied } from "./copy-checks"
 import { icymiCount, meaningful, normalizeUrl, unusedStorySlot, type Candidate, type McuAi, type ModelCall, type RankedPhoto, type SubjectBox } from "./model"
@@ -579,19 +579,25 @@ async function writeStep(deps: WorkerDeps, ai: McuAi, d: McuDraft): Promise<void
     if (h && d.kind === "icymi") { d.history.push({ at: iso(deps), event: `the writer asked to hold the roundup ("${h.slice(0, 200)}"); overruled: the engine decides which stories qualify` }); return undefined }
     return h
   }
-  let out = await ai.write({ kind: d.kind, story: d.story, today, ...steer, ...(d.frames.length ? { previous: { frames: d.frames, caption: d.caption ?? "" } } : {}) })
+  // Each write offers candidates for the headline or hook and the sub-headline; the one that goes on is chosen here.
+  const batches = { left: MAX_CANDIDATE_BATCHES }
+  const pick = (o: Awaited<ReturnType<McuAi["write"]>>) => writerHold(o) ? o : chooseCopy(deps, ai, d, o, today, steer, batches)
+  let out = await pick(await ai.write({ kind: d.kind, story: d.story, today, ...steer, ...(d.frames.length ? { previous: { frames: d.frames, caption: d.caption ?? "" } } : {}) }))
   for (let round = 0; round < 2; round++) {
     out.hold = writerHold(out)
     if (out.hold) return sourceHold(deps, ai, d, out.hold)
     out.frames = out.frames.map((f, i) => fix(f, i, d, today))
     problems = validate(out.frames, out.caption, d.story)
     if (!problems.length) break
-    out = await ai.write({ kind: d.kind, story: d.story, today, ...steer, previous: { frames: out.frames, caption: out.caption }, problems })
+    out = await pick(await ai.write({ kind: d.kind, story: d.story, today, ...steer, previous: { frames: out.frames, caption: out.caption }, problems }))
   }
   out.hold = writerHold(out)
   if (out.hold) return sourceHold(deps, ai, d, out.hold)
   out.frames = out.frames.map((f, i) => fix(f, i, d, today))
-  problems = validate(out.frames, out.caption, d.story)
+  // The v9 hold bar: only a safety problem holds the draft; a style problem left after the rewrites goes to Review as a
+  // note (copyProblems).
+  const safetyOf = (o: typeof out) => copyProblems(o.frames, o.caption, d.story).safety
+  problems = safetyOf(out)
   // Only copied wording or length is left: before holding, ask for fresh wording of just the fields that copy the
   // source (gate round 6), then for shorter wording of just the fields that run over (gate round 5).
   const targeted = (ps: string[], o: typeof out) => ps.every(p => overflow(o.frames).some(x => x.message === p) || copiedFields(o.frames, o.caption, d.story).some(x => x.message === p))
@@ -599,18 +605,102 @@ async function writeStep(deps: WorkerDeps, ai: McuAi, d: McuDraft): Promise<void
     const attempts: string[] = []
     if (copiedFields(out.frames, out.caption, d.story).length) {
       const fresh = await freshStep(ai, d, out, today, steer)
-      if (fresh.tries) { out = fresh.out; problems = validate(out.frames, out.caption, d.story); attempts.push(`${fresh.tries} rewording attempt${fresh.tries === 1 ? "" : "s"}`) }
+      if (fresh.tries) { out = fresh.out; problems = safetyOf(out); attempts.push(`${fresh.tries} rewording attempt${fresh.tries === 1 ? "" : "s"}`) }
     }
     if (problems.length && problems.every(p => overflow(out.frames).some(o => o.message === p))) {
       const fitted = await fitStep(ai, d, out, today, steer)
-      if (fitted.tries) { out = fitted.out; problems = validate(out.frames, out.caption, d.story); attempts.push(`${fitted.tries} shortening attempt${fitted.tries === 1 ? "" : "s"}`) }
+      if (fitted.tries) { out = fitted.out; problems = safetyOf(out); attempts.push(`${fitted.tries} shortening attempt${fitted.tries === 1 ? "" : "s"}`) }
     }
     if (problems.length && attempts.length) return hold(deps, d, `the copy still breaks the template rules after two rewrites and ${attempts.join(" and ")}: ${problems.slice(0, 4).join("; ")}`)
   }
   if (problems.length) return hold(deps, d, `the copy still breaks the template rules after two rewrites: ${problems.slice(0, 4).join("; ")}`)
+  const style = copyProblems(out.frames, out.caption, d.story).style
   d.frames = out.frames; d.caption = out.caption; d.holdReason = undefined; d.error = undefined
+  d.copyNotes = style.length ? style : undefined
   d.status = d.media.length === d.frames.length && d.media.every(Boolean) ? "designing" : "media"
-  await save(deps, d, `copy written (v${d.version})`)
+  await save(deps, d, `copy written (v${d.version})${style.length ? `; to Review with ${style.length} style note${style.length === 1 ? "" : "s"}: ${style.join("; ").slice(0, 300)}` : ""}`)
+}
+/** New candidate batches asked for, per write step, when none of the writer's candidates fits. */
+export const MAX_CANDIDATE_BATCHES = 2
+/**
+ * What keeps one candidate off the card, measured in code (plan v9, Phase 1 direction 2): its fields past the
+ * template's limits (per-line width and line count, as overLimits words them: the field, the limit and the measured
+ * length), a figure the source doesn't give, an abbreviated or cut-off word, and wording copied from the source past
+ * the profile's originality limits (unchanged). The candidate is normalized first, as the card would set it: uppercase,
+ * and a fixed-line hook re-broken where its words fit another way (fitLines). Nothing is stripped or cut.
+ */
+export function candidateProblems(frame: FrameCopy, option: Record<string, string>, fields: string[], story: Story, normalize: (f: FrameCopy) => FrameCopy): { frame: FrameCopy; problems: string[] } {
+  const series = SERIES[frame.series]
+  const set = normalize({ ...frame, fields: { ...frame.fields, ...Object.fromEntries(fields.map(n => [n, typeof option[n] === "string" ? option[n] : ""])) } })
+  const own = Object.fromEntries(fields.map(n => [n, set.fields[n] ?? ""]))
+  const problems: string[] = []
+  for (const spec of series.fields.filter(f => fields.includes(f.name))) {
+    const v = own[spec.name]
+    if (!v.trim()) { problems.push(`${spec.label} is empty`); continue }
+    if (spec.exactLines && v.split("\n").map(l => l.trim()).filter(Boolean).length !== spec.exactLines) problems.push(`${spec.label} must be exactly ${spec.exactLines} lines`)
+    problems.push(...overLimits(spec, v))
+  }
+  const nums = unsourcedNumbers(Object.values(own), story.sourceText)
+  if (nums.length) problems.push(`these figures are not in the source: ${nums.join(", ")}`)
+  const cut = [...new Set([...clippedWords(own, story.sourceText), ...cutOffWords(own, story.sourceText)])]
+  if (cut.length) problems.push(`abbreviated or cut-off words (${cut.join(", ")}): use whole words`)
+  problems.push(...copiedFields([set], "", story).filter(c => fields.includes(c.field)).map(c => c.message))
+  return { frame: set, problems }
+}
+/**
+ * Copy from candidates (plan v9, Phase 1 direction 2). The writer offers its first choice and 3–5 alternatives for the
+ * candidate fields (series.ts candidateFields). Each is measured in code (candidateProblems); a model picks the most
+ * compelling of those that fit (McuAi.pickCopy; without one, the writer's order stands). When none fits, the writer is
+ * asked for a new batch, told each candidate's exact overflow (field, limit, length), up to MAX_CANDIDATE_BATCHES per
+ * write step. When none fits even then, the writer's first choice goes on to the rewrites and the fit pass, as before.
+ * Only the candidate fields change here; a writer that offers no candidates is taken as it wrote.
+ */
+async function chooseCopy(deps: WorkerDeps, ai: McuAi, d: McuDraft, out: Awaited<ReturnType<McuAi["write"]>>, today: string, steer: { seeds: McuSeeds | null; direction?: string }, batches: { left: number }): Promise<Awaited<ReturnType<McuAi["write"]>>> {
+  const frames = out.frames.map(f => ({ ...f, fields: { ...f.fields } }))
+  const offered = (r: Awaited<ReturnType<McuAi["write"]>>, i: number, fields: string[]) => {
+    const all = [Object.fromEntries(fields.map(n => [n, r.frames[i]?.fields[n] ?? ""])), ...(r.options?.[i] ?? [])]
+    return all.filter((o, k) => fields.some(n => (o[n] ?? "").trim()) && all.findIndex(x => fields.every(n => (x[n] ?? "").trim() === (o[n] ?? "").trim())) === k)
+  }
+  for (const [i, f] of frames.entries()) {
+    const fields = candidateFields(f.series)
+    if (!fields.length || !out.options?.[i]?.length) continue
+    const measure = (o: Record<string, string>) => candidateProblems(frames[i], o, fields, d.story, x => fix(x, i, d, today))
+    let pool = offered(out, i, fields), measured = pool.map(measure), asked = 0
+    while (!measured.some(m => !m.problems.length) && batches.left > 0) {
+      batches.left--; asked++
+      const batch = measured.flatMap((m, k) => m.problems.map(p => `candidate ${k + 1} (${fields.map(n => `"${(m.frame.fields[n] ?? "").replace(/\n/g, " / ")}"`).join(", ")}): ${p}`))
+      const r = await ai.write({ kind: d.kind, story: d.story, today, ...steer, previous: { frames, caption: out.caption }, batch })
+      pool = offered(r, i, fields); measured = pool.map(measure)
+    }
+    const fitting = measured.map((m, k) => ({ ...m, k })).filter(m => !m.problems.length)
+    const tally = `${pool.length} candidate${pool.length === 1 ? "" : "s"}${asked ? ` after ${asked} new batch${asked === 1 ? "" : "es"}` : ""}, ${fitting.length} fit`
+    if (!fitting.length) { d.history.push({ at: iso(deps), event: `copy candidates: ${tally}; the writer's first choice goes on to the rewrites` }); continue }
+    let chosen = fitting[0], why = "the only one that fits"
+    if (fitting.length > 1) {
+      why = "the writer's order (no pick)"
+      if (ai.pickCopy) {
+        const r = await ai.pickCopy({ kind: d.kind, story: d.story, frame: frames[i], fields, options: fitting.map(m => Object.fromEntries(fields.map(n => [n, m.frame.fields[n]]))) })
+          .catch(err => { console.error("[content-pipeline] copy pick failed", d.id, err instanceof Error ? err.message : err); return null })
+        if (r) { chosen = fitting[r.index] ?? fitting[0]; why = r.reason || "picked" }
+        else why = "the writer's order (the pick failed)"
+      }
+    }
+    for (const n of fields) frames[i].fields[n] = chosen.frame.fields[n]
+    d.history.push({ at: iso(deps), event: `copy candidates: ${tally}; chose ${chosen.k + 1} (${fields.map(n => `"${chosen.frame.fields[n].replace(/\n/g, " / ")}"`).join(", ")}): ${why}`.slice(0, 600) })
+  }
+  return { ...out, frames, options: undefined }
+}
+/** A problem's rule, without the copy it quotes (a caption label such as "Tech:" is kept: it names the rule). */
+const ruleOf = (p: string) => p.replace(/"(?![A-Za-z]+:")[^"]*"/g, '""')
+/**
+ * What a fit or a rewording would break: every safety problem it leaves, and a style problem only when the copy before
+ * it didn't already have that rule's problem (coordinator review, 2026-10-19). Style isn't a hold (copyProblems), so a
+ * style problem the writer was told to leave alone, such as a caption with no "Tech:" line, never turns a shortening
+ * down; a shortening that adds one ("EYES ON. / SQUAD SEES ALL") still is.
+ */
+function introduced(after: { frames: FrameCopy[]; caption: string }, before: { frames: FrameCopy[]; caption: string }, story: Story): string[] {
+  const now = copyProblems(after.frames, after.caption, story), had = new Set(copyProblems(before.frames, before.caption, story).style.map(ruleOf))
+  return [...now.safety, ...now.style.filter(p => !had.has(ruleOf(p)))]
 }
 /** Shortening attempts after the rewrites, before a draft is held for length alone. */
 export const MAX_FIT_ATTEMPTS = 3
@@ -645,7 +735,7 @@ async function fitStep(ai: McuAi, d: McuDraft, out: { frames: FrameCopy[]; capti
     turnedDown = []
     if (!shorter) { turnedDown = ["the last answer was not shorter: use fewer or shorter words"]; continue }
     const candidate = { frames: next, caption: cur.caption }
-    const broke = validate(candidate.frames, candidate.caption, d.story).filter(p => !overflow(candidate.frames).some(o => o.message === p))
+    const broke = introduced(candidate, cur, d.story).filter(p => !overflow(candidate.frames).some(o => o.message === p))
     if (broke.length) { turnedDown = [`the last shorter version was turned down because it broke these rules: ${broke.slice(0, 3).join("; ")}`]; continue }
     cur = candidate
     if (!overflow(cur.frames).length) { tries++; break }
@@ -692,7 +782,7 @@ async function freshStep(ai: McuAi, d: McuDraft, out: { frames: FrameCopy[]; cap
     turnedDown = []
     if (!changed) { turnedDown = ["the last answer still copied the same run of words: say it differently, in your own words"]; continue }
     const left = copiedFields(next.frames, next.caption, d.story)
-    const broke = validate(next.frames, next.caption, d.story).filter(p => !left.some(x => x.message === p) && !overflow(next.frames).some(o => o.message === p))
+    const broke = introduced(next, cur, d.story).filter(p => !left.some(x => x.message === p) && !overflow(next.frames).some(o => o.message === p))
     if (broke.length) { turnedDown = [`the last rewording was turned down because it broke these rules: ${broke.slice(0, 3).join("; ")}`]; continue }
     cur = next
     if (!left.length) { tries++; break }
@@ -711,37 +801,52 @@ function fix(f: FrameCopy, _index: number, d: McuDraft, today: string): FrameCop
   if (f.series === "icymi_cover" && series.fields.some(x => x.name === "story_numbers")) out.story_numbers = Array.from({ length: icymiCount(d.story) }, (_, i) => String(i + 1).padStart(2, "0")).join("\n")
   return { ...f, fields: out }
 }
-function validate(frames: FrameCopy[], caption: string, story: Story): string[] {
+/**
+ * The copy's problems, sorted by the plan v9 hold bar (Phase 1 direction 1): a draft is held only for a safety problem
+ * (a fact or subject error, an unsourced figure, copy past the template's limits or otherwise a broken card, a cut-off
+ * word, a missing source line), and copy that copies its source's words beyond the profile's originality limits stays a
+ * hold too, as the words' rights. A style problem (headline or hook punctuation, the deck's form, the caption's shape)
+ * still gets the rewrites, and if it persists the draft goes to Review with it as a note, fixed through Open in Canva.
+ */
+export function copyProblems(frames: FrameCopy[], caption: string, story: Story): { safety: string[]; style: string[] } {
+  const safety: string[] = [], style: string[] = []
   // The cover's slots past the roundup's last story are blank by design, not empty by mistake.
   const n = icymiCount(story), unused = new Set(SERIES.icymi_cover.fields.filter(f => unusedStorySlot(f.name, n)).map(f => `${f.label} is empty`))
-  const problems = frames.flatMap((f, i) => checkFields(SERIES[f.series], f.fields).filter(p => f.series !== "icymi_cover" || !unused.has(p)).map(p => frames.length > 1 ? `frame ${i + 1}: ${p}` : p))
-  if (!caption.trim()) problems.push("caption is empty")
-  if (caption.length > 2100) problems.push("caption is longer than Instagram allows (2,200 characters with credits)")
-  if (/@[A-Za-z0-9_.]{2,}/.test(caption)) problems.push("caption contains an @handle; use plain names (tags need verified accounts)")
+  safety.push(...frames.flatMap((f, i) => checkFields(SERIES[f.series], f.fields).filter(p => f.series !== "icymi_cover" || !unused.has(p)).map(p => frames.length > 1 ? `frame ${i + 1}: ${p}` : p)))
+  if (!caption.trim()) safety.push("caption is empty")
+  if (caption.length > 2100) safety.push("caption is longer than Instagram allows (2,200 characters with credits)")
+  if (/@[A-Za-z0-9_.]{2,}/.test(caption)) safety.push("caption contains an @handle; use plain names (tags need verified accounts)")
   // Credit and notice lines carry license versions and item numbers, not story facts.
   const body = caption.split("\n").filter(l => !/^(Archive image|Image|Photo): /.test(l) && l !== DOD_NOTICE).join("\n")
   const nums = unsourcedNumbers([body, ...frames.flatMap(f => Object.entries(f.fields).filter(([k]) => k !== "date" && k !== "counter").map(([, v]) => v))], story.sourceText)
-  if (nums.length) problems.push(`these figures are not in the source: ${nums.join(", ")}`)
+  if (nums.length) safety.push(`these figures are not in the source: ${nums.join(", ")}`)
   // The caption ends with its own "Source:" line, and a DT101 caption is the mission brief (gate round 2: a DT101 with
   // a three-paragraph news caption, another with no source line, a News caption with "Source:" mid-paragraph).
-  if (!/^Source: \S/m.test(body)) problems.push('the caption needs its source on a line of its own: "Source: <organization>, <date>"')
+  if (!/^Source: \S/m.test(body)) safety.push('the caption needs its source on a line of its own: "Source: <organization>, <date>"')
   const format = frames[0] ? SERIES[frames[0].series]?.caption : undefined
   if (format) {
     const lines = body.split("\n").map(l => l.trim()).filter(Boolean)
-    if (format.firstLines.some((re, i) => !new RegExp(re).test(lines[i] ?? ""))) problems.push(format.format)
-    for (const label of format.labels) if (!lines.some(l => l.startsWith(label))) problems.push(format.missingLabel.replace("{label}", label))
+    if (format.firstLines.some((re, i) => !new RegExp(re).test(lines[i] ?? ""))) style.push(format.format)
+    for (const label of format.labels) if (!lines.some(l => l.startsWith(label))) style.push(format.missingLabel.replace("{label}", label))
   }
   // The copy must be about this draft's story (gate round 3: after a subject switch, DT101-10 and -12 carried the
   // previous subject's mission brief). A roundup's copy is about five stories, so it is not checked here.
-  if (!story.roundup && !sameSubject(`${story.title} ${story.sourceTitle}`, [caption, ...frames.flatMap(f => Object.values(f.fields))].join(" "))) problems.push(`the copy is not about this story ("${story.title.slice(0, 100)}"): write it from the source below`)
-  for (const f of frames) if (f.fields.deck && !/[.!?]["”’)]?$/.test(f.fields.deck.trim())) problems.push(`the deck must be one complete sentence ending with a period: "${f.fields.deck}"`)
+  if (!story.roundup && !sameSubject(`${story.title} ${story.sourceTitle}`, [caption, ...frames.flatMap(f => Object.values(f.fields))].join(" "))) safety.push(`the copy is not about this story ("${story.title.slice(0, 100)}"): write it from the source below`)
+  for (const f of frames) if (f.fields.deck && !/[.!?]["”’)]?$/.test(f.fields.deck.trim())) style.push(`the deck must be one complete sentence ending with a period: "${f.fields.deck}"`)
   // The profile's headline and originality checks (Phase 1c, founder 2026-10-17): off unless the profile turns them on.
   const checks = BRAND.checks
-  if (checks?.headline) problems.push(...headlineProblems(frames, checks.headline))
-  if (checks?.originality) problems.push(...originalityProblems(frames, caption, story, checks.originality, [...(checks.headline?.fields ?? []), ...(checks.headline?.hookFields ?? [])]))
+  if (checks?.headline) style.push(...headlineProblems(frames, checks.headline))
+  if (checks?.originality) safety.push(...originalityProblems(frames, caption, story, checks.originality, [...(checks.headline?.fields ?? []), ...(checks.headline?.hookFields ?? [])]))
   const clipped = [...new Set(frames.flatMap(f => clippedWords(f.fields, story.sourceText)))]
-  if (clipped.length) problems.push(`abbreviated words on the card (${clipped.join(", ")}); use whole words, and shorter ones if it must fit`)
-  return problems
+  if (clipped.length) safety.push(`abbreviated words on the card (${clipped.join(", ")}); use whole words, and shorter ones if it must fit`)
+  const cut = [...new Set(frames.flatMap(f => cutOffWords(f.fields, story.sourceText)))].filter(w => !clipped.includes(w))
+  if (cut.length) safety.push(`cut-off words on the card (${cut.join(", ")}): a line ends in part of a word; use whole words, and shorter ones if it must fit`)
+  return { safety, style }
+}
+/** Every problem, safety first: what a rewrite is asked to fix. */
+function validate(frames: FrameCopy[], caption: string, story: Story): string[] {
+  const c = copyProblems(frames, caption, story)
+  return [...c.safety, ...c.style]
 }
 
 /** The maker named on the card ("ULTRA / OVERLAND AI" → "OVERLAND AI"), else the story's publisher. */
@@ -1124,6 +1229,7 @@ export function reviewNotes(d: McuDraft): string {
   sections.push(`Photo rights\n${media.length ? media.join("\n") : "- No photo on this card"}`)
   sections.push(`Canva\n${d.designs.map((x, i) => `${d.designs.length > 1 ? `Frame ${i + 1}: ` : ""}${x.editUrl || x.viewUrl} (design ${x.designId})`).join("\n")}`)
   if (d.qa.length) sections.push(`Check before approving\n${d.qa.map(q => `- ${q}`).join("\n")}`)
+  if (d.copyNotes?.length) sections.push(`Style notes (not held: fix through Open in Canva)\n${d.copyNotes.map(n => `- ${n}`).join("\n")}`)
   if (d.notices.length) sections.push(`Not done\n${d.notices.map(n => `- ${n}`).join("\n")}`)
   const out = sections.join("\n\n")
   return out.length > 4000 ? `${out.slice(0, 3990)}…` : out
@@ -1159,7 +1265,7 @@ async function sourceHold(deps: WorkerDeps, ai: McuAi, d: McuDraft, reason: stri
   d.rejected = rejected; d.story = found[0]
   // A new subject starts its photo search afresh; its designs get their own Canva request ids (":r<n>"), since a
   // photo hold can come after the first subject's design was created.
-  d.frames = []; d.caption = undefined; d.media = []; d.designs = []; d.qa = []; d.holdReason = undefined; d.mediaRetries = undefined; d.avoidMedia = undefined; d.labelRefit = undefined
+  d.frames = []; d.caption = undefined; d.copyNotes = undefined; d.media = []; d.designs = []; d.qa = []; d.holdReason = undefined; d.mediaRetries = undefined; d.avoidMedia = undefined; d.labelRefit = undefined
   // The new subject starts at writing: if the write below fails, the retry writes again rather than resuming the
   // photo step on nothing (gate round 3).
   d.status = "writing"
