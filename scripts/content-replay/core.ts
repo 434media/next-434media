@@ -158,17 +158,21 @@ export async function replayStory(s: ReplayStory, captured: CapturedPages | null
  * the writer judged the source can't support the post. error: a step kept failing.
  */
 export type HoldKind = "photo" | "limits" | "figures" | "subject" | "originality" | "headline" | "format" | "writer" | "eligibility" | "error"
-export const SAFETY_HOLDS: readonly HoldKind[] = ["photo", "limits", "figures", "subject"]
+/** Holds v9 keeps: the safety reasons, and a writer's judgment that the source can't support the facts. */
+export const SAFETY_HOLDS: readonly HoldKind[] = ["photo", "limits", "figures", "subject", "writer"]
 export function holdKinds(reason: string, end: StoryRun["end"]): HoldKind[] {
   if (end === "failed") return ["error"]
   const r = reason, kinds = new Set<HoldKind>()
-  if (/no relevant, licensed photo|no photo of the subject/i.test(r)) kinds.add("photo")
-  if (/figures are not in the source/i.test(r)) kinds.add("figures")
-  if (/runs past \d+ lines?|at most \d+ characters|each line at most/i.test(r)) kinds.add("limits")
-  if (/the copy is not about this story/i.test(r)) kinds.add("subject")
-  if (/copies \d+ words in a row/i.test(r)) kinds.add("originality")
-  if (/the headline (takes|has)|the hook (ends|takes)|the deck (must|is one|repeats|carries)/i.test(r)) kinds.add("headline")
-  if (/mission brief|needs its source on a line|is empty|must be one of|abbreviated words|@handle|placeholder/i.test(r)) kinds.add("format")
+  if (/^no relevant, licensed photo|^no photo of the subject/i.test(r)) kinds.add("photo")
+  // The copy rules' own reasons; a writer's hold is in its own words, which may name a rule ("the mission brief").
+  if (/^the copy still breaks the template rules/i.test(r)) {
+    if (/figures are not in the source/i.test(r)) kinds.add("figures")
+    if (/runs past \d+ lines?|at most \d+ characters|each line at most/i.test(r)) kinds.add("limits")
+    if (/the copy is not about this story/i.test(r)) kinds.add("subject")
+    if (/copies \d+ words in a row/i.test(r)) kinds.add("originality")
+    if (/the headline (takes|has)|the hook (ends|takes)|the deck (must|is one|repeats|carries)/i.test(r)) kinds.add("headline")
+    if (/mission brief|needs its source on a line|is empty|must be one of|abbreviated words|@handle|placeholder/i.test(r)) kinds.add("format")
+  }
   if (/no .* story was published|so there is no ICYMI/i.test(r)) kinds.add("eligibility")
   if (!kinds.size) kinds.add("writer") // a writer's hold: the source can't support the post, in its words
   return [...kinds]
@@ -182,6 +186,11 @@ export interface Safety {
   unsourced: string[]
   /** Per photo frame: verified (public domain or an open license), company (official company media: its terms are for the reviewer to confirm) or missing. */
   rights: ("verified" | "company" | "missing" | "none_needed")[]
+  /**
+   * Cut-off words on the card: a line's last word, which the source doesn't use, that is the start of one it does ("PREC" for
+   * "precision", baseline 2026-10-19). The engine's own check (series.ts clippedWords) knows only a fixed list.
+   */
+  clipped: string[]
   /** Statements the fact check found unsupported by or contrary to the source; null when it didn't run. */
   factErrors: string[] | null
 }
@@ -195,7 +204,15 @@ export function safetyOf(run: StoryRun): Omit<Safety, "factErrors"> {
     if (!m) return "missing" as const
     return usableLicense(m.license.replace(/\s*\(.*\)$/, "")) || /^public domain/i.test(m.license) ? "verified" as const : "company" as const
   })
-  return { limits, unsourced, rights }
+  return { limits, unsourced, rights, clipped: run.story ? cutOffWords(run.frames, run.story.sourceText) : [] }
+}
+const SERVER_FIELDS = new Set(["date", "counter", "image_context", "story_numbers", "source"])
+export function cutOffWords(frames: StoryRun["frames"], source: string): string[] {
+  const inSource = new Set((source.toLowerCase().match(/[a-z]+/g) ?? []))
+  const longer = [...inSource].filter(w => w.length >= 6)
+  // A word is cut off where a line runs out: only the last word of each line is a candidate ("WAIT FOR EYES" is not).
+  const words = frames.flatMap(f => Object.entries(f.fields).filter(([k]) => !SERVER_FIELDS.has(k)).flatMap(([, v]) => v.split("\n").map(l => (l.toLowerCase().match(/[a-z]+/g) ?? []).pop() ?? "")))
+  return [...new Set(words.filter(w => w.length >= 3 && !inSource.has(w) && longer.some(l => l.length >= w.length + 3 && l.startsWith(w))).map(w => w.toUpperCase()))]
 }
 /**
  * The v9 pass: the draft reaches Review safe and within limits. Reached the Canva step, every field within its
@@ -204,5 +221,5 @@ export function safetyOf(run: StoryRun): Omit<Safety, "factErrors"> {
  * broken layout can only be seen on the Canva export, which the replay doesn't make: it is not scored here.
  */
 export function passes(run: StoryRun, s: Safety): boolean {
-  return run.end === "review" && !s.limits.length && !s.unsourced.length && !s.rights.includes("missing") && (s.factErrors?.length ?? 0) === 0
+  return run.end === "review" && !s.limits.length && !s.unsourced.length && !s.clipped.length && !s.rights.includes("missing") && (s.factErrors?.length ?? 0) === 0
 }

@@ -26,7 +26,7 @@ import type { McuSeeds } from "../../lib/content-pipeline/seeds"
 import { fetchImage, fetchSourcePage, searchCommons, searchNasa, searchOpenverse, type SourcePage } from "../../lib/content-pipeline/sources"
 import type { Story } from "../../lib/content-pipeline/store"
 import { holdKinds, passes, replayStory, safetyOf, SAFETY_HOLDS, type ReplayDeps, type Safety, type StoryRun } from "./core"
-import { loadPages, loadStories, REPLAY_DIR, type ReplayStory } from "./fixtures"
+import { loadPages, loadStories, REPLAY_DIR, storyOf, type ReplayStory } from "./fixtures"
 
 const CACHE = process.env.REPLAY_CACHE || join(REPLAY_DIR, "..", "..", ".replay-cache")
 const RESULTS = join(REPLAY_DIR, "results")
@@ -89,7 +89,31 @@ async function factCheck(input: { story: Story; frames: StoryRun["frames"]; capt
 
 interface Scored { run: StoryRun; safety: Safety | null; pass: boolean; holdKinds: string[]; v9Hold: boolean | null; observed: ReplayStory["observed"] }
 
+/**
+ * --rescore <results json>: the code checks and the hold sorting applied again to a recorded run, with no model
+ * called; the fact check's findings, the cost and the token counts are kept as recorded. For a change to the scoring.
+ */
+function rescore(file: string): void {
+  const old = JSON.parse(readFileSync(file, "utf8")) as ReturnType<typeof summarize>
+  const set = loadStories()
+  const scored: Scored[] = old.stories.map(o => {
+    const s = set.stories.find(x => x.id === o.id)!
+    const captured = s.kind === "icymi" ? null : loadPages(s.id)
+    const run: StoryRun = { id: o.id, kind: o.kind, end: o.end, status: o.end === "review" ? "designing" : "held", reason: o.reason, frames: o.frames, caption: o.caption, media: o.media, history: o.history, calls: [], ms: o.seconds * 1000, ...(o.roundup ? { roundup: o.roundup } : {}), ...(captured ? { story: storyOf(s, captured) } : {}) }
+    const safety = o.end === "review" ? { ...safetyOf(run), factErrors: o.safety?.factErrors ?? null } : null
+    const kinds = o.end === "review" ? [] : holdKinds(o.reason ?? "", o.end)
+    return { run, safety, pass: !!safety && passes(run, safety), holdKinds: kinds, v9Hold: o.end === "review" ? null : kinds.some(k => SAFETY_HOLDS.includes(k as never) || k === "error"), observed: s.observed }
+  })
+  const result = summarize({ ...old.meta, rescored: new Date().toISOString() } as Meta, scored)
+  result.tokens = old.tokens
+  result.stories.forEach((r, i) => { r.calls = old.stories[i].calls; r.inputTokens = old.stories[i].inputTokens; r.outputTokens = old.stories[i].outputTokens })
+  writeFileSync(file, `${JSON.stringify(result, null, 2)}\n`)
+  writeFileSync(file.replace(/\.json$/, ".md"), markdown(result))
+  console.log(`rescored: ${result.score.pass} of ${result.score.stories} pass (${result.score.reachedReview} reached the Canva step)`)
+}
+
 async function main() {
+  if (arg("--rescore")) return rescore(arg("--rescore")!)
   checkCredential()
   const label = arg("--label") ?? `run-${new Date().toISOString().slice(0, 16).replace(/[-:T]/g, "")}`
   const only = arg("--only")?.split(","), seedsFile = arg("--seeds") ?? process.env.REPLAY_SEEDS, doFacts = !process.argv.includes("--no-fact-check")
@@ -127,14 +151,14 @@ async function main() {
   const after = await gateway.getCredits()
   const cost = Number(after.totalUsed) - Number(before.totalUsed)
   const commit = (() => { try { return execSync("git rev-parse --short HEAD", { cwd: REPLAY_DIR }).toString().trim() } catch { return "unknown" } })()
-  const result = summarize({ label, started, finished: new Date().toISOString(), rules: BRAND.rulesVersion, models: PIPELINE_MODELS, factModel: doFacts ? FACT_MODEL : null, seeds: seedsFile ? { file: seedsFile.split("/").pop(), sha256: createHash("sha256").update(readFileSync(seedsFile)).digest("hex").slice(0, 16), snapshot: seeds?.snapshot ?? null } : null, head: commit, costUsd: Math.round(cost * 10_000) / 10_000, credits: { before, after } }, scored)
+  const result = summarize({ label, started, finished: new Date().toISOString(), rules: BRAND.rulesVersion, models: PIPELINE_MODELS, factModel: doFacts ? FACT_MODEL : null, seeds: seedsFile ? { file: seedsFile.split("/").pop(), sha256: createHash("sha256").update(readFileSync(seedsFile)).digest("hex").slice(0, 16), snapshot: seeds?.snapshot ?? null } : null, head: commit, costUsd: Math.round(cost * 10_000) / 10_000 }, scored)
   mkdirSync(RESULTS, { recursive: true })
   writeFileSync(join(RESULTS, `${label}.json`), `${JSON.stringify(result, null, 2)}\n`)
   writeFileSync(join(RESULTS, `${label}.md`), markdown(result))
   console.log(`\n${result.score.pass} of ${result.score.stories} pass (${result.score.reachedReview} reached the Canva step). Cost $${result.meta.costUsd}. Written: results/${label}.json, .md`)
 }
 
-type Meta = { label: string; started: string; finished: string; rules: string; models: Record<string, string>; factModel: string | null; seeds: { file?: string; sha256: string; snapshot: string | null } | null; head: string; costUsd: number; credits: unknown }
+type Meta = { rescored?: string; label: string; started: string; finished: string; rules: string; models: Record<string, string>; factModel: string | null; seeds: { file?: string; sha256: string; snapshot: string | null } | null; head: string; costUsd: number }
 function summarize(meta: Meta, scored: Scored[]) {
   const tokens: Record<string, { calls: number; input: number; output: number }> = {}
   for (const s of scored) for (const c of s.run.calls) { const t = tokens[`${c.step}:${c.model}`] ??= { calls: 0, input: 0, output: 0 }; t.calls++; t.input += c.inputTokens ?? 0; t.output += c.outputTokens ?? 0 }
@@ -150,10 +174,10 @@ function summarize(meta: Meta, scored: Scored[]) {
 }
 function markdown(r: ReturnType<typeof summarize>): string {
   const cell = (v: string) => v.replace(/\|/g, "\\|").replace(/\n/g, " / ")
-  const rows = r.stories.map(s => `| ${s.id} | ${s.kind} | ${s.pass ? "**pass**" : s.end === "review" ? "reached, unsafe" : s.end} | ${cell(s.pass ? "" : s.end === "review" ? [...(s.safety?.limits ?? []), ...(s.safety?.unsourced ?? []).map(n => `unsourced ${n}`), ...(s.safety?.factErrors ?? []), ...(s.safety?.rights.includes("missing") ? ["photo missing"] : [])].join("; ") : `${s.holdKinds.join(", ")}: ${s.reason ?? ""}`).slice(0, 300)} | ${cell(s.frames.map(f => Object.entries(f.fields).filter(([k]) => !["date", "image_context", "counter", "story_numbers"].includes(k)).map(([, v]) => v).join(" · ")).join(" ‖ ").slice(0, 160))} | ${cell(s.observed.map(o => o.replace(/ — .*/, "")).join("; "))} |`)
+  const rows = r.stories.map(s => `| ${s.id} | ${s.kind} | ${s.pass ? "**pass**" : s.end === "review" ? "reached, unsafe" : s.end} | ${cell(s.pass ? "" : s.end === "review" ? [...(s.safety?.limits ?? []), ...(s.safety?.unsourced ?? []).map(n => `unsourced ${n}`), ...(s.safety?.clipped ?? []).map(w => `cut-off word ${w}`), ...(s.safety?.factErrors ?? []), ...(s.safety?.rights.includes("missing") ? ["photo missing"] : [])].join("; ") : `${s.holdKinds.join(", ")}: ${s.reason ?? ""}`).slice(0, 300)} | ${cell(s.frames.map(f => Object.entries(f.fields).filter(([k]) => !["date", "image_context", "counter", "story_numbers"].includes(k)).map(([, v]) => v).join(" · ")).join(" ‖ ").slice(0, 160))} | ${cell(s.observed.map(o => o.replace(/ — .*/, "")).join("; "))} |`)
   return [
     `# Content pipeline replay: ${r.meta.label}`, "",
-    `Rules ${r.meta.rules} · head ${r.meta.head} · ${r.meta.started} → ${r.meta.finished}`,
+    `Rules ${r.meta.rules} · head ${r.meta.head} · ${r.meta.started} → ${r.meta.finished}${r.meta.rescored ? ` · rescored ${r.meta.rescored} (code checks again, no model called)` : ""}`,
     `Models: ${Object.entries(r.meta.models).map(([k, v]) => `${k} ${v}`).join(", ")}${r.meta.factModel ? ` · fact check ${r.meta.factModel}` : " · no fact check"} · seeds ${r.meta.seeds ? `${r.meta.seeds.file} (${r.meta.seeds.sha256})` : "none"}`, "",
     `**Score: ${r.score.pass} of ${r.score.stories} pass** (reach Review safe and within limits). Reached the Canva step: ${r.score.reachedReview}; of those unsafe: ${r.score.unsafeAtReview}. Held: ${r.score.held} (${r.score.heldForStyleOnly} for reasons v9 no longer holds for). Failed: ${r.score.failed}. No draft: ${r.score.noDraft}.`,
     `Hold reasons: ${Object.entries(r.score.holdKinds).map(([k, n]) => `${k} ${n}`).join(", ") || "none"}.`,

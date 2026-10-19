@@ -33,15 +33,34 @@ A story **passes** when it reaches Review safe and within limits:
 - every field is within its template limits, as the server measures them;
 - every figure is in the source (`unsourcedNumbers`);
 - every photo frame has a photo whose rights were read from its page. Company media counts, flagged for the reviewer to confirm its terms, as production sends it;
+- no word on the card is cut off: a line's last word that the source doesn't use, and that begins a source word that is at least three letters longer ("PREC" for "precision"). The engine's own check knows only a fixed list;
 - the fact check finds no statement that the source doesn't support. The check is the scorer's own: Claude Sonnet 5.5, separate from the writer.
 
 The layout can only be seen on the Canva export, which the replay doesn't make, so a broken layout isn't scored here.
 
 A held story's reason is sorted as v9 sorts it:
 
-- **Safety** (still a hold under v9): `photo`, `limits`, `figures`, `subject`.
+- **Kept as a hold under v9:** `photo`, `limits`, `figures`, `subject`, and `writer` (the writer judged the source can't support the facts).
 - **Style** (v9 sends it to Review with a note): `originality`, `headline`, `format`.
-- **Other:** `writer` (the writer judged the source can't support the post), `eligibility` and `error`.
+- **Other:** `eligibility` and `error`.
+
+To apply a scoring change to a recorded run without calling a model again, use `--rescore results/<name>.json`. The fact check's findings, the cost and the token counts are kept as recorded.
+
+## Baseline (2026-10-19, main `f306279` plus this harness; engine unchanged)
+
+**4 of 18 pass. $0.68 a run.** Full table: `results/baseline-2026-10-19.md`.
+
+- **Passed:** `rtx-coyote`, `setaf-gtead`, `seasats-lightfish`, `paravision-state`. Paravision's primary page is an outlet's.
+- **Reached the Canva step but unsafe: 3.**
+  - `l3harris-navy-vampire`: hook "STOPS DRONES AT / SEA WITH PREC" has a cut-off word.
+  - `skydio-x10d` and `skydio-f10`: the mission brief adds "📍San Mateo, CA" and "Private company", and the source states neither.
+- **Held for a photo: 8.**
+  - `raid-hunter`, `pac3-edge`, both MORFIUS stories, `l3harris-drone-guardian`: no candidate shows the subject.
+  - `xtend-striker`: the crop is under 500 px wide.
+  - `antheia-osc`: no candidate at all.
+  - The ICYMI cover: no photo for a generic roundup.
+- **Held by the writer: 3.** Two Anduril pages are boilerplate only, and EagleEye states no headquarters.
+- **Held for style reasons that v9 drops: 0.** The copy-length and originality holds of rounds 5–6 no longer occur on main.
 
 ## Files
 

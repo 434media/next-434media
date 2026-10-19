@@ -10,7 +10,7 @@ import assert from "node:assert/strict"
 import type { McuAi, ModelCall } from "../content-pipeline/model"
 import type { SeriesKey } from "../content-pipeline/series"
 import type { MediaCandidate } from "../content-pipeline/sources"
-import { FIXED_RESEARCH, holdKinds, passes, replayStory, safetyOf, SAFETY_HOLDS, type ReplayDeps } from "../../scripts/content-replay/core"
+import { FIXED_RESEARCH, cutOffWords, holdKinds, passes, replayStory, safetyOf, SAFETY_HOLDS, type ReplayDeps } from "../../scripts/content-replay/core"
 import { loadPages, loadStories, storyOf } from "../../scripts/content-replay/fixtures"
 
 const set = loadStories()
@@ -63,6 +63,14 @@ test("a replayed News story runs writing, the checks and the photo pick, and sto
   assert.deepEqual(s.limits, []); assert.deepEqual(s.unsourced, []); assert.deepEqual(s.rights, ["verified"])
   assert.equal(passes(run, s), true)
   assert.equal(passes(run, { ...s, factErrors: ["XTEND is not an Army supplier — the source names no service"] }), false, "a fact error fails the pass")
+  assert.equal(passes(run, { ...s, clipped: ["PREC"] }), false, "a cut-off word fails the pass")
+})
+
+test("a cut-off word on the card is caught: the start of a source word the source never uses whole", () => {
+  const frames = [{ series: "dt101" as SeriesKey, fields: { benefit_headline: "STOPS DRONES AT\nSEA WITH PREC", subject_identifier: "VAMPIRE / L3HARRIS", image_context: "IMAGE: L3HARRIS" } }]
+  assert.deepEqual(cutOffWords(frames, "VAMPIRE pairs reconnaissance with precision strike against drones at sea."), ["PREC"])
+  assert.deepEqual(cutOffWords([{ series: "dt101" as SeriesKey, fields: { benefit_headline: "FASTER LAUNCHES\nFASTER SHOTS" } }], "faster launch and faster successive shots"), [], "an inflection the source doesn't use is not a cut-off")
+  assert.deepEqual(cutOffWords([{ series: "dt101" as SeriesKey, fields: { benefit_headline: "CUTS RESPONSE\nWAIT FOR EYES" } }], "no more waiting for eyes on the scene"), [], "only a line's last word can be cut off")
 })
 
 test("a draft the pipeline would move to another subject is held instead: research is fixed to the captured story", async () => {
@@ -94,6 +102,8 @@ test("holds are sorted as plan v9 sorts them: safety reasons stay holds, style r
   assert.deepEqual(kinds("the copy still breaks the template rules after two rewrites: the DT101 caption must be the mission brief"), ["format"])
   assert.deepEqual(kinds("the copy still breaks the template rules after two rewrites: the headline takes no period"), ["headline"])
   assert.deepEqual(holdKinds("the write step failed 4 times", "failed"), ["error"])
+  // A writer's hold in its own words is a writer's hold, even when it names a rule (baseline 2026-10-19).
+  assert.deepEqual(kinds("The source is a company product page, so a Defense Tech 101 mission brief cannot be verified from it. No replacement subject qualified: replay"), ["writer"])
   for (const k of ["photo", "limits", "figures", "subject"] as const) assert.ok(SAFETY_HOLDS.includes(k))
   for (const k of ["originality", "headline", "format"] as const) assert.ok(!SAFETY_HOLDS.includes(k))
 })
