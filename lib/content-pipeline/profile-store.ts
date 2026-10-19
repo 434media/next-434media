@@ -57,13 +57,16 @@ export interface BrandProfileDoc {
   published: ProfileVersion | null
   /** The highest version number kept (0 before the first Publish). */
   last_version: number
-  /** The unpublished draft a forced Restore replaced, kept so no edit is lost (drafts are not versioned). */
-  draft_before_restore: ProfileDraft | null
+  /** The unpublished drafts forced Restores replaced, newest first, so no edit is lost (drafts are not versioned).
+   * Only the last KEPT_DRAFTS are kept; an older one is dropped when a newer one is added. */
+  drafts_before_restore: ProfileDraft[]
 }
 
-/** A draft or a version this size or larger is refused: three of them (draft, published, the draft a restore kept) stay
- * well under Firestore's 1 MiB document limit. */
-export const MAX_PROFILE_BYTES = 250_000
+/** Drafts a forced Restore keeps. */
+export const KEPT_DRAFTS = 2
+/** A draft or a version this size or larger is refused: the four a document can hold (draft, published and the kept
+ * drafts) stay well under Firestore's 1 MiB document limit. */
+export const MAX_PROFILE_BYTES = 200_000
 const contentSha = (d: { profile: unknown; examples: unknown }) => profileSha256({ profile: d.profile, examples: d.examples })
 /** The draft holds edits that are not published (or nothing is published yet). */
 export const draftDiffers = (doc: Pick<BrandProfileDoc, "draft" | "published">) => !!doc.draft && (!doc.published || contentSha(doc.draft) !== contentSha(doc.published))
@@ -130,9 +133,11 @@ export function preparePublish(doc: BrandProfileDoc, actor: string, at: string, 
   if (!actor.trim()) problems.push("who is publishing is required")
   // Publishing what is already live would only add a duplicate version.
   if (!opts.restoredFrom && draft && doc.published && contentSha(draft) === contentSha(doc.published)) problems.push(`nothing to publish: the draft is the published version ${doc.published.version_id}`)
-  // A restore replaces the draft; unpublished edits there are refused unless forced, and then kept (draft_before_restore).
+  // A restore replaces the draft; unpublished edits there are refused unless forced, and then kept (drafts_before_restore).
   const unpublished = !!opts.restoredFrom && draftDiffers(doc)
-  if (unpublished && !opts.force) problems.push("the draft has unpublished edits: publish or discard them first, or restore with force (the draft is then kept as draft_before_restore)")
+  if (unpublished && !opts.force) problems.push("the draft has unpublished edits: publish or discard them first, or restore with force (the draft is then kept in drafts_before_restore)")
+  // Restoring what is already live would only add a duplicate version.
+  if (opts.restoredFrom && draft && doc.published && contentSha(draft) === contentSha(doc.published)) problems.push(`nothing to restore: ${opts.restoredFrom} is what is live (${doc.published.version_id})`)
   if (problems.length || !draft) return { ok: false, problems }
   const profile = draft.profile as BrandProfile, n = (doc.last_version || 0) + 1
   const version: ProfileVersion = {
@@ -141,5 +146,5 @@ export function preparePublish(doc: BrandProfileDoc, actor: string, at: string, 
   }
   // A restore also becomes the draft, so the next edit starts from what is live.
   const nextDraft = opts.restoredFrom ? { profile, examples: draft.examples, updated_by: actor, updated_at: at } : doc.draft
-  return { ok: true, version, doc: { ...doc, draft: nextDraft, published: version, last_version: n, ...(unpublished ? { draft_before_restore: doc.draft } : {}) } }
+  return { ok: true, version, doc: { ...doc, draft: nextDraft, published: version, last_version: n, ...(unpublished && doc.draft ? { drafts_before_restore: [doc.draft, ...(doc.drafts_before_restore ?? [])].slice(0, KEPT_DRAFTS) } : {}) } }
 }

@@ -24,9 +24,10 @@ export async function GET(request: NextRequest) {
     const result = await runPipeline(RUN_BUDGET_MS)
     if ("skipped" in result) {
       // Work is due but the brand has no runnable published profile: a skip, not a failure. One log line a minute;
-      // a run record once an hour, so the cron history shows it without filling up with it.
+      // a run record when the last one is more than an hour old, so the cron history shows it without filling up.
       console.warn("[cron:content-pipeline] skipped:", result.skipped)
-      if (startedAt.getUTCMinutes() === 0) await recordCronRun({ job: "content-pipeline", startedAt: startedAt.toISOString(), finishedAt: new Date().toISOString(), durationMs: Date.now() - startedAt.getTime(), status: "partial", message: `Skipped: ${result.skipped}`.slice(0, 500) })
+      const { claimCronSkipRecord } = await import("@/lib/firestore-content-pipeline")
+      if (await claimCronSkipRecord(startedAt.getTime(), 60 * 60_000).catch(() => false)) await recordCronRun({ job: "content-pipeline", startedAt: startedAt.toISOString(), finishedAt: new Date().toISOString(), durationMs: Date.now() - startedAt.getTime(), status: "partial", message: `Skipped: ${result.skipped}`.slice(0, 500) })
       return NextResponse.json({ ok: true, job: "content-pipeline", skipped: result.skipped })
     }
     const { steps } = result

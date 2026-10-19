@@ -14,6 +14,7 @@ const DRAFTS = CRM_COLLECTIONS.CONTENT_PIPELINE_DRAFTS
 const CONFIG = CRM_COLLECTIONS.CONTENT_PIPELINE_CONFIG
 const SEEDS_DOC = "mcu_seeds"
 const ICYMI_WINDOW_DOC = "icymi_window"
+const CRON_SKIP_DOC = "cron_skip"
 
 // Firestore rejects undefined; a JSON round trip drops it and keeps the record plain.
 const clean = <T>(v: T): T => JSON.parse(JSON.stringify(v)) as T
@@ -113,4 +114,18 @@ export async function getIcymiWindow(): Promise<IcymiWindowSetting> {
 }
 export async function saveIcymiWindow(setting: IcymiWindowSetting): Promise<void> {
   await getDb().collection(CONFIG).doc(ICYMI_WINDOW_DOC).set(clean(setting))
+}
+
+/**
+ * When the cron last recorded a skipped run (due work, but no runnable brand profile), so it records one at most an
+ * hour rather than every minute. Claimed in a transaction: of two overlapping ticks, one records.
+ */
+export async function claimCronSkipRecord(nowMs: number, everyMs: number): Promise<boolean> {
+  const db = getDb(), ref = db.collection(CONFIG).doc(CRON_SKIP_DOC)
+  return db.runTransaction(async tx => {
+    const last = (await tx.get(ref)).data()?.recordedAt
+    if (typeof last === "string" && nowMs - Date.parse(last) < everyMs) return false
+    tx.set(ref, { recordedAt: new Date(nowMs).toISOString() })
+    return true
+  })
 }

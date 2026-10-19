@@ -8,7 +8,7 @@
  *   draft <id> <file.json>            save the draft from {profile, examples?} (a private file outside this repository)
  *   publish <id>                      validate the draft and publish it as a new version
  *   restore <id> <id@vN> [--force]    republish an earlier version as a new version; --force replaces a draft with
- *                                     unpublished edits, which is kept as draft_before_restore
+ *                                     unpublished edits, which is kept in drafts_before_restore
  *   show <id>                         the published version and whether the draft differs from it
  *   history <id>                      every published version
  *   export <id> <id@vN> <file>        write a version's backup record to a file

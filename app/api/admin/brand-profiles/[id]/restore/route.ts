@@ -10,7 +10,7 @@ const input = z.object({ versionId: z.string().regex(/^[a-z][a-z0-9-]{1,30}@v\d{
 /**
  * POST /api/admin/brand-profiles/[id]/restore { versionId, force? } — restore an earlier version in one action: it is
  * validated again and republished as a new version (restored_from names the one it came from), and becomes the
- * draft. A draft with unpublished edits is refused (400) unless force, and then kept as draft_before_restore.
+ * draft. A draft with unpublished edits is refused (400) unless force, and then kept in drafts_before_restore (the last two).
  * History is never rewritten.
  */
 export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {

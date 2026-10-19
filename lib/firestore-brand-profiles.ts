@@ -29,7 +29,7 @@ const normalize = (id: string, raw: FirebaseFirestore.DocumentData): BrandProfil
   draft: raw.draft ?? null,
   published: raw.published ?? null,
   last_version: typeof raw.last_version === "number" ? raw.last_version : 0,
-  draft_before_restore: raw.draft_before_restore ?? null,
+  drafts_before_restore: Array.isArray(raw.drafts_before_restore) ? raw.drafts_before_restore : [],
 })
 
 export class DraftTooLarge extends Error {
@@ -47,7 +47,7 @@ export interface BrandProfileStore {
   saveDraft(id: string, draft: { profile: unknown; examples: ProfileExamples }, actor: string, at: string): Promise<BrandProfileDoc>
   publish(id: string, actor: string, at: string): Promise<PublishResult>
   /** Republishes an earlier version as a new version (one action); it becomes the draft too. A draft with unpublished
-   * edits is refused unless force, and then kept as draft_before_restore. */
+   * edits is refused unless force, and then kept in drafts_before_restore. */
   restore(id: string, versionId: string, actor: string, at: string, force?: boolean): Promise<PublishResult>
   /** Every published version, newest first. */
   versions(id: string): Promise<ProfileVersion[]>
@@ -59,7 +59,7 @@ export function firestoreBrandProfiles(db: FirebaseFirestore.Firestore = getDb()
   const missing = (id: string): PublishResult => ({ ok: false, problems: [`no brand profile document for ${id}`] })
   const write = (tx: FirebaseFirestore.Transaction, id: string, result: PublishResult & { ok: true }) => {
     tx.create(col.doc(id).collection(VERSIONS).doc(versionDocId(result.version.n)), clean(result.version))
-    tx.set(col.doc(id), clean({ draft: result.doc.draft, published: result.version, last_version: result.version.n, draft_before_restore: result.doc.draft_before_restore }), { mergeFields: ["draft", "published", "last_version", "draft_before_restore"] })
+    tx.set(col.doc(id), clean({ draft: result.doc.draft, published: result.version, last_version: result.version.n, drafts_before_restore: result.doc.drafts_before_restore }), { mergeFields: ["draft", "published", "last_version", "drafts_before_restore"] })
   }
   return {
     get: async id => {
@@ -71,7 +71,7 @@ export function firestoreBrandProfiles(db: FirebaseFirestore.Firestore = getDb()
     create: doc => db.runTransaction(async tx => {
       const ref = col.doc(doc.id)
       if ((await tx.get(ref)).exists) return { created: false }
-      tx.create(ref, clean({ ...doc, draft: null, published: null, last_version: 0, draft_before_restore: null }))
+      tx.create(ref, clean({ ...doc, draft: null, published: null, last_version: 0, drafts_before_restore: [] }))
       return { created: true }
     }),
     saveDraft: (id, draft, actor, at) => db.runTransaction(async tx => {
