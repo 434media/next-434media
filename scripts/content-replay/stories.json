@@ -1,0 +1,245 @@
+{
+  "about": "The content pipeline's offline replay set (plan v9, Phase 1 direction 4): the real stories of gate rounds 3-6 (2026-10-17 and 2026-10-18), rebuilt read-only from the saved pipeline drafts (GET /api/admin/content-pipeline/drafts/<id>), the published posts ICYMI drew on (GET /api/admin/crm/content-posts) and the production runtime logs ([content-pipeline] job drafting / media). Each story's source pages are captured once into pages/ (capture.ts), so a replay never depends on a live site. Public material only: source URLs, page text, published captions and what happened. No seeds, cohorts, pricing or ICP.",
+  "built": "2026-10-19",
+  "stories": [
+    {
+      "id": "raid-hunter",
+      "kind": "dt101",
+      "now": "2026-10-18T15:27:52Z",
+      "title": "Northrop Grumman RAIDS Hunter next-generation gun-based air-defense system",
+      "primaryUrl": "https://news.northropgrumman.com/missiles/northrop-grumman-introduces-raid-hunter-next-generation-gun-based-air-defense-system",
+      "publisher": "Northrop Grumman",
+      "supporting": ["https://www.northropgrumman.com/what-we-do/advanced-weapons/armament-systems/raid-hunter"],
+      "observed": [
+        { "round": 3, "draft": "MCU-DT101-20261017-10", "models": "nemotron", "outcome": "replaced", "reason": "no relevant, licensed photo: no candidate shows the Raid Hunter gun system (CGI promo frames, unrelated 'raid'/'Hunter' archive matches)" },
+        { "round": 4, "draft": "MCU-DT101-20261018-03", "models": "nemotron", "outcome": "held", "reason": "copy still breaks the template after two rewrites: the DT101 caption must be the mission brief (no Tech:/Platform:/Goal: lines)" }
+      ]
+    },
+    {
+      "id": "anduril-thunder",
+      "kind": "dt101",
+      "now": "2026-10-17T19:54:42Z",
+      "title": "Anduril Thunder Group 5 Autonomous Attack Rotorcraft",
+      "primaryUrl": "https://www.anduril.com/news/thunder",
+      "publisher": "Anduril Industries",
+      "publishedAt": "2026-07-20",
+      "observed": [
+        { "round": 3, "draft": "MCU-DT101-20261017-10", "models": "nemotron", "outcome": "held", "reason": "copy still breaks the template after two rewrites: the caption needs its source on a line of its own (and the caption first carried Raid Hunter's mission brief: the subject-switch bug fixed after round 3)" }
+      ]
+    },
+    {
+      "id": "anduril-submarine",
+      "kind": "dt101",
+      "now": "2026-10-17T19:54:42Z",
+      "title": "Anduril, U.S. Navy Invest $6.6 Billion to Expand America's Submarine Industrial Base",
+      "primaryUrl": "https://www.anduril.com/news/anduril-u-s-navy-invest-usd6-6-billion-to-expand-america-s-submarine-industrial-base",
+      "publisher": "Anduril Industries",
+      "publishedAt": "2026-10-06",
+      "observed": [
+        { "round": 3, "draft": "MCU-DT101-20261017-11", "models": "nemotron", "outcome": "held", "reason": "no relevant, licensed photo: no candidate shows Anduril's undersea vehicle (shipyard rendering, Altius 600, a Teledyne glider, Boeing Orca, Lockheed facilities)" }
+      ]
+    },
+    {
+      "id": "pac3-edge",
+      "kind": "dt101",
+      "now": "2026-10-18T15:27:52Z",
+      "title": "Lockheed Martin debuts PAC-3 Edge for the U.S. Army Innovative Future Interceptor Program",
+      "primaryUrl": "https://news.lockheedmartin.com/2026-10-09-Lockheed-Martin-Debuts-PAC-3-Edge-TM-for-the-U-S-Armys-Innovative-Future-Interceptor-Program",
+      "publisher": "Lockheed Martin",
+      "publishedAt": "2026-10-09",
+      "observed": [
+        { "round": 3, "draft": "MCU-DT101-20261017-12", "models": "nemotron", "outcome": "replaced", "reason": "no relevant, licensed photo: Patriot launcher photos are related but not PAC-3 Edge" },
+        { "round": 4, "draft": "MCU-DT101-20261018-01", "models": "nemotron", "outcome": "replaced", "reason": "no photo of the subject fits the 4:5 card (#0, the PAC-3 Edge render: the 4:5 crop cuts off the subject)", "shown": ["source:1920x1280:PAC-3 Edge", "commons:4049x1821:PAC-3 MSE fired from an Arleigh Burke destroyer.jpg", "commons:1404x936:Leading Edge 13-West-Pac 12-2 130303-M-HW830-020.jpg", "commons:796x1194:Leading Edge 13-West-Pac 12-2 130303-M-HW830-013.jpg", "commons:5076x3626:220316-N-XI307-1067 - Air Defense in AE22.jpg", "commons:8144x4104:220305-F-EI268-1044 - Arctic sky illuminates Patriot", "commons:7728x4954:220305-F-EI268-1046 - Arctic sky illuminates Patriot"] }
+      ]
+    },
+    {
+      "id": "skydio-f10",
+      "kind": "dt101",
+      "now": "2026-10-17T19:54:42Z",
+      "title": "F10 Lightrunner and MegaDock",
+      "primaryUrl": "https://www.skydio.com/blog/ascend-2026-f10-lightrunner-megadock-commands",
+      "publisher": "Skydio, Inc.",
+      "publishedAt": "2026-09-24",
+      "observed": [
+        { "round": 3, "draft": "MCU-DT101-20261017-12", "models": "nemotron", "outcome": "held", "reason": "the writer returned hold \"None\" (read as a hold: fixed after round 3), then no replacement subject qualified" }
+      ]
+    },
+    {
+      "id": "l3harris-navy-vampire",
+      "kind": "dt101",
+      "now": "2026-10-18T15:27:52Z",
+      "title": "L3Harris Wraith Shield",
+      "primaryUrl": "https://www.l3harris.com/newsroom/press-release/2026/09/l3harris-delivering-counter-drone-systems-us-navy",
+      "publisher": "L3Harris Technologies",
+      "publishedAt": "2026-09-08",
+      "observed": [
+        { "round": 4, "draft": "MCU-DT101-20261018-01", "models": "nemotron", "outcome": "in_review", "reason": "In Review as VAMPIRE / L3HARRIS with DVIDS 9608168 (public domain); hook \"RAPID STRIKE / AGAINST DRONES\" is a verbless fragment", "shown": ["source:1220x684:L3Harris Delivering Counter-Drone Systems to US Navy", "dvids:2000x1333:Rakkasan Soldiers bolster counter-UAS readiness with VAMPIRE", "dvids:1999x1333:Rakkasans of 101st Airborne Division (Air Assault) integrate", "dvids:2000x1333:Rakkasan Soldiers bolster counter-UAS readiness with VAMPIRE", "commons:2048x1274:N8035H Air Tractor AT-802U L3Harris OA-1K Skyraider II", "commons:1390x1737:Roman Primary Mirror Completed at L3Harris", "commons:2048x934:N8035H Air Tractor AT-802U L3Harris OA-1K Skyraider II", "commons:1995x1496:Roman Primary Mirror Completed at L3Harris"] }
+      ]
+    },
+    {
+      "id": "morfius-release",
+      "kind": "dt101",
+      "now": "2026-10-18T15:27:52Z",
+      "title": "Lockheed Martin MORFIUS X-Rotor drone-killer",
+      "primaryUrl": "https://news.lockheedmartin.com/2026-07-20-Lockheed-Martin-Unveils-MORFIUS-TM-X-Rotor-The-New-Drone-Killer-Set-to-Power-Americas-Fight-Against-Swarms",
+      "publisher": "Lockheed Martin",
+      "publishedAt": "2026-07-20",
+      "observed": [
+        { "round": 4, "draft": "MCU-DT101-20261018-02", "models": "nemotron", "outcome": "replaced", "reason": "no relevant, licensed photo (query \"multi-domain\"): coats of arms, an autonomous launcher, a solar image", "shown": ["commons:1392x1710:2nd Multi-Domain Effects Battalion COA.png", "commons:1616x1080:Autonomous multi-domain launcher 02.jpg", "commons:1616x1080:Autonomous multi-domain launcher 01.jpg", "commons:4096x4096:August 2010 CME SDO Multi-Wavelength.jpg", "commons:1392x1710:1st Multi-Domain Effects Battalion COA.png", "commons:6048x4032:2nd Multi-Domain Task Force Deactivates (9422841).jpg", "commons:6048x4032:2nd Multi-Domain Task Force Deactivates (9422846).jpg", "commons:6048x4032:2nd Multi-Domain Task Force Deactivates (9422845).jpg"] }
+      ]
+    },
+    {
+      "id": "morfius-product",
+      "kind": "dt101",
+      "now": "2026-10-18T15:27:52Z",
+      "title": "Lockheed Martin Unveils MORFIUS X-Rotor: The New Drone-Killer Set to Power America's Fight Against Swarms",
+      "primaryUrl": "https://www.lockheedmartin.com/en-us/products/MORFIUS.html",
+      "publisher": "Lockheed Martin",
+      "observed": [
+        { "round": 4, "draft": "MCU-DT101-20261018-02", "models": "nemotron", "outcome": "held", "reason": "no relevant, licensed photo: #0 is the MORFIUS page banner (text over desert, faint aircraft shadow); the rest show other drones and soldiers", "shown": ["source:1920x1125:MORFIUS", "commons:997x664:Karrar drone equipped with Azarakhsh missile.png", "commons:6745x4497:U S -Led exercise tests innovative drone warfare in Eastern", "commons:7423x4949:U S -Led exercise tests innovative drone warfare in Eastern", "commons:6984x4656:U S -Led exercise tests innovative drone warfare in Eastern", "commons:7149x4766:U S -Led exercise tests innovative drone warfare in Eastern", "commons:5803x3869:U S -Led exercise tests innovative drone warfare in Eastern"] }
+      ]
+    },
+    {
+      "id": "paravision-state",
+      "kind": "news",
+      "now": "2026-10-18T15:28:39Z",
+      "title": "US State Department awards Paravision up to $6.5 m for digital identity assurance",
+      "primaryUrl": "https://www.biometricupdate.com/202610/us-state-department-awards-paravision-up-to-6-5m-for-digital-identity-assurance",
+      "publisher": "Biometric Update",
+      "publishedAt": "2026-10-17",
+      "note": "Its primary page is a news outlet's report: research on current main skips an outlet as primary (sources.ts isOutlet), so this story would not reach writing today. It is kept because it reached writing in round 4, and its copy failure is real.",
+      "observed": [
+        { "round": 4, "draft": "MCU-NEWS-20261018-01", "models": "nemotron", "outcome": "held", "reason": "copy still breaks the template after two rewrites: headline runs past 3 lines" }
+      ]
+    },
+    {
+      "id": "seasats-lightfish",
+      "kind": "dt101",
+      "now": "2026-10-18T16:09:51Z",
+      "title": "Seasats Deploys Fleet of Lightfish USVs for Maritime Border Security in the Gulf of America",
+      "primaryUrl": "https://www.prnewswire.com/news-releases/seasats-deploys-fleet-of-lightfish-usvs-for-maritime-border-security-in-the-gulf-of-america-302896922.html",
+      "publisher": "Seasats (via PR Newswire)",
+      "publishedAt": "2026-10-02",
+      "supporting": ["https://www.seasats.com/"],
+      "observed": [
+        { "round": 5, "draft": "MCU-DT101-20261018-04", "models": "haiku", "outcome": "held", "reason": "copy still breaks the template after two rewrites: benefit hook lines over 16 characters" }
+      ]
+    },
+    {
+      "id": "l3harris-drone-guardian",
+      "kind": "dt101",
+      "now": "2026-10-18T16:09:51Z",
+      "title": "L3Harris Drone Guardian counter-sUAS",
+      "primaryUrl": "https://www.l3harris.com/all-capabilities/drone-guardian-counter-suas",
+      "publisher": "L3Harris Technologies",
+      "supporting": ["https://www.l3harris.com/newsroom/editorial/2023/03/how-resolve-security-and-policing-challenges-drones-present"],
+      "observed": [
+        { "round": 5, "draft": "MCU-DT101-20261018-05", "models": "haiku", "outcome": "held", "reason": "no relevant, licensed photo: none shows Drone Guardian (a commercial quadcopter, MQ-9 Reapers); replacements failed (FLIR 403, Skydio pages older than 90 days)", "shown": ["source:1594x1140:How to Resolve the Security and Policing Challenges Drones P", "commons:2100x1500:MQ-9 Reaper in flight (2007).jpg", "commons:3022x1986:MQ-9 Reaper UAV (cropped).jpg", "commons:4288x2848:MQ-9 Reaper UAV.jpg", "commons:1800x1200:MQ-9 Reaper during Exercise Northern Strike 2019.png", "commons:4272x2848:MQ-9 Reaper display - Aviation Nation 2019.jpg", "commons:3216x2136:174th ATKW MQ-9 Reaper.jpg", "commons:4032x2688:An MQ-9 Reaper sits in front of a hanger at Ebbing Air Natio"] }
+      ]
+    },
+    {
+      "id": "anduril-eagleeye",
+      "kind": "dt101",
+      "now": "2026-10-18T16:09:51Z",
+      "title": "Anduril EagleEye soldier mixed-reality helmet system",
+      "primaryUrl": "https://www.anduril.com/eagleeye",
+      "publisher": "Anduril Industries",
+      "observed": [
+        { "round": 5, "draft": "MCU-DT101-20261018-06", "models": "haiku", "outcome": "held", "reason": "copy still breaks the template after two rewrites: benefit hook lines over 16 characters" }
+      ]
+    },
+    {
+      "id": "xtend-striker",
+      "kind": "news",
+      "now": "2026-10-18T16:09:51Z",
+      "title": "XTEND awarded $40.5M order for 6,000 STRIKER systems",
+      "primaryUrl": "https://xtend.me/xtend-awarded-40-5-million-order-for-6000-striker-systems-following-drone-dominance-program-gauntlet-ii/",
+      "publisher": "XTEND AI Robotics (NYSE: XTND), via Business Wire",
+      "publishedAt": "2026-10-13",
+      "observed": [
+        { "round": 5, "draft": "MCU-NEWS-20261018-02", "models": "haiku", "outcome": "in_review", "reason": "In Review: \"XTEND LANDS $40.5M DRONE BUY FOR STRIKER\"; grey placeholder photo (the News template had no photo field yet)" }
+      ]
+    },
+    {
+      "id": "skydio-x10d",
+      "kind": "dt101",
+      "now": "2026-10-18T19:36:11Z",
+      "title": "Skydio X10D",
+      "primaryUrl": "https://www.skydio.com/x10d",
+      "publisher": "Skydio",
+      "observed": [
+        { "round": 6, "draft": "MCU-DT101-20261018-07", "models": "haiku", "outcome": "replaced", "reason": "the writer held: the Traction line came from Skydio's order announcement, not the product page, and the date line relied on an undated primary page" }
+      ]
+    },
+    {
+      "id": "rtx-coyote",
+      "kind": "dt101",
+      "now": "2026-10-18T19:36:11Z",
+      "title": "RTX's Raytheon completes three successful tests of new Coyote upgrades",
+      "primaryUrl": "https://www.rtx.com/news/news-center/2026/10/12/rtxs-raytheon-completes-three-successful-tests-of-new-coyote-upgrades",
+      "publisher": "RTX (Raytheon)",
+      "publishedAt": "2026-10-12",
+      "observed": [
+        { "round": 6, "draft": "MCU-DT101-20261018-07", "models": "haiku", "outcome": "in_review", "reason": "In Review: \"ADDS A ROCKET / MOTOR FOR SPEED\", RTX release photo (company media); credit read \"UNITED TECHNOLOGIES\" and crossed the exhaust (fixed in #205)", "shown": ["source:1920x1080:RTX", "dvids:2000x1117:Coalition Forces Test Coyote UAS in Base Defense Exercise at", "commons:3247x2558:Raytheon headquarters.jpg", "commons:3732x2151:Raytheon 400A ZS-JPS (22826620060).jpg", "commons:5500x3800:Raytheon CK533AX.jpg", "commons:3519x1518:Raytheon 6104-04 front view.jpg", "commons:2048x1536:Raytheon Waterloo - Flickr - gloom.jpg", "commons:3264x2448:Raytheon ECG prototype.JPG"] }
+      ]
+    },
+    {
+      "id": "setaf-gtead",
+      "kind": "news",
+      "now": "2026-10-18T19:36:18Z",
+      "title": "Army partners with G-TEAD to test counter-drone systems in Africa, with up to 15 systems in Morocco",
+      "primaryUrl": "https://www.army.mil/article-amp/296161/setaf_af_g_tead_partner_to_accelerate_counter_drone_tech_in_africa",
+      "publisher": "U.S. Army",
+      "publishedAt": "2026-10-16",
+      "observed": [
+        { "round": 6, "draft": "MCU-NEWS-20261018-03", "models": "haiku", "outcome": "held", "reason": "copy still breaks the template after two rewrites: the caption copies 16 words in a row from the source (originality)" }
+      ]
+    },
+    {
+      "id": "antheia-osc",
+      "kind": "breaking",
+      "now": "2026-10-18T19:38:52Z",
+      "title": "Department of War's Office of Strategic Capital Signs $80 Million Conditional Loan Commitment With Antheia, Inc.",
+      "primaryUrl": "https://www.prnewswire.com/news-releases/antheia-secures-80-million-conditional-funding-commitment-from-department-of-wars-office-of-strategic-capital-302911991.html",
+      "publisher": "U.S. Department of War (war.gov); company release via PR Newswire",
+      "publishedAt": "2026-10-18",
+      "fresh": { "at": "2026-10-18T16:34:00.000Z", "how": "official" },
+      "whyNow": "The war.gov release appears in the official RSS feed at Oct. 18 00:55 GMT, and the company release is dated Oct. 18, 12:34 ET. Both fall within the 24-hour window, but the window closes soon.",
+      "observed": [
+        { "round": 6, "draft": "MCU-BN-20261018-01", "models": "haiku", "outcome": "held", "reason": "no relevant, licensed photo: no candidate at all; the replacement (Navy E-130J) was refused by war.gov (403)", "shown": [] }
+      ]
+    },
+    {
+      "id": "icymi-week-2026-10-05",
+      "kind": "icymi",
+      "now": "2026-10-18T19:35:25Z",
+      "title": "ICYMI roundup, the week of 2026-10-05",
+      "note": "The posts the roundup draws on, as the board held them on 2026-10-19: the engine's own icymiStory decides which qualify (gate round 6 fix). The cards are referenced by URL and reused, never re-filled. Two posts the engine excludes (the earlier ICYMI and the ULTRA DT101) keep their captions without their image-credit lines.",
+      "posts": [
+        { "id": "vGpQnY7cCxilxERgE9gN", "title": "MCU-BN-20261009-02 | Marconi USSOCOM Orion X604 | REVIEW DRAFT", "status": "posted", "publishedAt": "2026-10-09T23:30:34.996Z", "card": { "url": "https://lsnohwxds20pllzf.public.blob.vercel-storage.com/content-posts/cbbde91f-a8e8-4a99-892f-75b96cbd2911-bcb68706-6e94-418f-8405-8801b68b579d-MCU-BN-20261009-02-Marconi-REVIEW.jpg" }, "caption": "Marconi Technologies says it has received an initial USSOCOM contract for Orion X604 tactical radios, with deliveries expected to begin in late 2026.\n\nThe company says the radios connect operators with sensors and autonomous systems, supporting robotic control and sensor-data transfer in contested environments.\n\nIllustrative archive: military communications training, Djibouti, Jan. 18, 2019. This is not the Orion X604 or footage of this award.\nPhoto: U.S. Air Force / Tech. Sgt. Thomas Grimes, via DVIDS.\n\nThe appearance of U.S. Department of War (DoW) visual information does not imply or constitute DoW endorsement.\n\nSource: Marconi Technologies release, Oct. 9, 2026, via European Security & Defence.\nhttps://euro-sd.com/2026/10/news/cyber-coms/54288/marconi-technologies/" },
+        { "id": "n4WpZWHja2cz9W4oRFVl", "title": "MCU-BN-20261010-01 | Lockheed Martin PAC-3 Edge | Approved", "status": "posted", "publishedAt": "2026-10-10T00:56:00.159Z", "card": { "url": "https://lsnohwxds20pllzf.public.blob.vercel-storage.com/content-posts/46dc1076-482d-47f0-8405-6256756a89ef-MCU-BN-20261010-01-v1-APPROVED.jpg" }, "caption": "Lockheed Martin has unveiled PAC-3 Edge, its entry in the U.S. Army's Future Interceptor competition.\n\nThe company says the interceptor adds a new seeker, a Northrop Grumman multi-pulse rocket motor and upgraded flight controls. Testing is planned for 2027, with deployment targeted by 2031.\n\nPhoto: PAC-3 MSE archive dated July 1, 2024, via Darrell Ames/U.S. Army and DVIDS. The image shows the earlier MSE variant, not PAC-3 Edge.\n\nThe appearance of U.S. Department of War (DoW) visual information does not imply or constitute DoW endorsement.\n\nSource: Lockheed Martin, Oct. 9, 2026.\nhttps://news.lockheedmartin.com/2026-10-09-Lockheed-Martin-Debuts-PAC-3-Edge-TM-for-the-U-S-Armys-Innovative-Future-Interceptor-Program" },
+        { "id": "KQ5cnZEEWg5ZrjVqHDfK", "title": "MCU-ICYMI-20261009-01 | Five defense-tech developments | Approved r3", "status": "posted", "publishedAt": "2026-10-10T00:51:14.546Z", "card": { "url": "https://lsnohwxds20pllzf.public.blob.vercel-storage.com/content-posts/63b96590-7c21-4156-a113-5fac3603dc35-01-cover.jpg" }, "caption": "ICYMI: five defense-tech developments this week.\n\n• Anduril: $3.7B in private shipyard investment, alongside Navy work valued up to $2.9B.\n\n• Raytheon: an SM-3 IB interceptor production and sustainment award valued up to $6.3B.\n\n• Lockheed Martin: next-generation Army network integration with industry partners.\n\n• Kratos: more than $100M in space and cyber mission awards.\n\n• BLADE: Hunter WOLF advances to Phase II of the Army’s GroundBreaker 1 demonstration.\n\nSources: Anduril (Oct. 6), RTX (Oct. 8), Lockheed Martin (Oct. 8), Kratos (Oct. 5), HDT/BLADE (Oct. 8), 2026." },
+        { "id": "Bhix2RcJcz98WoS4ai4S", "title": "MCU-P03 Drone Crucible 26.3", "status": "posted", "publishedAt": "2026-10-09T20:45:57.671Z", "card": { "url": "https://lsnohwxds20pllzf.public.blob.vercel-storage.com/content-posts/9dcb2004-a973-4a9d-b269-b7fdf2f5b817-MCU-P03-v3-derived-JPEG-review.jpg" }, "caption": "Drone Crucible 26.3 put the Florida National Guard and joint partners through an integration test at Camp Blanding, Sept. 26–Oct. 2.\n\nIn its Oct. 6 report, the Guard described combining Tactical Assault Kit location data, unmanned-system information and video feeds into a shared operational picture. It also connected exercise information with higher-level commands.\n\nThe less visible requirement was technical support: the Guard said dedicated specialists were critical to maintaining that shared picture and fixing issues. Our takeaway: useful drone capability depends on connected systems and people who can keep them working.\n\nPhoto: Camp Blanding, Oct. 1, 2026. U.S. Air National Guard photo by Staff Sgt. N.W. Huertas / DVIDS.\n\nThe appearance of U.S. Department of War (DoW) visual information does not imply or constitute DoW endorsement.\n\nSource: https://www.army.mil/article/295987/florida_national_guard_advances_unmanned_systems_during_drone_crucible_26_3" },
+        { "id": "L4OimXdL9sU6E6xf0FEZ", "title": "MCU-IGTEST-20261010-01 | ULTRA Defense Tech101 | Approved", "status": "posted", "publishedAt": "2026-10-11T00:10:51.428Z", "card": { "url": "https://lsnohwxds20pllzf.public.blob.vercel-storage.com/content-posts/43c9979d-5122-44d3-b9b7-48aab0a28511-0001-3378218315779731634.jpg" }, "caption": "MISSION BRIEF // ULTRA\n\n//Overland AI\n📍Seattle, WA\n\nTech: Autonomy\n\nPlatform: OFF ROAD VEHICLE\n\nGoal: Decrease hazard and casualty during resupply and recon missions\n\nBackers: 8VC, Point72 Ventures, Shasta Ventures\n\nTraction: Four ULTRAs in Army training with 3rd Brigade, 82nd Airborne Division, per Overland. Training evidence, not proof of combat performance." },
+        { "id": "Ic6A6lPf0WFmAQ8Nx7XG", "title": "MCU-BN-20261010-02 | Microchip acquires VORAGO | Approved", "status": "posted", "publishedAt": "2026-10-10T01:54:27.370Z", "card": { "url": "https://lsnohwxds20pllzf.public.blob.vercel-storage.com/content-posts/d40f6541-c1c0-4f97-9b20-e4a894b2ffcc-MCU-BN-20261010-02-v1-REVIEW.jpg" }, "caption": "Microchip Technology has acquired Austin-based VORAGO Technologies, adding radiation-hardened microcontrollers, microprocessors and the company’s HARDSIL process technology to its space and defense portfolio.\n\nThe deal brings chip-design and radiation-hardening expertise for electronics that operate in harsh environments. Financial terms were not disclosed.\n\nSource: Microchip Technology, Oct. 9, 2026.\nhttps://ir.microchip.com/news-events/press-releases/detail/1419/microchip-technology-acquires-vorago-technologies\n\nIllustrative archive: Space Development Agency satellite-network graphic, Sept. 28, 2020, via U.S. Naval Research Laboratory/DVIDS. No VORAGO component or involvement in the pictured network is established.\n\nThe appearance of U.S. Department of War (DoW) visual information does not imply or constitute DoW endorsement." }
+      ],
+      "observed": [
+        { "round": 3, "draft": "MCU-ICYMI-20261017-02", "models": "nemotron", "outcome": "held", "reason": "no licensed photo for frame 2 (the roundup then searched new photos for each story: fixed after round 3)" },
+        { "round": 4, "draft": "MCU-ICYMI-20261018-01", "models": "nemotron", "outcome": "held", "reason": "copy still breaks the template after two rewrites: decks over 2 lines and not one sentence" },
+        { "round": 5, "draft": "MCU-ICYMI-20261018-02", "models": "haiku", "outcome": "held", "reason": "copy still breaks the template after two rewrites: headlines and decks over their 2-line limits on frames 2-4" },
+        { "round": 6, "draft": "MCU-ICYMI-20261018-03", "models": "haiku", "outcome": "held", "reason": "the writer held the roundup on eligibility (Marconi titled REVIEW DRAFT): eligibility moved into the engine in #205" }
+      ]
+    }
+  ],
+  "notRebuilt": [
+    { "round": 3, "draft": "MCU-DT101-20261017-11", "title": "Shield AI and Honeywell Aerospace collaborate to advance autonomous aircraft development", "outcome": "replaced: no photo of the subject fits the 4:5 card", "why": "its primary URL is not on the draft (only rejected titles are kept) and round 3's runtime logs are past Vercel's one-day retention" },
+    { "round": 3, "draft": "MCU-DT101-20261017-11", "title": "Anduril NGC2 Command and Control Expansion", "outcome": "replaced: the writer held \"None\"", "why": "same: no URL recorded" },
+    { "round": 4, "draft": "MCU-DT101-20261018-02", "title": "L3Harris Wraith Shield AI-Enabled Counter-UAS System", "outcome": "replaced: no candidate shows Wraith Shield (a software upgrade; the sell sheet is mostly text)", "why": "no URL recorded on the draft, and the job log lists only the first story per draft" },
+    { "round": 3, "job": "job-50c66297f8104b3c8e064ab8c1ee654b", "title": "News x2", "outcome": "no new content (card SjcbjyW04U47SiXmCJge): outlet and primary-source rules starved News", "why": "a research outcome: the replay fixes research to a captured story" },
+    { "round": 3, "job": "job-807d3d05518f4a1d83470da400edd8a7", "title": "Breaking x1", "outcome": "no new content (card PQbZt80GZojA2k2Q6Hli)", "why": "research outcome" },
+    { "round": 4, "job": "job-32d760bd950d4c0f814c6baaf00e7a77", "title": "News #2", "outcome": "not qualified (1 of 2)", "why": "research outcome" },
+    { "round": 4, "title": "Breaking x1", "outcome": "no new content (card Fw2jAGwoBILEqEtQwgZH): every candidate a breakingdefense.com article", "why": "research outcome" },
+    { "round": 5, "job": "job-ff7ba6287d864dfe8ee1167b96f4bd81", "title": "News #2", "outcome": "not qualified (1 of 2)", "why": "research outcome" },
+    { "round": 5, "job": "job-fb17d8cb594847049418b87506c02ac9", "title": "Breaking x1", "outcome": "no new content, correctly (card gPf2viX74Holdeqypa2d)", "why": "research outcome" }
+  ]
+}

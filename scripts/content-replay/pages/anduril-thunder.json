@@ -1,0 +1,15 @@
+{
+  "story": "anduril-thunder",
+  "capturedAt": "2026-10-19T00:19:18.603Z",
+  "pages": {
+    "https://www.anduril.com/news/thunder": {
+      "url": "https://www.anduril.com/news/thunder",
+      "title": "Introducing Thunder: Autonomous Attack Rotorcraft for the Near-Surface Fight | Anduril",
+      "text": "Anduril Industries, Inc. is a defense technology company that specializes in advanced autonomous systems.\nReliable and flexible autonomous undersea systems, designed for littoral and deep-water survey, inspection, and delivery of effects - applicable to a wide range of defense and commercial mission sets.\nA family of autonomous systems, powered by Lattice, that provide integrated, persistent awareness and security for land regions, landmarks, or critical infrastructure.\nAutonomous air systems that are tasked, connected and controlled by Lattice. Together, they enable a variety of intelligence, surveillance, reconnaissance, and strike mission profiles across echelons of command.\nLattice is the software platform that powers the capabilities of our software-defined weapons, and easily integrates with third-party and government-owned capabilities to create a comprehensive, extensible network of sensors and effectors.\nAnduril Industries, Inc. is an American defense technology company that specializes in advanced autonomous systems.\nAnduril Industries builds advanced autonomous systems and defense technology to protect US and allied forces. Creating the future of national security through AI, robotics, and cutting-edge engineering.",
+      "publishedAt": "2026-07-20",
+      "image": "https://cdn.sanity.io/images/61nocsj5/production/4131a93789326418b07946381e8060174074c7b3-3000x2000.jpg?rect=0,213,3000,1575&w=1200&h=630&fit=min&auto=format",
+      "siteName": "Anduril",
+      "description": "Anduril Industries builds advanced autonomous systems and defense technology to protect US and allied forces. Creating the future of national security through AI, robotics, and cutting-edge engineering."
+    }
+  }
+}
