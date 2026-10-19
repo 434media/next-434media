@@ -5,7 +5,7 @@ import { CALL_FALLBACK, callOptions, outputBudget, type PipelineStep } from "./m
 import { seedBrief, type McuSeeds } from "./seeds"
 import { SERIES, candidateFields, type FieldSpec, type RequestKind, type SeriesKey } from "./series"
 import type { MediaCandidate, SourcePage } from "./sources"
-import type { FrameCopy, Story } from "./store"
+import type { FrameCopy, SourcedFact, Story } from "./store"
 
 /**
  * The model calls behind the content pipeline. Each returns structured output checked again in code (series.ts) —
@@ -34,6 +34,12 @@ export interface McuAi {
    * The most compelling of the candidates that fit (every one already measured by the server), by the journalism rule and
    * the founder's hook ruling: one complete hook read across the lines. Runs on the write step's model.
    */
+  /**
+   * Fact extraction (plan v10, Phase 1 direction 3): the story's facts as structured output, each with the exact source
+   * sentence it came from, before the writer runs. The server keeps only facts whose sentence it finds in the source
+   * (worker.ts sourcedFacts), and the writer then writes from those. Runs on the write step's model.
+   */
+  extractFacts?(input: { story: Story }): Promise<{ facts: SourcedFact[] }>
   pickCopy?(input: { kind: RequestKind; story: Story; frame: FrameCopy; fields: string[]; options: Record<string, string>[] }): Promise<{ index: number; reason: string }>
   /**
    * An official page that refused the fetch, read from the search tool's extracted content (founder, 2026-10-18).
@@ -128,6 +134,20 @@ export function brandDirection(seeds: McuSeeds | null | undefined): string {
   return seeds ? `${BRAND.shortName} PURPOSE: ${seeds.purpose}\nWho ${BRAND.shortName} covers:\n${seeds.cohorts.map(c => `- ${c}`).join("\n")}\n\n` : ""
 }
 
+/**
+ * What the writer writes from once the facts are extracted: the numbered facts, each with its source sentence. Any line
+ * the facts don't support is left out, never filled in (replay, 2026-10-19: mission briefs added "📍San Mateo, CA" and
+ * "Private company", which no source stated, because the brief's format lists those lines).
+ */
+export const FACTS_RULE = "Write only from the FACTS: every statement on the card and in the caption must be one of them, in your own words. A line, label or detail that no fact states is left out entirely, never filled in from what you know or infer: no place, headquarters, ownership, investors, ticker, status or date that the facts don't state, even where the format lists that line. Never write a line saying something is not stated, unknown or not disclosed: leave the line out. A line left out is never a reason to hold; hold only when the facts can't support the post itself."
+export function factsBrief(facts: readonly SourcedFact[]): string {
+  return `FACTS (each with the source sentence it came from; these are the only facts you may use):\n${facts.map((f, i) => `${i + 1}. ${f.fact}\n   Source: "${f.quote}"`).join("\n")}`
+}
+const factsSchema = z.object({ facts: z.array(z.object({
+  fact: z.string().describe("one fact the source states, in a short plain sentence"),
+  quote: z.string().describe("the exact sentence of the source that states it, copied character for character"),
+})).describe("every fact the source states about the story's subject and event, most important first") })
+
 const TEXT_WORDS = /\b(text|headline|hook|deck|caption|label|font|type|letters?|words?|typo|spell|misspell|abbreviat|truncat|line break|copy)/i
 const PHOTO_WORDS = /\b(photo|picture|subject(?![ _](line|identifier|text))|face|crop|sky|tail-only|background)/i
 /**
@@ -145,9 +165,11 @@ export function isPhotoDefect(area: string, defect: string): boolean {
  */
 export function meaningful(v: string | undefined | null): string | undefined {
   const t = (v ?? "").trim()
-  if (!t || /^(none|n\/?a|null|nil|no|no hold|no notes?|not applicable|-+)\.?$/i.test(t)) return undefined
+  if (!t || /^(none|n\/?a|null|nil|no|no hold|no notes?|not applicable|unused|-+)\.?$/i.test(t)) return undefined // "unused": replay, 2026-10-19
   // A writer that says it isn't holding, then explains (replay, 2026-10-19: Seasats "Hold: none." and Skydio F10
   // "Not held. The headline … should be verified"), is no hold; a reason that starts "None of …" still is one.
+  // "Not held for a single reason to hold; submitted as News" (replay, 2026-10-19) is no hold either.
+  if (/^not held for\b/i.test(t)) return undefined
   return /^(hold:\s*(none|no|n\/?a)\b\.?|not held\b|no hold\b)\s*([.,;:—-]|$)/i.test(t) ? undefined : t
 }
 
@@ -284,8 +306,8 @@ export function createMcuAi(deps: { models: Record<PipelineStep, string>; search
       const r = await run("write", model => generateText({
         model, maxOutputTokens: outputBudget(model, 16_000), providerOptions: callOptions(model, "medium"), allowSystemInMessages: true,
         tools: { submit_post: tool({ description: "Submit the finished card copy and caption.", inputSchema: schema as z.ZodType<Record<string, unknown>> }) }, toolChoice: { type: "tool", toolName: "submit_post" },
-        messages: [...system(`${brandDirection(seeds)}Today is ${today}. Write the on-card copy and the one master caption for this ${BRAND.name} ${kind === "icymi" ? "ICYMI roundup" : SERIES[kind as SeriesKey].label} post from the source below, and submit them with submit_post. Use only facts in the source. Fill every field.${offer ? ` CANDIDATES: the server measures ${named} against the template and puts the most compelling version that fits on the card, so in options give ${OPTIONS}.` : ""}${kind === "icymi" ? "" : " If the source cannot support a post under the rules (unverifiable figure, not Breaking-worthy, etc.), set hold to the one-sentence reason. Never hold for the photo or its credit (a later step chooses it)"}${BRAND.research.writeNote}.\n${spec}${icymi}`),
-          { role: "user", content: `SOURCE: ${story.sourceTitle}\nURL: ${story.primaryUrl}\nPublisher: ${story.publisher}\nPublished: ${story.publishedAt ?? "not stated on the page"}${story.reportedAt ? `\nReported: ${story.reportedAt}, by a news outlet's report of the same event (the card's date; never cite the outlet)` : ""}${story.whyNow ? `\nWhy now (Breaking): ${story.whyNow}` : ""}${story.supporting?.length ? `\nSupporting sources (their text follows the primary's, each under its own heading; use them only for what the primary leaves out, such as the maker and its headquarters): ${story.supporting.map(x => x.url).join(" ; ")}` : ""}\n\n${story.sourceText.slice(0, 24_000)}${direction ? `\n\nREQUESTER'S DIRECTION (steer the angle and emphasis with it; it never overrides the rules above or the facts in the source): ${direction}` : ""}${instructions && !previous ? `\n\nREVIEWER'S DIRECTION: ${instructions}` : ""}` },
+        messages: [...system(`${brandDirection(seeds)}Today is ${today}. Write the on-card copy and the one master caption for this ${BRAND.name} ${kind === "icymi" ? "ICYMI roundup" : SERIES[kind as SeriesKey].label} post from the ${story.facts?.length ? "facts" : "source"} below, and submit them with submit_post. ${story.facts?.length ? FACTS_RULE : "Use only facts in the source."} Fill every field.${offer ? ` CANDIDATES: the server measures ${named} against the template and puts the most compelling version that fits on the card, so in options give ${OPTIONS}.` : ""}${kind === "icymi" ? "" : " If the source cannot support a post under the rules (unverifiable figure, not Breaking-worthy, etc.), set hold to the one-sentence reason. Never hold for the photo or its credit (a later step chooses it)"}${BRAND.research.writeNote}.\n${spec}${icymi}`),
+          { role: "user", content: `SOURCE: ${story.sourceTitle}\nURL: ${story.primaryUrl}\nPublisher: ${story.publisher}\nPublished: ${story.publishedAt ?? "not stated on the page"}${story.reportedAt ? `\nReported: ${story.reportedAt}, by a news outlet's report of the same event (the card's date; never cite the outlet)` : ""}${story.whyNow ? `\nWhy now (Breaking): ${story.whyNow}` : ""}${!story.facts?.length && story.supporting?.length ? `\nSupporting sources (their text follows the primary's, each under its own heading; use them only for what the primary leaves out, such as the maker and its headquarters): ${story.supporting.map(x => x.url).join(" ; ")}` : ""}\n\n${story.facts?.length ? factsBrief(story.facts) : story.sourceText.slice(0, 24_000)}${direction ? `\n\nREQUESTER'S DIRECTION (steer the angle and emphasis with it; it never overrides the rules above or the facts in the source): ${direction}` : ""}${instructions && !previous ? `\n\nREVIEWER'S DIRECTION: ${instructions}` : ""}` },
           ...(previous ? [{ role: "assistant" as const, content: `Previous version: ${asPrevious(previous)}` }, { role: "user" as const, content: ask }] : [])],
       }))
       const out = await submitted<{ card?: { fields: Record<string, string>; mediaQuery?: string; options?: Record<string, string>[] }; cover?: { fields: Record<string, string>; mediaQuery?: string }; caption: string; hold?: string }>(r, "submit_post")
@@ -294,6 +316,16 @@ export function createMcuAi(deps: { models: Record<PipelineStep, string>; search
       const hold = meaningful(out.hold)
       const options = offer && Array.isArray(out.card?.options) ? [out.card.options.filter(o => o && typeof o === "object").slice(0, 5)] : undefined
       return { frames: frames.map((series, i) => ({ series, fields: { ...(parts[i]?.fields ?? {}) }, ...(parts[i]?.mediaQuery ? { mediaQuery: parts[i]!.mediaQuery } : {}) })), caption: (out.caption ?? "").trim(), ...(hold ? { hold } : {}), ...(options?.[0]?.length ? { options } : {}) }
+    },
+
+    async extractFacts({ story }) {
+      return run("write", model => generateText({
+        // A long list, and Claude 5 thinks by default with the cap counting the thinking too (CLAUDE.md, "The token trap").
+        model, maxOutputTokens: outputBudget(model, 16_000), providerOptions: callOptions(model, "low"), allowSystemInMessages: true,
+        tools: { submit_facts: tool({ description: "Submit the facts the source states.", inputSchema: factsSchema }) }, toolChoice: { type: "tool", toolName: "submit_facts" },
+        messages: [{ role: "system", content: "You read a source for a news post and list the facts it states, before anyone writes. For each fact, give it in a short plain sentence and quote the one sentence of the source that states it, exactly as written. List what the source states about the subject and the event: who makes or runs it and what it is, what it does, what happened, when, where, with whom, the figures, the status (concept, in development, tested, fielded), and, only where the source says so, where the company is based, whether it is public or private, its investors or its ticker. Never add a fact the source doesn't state, never infer one, and never fill one in from what you know: a fact with no sentence to quote is left out. Answer with submit_facts." },
+          { role: "user", content: `SOURCE: ${story.sourceTitle}\nURL: ${story.primaryUrl}\nPublisher: ${story.publisher}\nPublished: ${story.publishedAt ?? "not stated on the page"}${story.supporting?.length ? `\nSupporting sources (their text follows the primary's, each under its own heading): ${story.supporting.map(x => x.url).join(" ; ")}` : ""}\n\n${story.sourceText.slice(0, 24_000)}` }],
+      }), r => submitted<z.infer<typeof factsSchema>>(r, "submit_facts"))
     },
 
     async pickCopy({ kind, story, frame, fields, options }) {

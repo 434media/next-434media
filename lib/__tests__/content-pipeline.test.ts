@@ -20,6 +20,8 @@ import { PIPELINE_PROPERTIES, PROPERTY_TEMPLATES, contentPropertyOf, propertyCan
 import { BRANDS, CONTENT_PROPERTIES } from "../../components/crm/types"
 import { candidateFields, cutOffWords } from "../content-pipeline/series"
 import { candidateProblems, copyProblems, MAX_CANDIDATE_BATCHES } from "../content-pipeline/worker"
+import { sourcedFacts, MIN_FACTS, placeholderLines, unsourcedClaims } from "../content-pipeline/worker"
+import { factsBrief, FACTS_RULE } from "../content-pipeline/model"
 
 // ── in-memory store with the Firestore store's lease semantics ──
 class MemStore implements McuStore {
@@ -1730,4 +1732,113 @@ test("photo first: the confirmed photo is placed only when the card names the su
   assert.equal(subjectMatches("Raytheon Coyote Block 2 interceptor", { series: "dt101" as SeriesKey, fields: { subject_identifier: "COYOTE / RAYTHEON" } }), true)
   assert.equal(subjectMatches("PAC-3 Edge", { series: "news" as SeriesKey, fields: { headline: "LOCKHEED DEBUTS PAC-3 EDGE", deck: "x" } }), true)
   assert.equal(subjectMatches("Raytheon Coyote interceptor", { series: "dt101" as SeriesKey, fields: { subject_identifier: "LIGHTFISH / SEASATS" } }), false)
+})
+
+// ── fact extraction before writing (plan v10, Phase 1 direction 3) ──
+
+test("sourcedFacts keeps a fact only when its quoted sentence is in the source", () => {
+  const source = "Skydio builds the X10D drone. The Army tested the X10D at Fort Bragg in March. Skydio says the drone flies 40 minutes."
+  const { kept, dropped } = sourcedFacts([
+    { fact: "Skydio makes the X10D.", quote: "Skydio builds the X10D drone." },
+    { fact: "The Army tested it at Fort Bragg.", quote: "the army tested  the X10D at Fort Bragg in March" }, // case, spacing and the full stop aside
+    { fact: "Skydio is based in San Mateo, CA.", quote: "Skydio is headquartered in San Mateo, California." }, // not in the source
+    { fact: "Skydio is a private company.", quote: "" },
+    { fact: "It flies.", quote: "the drone" }, // too short to show anything
+    { fact: "Skydio makes the X10D.", quote: "Skydio builds the X10D drone." }, // a duplicate
+    { fact: "", quote: "Skydio builds the X10D drone." },
+  ], source)
+  assert.deepEqual(kept.map(f => f.fact), ["Skydio makes the X10D.", "The Army tested it at Fort Bragg."])
+  assert.deepEqual(dropped, ["Skydio is based in San Mateo, CA.", "Skydio is a private company.", "It flies."])
+  // A quote that runs across a word boundary of another word is not found ("ted the X10D" inside "tested the X10D").
+  assert.equal(sourcedFacts([{ fact: "x", quote: "ted the X10D at" }], source).kept.length, 0)
+})
+
+test("the writer is given the sourced facts and the rule to leave unsupported lines out", async () => {
+  const seen: { facts?: string[]; title: string }[] = []
+  let extracted = 0
+  const w = world({ ai: {
+    extractFacts: async () => (extracted++, { facts: [
+      { fact: "The Army awarded $93.6 million to nine companies.", quote: "The U.S. Army awarded contracts worth $93.6 million to nine companies on Oct. 15, 2026" },
+      { fact: "The software goes to I Corps.", quote: "to deliver next-generation command and control software to I Corps." },
+      { fact: "Lockheed Martin is based in Bethesda, MD.", quote: "Lockheed Martin is headquartered in Bethesda, Maryland." },
+    ] }),
+    write: async ({ story }) => { seen.push({ facts: story.facts?.map(f => f.fact), title: story.title }); return { frames: [{ series: "news" as SeriesKey, fields: { headline: "Army backs 9 C2 software vendors", deck: "Awards worth $93.6 million fund I Corps command software.", source: "ARMY.MIL" } }], caption: "The Army awarded $93.6 million to nine companies.\n\nSource: U.S. Army, 2026-10-15" } },
+  } })
+  await w.start()
+  const d = onlyDraft(w)
+  assert.equal(d.status, "in_review")
+  // Every write of the story gets the same two sourced facts; the headquarters with no sentence in the source never reaches it.
+  assert.ok(seen.length >= 1 && seen.every(s => JSON.stringify(s.facts) === JSON.stringify(["The Army awarded $93.6 million to nine companies.", "The software goes to I Corps."])))
+  assert.deepEqual(d.story.facts?.length, 2)
+  assert.ok(d.history.some(h => /^facts extracted: 2; dropped 1 whose sentence isn't in the source: "Lockheed Martin is based in Bethesda, MD\."/.test(h.event)))
+  // Extraction is one call per story, before the first write; the rewrites reuse its facts.
+  assert.equal(extracted, 1)
+  // The writer's brief: the facts with their sentences, and the rule that leaves an unsupported line out.
+  const brief = factsBrief(d.story.facts!)
+  assert.match(brief, /^FACTS .*\n1\. The Army awarded \$93\.6 million to nine companies\.\n {3}Source: "The U\.S\. Army awarded/)
+  assert.match(FACTS_RULE, /left out entirely, never filled in/); assert.match(FACTS_RULE, /headquarters, ownership/)
+})
+
+test("fact extraction that fails or finds too few sourced facts leaves the writer on the source text", async () => {
+  for (const extractFacts of [async () => { throw new Error("gateway down") }, async () => ({ facts: [{ fact: "Invented.", quote: "Not in the page at all, anywhere." }] })]) {
+    let facts: unknown = "unset"
+    const w = world({ ai: { extractFacts, write: async ({ story }) => { facts = story.facts; return { frames: [{ series: "news" as SeriesKey, fields: { headline: "Army backs 9 C2 software vendors", deck: "Awards worth $93.6 million fund I Corps command software.", source: "ARMY.MIL" } }], caption: "The Army awarded $93.6 million.\n\nSource: U.S. Army, 2026-10-15" } } } })
+    await w.start()
+    const d = onlyDraft(w)
+    assert.equal(d.status, "in_review"); assert.equal(facts, undefined); assert.equal(d.story.facts, undefined)
+    assert.ok(d.history.some(h => /fact extraction failed; writing from the source text|fact extraction found 0 sourced facts; dropped 1 .*writing from the source text/.test(h.event)))
+  }
+  assert.equal(MIN_FACTS, 2)
+})
+
+test("fact extraction: a roundup extracts nothing, and a replacement story extracts its own facts", async () => {
+  // A switched story starts without the first story's facts (switchStory replaces the story whole).
+  const asked: string[] = []
+  const w = world({ ai: {
+    extractFacts: async ({ story }) => { asked.push(story.primaryUrl); return { facts: [{ fact: "The Army awarded $93.6 million.", quote: "The U.S. Army awarded contracts worth $93.6 million" }, { fact: "Nine companies won.", quote: "to nine companies on Oct. 15, 2026" }] } },
+    write: async ({ story }) => story.primaryUrl.endsWith("/1")
+      ? { frames: [], caption: "", hold: "the page states no figure for the award" }
+      : { frames: [{ series: "news" as SeriesKey, fields: { headline: "Army backs 9 C2 software vendors", deck: "Awards worth $93.6 million fund I Corps command software.", source: "ARMY.MIL" } }], caption: "The Army awarded $93.6 million.\n\nSource: U.S. Army, 2026-10-15" },
+  } })
+  await w.start()
+  assert.deepEqual(asked, ["https://www.army.mil/article/1", "https://www.army.mil/article/2"])
+})
+
+test("a writer's \"Not held for …\" is no hold", () => {
+  assert.equal(meaningful("Not held for a single reason to hold; submitted as News with the source's figures."), undefined)
+  assert.equal(meaningful("None of the figures can be verified."), "None of the figures can be verified.")
+})
+
+test("a caption line that fills in what the source doesn't state is a safety problem, so the rewrite leaves it out", () => {
+  const brief = "MISSION BRIEF // EAGLEEYE\n\n//Anduril Industries\n\n📍Location not stated in source\n\nTech: AI vision\n\nPrivate company → Backers: not stated in source\n\nTraction: Not stated in source.\n\nTicker: N/A\n\nSource: Anduril Industries, page undated"
+  assert.deepEqual(placeholderLines(brief), ["📍Location not stated in source", "Private company → Backers: not stated in source", "Traction: Not stated in source.", "Ticker: N/A"])
+  // A sourced sentence about what wasn't disclosed is a fact, not a placeholder; nor is a word like "unknown" mid-line.
+  assert.deepEqual(placeholderLines("The Army did not disclose the award's value, and the delivery date was not disclosed by the service in its release.\n\nGoal: Find unknown drones at sea."), [])
+  assert.deepEqual(placeholderLines(BRIEF), [])
+  const story = { title: "EagleEye", sourceTitle: "EagleEye", publisher: "Anduril", primaryUrl: "https://www.anduril.com/eagleeye", sourceText: "EagleEye gives operators AI vision. Anduril Industries builds EagleEye." }
+  const p = copyProblems([{ series: "dt101" as SeriesKey, fields: { benefit_headline: "SEE THREATS\nSOONER", subject_identifier: "EAGLEEYE / ANDURIL" } }], brief, story as never)
+  assert.ok(p.safety.some(x => /^the caption fills lines the source doesn't support \("📍Location not stated in source", .*leave each such line out entirely$/.test(x)))
+})
+
+test("a place or ownership the source doesn't state is a safety problem, like an unsourced figure", () => {
+  const source = "Skydio's F10 Lightrunner launches in seconds. The Army tested it at Fort Bragg. Lockheed Martin (NYSE: LMT) of Bethesda, Md., builds HIMARS."
+  assert.deepEqual(unsourcedClaims(["📍San Mateo, CA\n\nPrivate company → Backers: a16z"], source), ["San Mateo, CA", "Private company"])
+  assert.deepEqual(unsourcedClaims(["📍Bethesda, MD\n\nPublic company → Ticker: NYSE: LMT"], source), [])
+  // Not a place: "Goal: Find drones, US forces" has no city; a non-state code is no place either.
+  assert.deepEqual(unsourcedClaims(["Tech: Autonomy, AI\n\nGoal: Find drones at sea."], source), [])
+  assert.deepEqual(unsourcedClaims(["Private company"], "Anduril is a privately held defense company."), [])
+  const story = { title: "F10 Lightrunner", sourceTitle: "F10 Lightrunner", publisher: "Skydio", primaryUrl: "https://www.skydio.com/f10", sourceText: source, facts: [{ fact: "The F10 launches in seconds.", quote: "Skydio's F10 Lightrunner launches in seconds." }] }
+  const p = copyProblems([{ series: "dt101" as SeriesKey, fields: { benefit_headline: "A PLANE THAT\nLAUNCHES ITSELF", subject_identifier: "F10 LIGHTRUNNER / SKYDIO" } }], "MISSION BRIEF // F10\n\n//Skydio\n\n📍San Mateo, CA\n\nSource: Skydio, 24SEP26", story as never)
+  assert.ok(p.safety.includes(`the caption states what the source doesn't ("San Mateo, CA"): leave each such line or detail out entirely`))
+  // Copy written from the source text, not from extracted facts, is checked as before.
+  assert.ok(!copyProblems([{ series: "dt101" as SeriesKey, fields: { benefit_headline: "A PLANE THAT\nLAUNCHES ITSELF", subject_identifier: "F10 LIGHTRUNNER / SKYDIO" } }], "MISSION BRIEF // F10\n\n//Skydio\n\n📍San Mateo, CA\n\nSource: Skydio, 24SEP26", { ...story, facts: undefined } as never).safety.some(x => /states what the source doesn't/.test(x)))
+})
+
+test("coordinator review of #210: sentences aren't placeholders, places match by their last words, and \"unused\" is no hold", () => {
+  for (const sentence of ["Financial terms were not disclosed.", "The cause of the crash is unknown.", "The contract value was not specified."]) assert.deepEqual(placeholderLines(`MISSION BRIEF // X\n\n${sentence}`), [])
+  assert.deepEqual(placeholderLines("Backers: not disclosed\n\nPublic company → Ticker: unknown"), ["Backers: not disclosed", "Public company → Ticker: unknown"])
+  const source = "The Army tested it at Fort Bragg, N.C., in March. Skydio, of San Mateo, Calif., builds the X10D."
+  assert.deepEqual(unsourcedClaims(["Traction: Tested Fort Bragg, NC", "📍Skydio San Mateo, CA"], source), [])
+  assert.deepEqual(unsourcedClaims(["Traction: Tested Fort Hood, TX"], source), ["Fort Hood, TX"])
+  assert.equal(meaningful("unused"), undefined); assert.equal(meaningful("Unused."), undefined)
 })

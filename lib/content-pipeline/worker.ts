@@ -6,7 +6,7 @@ import { contentPropertyOf } from "./properties"
 import type { ContentProperty, PipelineMedia } from "@/components/crm/types"
 import type { McuSeeds } from "./seeds"
 import { MIN_SHORT_SIDE, archiveRelevant, federalHost, imageSize, isDvidsImagePage, isOutlet, pageImageCandidate, type MediaCandidate, type SourcePage } from "./sources"
-import { MAX_ATTEMPTS, WORKING, type CheckedPhoto, type ChosenMedia, type CropBox, type FrameCopy, type FrameDesign, type McuDraft, type McuJob, type McuStore, type RoundupItem, type Story } from "./store"
+import { MAX_ATTEMPTS, WORKING, type CheckedPhoto, type ChosenMedia, type CropBox, type FrameCopy, type FrameDesign, type McuDraft, type McuJob, type McuStore, type RoundupItem, type SourcedFact, type Story } from "./store"
 
 /**
  * The pipeline worker: advances due jobs and drafts one step at a time, saving after every step, so an interrupted run
@@ -645,8 +645,68 @@ export function unsourcedNumbers(texts: string[], source: string): string[] {
   })
 }
 
+/** Text as it is compared for a quote: lowercase letters and digits, every other run of characters one space. */
+const quoteText = (s: string) => s.toLowerCase().normalize("NFKD").replace(/[^a-z0-9]+/g, " ").trim()
+/**
+ * The extracted facts the source bears out: each fact's quoted sentence must be found in the source text, compared as
+ * quoteText (case, punctuation and spacing aside). A fact whose quote isn't there, or is too short to show anything
+ * (under four words), is dropped. Duplicates are dropped too.
+ */
+export function sourcedFacts(facts: readonly { fact?: unknown; quote?: unknown }[], source: string): { kept: SourcedFact[]; dropped: string[] } {
+  const hay = ` ${quoteText(source)} `, kept: SourcedFact[] = [], dropped: string[] = []
+  for (const f of facts) {
+    const fact = typeof f.fact === "string" ? f.fact.trim() : "", quote = typeof f.quote === "string" ? f.quote.trim() : ""
+    if (!fact) continue
+    const q = quoteText(quote)
+    if (q.split(" ").length < 4 || !hay.includes(` ${q} `)) { dropped.push(fact); continue }
+    if (!kept.some(k => k.fact === fact)) kept.push({ fact, quote })
+  }
+  return { kept, dropped }
+}
+/** Fewer sourced facts than this and the writer writes from the source text, as before fact extraction. */
+export const MIN_FACTS = 2
+/**
+ * Fact extraction before the first write of a story (plan v10, Phase 1 direction 3). The facts are kept on the story,
+ * so the rewrites, the fit and the fresh wording write from the same facts, and a switched story extracts its own. An
+ * extraction that fails, or finds fewer than MIN_FACTS sourced facts, leaves the writer on the source text as before,
+ * and the history says so. A roundup is written from its published posts, so it extracts nothing.
+ */
+async function extractFacts(deps: WorkerDeps, ai: McuAi, d: McuDraft): Promise<void> {
+  if (d.story.roundup || d.story.facts || !ai.extractFacts) return
+  const r = await ai.extractFacts({ story: d.story }).catch(err => { console.error("[content-pipeline] fact extraction failed", d.id, err instanceof Error ? err.message : err); return null })
+  if (!r) { d.history.push({ at: iso(deps), event: "fact extraction failed; writing from the source text" }); return }
+  const { kept, dropped } = sourcedFacts(Array.isArray(r.facts) ? r.facts : [], d.story.sourceText)
+  const note = dropped.length ? `; dropped ${dropped.length} whose sentence isn't in the source: ${dropped.slice(0, 4).map(f => `"${f.slice(0, 80)}"`).join(", ")}` : ""
+  if (kept.length < MIN_FACTS) { d.history.push({ at: iso(deps), event: `fact extraction found ${kept.length} sourced fact${kept.length === 1 ? "" : "s"}${note}; writing from the source text` }); return }
+  d.story.facts = kept
+  d.history.push({ at: iso(deps), event: `facts extracted: ${kept.length}${note}`.slice(0, 600) })
+}
+
+const STATES = new Set("AL AK AZ AR CA CO CT DE FL GA HI ID IL IN IA KS KY LA ME MD MA MI MN MS MO MT NE NV NH NJ NM NY NC ND OH OK OR PA RI SC SD TN TX UT VT VA WA WV WI WY DC".split(" "))
+/**
+ * Places and ownership the copy states that the source doesn't, checked like figures (unsourcedNumbers). A "City, ST"
+ * place counts as sourced when the last word or two of its name is in the source; "private company" or "public company" when the source
+ * says private or public (or names a stock exchange or ticker for public). Replay, 2026-10-19: with 28 sourced facts
+ * the writer still added "📍San Mateo, CA" to Skydio's mission brief from what it knew.
+ */
+export function unsourcedClaims(texts: string[], source: string): string[] {
+  const text = texts.join("\n"), hay = source.toLowerCase(), out: string[] = []
+  // The capitalised run before ", ST" may take in words that aren't the place ("Tested Fort Bragg, NC"), so the place
+  // counts as sourced when its last word or last two words are in the source ("Fort Bragg, N.C."; coordinator review).
+  for (const m of text.matchAll(/\b((?:[A-Z][a-z]+\.? ){0,3}[A-Z][a-z]+), ([A-Z]{2})\b/g)) {
+    const words = m[1].split(" ")
+    if (STATES.has(m[2]) && ![words.slice(-1), words.slice(-2)].some(w => hay.includes(w.join(" ").toLowerCase()))) out.push(`${words.slice(-2).join(" ")}, ${m[2]}`)
+  }
+  for (const m of text.matchAll(/\b(private|public)(?:ly)?(?:[- ](?:held|traded))? (?:company|firm)\b/gi)) {
+    const pub = m[1].toLowerCase() === "public"
+    if (!(pub ? /\bpublic(ly)?\b|\b(nyse|nasdaq)\b|stock exchange|ticker/i : /\bprivate(ly)?\b|privately held|venture[- ]backed/i).test(source)) out.push(m[0])
+  }
+  return [...new Set(out)]
+}
+
 async function writeStep(deps: WorkerDeps, ai: McuAi, d: McuDraft): Promise<void> {
   const today = iso(deps).slice(0, 10)
+  await extractFacts(deps, ai, d)
   let problems: string[] = []
   const seeds = await deps.seeds(), steer = { seeds, ...(d.direction ? { direction: d.direction } : {}) }
   // A roundup's stories were chosen by the engine (icymiStory: published, with a staged card), so a writer that holds
@@ -914,11 +974,31 @@ export function copyProblems(frames: FrameCopy[], caption: string, story: Story)
   const checks = BRAND.checks
   if (checks?.headline) style.push(...headlineProblems(frames, checks.headline))
   if (checks?.originality) safety.push(...originalityProblems(frames, caption, story, checks.originality, [...(checks.headline?.fields ?? []), ...(checks.headline?.hookFields ?? [])]))
+  // Run on copy written from extracted facts (writeStep), the path that promises no unstated line.
+  const claims = story.facts?.length ? unsourcedClaims([body], story.sourceText) : []
+  if (claims.length) safety.push(`the caption states what the source doesn't (${claims.map(c => `"${c}"`).join(", ")}): leave each such line or detail out entirely`)
+  const filled = placeholderLines(body)
+  if (filled.length) safety.push(`the caption fills lines the source doesn't support (${filled.slice(0, 3).map(l => `"${l}"`).join(", ")}): leave each such line out entirely`)
   const clipped = [...new Set(frames.flatMap(f => clippedWords(f.fields, story.sourceText)))]
   if (clipped.length) safety.push(`abbreviated words on the card (${clipped.join(", ")}); use whole words, and shorter ones if it must fit`)
   const cut = [...new Set(frames.flatMap(f => cutOffWords(f.fields, story.sourceText)))].filter(w => !clipped.includes(w))
   if (cut.length) safety.push(`cut-off words on the card (${cut.join(", ")}): a line ends in part of a word; use whole words, and shorter ones if it must fit`)
   return { safety, style }
+}
+/**
+ * Caption lines that fill in what the source doesn't state rather than leave the line out (replay, 2026-10-19: a
+ * mission brief with "📍Location not stated in source" and "Private company → Backers: not stated in source"). Only a
+ * label-style line counts: its value (after the last ":" or "→", or after a leading symbol such as "📍") is a
+ * placeholder, with at most two words before it. A sentence such as "Financial terms were not disclosed." or "The
+ * cause of the crash is unknown." is a sourced fact, not a placeholder (coordinator review of #210).
+ */
+export function placeholderLines(caption: string): string[] {
+  const placeholder = /^(?:\S+ ){0,2}?(?:not (?:stated|disclosed|specified|given|provided|available|confirmed|known)(?: (?:in|by) (?:the )?(?:source|facts|page))?|unknown|n\/a|tbd|none stated)\.?$/i
+  return caption.split("\n").map(l => l.trim()).filter(l => {
+    const marker = Math.max(l.lastIndexOf(":"), l.lastIndexOf("→"))
+    const value = marker >= 0 ? l.slice(marker + 1) : /^[^\p{L}\p{N}\s]/u.test(l) ? l.replace(/^[^\p{L}\p{N}]+/u, "") : null
+    return value !== null && placeholder.test(value.trim())
+  })
 }
 /** Every problem, safety first: what a rewrite is asked to fix. */
 function validate(frames: FrameCopy[], caption: string, story: Story): string[] {

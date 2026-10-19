@@ -86,7 +86,14 @@ export interface Story {
    * step places it on the story's card rather than searching again, unless it has to be avoided (an artwork defect).
    */
   photo?: CheckedPhoto
+  /**
+   * Fact extraction (plan v10, Phase 1 direction 3): the story's facts, read once before writing, each with the exact
+   * source sentence it came from and found again in sourceText by the server (worker.ts sourcedFacts). The writer writes
+   * from these, not from the page's prose; the checks on the written copy still run against sourceText.
+   */
+  facts?: SourcedFact[]
 }
+export interface SourcedFact { fact: string; quote: string }
 export interface CheckedPhoto { candidate: MediaCandidate; ranked: RankedPhoto; crop: CropBox; placement: Placement; subject: string }
 export interface RoundupItem { postId: string; title: string; caption: string; publishedUrl?: string; publishedAt?: string; media?: PipelineMedia; card?: { url: string; sha256?: string }
 }
