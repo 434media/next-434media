@@ -2,7 +2,7 @@ import { gateway } from "@ai-sdk/gateway"
 import { BRAND } from "./brand"
 import { createMcuAi } from "./model"
 import { PIPELINE_MODELS } from "./models"
-import { fetchImage, fetchSourcePage, searchCommons, searchNasa, searchOpenverse } from "./sources"
+import { fetchImage, fetchSourcePage, searchCommons, searchDvids, searchNasa, searchOpenverse } from "./sources"
 import { runDue, label, type ChoiceTasks, type PostRow, type WorkerDeps } from "./worker"
 import type { McuDraft, McuJob } from "./store"
 import { adoptablePost, pipelineMarked } from "./ownership"
@@ -37,6 +37,9 @@ export async function pipelineDeps(): Promise<WorkerDeps> {
     fetchImage: url => fetchImage(url),
     searchCommons: q => searchCommons(q),
     searchMore: async q => (await Promise.all([searchOpenverse(q).catch(() => []), searchNasa(q).catch(() => [])])).flat(),
+    // DVIDS through its API with the public key the founder set in Vercel (DVIDS_API_KEY); without it, not searched.
+    ...(process.env.DVIDS_API_KEY ? { searchDvids: (q: string) => searchDvids(q, process.env.DVIDS_API_KEY!) } : {}),
+    photoFirst: true,
     nowMs: Date.now,
     content: {
       // The brand's posts under any of the names they carry (older MCU records are not all tagged "milcity"), as

@@ -1,6 +1,6 @@
 import type { Placement, RequestKind, SeriesKey } from "./series"
 import type { MediaCandidate } from "./sources"
-import type { ModelCall, SubjectBox } from "./model"
+import type { ModelCall, RankedPhoto, SubjectBox } from "./model"
 import type { PipelineMedia } from "@/components/crm/types"
 
 /**
@@ -31,6 +31,18 @@ export interface McuJob {
   notifiedAt?: string
   /** The "no new content" card in Review (a crm_content_posts id) when the job found nothing usable. */
   noContentPostId?: string
+  /**
+   * Set when the stories come with their own photo (Human+, later): research then doesn't confirm a photo before a
+   * story is chosen (photo first, worker.ts confirmPhoto).
+   */
+  skipPhotoFirst?: true
+  /**
+   * Photo first in progress (worker.ts photoFirstStep), saved after every check so each check is its own step:
+   * candidates still to check, those kept (photo confirmed, or unchecked once the checks ran out), why others were
+   * passed over, checks left, research passes run, what research tried, and the model calls so far (copied onto the
+   * drafts). Cleared when the drafts open.
+   */
+  photoFirst?: { pending: Story[]; kept: Story[]; dropped: string[]; left: number; passes: number; tried: string[]; triedUrls: string[]; calls: ModelCall[] }
   /** Who confirmed "no new content", and when (the card's close action). */
   closedAt?: string
   closedBy?: string
@@ -68,7 +80,14 @@ export interface Story {
    * the post's own exported card (its first staged image asset), reused as the story's slide exactly as posted.
    */
   roundup?: RoundupItem[]
+  /**
+   * Photo first (plan v10, Phase 1 direction 6): the licensed photo of the subject research confirmed before the story
+   * was chosen, with where the vision pick saw the subject and the crop that passed for the job's placement. The media
+   * step places it on the story's card rather than searching again, unless it has to be avoided (an artwork defect).
+   */
+  photo?: CheckedPhoto
 }
+export interface CheckedPhoto { candidate: MediaCandidate; ranked: RankedPhoto; crop: CropBox; placement: Placement; subject: string }
 export interface RoundupItem { postId: string; title: string; caption: string; publishedUrl?: string; publishedAt?: string; media?: PipelineMedia; card?: { url: string; sha256?: string }
 }
 export interface FrameCopy { series: SeriesKey; fields: Record<string, string>; mediaQuery?: string }
@@ -100,6 +119,8 @@ export interface McuDraft {
   /** Subjects the skill replaced on its own because the source could not support the post. */
   rejected?: string[]
   autoReplaced?: number
+  /** Photo first for a replacement subject in progress (worker.ts replaceStep): candidates to check, checks left, why the draft is being replaced, and why candidates were passed over. */
+  replacing?: { pending: Story[]; left: number; reason: string; dropped: string[]; rejected: string[] }
   /** Photos the artwork check turned down for this draft (item pages); the media step skips them. */
   avoidMedia?: string[]
   /** How many times the artwork check sent the draft back for a different photo. */

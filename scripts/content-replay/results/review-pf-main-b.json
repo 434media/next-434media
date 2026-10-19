@@ -1,0 +1,847 @@
+{
+  "meta": {
+    "label": "review-pf-main-b",
+    "started": "2026-10-19T04:03:45.191Z",
+    "finished": "2026-10-19T04:12:21.604Z",
+    "rules": "mcu-rules-2026-10-18.2",
+    "models": {
+      "research": "anthropic/claude-haiku-5.5",
+      "write": "anthropic/claude-haiku-5.5",
+      "photoSearch": "anthropic/claude-haiku-5.5",
+      "photoPick": "anthropic/claude-sonnet-5.5",
+      "artworkCheck": "anthropic/claude-sonnet-5.5"
+    },
+    "factModel": "anthropic/claude-sonnet-5.5",
+    "seeds": {
+      "file": "mcu-seeds-2026-10-17.json",
+      "sha256": "0e7a9a32de345d02",
+      "snapshot": "Tracker (1nFFBzcDvY9ZhP0uJuAfGKGSJZdLQm7fAEE3Ajaoa39s, modified 2026-10-14), Operating Model and MCU Canon Handoff v0.3, founder's named primes (2026-10-16); copied from the pilot's seeds.ts at b36e7be; backlog home-page URLs replaced with the official product or announcement pages, 2026-10-17"
+    },
+    "head": "38b94e0",
+    "costUsd": 0.6849
+  },
+  "score": {
+    "stories": 18,
+    "pass": 4,
+    "reachedReview": 7,
+    "unsafeAtReview": 3,
+    "held": 11,
+    "failed": 0,
+    "noDraft": 0,
+    "heldForStyleOnly": 0,
+    "holdKinds": {
+      "photo": 9,
+      "writer": 2
+    }
+  },
+  "tokens": {
+    "write:anthropic/claude-haiku-5.5": {
+      "calls": 60,
+      "input": 528107,
+      "output": 29399
+    },
+    "photoSearch:anthropic/claude-haiku-5.5": {
+      "calls": 38,
+      "input": 390050,
+      "output": 26279
+    },
+    "photoPick:anthropic/claude-sonnet-5.5": {
+      "calls": 15,
+      "input": 140235,
+      "output": 7451
+    },
+    "write:anthropic/claude-sonnet-5.5 (fact check)": {
+      "calls": 7,
+      "input": 27999,
+      "output": 2488
+    }
+  },
+  "stories": [
+    {
+      "id": "raid-hunter",
+      "kind": "dt101",
+      "end": "held",
+      "pass": false,
+      "reason": "no relevant, licensed photo was found (\"Raid Hunter 50mm gun-based air defense system Northrop Grumman\"): no candidate shows the subject itself (None of the candidates shows the Raid Hunter gun system itself. #0 is the press-release render of a one-way attack drone seen from behind with intercept explosions over a bay at dusk. It illustrates the threat and the effect, not the system. The drone is small and dark, and most of the frame is sky and water. #1 is the same image with a title graphic over it, so it counts as a logo or graphic. #2 to #7 are unrelated Army and Marine photos that only share the words \"raid\" or \"hunter\".). No replacement subject qualified: replay: research is fixed to the captured story, so no replacement subject is searched",
+      "holdKinds": [
+        "photo"
+      ],
+      "v9WouldHold": true,
+      "safety": null,
+      "frames": [
+        {
+          "series": "dt101",
+          "fields": {
+            "benefit_headline": "STOPS MASS RAIDS\nAT LOWER COST",
+            "subject_identifier": "RAID HUNTER / NORTHROP GRUMMAN"
+          },
+          "mediaQuery": "Raid Hunter 50mm gun-based air defense system Northrop Grumman"
+        }
+      ],
+      "caption": "MISSION BRIEF // RAID HUNTER / NORTHROP GRUMMAN\n\n//Northrop Grumman\n\n📍Falls Church, VA\n\nTech: Guided 50mm munitions\n\nPlatform: Gun-based air defense system\n\nGoal: Defend bases, airfields and critical infrastructure against cruise missiles, drone swarms and other aerial threats.\n\nWhy: Guided rounds and a high rate of fire aim to address mass raids at lower engagement cost than traditional missile interceptors, per Northrop Grumman.\n\nTicker: NYSE: NOC\n\nTraction: Concept stage; planned testing this year will validate performance and support accelerated fielding, per Northrop Grumman.\n\nSource: Northrop Grumman, Aug. 11, 2026",
+      "media": [
+        null
+      ],
+      "history": [
+        "opened under mcu-rules-2026-10-18.2 (replay)",
+        "copy candidates: 5 candidates after 2 new batches, 1 fit; chose 1 (\"STOPS MASS RAIDS / AT LOWER COST\"): the only one that fits",
+        "copy written (v1)",
+        "held: no relevant, licensed photo was found (\"Raid Hunter 50mm gun-based air defense system Northrop Grumman\"): no candidate shows the subject itself (None of the candidates shows the Raid Hunter gun system itself. #0 is the press-release render of a one-way attack drone seen from behind with intercept explosions over a bay at dusk. It illustrates the threat and the effect, not the system. The drone is small and dark, and most of the frame is sky and water. #1 is the same image with a title graphic over it, so it counts as a logo or graphic. #2 to #7 are unrelated Army and Marine photos that only share the words \"raid\" or \"hunter\".). No replacement subject qualified: replay: research is fixed to the captured story, so no replacement subject is searched"
+      ],
+      "calls": 6,
+      "inputTokens": 70710,
+      "outputTokens": 4287,
+      "seconds": 31,
+      "observed": [
+        "round 3 (nemotron): replaced — no relevant, licensed photo: no candidate shows the Raid Hunter gun system (CGI promo frames, unrelated 'raid'/'Hunter' archive matches)",
+        "round 4 (nemotron): held — copy still breaks the template after two rewrites: the DT101 caption must be the mission brief (no Tech:/Platform:/Goal: lines)"
+      ]
+    },
+    {
+      "id": "anduril-thunder",
+      "kind": "dt101",
+      "end": "held",
+      "pass": false,
+      "reason": "Hold: the source is Anduril's Thunder page, but the text provided contains only generic company boilerplate and product-family descriptions. It does not state Thunder's specifications, variant, tech or status (concept, in development, testing or fielded), so no verifiable mission brief can be written under the rules. No replacement subject qualified: replay: research is fixed to the captured story, so no replacement subject is searched",
+      "holdKinds": [
+        "writer"
+      ],
+      "v9WouldHold": true,
+      "safety": null,
+      "frames": [],
+      "caption": null,
+      "media": [],
+      "history": [
+        "opened under mcu-rules-2026-10-18.2 (replay)",
+        "held: Hold: the source is Anduril's Thunder page, but the text provided contains only generic company boilerplate and product-family descriptions. It does not state Thunder's specifications, variant, tech or status (concept, in development, testing or fielded), so no verifiable mission brief can be written under the rules. No replacement subject qualified: replay: research is fixed to the captured story, so no replacement subject is searched"
+      ],
+      "calls": 1,
+      "inputTokens": 6427,
+      "outputTokens": 233,
+      "seconds": 2,
+      "observed": [
+        "round 3 (nemotron): held — copy still breaks the template after two rewrites: the caption needs its source on a line of its own (and the caption first carried Raid Hunter's mission brief: the subject-switch bug fixed after round 3)"
+      ]
+    },
+    {
+      "id": "anduril-submarine",
+      "kind": "dt101",
+      "end": "held",
+      "pass": false,
+      "reason": "The source is a company announcement of a $6.6 billion Navy investment to expand the submarine industrial base, but it does not describe a specific Defense Tech 101 technology in enough detail (capability, platform, status or test) to support a mission brief without inventing facts. Only generic product descriptions are given, so no compliant Defense Tech 101 post can be built from this source alone. No replacement subject qualified: replay: research is fixed to the captured story, so no replacement subject is searched",
+      "holdKinds": [
+        "writer"
+      ],
+      "v9WouldHold": true,
+      "safety": null,
+      "frames": [],
+      "caption": null,
+      "media": [],
+      "history": [
+        "opened under mcu-rules-2026-10-18.2 (replay)",
+        "held: The source is a company announcement of a $6.6 billion Navy investment to expand the submarine industrial base, but it does not describe a specific Defense Tech 101 technology in enough detail (capability, platform, status or test) to support a mission brief without inventing facts. Only generic product descriptions are given, so no compliant Defense Tech 101 post can be built from this source alone. No replacement subject qualified: replay: research is fixed to the captured story, so no replacement subject is searched"
+      ],
+      "calls": 1,
+      "inputTokens": 6469,
+      "outputTokens": 335,
+      "seconds": 2,
+      "observed": [
+        "round 3 (nemotron): held — no relevant, licensed photo: no candidate shows Anduril's undersea vehicle (shipyard rendering, Altius 600, a Teledyne glider, Boeing Orca, Lockheed facilities)"
+      ]
+    },
+    {
+      "id": "pac3-edge",
+      "kind": "dt101",
+      "end": "held",
+      "pass": false,
+      "reason": "no relevant, licensed photo was found (\"Lockheed Martin PAC-3 interceptor official company media\"): no photo of the subject fits the 4:5 card (#0: the 4:5 crop cuts off the subject) (Candidate 0 is the only photo that shows the PAC-3 Edge interceptor. It is a rendering of the missile in flight above clouds. The missile is large and recognizable, although it is wide and runs diagonally, so the 4:5 crop will lose some of its ends. The clouds give it atmospheric context. The other candidates show a destroyer launch, Marines at a ceremony, Patriot launchers, or an F-22, and none of those is the subject.). No replacement subject qualified: replay: research is fixed to the captured story, so no replacement subject is searched",
+      "holdKinds": [
+        "photo"
+      ],
+      "v9WouldHold": true,
+      "safety": null,
+      "frames": [
+        {
+          "series": "dt101",
+          "fields": {
+            "benefit_headline": "REACHES HIGHER\nTHREATS SOONER",
+            "subject_identifier": "PAC-3 EDGE / LOCKHEED MARTIN"
+          },
+          "mediaQuery": "Lockheed Martin PAC-3 interceptor official company media"
+        }
+      ],
+      "caption": "MISSION BRIEF // PAC-3 EDGE\n\n//Lockheed Martin\n\n📍Bethesda, MD\n\nTech: Advanced interceptor\n\nPlatform: Missile interceptor\n\nGoal: Counter hypersonic and advanced missile threats at higher altitudes and longer ranges.\n\nWhy: It is designed to expand the Army's Integrated Air and Missile Defense coverage.\n\nTicker: NYSE: LMT\n\nTraction: Lockheed Martin plans to begin testing PAC-3 Edge in 2027 and prepare for rapid deployment by 2031, per Lockheed Martin.\n\nLockheed Martin debuted PAC-3 Edge on Oct. 9, 2026, as its new interceptor for the U.S. Army's Future Interceptor program, which is currently in competition. The Army's decision to move Lockheed Martin into the next stage of development is a sign of confidence in its Integrated Air and Missile Defense experience, according to the company.\n\nThe seeker is built by Lockheed Martin's Strigo Product Center, and the multi-pulse solid rocket motor is designed by Northrop Grumman. The company also says PAC-3 Edge is designed to integrate with IBCS, the M903 launcher, containerized launchers and HIMARS Flex.\n\nSource: Lockheed Martin, 09OCT26",
+      "media": [
+        null
+      ],
+      "history": [
+        "opened under mcu-rules-2026-10-18.2 (replay)",
+        "copy candidates: 5 candidates after 1 new batch, 1 fit; chose 4 (\"REACHES HIGHER / THREATS SOONER\"): the only one that fits",
+        "copy written (v1)",
+        "held: no relevant, licensed photo was found (\"Lockheed Martin PAC-3 interceptor official company media\"): no photo of the subject fits the 4:5 card (#0: the 4:5 crop cuts off the subject) (Candidate 0 is the only photo that shows the PAC-3 Edge interceptor. It is a rendering of the missile in flight above clouds. The missile is large and recognizable, although it is wide and runs diagonally, so the 4:5 crop will lose some of its ends. The clouds give it atmospheric context. The other candidates show a destroyer launch, Marines at a ceremony, Patriot launchers, or an F-22, and none of those is the subject.). No replacement subject qualified: replay: research is fixed to the captured story, so no replacement subject is searched"
+      ],
+      "calls": 5,
+      "inputTokens": 45047,
+      "outputTokens": 3423,
+      "seconds": 24,
+      "observed": [
+        "round 3 (nemotron): replaced — no relevant, licensed photo: Patriot launcher photos are related but not PAC-3 Edge",
+        "round 4 (nemotron): replaced — no photo of the subject fits the 4:5 card (#0, the PAC-3 Edge render: the 4:5 crop cuts off the subject)"
+      ]
+    },
+    {
+      "id": "skydio-f10",
+      "kind": "dt101",
+      "end": "review",
+      "pass": false,
+      "reason": null,
+      "holdKinds": [],
+      "v9WouldHold": null,
+      "safety": {
+        "limits": [],
+        "unsourced": [],
+        "rights": [
+          "company"
+        ],
+        "clipped": [],
+        "factErrors": [
+          "📍San Mateo, CA — The source never states Skydio's headquarters or any San Mateo location, so this location is unsupported."
+        ]
+      },
+      "frames": [
+        {
+          "series": "dt101",
+          "fields": {
+            "benefit_headline": "ONE LAUNCH SITE\nWATCHES A COUNTY",
+            "subject_identifier": "F10 LIGHTRUNNER / SKYDIO"
+          },
+          "mediaQuery": "F10 Lightrunner fixed-wing aircraft Skydio"
+        }
+      ],
+      "caption": "MISSION BRIEF // F10 LIGHTRUNNER\n\n//Skydio\n\n📍San Mateo, CA\n\nTech: Autonomous flight\n\nPlatform: Fixed-wing aircraft\n\nGoal: Give responders a live aerial view over long distances, where quadcopters cannot reach.\n\nWhy: Rural emergencies can wait 45 minutes or more for a deputy, and utility fault searches along transmission lines are slow.\n\nTraction: Deploying to customers in 2027, per Skydio.\n\nSkydio's F10 Lightrunner is a fixed-wing aircraft built for emergency response, search and rescue, and asset inspection missions measured in miles. It is designed to launch and catch itself through a suction-based robotic gripper, fly at speeds up to 100 mph, and be housed in a MegaDock that holds up to five F10s. Skydio says a single MegaDock, with F10's 30-mile flight radius, gives one launch location a reach of nearly 3,000 square miles, which the company says could bring a 15-minute response to a rural county.\n\nThe aircraft uses the same autonomy engine as Skydio's X10 quadcopter, extended to a form factor built for distance and speed. Skydio says Pathfinder plans the route before launch, and Foresight adjusts the flight path in real time to keep the subject in view.\n\nSkydio says F10 deploys to customers in 2027 and that customers can talk to sales now to get in line. Skydio also announced the Asset Command and Security Command software platforms, which are available to purchase now with general availability early next year.\n\nSource: Skydio, Inc., September 24, 2026\n\nImage: skydio.com (courtesy)",
+      "media": [
+        {
+          "pageUrl": "https://www.skydio.com/f10",
+          "license": "Official company media",
+          "credit": "skydio.com (courtesy)",
+          "rightsNote": "Company media from www.skydio.com: confirm its terms allow editorial use before approving",
+          "note": "Company media from www.skydio.com: confirm its terms allow editorial use before approving"
+        }
+      ],
+      "history": [
+        "opened under mcu-rules-2026-10-18.2 (replay)",
+        "copy candidates: 5 candidates after 1 new batch, 4 fit; chose 4 (\"IT FLIES 100 MPH / TO REACH SCENES\"): Candidate 3 states the source's main point, what F10 does (fly at up to 100 mph to reach scenes), with a concrete stake and verb. It is a complete sentence that fits both lines. Candidates 0 and 1 claim \"a whole county\" watched, which overstates the source's \"enough to bring a 15-minute response time\" framing, and candidate 2 is vaguer. Note the source says \"up to 100 mph\", so the hook uses the sourced ceiling only as a design speed.",
+        "copy candidates: 4 candidates, 3 fit; chose 3 (\"ONE LAUNCH SITE / WATCHES A COUNTY\"): Candidate 1 states the source's main point: one launch site can cover a whole rural county, which is the problem the F10 solves (a 45-minute wait cut to 15 minutes). It is a complete, active statement with a concrete stake. Candidate 0 leads with a reach figure that is a side detail, and candidate 2 is a subject-less fragment that reads as a command-like line with no clear actor.",
+        "copy written (v1)",
+        "media chosen"
+      ],
+      "calls": 9,
+      "inputTokens": 72141,
+      "outputTokens": 5326,
+      "seconds": 32,
+      "observed": [
+        "round 3 (nemotron): held — the writer returned hold \"None\" (read as a hold: fixed after round 3), then no replacement subject qualified"
+      ]
+    },
+    {
+      "id": "l3harris-navy-vampire",
+      "kind": "dt101",
+      "end": "review",
+      "pass": true,
+      "reason": null,
+      "holdKinds": [],
+      "v9WouldHold": null,
+      "safety": {
+        "limits": [],
+        "unsourced": [],
+        "rights": [
+          "company"
+        ],
+        "clipped": [],
+        "factErrors": []
+      },
+      "frames": [
+        {
+          "series": "dt101",
+          "fields": {
+            "benefit_headline": "CLOSE-IN STRIKE\nON DRONE THREATS",
+            "subject_identifier": "VAMPIRE / L3HARRIS"
+          },
+          "mediaQuery": "L3Harris VAMPIRE counter-unmanned system"
+        }
+      ],
+      "caption": "MISSION BRIEF // VAMPIRE\n\n//L3Harris\n\n📍Melbourne, FL\n\nTech: Precision strike and ISR\n\nPlatform: Self-contained weapons system\n\nGoal: Defeat drones and remotely piloted platforms in littoral environments.\n\nWhy: It gives the Navy a counter-drone option built for maritime conditions.\n\nTicker: NYSE: LHX\n\nTraction: Selected by the U.S. Navy to deliver VAMPIRE counter-unmanned systems, per L3Harris.\n\nL3Harris said the system is a portable, self-contained weapons solution that combines reconnaissance with precision strike against drones and remotely piloted platforms. The company is also delivering VAMPIRE systems to the U.S. Army, and it says it is ruggedizing the system for maritime environments.\n\nSource: L3Harris Technologies, 08SEP26\n\nImage: L3Harris (courtesy)",
+      "media": [
+        {
+          "pageUrl": "https://www.l3harris.com/all-capabilities/vampire",
+          "license": "Official company media",
+          "credit": "L3Harris (courtesy)",
+          "rightsNote": "Company media from www.l3harris.com: confirm its terms allow editorial use before approving",
+          "note": "Company media from www.l3harris.com: confirm its terms allow editorial use before approving"
+        }
+      ],
+      "history": [
+        "opened under mcu-rules-2026-10-18.2 (replay)",
+        "copy candidates: 5 candidates after 1 new batch, 5 fit; chose 5 (\"CLOSE-IN STRIKE / ON DRONE THREATS\"): Candidate 4 is a complete, specific hook that states the source's main point: a Navy-selected system delivering precision strike against drone threats. It names the stake (close-in strike on drone threats) without withholding the news or exaggerating. Candidate 0 and 1 are fragments or vaguer; candidate 3 is a fragment-style stack; candidate 2 drifts to a side detail (ship or truck) and implies more than the source states.",
+        "copy written (v1)",
+        "media chosen"
+      ],
+      "calls": 7,
+      "inputTokens": 50061,
+      "outputTokens": 4161,
+      "seconds": 26,
+      "observed": [
+        "round 4 (nemotron): in_review — In Review as VAMPIRE / L3HARRIS with DVIDS 9608168 (public domain); hook \"RAPID STRIKE / AGAINST DRONES\" is a verbless fragment"
+      ]
+    },
+    {
+      "id": "morfius-release",
+      "kind": "dt101",
+      "end": "held",
+      "pass": false,
+      "reason": "no relevant, licensed photo was found (\"Lockheed Martin MORFIUS X-Rotor airborne high power microwave counter-drone system\"): no candidate shows the subject itself (None of the candidates show the MORFIUS X-Rotor. They show an F-22, C-130s, Lockheed buildings and a cockpit interior, so all are related at best or unrelated. I'm not ranking any of them.). No replacement subject qualified: replay: research is fixed to the captured story, so no replacement subject is searched",
+      "holdKinds": [
+        "photo"
+      ],
+      "v9WouldHold": true,
+      "safety": null,
+      "frames": [
+        {
+          "series": "dt101",
+          "fields": {
+            "benefit_headline": "IT CAN STOP\nA 50-DRONE SWARM",
+            "subject_identifier": "MORFIUS X-ROTOR / LOCKHEED MARTIN"
+          },
+          "mediaQuery": "Lockheed Martin MORFIUS X-Rotor airborne high power microwave counter-drone system"
+        }
+      ],
+      "caption": "MISSION BRIEF // MORFIUS X-ROTOR\n\n//Lockheed Martin\n\n📍Bethesda, MD\n\nTech: Airborne high power microwave\n\nPlatform: Ground-launched counter-drone system\n\nGoal: Neutralize swarms of hostile drones with a reusable, low-cost system.\n\nWhy: Commercial drone swarms are a growing threat to allied forces, and the system is designed for field recovery and reuse, which keeps the cost per kill low.\n\nTicker: NYSE: LMT\n\nTraction: Lockheed Martin says MORFIUS past variants have flown since 2017, and the company tested flight, intercept and lethality conditions in Arizona, California and Oklahoma. Per Lockheed Martin, the company is accelerating prototype production of MORFIUS and its HPM payload, and planning the next series of flight tests. Lockheed Martin describes the X-Rotor as newly released and says it can neutralize more than 50 enemy drones in a single flight.\n\nSource: Lockheed Martin, July 20, 2026",
+      "media": [
+        null
+      ],
+      "history": [
+        "opened under mcu-rules-2026-10-18.2 (replay)",
+        "copy candidates: 5 candidates after 1 new batch, 2 fit; chose 5 (\"IT CAN STOP / A 50-DRONE SWARM\"): Candidate 1 is one complete sentence across both lines (\"It can stop a 50-drone swarm\"), with a concrete stake matching the source's main point: the system neutralizes more than 50 drones in a single flight against swarms. Candidate 0 is a fragment-like label (\"One flight can down 50+ drones\") and \"50+\" is a compressed figure; candidate 1 states the swarm threat the source names, though it slightly compresses \"more than 50\" to \"a 50-drone swarm.\" Both are supported; candidate 1 reads more as a c",
+        "copy written (v1)",
+        "held: no relevant, licensed photo was found (\"Lockheed Martin MORFIUS X-Rotor airborne high power microwave counter-drone system\"): no candidate shows the subject itself (None of the candidates show the MORFIUS X-Rotor. They show an F-22, C-130s, Lockheed buildings and a cockpit interior, so all are related at best or unrelated. I'm not ranking any of them.). No replacement subject qualified: replay: research is fixed to the captured story, so no replacement subject is searched"
+      ],
+      "calls": 6,
+      "inputTokens": 42526,
+      "outputTokens": 2867,
+      "seconds": 20,
+      "observed": [
+        "round 4 (nemotron): replaced — no relevant, licensed photo (query \"multi-domain\"): coats of arms, an autonomous launcher, a solar image"
+      ]
+    },
+    {
+      "id": "morfius-product",
+      "kind": "dt101",
+      "end": "held",
+      "pass": false,
+      "reason": "no relevant, licensed photo was found (\"Lockheed Martin MORFIUS counter-UAS high-power microwave interceptor product imagery, public or openly licensed\"): no candidate shows the subject itself (None of the candidates clearly shows the MORFIUS interceptor. #0 is a promotional graphic with text and only faint aircraft shadows on the ground. The other six are unrelated: an Iranian drone, and soldiers at a Polish C-UAS exercise.). No replacement subject qualified: replay: research is fixed to the captured story, so no replacement subject is searched",
+      "holdKinds": [
+        "photo"
+      ],
+      "v9WouldHold": true,
+      "safety": null,
+      "frames": [
+        {
+          "series": "dt101",
+          "fields": {
+            "benefit_headline": "IT HALTS DRONES\nWITH MICROWAVES",
+            "subject_identifier": "MORFIUS / LOCKHEED MARTIN"
+          },
+          "mediaQuery": "Lockheed Martin MORFIUS counter-UAS high-power microwave interceptor product imagery, public or openly licensed"
+        }
+      ],
+      "caption": "MISSION BRIEF // MORFIUS\n\n//Lockheed Martin\n\n📍Bethesda, MD\n\nTech: High-power microwave\n\nPlatform: Reusable interceptor\n\nGoal: Counter unmanned aerial systems and drone swarms.\n\nTraction: Lockheed Martin says it worked across multiple services to rapidly develop and prove MORFIUS, per Lockheed Martin. The product page does not state a fielding date or a specific test.\n\nLockheed Martin describes MORFIUS as a reusable, high-power microwave-based interceptor for counter-UAS and counter-swarm scenarios. The company says threats such as drone swarms are evolving quickly, and defensive systems need to keep pace.\n\nSource: Lockheed Martin, product page undated",
+      "media": [
+        null
+      ],
+      "history": [
+        "opened under mcu-rules-2026-10-18.2 (replay)",
+        "copy candidates: 5 candidates after 2 new batches, 3 fit; chose 3 (\"IT HALTS DRONES / WITH MICROWAVES\"): Candidate 0 states the source's main point: MORFIUS is a high-power microwave interceptor that counters drones. It is a complete, active statement in two lines. Candidate 1 leads with reuse, a side detail. Candidate 2 says \"jams\" and \"at scale\", which the source does not support: it describes an interceptor, not jamming, and it does not give a scale.",
+        "copy written (v1)",
+        "held: no relevant, licensed photo was found (\"Lockheed Martin MORFIUS counter-UAS high-power microwave interceptor product imagery, public or openly licensed\"): no candidate shows the subject itself (None of the candidates clearly shows the MORFIUS interceptor. #0 is a promotional graphic with text and only faint aircraft shadows on the ground. The other six are unrelated: an Iranian drone, and soldiers at a Polish C-UAS exercise.). No replacement subject qualified: replay: research is fixed to the captured story, so no replacement subject is searched"
+      ],
+      "calls": 7,
+      "inputTokens": 53672,
+      "outputTokens": 3378,
+      "seconds": 25,
+      "observed": [
+        "round 4 (nemotron): held — no relevant, licensed photo: #0 is the MORFIUS page banner (text over desert, faint aircraft shadow); the rest show other drones and soldiers"
+      ]
+    },
+    {
+      "id": "paravision-state",
+      "kind": "news",
+      "end": "review",
+      "pass": true,
+      "reason": null,
+      "holdKinds": [],
+      "v9WouldHold": null,
+      "safety": {
+        "limits": [],
+        "unsourced": [],
+        "rights": [
+          "company"
+        ],
+        "clipped": [],
+        "factErrors": []
+      },
+      "frames": [
+        {
+          "series": "news",
+          "fields": {
+            "headline": "STATE WIDENS ID CHECKS",
+            "deck": "The award is up to $6.5 million through 2031.",
+            "date": "17OCT26",
+            "source": "BIOMETRIC UPDATE"
+          }
+        }
+      ],
+      "caption": "The U.S. State Department awarded facial recognition developer Paravision a contract worth up to $6.5 million on September 23, for what federal procurement records describe as \"digital detection/identity assurance.\" The firm-fixed-price contract runs through September 22, 2031, and the department initially obligated $1.3 million.\n\nThe State Department competed the award under simplified acquisition procedures as a total small-business set-aside, and it received a single offer. Public award records do not identify which Paravision products were purchased. The description overlaps with Paravision's deepfake detection and liveness detection technology, which the company markets to protect digital identity systems against manipulated and AI-generated faces, but the record does not confirm that either product is included.\n\nThe September contract is much larger than an earlier April 30 State Department purchase from Paravision, a $24,717 purchase card order for a software license. Public records do not show whether that purchase was a test, pilot or precursor to the larger award.\n\nSource: Biometric Update, October 17, 2026\n\nImage: Biometric Update (courtesy)",
+      "media": [
+        {
+          "pageUrl": "https://www.biometricupdate.com/202610/us-state-department-awards-paravision-up-to-6-5m-for-digital-identity-assurance",
+          "license": "Official company media",
+          "credit": "Biometric Update (courtesy)",
+          "rightsNote": "Company media from www.biometricupdate.com: confirm its terms allow editorial use before approving",
+          "note": "Company media from www.biometricupdate.com: confirm its terms allow editorial use before approving. Representative photo (face biometric scan mesh on a man's face on a screen), not the event itself: check the caption doesn't present it as the event"
+        }
+      ],
+      "history": [
+        "opened under mcu-rules-2026-10-18.2 (replay)",
+        "copy candidates: 4 candidates after 1 new batch, 4 fit; chose 4 (\"STATE WIDENS ID CHECKS\", \"The award is up to $6.5 million through 2031.\"): Candidate 3 is the most accurate and complete option. Candidates 0 and 1 are fragment-like or overstate the product (the source does not identify the purchased products, and \"deepfake\" is not confirmed). Candidate 2 says \"test,\" which the source does not support. Candidate 3 is a plain, specific claim, though its headline is still short on actor detail. Its deck is one complete sentence that ends with a period and gives the value and end date from the sou",
+        "copy written (v1)",
+        "media chosen"
+      ],
+      "calls": 9,
+      "inputTokens": 92811,
+      "outputTokens": 3567,
+      "seconds": 27,
+      "observed": [
+        "round 4 (nemotron): held — copy still breaks the template after two rewrites: headline runs past 3 lines"
+      ]
+    },
+    {
+      "id": "seasats-lightfish",
+      "kind": "dt101",
+      "end": "review",
+      "pass": true,
+      "reason": null,
+      "holdKinds": [],
+      "v9WouldHold": null,
+      "safety": {
+        "limits": [],
+        "unsourced": [],
+        "rights": [
+          "company"
+        ],
+        "clipped": [],
+        "factErrors": []
+      },
+      "frames": [
+        {
+          "series": "dt101",
+          "fields": {
+            "benefit_headline": "UNCREWED BOATS\nGUARD THE GULF",
+            "subject_identifier": "LIGHTFISH / SEASATS"
+          }
+        }
+      ],
+      "caption": "MISSION BRIEF // LIGHTFISH\n\n//Seasats\n\n📍San Diego, CA\n\nTech: Autonomous surveillance\n\nPlatform: Unmanned surface vessel\n\nGoal: Detect illegal maritime activity, including drug trafficking and unauthorized vessel ingress, in the Gulf of America.\n\nWhy: Crewed patrols are limited by crew endurance, operating cost and the area one asset can cover at a time.\n\nPrivate company → Backers: Shield Capital, L3Harris Technologies, Konvoy Ventures\n\nTraction: Lightfish vessels deployed in the Gulf of America for U.S. maritime border security, expanding Operation River Wall work on the Rio Grande since January 2026, per Seasats.\n\nSeasats said on Oct. 2, 2026 that it has deployed a fleet of Lightfish unmanned surface vessels for U.S. maritime border security. The vessels launched from the Texas coast and will run persistent autonomous surveillance, building on the company's earlier support of Operation River Wall.\n\nEach Lightfish is about 11 feet long and 340 pounds, solar powered, and rated for multi-month endurance on station. Two people can launch and recover one from a boat ramp or a pickup truck. The company says its swappable sensor bay has carried infrared and daylight cameras, radio-signal payloads and sonar on earlier missions, so one hull can be set up for different sensing jobs.\n\nAssistant Secretary of War for Homeland Defense and Americas Security Affairs Mark R. Ditlevson said the Lightfish has been prototyped and piloted on the Rio Grande and in the Gulf, calling it part of efforts to \"gain 100% operational control of our borders.\"\n\nSource: Seasats via PR Newswire, Oct. 2, 2026\n\nImage: prnewswire.com (courtesy)",
+      "media": [
+        {
+          "pageUrl": "https://www.prnewswire.com/news-releases/seasats-deploys-fleet-of-lightfish-usvs-for-maritime-border-security-in-the-gulf-of-america-302896922.html",
+          "license": "Official company media",
+          "credit": "prnewswire.com (courtesy)",
+          "rightsNote": "Company media from www.prnewswire.com: confirm its terms allow editorial use before approving",
+          "note": "Company media from www.prnewswire.com: confirm its terms allow editorial use before approving"
+        }
+      ],
+      "history": [
+        "opened under mcu-rules-2026-10-18.2 (replay)",
+        "copy candidates: 5 candidates after 1 new batch, 1 fit; chose 5 (\"UNCREWED BOATS / GUARD THE GULF\"): the only one that fits",
+        "copy candidates: 4 candidates, 2 fit; chose 1 (\"UNCREWED BOATS / GUARD THE GULF\"): Candidate 0 states the source's main point: uncrewed boats now provide persistent surveillance over the Gulf of America. \"GUARD\" is a slightly stronger verb than the source's surveillance language, but it stays within the mission, which is detecting illegal maritime activity. Candidate 1 leads with the solar power detail, which is a side feature. Candidate 0 is also the more compelling of the two for a reader scrolling a feed.",
+        "copy written (v1)",
+        "media chosen"
+      ],
+      "calls": 9,
+      "inputTokens": 87719,
+      "outputTokens": 6374,
+      "seconds": 37,
+      "observed": [
+        "round 5 (haiku): held — copy still breaks the template after two rewrites: benefit hook lines over 16 characters"
+      ]
+    },
+    {
+      "id": "l3harris-drone-guardian",
+      "kind": "dt101",
+      "end": "held",
+      "pass": false,
+      "reason": "no relevant, licensed photo was found (\"Drone Guardian counter-UAS L3Harris\"): no candidate shows the subject itself (None of the candidates shows Drone Guardian or any L3Harris counter-UAS equipment. Candidate 0 is a stock photo of a small quadcopter at a razor-wire fence, which is the threat and not the system. Candidates 1-7 are MQ-9 Reapers, which are unrelated aircraft. No candidate is relevant and strong.). No replacement subject qualified: replay: research is fixed to the captured story, so no replacement subject is searched",
+      "holdKinds": [
+        "photo"
+      ],
+      "v9WouldHold": true,
+      "safety": null,
+      "frames": [
+        {
+          "series": "dt101",
+          "fields": {
+            "benefit_headline": "IT TRACKS SWARMS\nAS ONE PICTURE",
+            "subject_identifier": "DRONE GUARDIAN / L3HARRIS"
+          },
+          "mediaQuery": "Drone Guardian counter-UAS L3Harris"
+        }
+      ],
+      "caption": "MISSION BRIEF // DRONE GUARDIAN\n\n//L3Harris\n\n📍Melbourne, FL\n\nTech: Autonomous counter-UAS\n\nPlatform: Deployable tower and networked system\n\nGoal: Detect, track and identify drone threats at critical sites, deployed forces and temporary security environments.\n\nWhy: It correlates radar, RF, EO/IR and acoustic sensors into one operating picture, which the source says helps reduce nuisance alerts and operator workload.\n\nTraction: Described by L3Harris as operationally proven counter-UAS protection, per L3Harris. Drone Guardian's SPIDER tower, NEST network and WEB software layer are product descriptions on the company's page.\n\nSource: L3Harris Technologies, published date not stated on the page. Verified October 18, 2026.",
+      "media": [
+        null
+      ],
+      "history": [
+        "opened under mcu-rules-2026-10-18.2 (replay)",
+        "copy candidates: 5 candidates after 1 new batch, 4 fit; chose 4 (\"IT TRACKS SWARMS / AS ONE PICTURE\"): \"IT TRACKS SWARMS / AS ONE PICTURE\" is a complete, active hook that states the source's main point: Drone Guardian correlates multiple sensor detections into a single-track picture and is designed to manage multiple simultaneous tracks, including swarms. It gives a concrete stake (swarm tracking) without repeating the subject line or exaggerating. Option 0 is also supported, but \"false alarms\" is a secondary benefit; option 1 describes sensor integration rather than the consequence; option 3 ",
+        "copy written (v1)",
+        "held: no relevant, licensed photo was found (\"Drone Guardian counter-UAS L3Harris\"): no candidate shows the subject itself (None of the candidates shows Drone Guardian or any L3Harris counter-UAS equipment. Candidate 0 is a stock photo of a small quadcopter at a razor-wire fence, which is the threat and not the system. Candidates 1-7 are MQ-9 Reapers, which are unrelated aircraft. No candidate is relevant and strong.). No replacement subject qualified: replay: research is fixed to the captured story, so no replacement subject is searched"
+      ],
+      "calls": 6,
+      "inputTokens": 65417,
+      "outputTokens": 3047,
+      "seconds": 29,
+      "observed": [
+        "round 5 (haiku): held — no relevant, licensed photo: none shows Drone Guardian (a commercial quadcopter, MQ-9 Reapers); replacements failed (FLIR 403, Skydio pages older than 90 days)"
+      ]
+    },
+    {
+      "id": "anduril-eagleeye",
+      "kind": "dt101",
+      "end": "review",
+      "pass": false,
+      "reason": null,
+      "holdKinds": [],
+      "v9WouldHold": null,
+      "safety": {
+        "limits": [],
+        "unsourced": [],
+        "rights": [
+          "company"
+        ],
+        "clipped": [],
+        "factErrors": [
+          "IT SPOTS DRONES AT ONE KILOMETER — The source gives 1 km range for general threat detection with EO and LWIR cameras. It doesn't say drones are detected at 1 km. Drone detection is only mentioned for the microphone array, with no range given.",
+          "📍Costa Mesa, CA — The source never states a location or headquarters for Anduril."
+        ]
+      },
+      "frames": [
+        {
+          "series": "dt101",
+          "fields": {
+            "benefit_headline": "IT SPOTS DRONES\nAT ONE KILOMETER",
+            "subject_identifier": "EAGLEEYE / ANDURIL"
+          }
+        }
+      ],
+      "caption": "MISSION BRIEF // EAGLEEYE / ANDURIL\n\n//Anduril Industries\n\n📍Costa Mesa, CA\n\nTech: AI-enhanced vision\n\nPlatform: Wearable warfighter augment\n\nGoal: Give operators threat detection, Blue Force tracking and battlefield alerts while keeping their eyes up.\n\nWhy: Operators can task unmanned vehicles, call for fires and control robotic teammates without looking down, per the product page.\n\nTraction: Product page describes the system as a family of warfighter augments powered by Lattice; the page does not state a test, purchase or fielding status.\n\nSource: Anduril Industries, date not stated on the page.\n\nImage: Anduril (courtesy)",
+      "media": [
+        {
+          "pageUrl": "https://www.anduril.com/news/anduril-s-eagleeye-puts-mission-command-and-ai-directly-into-the-warfighter-s-helmet",
+          "license": "Official company media",
+          "credit": "Anduril (courtesy)",
+          "rightsNote": "Company media from www.anduril.com: confirm its terms allow editorial use before approving",
+          "note": "Company media from www.anduril.com: confirm its terms allow editorial use before approving"
+        }
+      ],
+      "history": [
+        "opened under mcu-rules-2026-10-18.2 (replay)",
+        "copy candidates: 5 candidates after 1 new batch, 3 fit; chose 3 (\"IT SPOTS DRONES / AT ONE KILOMETER\"): Candidate 1 is a complete, specific, active statement that states a concrete stake from the source: it spots drones at one kilometer. The source says EagleEye provides \"1km threats detection with optical zoom EO and LWIR cameras\" and an \"8 Microphone Array for Gunshot/Drone Detection Localization.\" The hook leads with the capability and range, reads as one sentence across both lines, and does not repeat the subject line. Candidate 0 (\"SOLDIERS SEE THREATS FIRST\") is a slogan-like claim the s",
+        "copy written (v1)",
+        "media chosen"
+      ],
+      "calls": 7,
+      "inputTokens": 55816,
+      "outputTokens": 3301,
+      "seconds": 24,
+      "observed": [
+        "round 5 (haiku): held — copy still breaks the template after two rewrites: benefit hook lines over 16 characters"
+      ]
+    },
+    {
+      "id": "xtend-striker",
+      "kind": "news",
+      "end": "held",
+      "pass": false,
+      "reason": "no relevant, licensed photo was found: no photo of the subject fits the 4:5 card (#0: the cropped photo is under 500 px wide) (Close-up of an XTEND drone (caged, dual cameras) with the Drone Dominance Program coin; dominant, dark, recognizable subject tied to the story.); a representative photo (the people, unit or equipment the story is about) was searched for too, and none was found. No replacement subject qualified: replay: research is fixed to the captured story, so no replacement subject is searched",
+      "holdKinds": [
+        "photo"
+      ],
+      "v9WouldHold": true,
+      "safety": null,
+      "frames": [
+        {
+          "series": "news",
+          "fields": {
+            "headline": "XTEND TO BUILD 6,000 STRIKER DRONES",
+            "deck": "The $40.5 million order follows a top Gauntlet II finish in close quarters combat.",
+            "date": "13OCT26",
+            "source": "XTEND"
+          }
+        }
+      ],
+      "caption": "XTEND AI Robotics, Inc. (NYSE: XTND) has received a $40.5 million order for 6,000 STRIKER systems. The order comes after XTEND was named a top performer in the Close Quarters Battle segment of Gauntlet II, the second gauntlet in the U.S. Department of War's Drone Dominance Program, a $1 billion iterative effort. CEO Aviv Shapira said the order reflects trust in the company's technology and its ability to deliver at scale.\n\nSTRIKER runs on XTEND's proprietary XOS operating system and is built for tactical work in confined, complex and GNSS-denied settings, where satellite navigation signals may be unreliable. The company says the order also reflects how STRIKER performed in a government-run evaluation against a competitive field.\n\nUnder the program's structure, Gauntlet II awardees move straight to Gauntlet III in the mission set where they were selected, but only after fulfilling a 400-system production order. Phase 3 of the program opened September 28, 2026. Gauntlet III performance will determine whether any Phase 3 orders are placed, and taking part does not guarantee an award.\n\nSource: XTEND, 13OCT26",
+      "media": [
+        null
+      ],
+      "history": [
+        "opened under mcu-rules-2026-10-18.2 (replay)",
+        "copy candidates: 3 candidates, 3 fit; chose 2 (\"XTEND SECURES $40.5M ORDER FOR STRIKER\", \"The award covers 6,000 STRIKER systems after a Gauntlet II result.\"): Candidate 1 is a complete, active statement naming the company, the order value, and the system, with no label stack. It stays accurate: the source says XTEND was \"awarded\" a $40.5 million order, and \"secures\" conveys that without implying a pentagon customer. Candidate 0 uses \"wins\", which overstates a contract award as a competition win. Candidate 2 attributes the order to the Pentagon, which the source does not state; it says only th",
+        "copy candidates: 4 candidates, 1 fit; chose 4 (\"XTEND TO BUILD 6,000 STRIKER DRONES\", \"The $40.5 million order follows a top Gauntlet II finish in close quarters combat.\"): the only one that fits",
+        "copy written (v1)",
+        "held: no relevant, licensed photo was found: no photo of the subject fits the 4:5 card (#0: the cropped photo is under 500 px wide) (Close-up of an XTEND drone (caged, dual cameras) with the Drone Dominance Program coin; dominant, dark, recognizable subject tied to the story.); a representative photo (the people, unit or equipment the story is about) was searched for too, and none was found. No replacement subject qualified: replay: research is fixed to the captured story, so no replacement subject is searched"
+      ],
+      "calls": 9,
+      "inputTokens": 77434,
+      "outputTokens": 5039,
+      "seconds": 40,
+      "observed": [
+        "round 5 (haiku): in_review — In Review: \"XTEND LANDS $40.5M DRONE BUY FOR STRIKER\"; grey placeholder photo (the News template had no photo field yet)"
+      ]
+    },
+    {
+      "id": "skydio-x10d",
+      "kind": "dt101",
+      "end": "review",
+      "pass": false,
+      "reason": null,
+      "holdKinds": [],
+      "v9WouldHold": null,
+      "safety": {
+        "limits": [],
+        "unsourced": [],
+        "rights": [
+          "company"
+        ],
+        "clipped": [],
+        "factErrors": [
+          "📍San Francisco, CA — The source never states Skydio's headquarters or location. San Francisco is unsupported, and Skydio is actually based in San Mateo, CA."
+        ]
+      },
+      "frames": [
+        {
+          "series": "dt101",
+          "fields": {
+            "benefit_headline": "STAYS LINKED\nWHEN JAMMED",
+            "subject_identifier": "SKYDIO X10D / SKYDIO"
+          },
+          "mediaQuery": "Skydio X10D drone, official company product imagery"
+        }
+      ],
+      "caption": "MISSION BRIEF // SKYDIO X10D\n\n//Skydio\n\n📍San Francisco, CA\n\nTech: Contested-environment autonomy\n\nPlatform: Small unmanned aircraft system\n\nGoal: Keep a small drone operating and returning when GPS and communications are jammed.\n\nWhy: Operators can navigate and return autonomously in GPS-denied environments using vision-based reference points on the map.\n\nTraction: Listed on the Blue UAS Cleared list, per Skydio. Fielding status not stated on the source page.\n\nSource: Skydio, undated product page.\n\nImage: skydio.com (courtesy)",
+      "media": [
+        {
+          "pageUrl": "https://www.skydio.com/x10d",
+          "license": "Official company media",
+          "credit": "skydio.com (courtesy)",
+          "rightsNote": "Company media from www.skydio.com: confirm its terms allow editorial use before approving",
+          "note": "Company media from www.skydio.com: confirm its terms allow editorial use before approving"
+        }
+      ],
+      "history": [
+        "opened under mcu-rules-2026-10-18.2 (replay)",
+        "copy candidates: 5 candidates after 1 new batch, 3 fit; chose 4 (\"STAYS LINKED / WHEN JAMMED\"): \"STAYS LINKED / WHEN JAMMED\" is a complete, active hook that states the source's main point: the X10D keeps connectivity under GPS and communication jamming, with vision-only return flights as the follow-on. It stakes out a concrete problem (jamming) without overstating, and it is accurate to the source. Candidate 0 covers only the return flight, and candidate 1 covers only GPS-denied navigation, so neither captures the resilience claim as fully.",
+        "copy written (v1)",
+        "media chosen"
+      ],
+      "calls": 7,
+      "inputTokens": 68408,
+      "outputTokens": 3203,
+      "seconds": 26,
+      "observed": [
+        "round 6 (haiku): replaced — the writer held: the Traction line came from Skydio's order announcement, not the product page, and the date line relied on an undated primary page"
+      ]
+    },
+    {
+      "id": "rtx-coyote",
+      "kind": "dt101",
+      "end": "review",
+      "pass": true,
+      "reason": null,
+      "holdKinds": [],
+      "v9WouldHold": null,
+      "safety": {
+        "limits": [],
+        "unsourced": [],
+        "rights": [
+          "company"
+        ],
+        "clipped": [],
+        "factErrors": []
+      },
+      "frames": [
+        {
+          "series": "dt101",
+          "fields": {
+            "benefit_headline": "FASTER LAUNCHES\nTO STOP DRONES",
+            "subject_identifier": "COYOTE BLOCK 2C+RM / RAYTHEON"
+          },
+          "mediaQuery": "Coyote interceptor counter-drone Raytheon"
+        }
+      ],
+      "caption": "MISSION BRIEF // COYOTE BLOCK 2C+RM / RAYTHEON\n\n//Raytheon\n\n📍Tucson, AZ\n\nTech: Counter-drone interceptor\n\nPlatform: Interceptor effector\n\nGoal: Counter current and emerging drone threats with an upgraded Coyote interceptor.\n\nWhy: A tactical rocket motor is meant to shorten engagement times and allow faster successive shots.\n\nTicker: NYSE: RTX\n\nTraction: Three Raytheon-funded developmental tests completed, per Raytheon. The first launches of a Coyote effector with a tactical rocket motor were part of the initial test series.\n\nRaytheon is developing the Coyote Block 2C+RM upgrade with company funding. The effort builds on current Coyote variants, which the company says have intercepted hundreds of drones in combat. Raytheon also reports that the initial tests confirmed integration with the current counter-drone architecture.\n\nThe upgrade is aimed at an urgent joint U.S. military mission. The program has moved from concept to testing in 15 months, according to the company.\n\nSource: RTX, 12OCT26\n\nImage: RTX (courtesy)",
+      "media": [
+        {
+          "pageUrl": "https://www.rtx.com/news/news-center/2026/10/12/rtxs-raytheon-completes-three-successful-tests-of-new-coyote-upgrades",
+          "license": "Official company media",
+          "credit": "RTX (courtesy)",
+          "rightsNote": "Company media from www.rtx.com: confirm its terms allow editorial use before approving",
+          "note": "Company media from www.rtx.com: confirm its terms allow editorial use before approving"
+        }
+      ],
+      "history": [
+        "opened under mcu-rules-2026-10-18.2 (replay)",
+        "copy candidates: 5 candidates after 2 new batches, 2 fit; chose 4 (\"FASTER LAUNCHES / TO STOP DRONES\"): Candidate 1 states the source's main point (faster launches to counter drones) as a concrete stake, and it fits the two-line container. Candidate 0 focuses on a side detail (rocket motor cutting shot time), and the source says the rocket motor is intended to improve engagement times, so it claims more than the source gives. Candidate 1 is also a fragment pair rather than one complete sentence, but it is the closer fit to the source's point, and the source supports \"faster launches\" and \"stop",
+        "copy written (v1)",
+        "media chosen"
+      ],
+      "calls": 8,
+      "inputTokens": 55433,
+      "outputTokens": 4150,
+      "seconds": 26,
+      "observed": [
+        "round 6 (haiku): in_review — In Review: \"ADDS A ROCKET / MOTOR FOR SPEED\", RTX release photo (company media); credit read \"UNITED TECHNOLOGIES\" and crossed the exhaust (fixed in #205)"
+      ]
+    },
+    {
+      "id": "setaf-gtead",
+      "kind": "news",
+      "end": "held",
+      "pass": false,
+      "reason": "no relevant, licensed photo was found: no photo of the subject fits the 4:5 card (#0: the 4:5 crop cuts off the subject) (Close, dominant view of a Soldier handling a counter-drone system (Bumblebee) in Morocco during African Lion 26. It is representative of counter-drone tech in Africa, though not the G-TEAD test itself.); a representative photo (the people, unit or equipment the story is about) was searched for too, and none of the photos found qualified. No replacement subject qualified: replay: research is fixed to the captured story, so no replacement subject is searched",
+      "holdKinds": [
+        "photo"
+      ],
+      "v9WouldHold": true,
+      "safety": null,
+      "frames": [
+        {
+          "series": "news",
+          "fields": {
+            "headline": "ARMY TO TEST COUNTER-DRONE TECH IN AFRICA",
+            "deck": "The partnership aims to deliver tested systems to Soldiers within 180 days.",
+            "date": "16OCT26",
+            "source": "ARMY.MIL"
+          }
+        }
+      ],
+      "caption": "The U.S. Army Southern European Task Force, Africa (SETAF-AF) has teamed with the Army's Global Tactical Edge Acquisition Directorate (G-TEAD) to put emerging systems through testing in Africa, with the goal of getting proven ones into Soldiers' hands within 180 days.\n\nThe first accelerated capability event (ACE) is set for spring 2027 in Tan-Tan, Morocco. It will center on counter-unmanned aircraft systems and force protection, aimed at shielding early-entry command posts and operating locations from Group 1–3 small UAS. The Army points to Africa's open spectrum, uncongested airspace and varied terrain as conditions that let Soldiers validate solutions in theater before scaling them across the service.\n\nEach ACE runs in three phases: submission and preparation, Soldier-led demonstrations and follow-on operational evaluation. SETAF-AF plans a Soldier-led demonstration in February and March 2027. The operational assessment comes next, in April and May, during the 2027 iteration of African Lion. G-TEAD will validate up to 15 solutions with PAE Fires as the transition partner.\n\nSource: U.S. Army, October 16, 2026",
+      "media": [
+        null
+      ],
+      "history": [
+        "opened under mcu-rules-2026-10-18.2 (replay)",
+        "copy candidates: 4 candidates, 2 fit; chose 2 (\"ARMY TESTS COUNTER-DRONE GEAR IN AFRICA\", \"The effort targets protection for early-entry command posts.\"): Candidate 1 is the more accurate choice. The source says SETAF-AF and G-TEAD will test emerging systems in Africa and deliver them within 180 days, but the first accelerated capability event is only scheduled for spring 2027, so nothing is fielded yet. \"Tests\" describes the actual activity without claiming delivery, while candidate 0's \"TO FIELD\" and its \"would receive\" deck overstate the timeline. The deck in candidate 1 is a complete sente",
+        "copy candidates: 4 candidates, 3 fit; chose 2 (\"ARMY TO TEST COUNTER-DRONE TECH IN AFRICA\", \"The partnership aims to deliver tested systems to Soldiers within 180 days.\"): Candidate 1 is a complete, active statement that names the actor (Army), the concrete work (testing counter-drone tech) and the place (Africa), matching the source's main point. Candidate 0 states the test as done, which the source does not yet support: the first ACE is scheduled for spring 2027. Candidate 2 is vaguer and leads with a partnership rather than the capability. The deck is a complete sentence drawn from the sour",
+        "copy written (v1)",
+        "held: no relevant, licensed photo was found: no photo of the subject fits the 4:5 card (#0: the 4:5 crop cuts off the subject) (Close, dominant view of a Soldier handling a counter-drone system (Bumblebee) in Morocco during African Lion 26. It is representative of counter-drone tech in Africa, though not the G-TEAD test itself.); a representative photo (the people, unit or equipment the story is about) was searched for too, and none of the photos found qualified. No replacement subject qualified: replay: research is fixed to the captured story, so no replacement subject is searched"
+      ],
+      "calls": 11,
+      "inputTokens": 122482,
+      "outputTokens": 7071,
+      "seconds": 52,
+      "observed": [
+        "round 6 (haiku): held — copy still breaks the template after two rewrites: the caption copies 16 words in a row from the source (originality)"
+      ]
+    },
+    {
+      "id": "antheia-osc",
+      "kind": "breaking",
+      "end": "held",
+      "pass": false,
+      "reason": "no relevant, licensed photo was found: no candidate shows the subject itself (no licensed candidates); a representative photo (the people, unit or equipment the story is about) was searched for too, and none was found. No replacement subject qualified: replay: research is fixed to the captured story, so no replacement subject is searched",
+      "holdKinds": [
+        "photo"
+      ],
+      "v9WouldHold": true,
+      "safety": null,
+      "frames": [
+        {
+          "series": "breaking",
+          "fields": {
+            "headline": "ANTHEIA GETS CONDITIONAL $80M LOAN OFFER",
+            "deck": "The Office of Strategic Capital would fund onshoring of critical drug ingredients.",
+            "date": "18OCT26",
+            "source": "WAR.GOV"
+          }
+        }
+      ],
+      "caption": "Antheia, a biosynthesis company based in Menlo Park, Calif., has received a conditional commitment from the Department of War's Office of Strategic Capital for a direct, long-term loan of up to $80 million. The company says the financing, alongside additional private capital, would support its U.S. manufacturing strategy to onshore critical pharmaceutical ingredients.\n\nThe U.S. relies on foreign countries for about 90 percent of its supply of key starting materials and active pharmaceutical ingredients, a dependence the department's release links to drug shortages from public health emergencies, natural disasters, geopolitical tensions and supply chain failures. Antheia says it has previously received $32 million in non-dilutive federal financing and equity from strategic government-affiliated investors.\n\nThe commitment is conditional. Antheia must complete further financial, legal, technical, investment and due diligence requirements before financial close.\n\nSource: Department of War, Oct. 18, 2026",
+      "media": [
+        null
+      ],
+      "history": [
+        "opened under mcu-rules-2026-10-18.2 (replay)",
+        "copy candidates: 4 candidates, 4 fit; chose 2 (\"ANTHEIA GETS CONDITIONAL $80M LOAN OFFER\", \"The Office of Strategic Capital would fund onshoring of critical drug ingredients.\"): Candidate 1 is a complete, active headline that names the actor (Antheia), the concrete financing (conditional $80M loan), and the source's own terms. Its deck names the lender and the consequence (onshoring critical drug ingredients) without repeating the headline. Candidates 0 and 2 are weaker: 0 and 2 frame the commitment as a finished backing/offer that reads more definitively than the source's conditional status, ",
+        "copy written (v1)",
+        "held: no relevant, licensed photo was found: no candidate shows the subject itself (no licensed candidates); a representative photo (the people, unit or equipment the story is about) was searched for too, and none was found. No replacement subject qualified: replay: research is fixed to the captured story, so no replacement subject is searched"
+      ],
+      "calls": 6,
+      "inputTokens": 68791,
+      "outputTokens": 3888,
+      "seconds": 33,
+      "observed": [
+        "round 6 (haiku): held — no relevant, licensed photo: no candidate at all; the replacement (Navy E-130J) was refused by war.gov (403)"
+      ]
+    },
+    {
+      "id": "icymi-week-2026-10-05",
+      "kind": "icymi",
+      "end": "held",
+      "pass": false,
+      "reason": "no relevant, licensed photo was found (\"ICYMI cover, 3 published MCU stories, week of Oct. 5, 2026\"): no candidate shows the subject itself (no licensed candidates).",
+      "holdKinds": [
+        "photo"
+      ],
+      "v9WouldHold": true,
+      "safety": null,
+      "frames": [
+        {
+          "series": "icymi_cover",
+          "fields": {
+            "headline": "TOP DEFENSE DEVELOPMENTS",
+            "date": "18OCT26",
+            "story_01": "Microchip buys VORAGO chip maker",
+            "story_02": "Lockheed unveils PAC-3 Edge design",
+            "story_03": "Florida Guard tests drone data link",
+            "story_numbers": "01\n02\n03"
+          },
+          "mediaQuery": "ICYMI cover, 3 published MCU stories, week of Oct. 5, 2026"
+        }
+      ],
+      "caption": "ICYMI: three MilCityUSA stories from the past week, each shown as first published.\n\nSource: MilCityUSA, week of Oct. 5, 2026.",
+      "media": [
+        null
+      ],
+      "roundup": [
+        "MCU-BN-20261010-02 | Microchip acquires VORAGO | Approved",
+        "MCU-BN-20261010-01 | Lockheed Martin PAC-3 Edge | Approved",
+        "MCU-P03 Drone Crucible 26.3"
+      ],
+      "history": [
+        "opened under mcu-rules-2026-10-18.2",
+        "copy written (v1)",
+        "held: no relevant, licensed photo was found (\"ICYMI cover, 3 published MCU stories, week of Oct. 5, 2026\"): no candidate shows the subject itself (no licensed candidates)."
+      ],
+      "calls": 6,
+      "inputTokens": 45027,
+      "outputTokens": 1967,
+      "seconds": 17,
+      "observed": [
+        "round 3 (nemotron): held — no licensed photo for frame 2 (the roundup then searched new photos for each story: fixed after round 3)",
+        "round 4 (nemotron): held — copy still breaks the template after two rewrites: decks over 2 lines and not one sentence",
+        "round 5 (haiku): held — copy still breaks the template after two rewrites: headlines and decks over their 2-line limits on frames 2-4",
+        "round 6 (haiku): held — the writer held the roundup on eligibility (Marconi titled REVIEW DRAFT): eligibility moved into the engine in #205"
+      ]
+    }
+  ]
+}

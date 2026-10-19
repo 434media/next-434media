@@ -327,3 +327,76 @@ export function pageImageCandidate(page: SourcePage, origin: "source" | "dvids")
     ...(gov ? {} : { rightsNote: govNote ?? `Company media from ${host}: confirm its terms allow editorial use before approving` }),
   }
 }
+
+// ── DVIDS, through its API (plan v10, Phase 1 direction 6) ──
+/** An image asset as the DVIDS asset API returns it (api.dvidshub.net/docs/asset_api). */
+export interface DvidsAsset {
+  id?: string; title?: string; description?: string; date?: string; url?: string; image?: string; thumbnail?: string | { url?: string }
+  unit_name?: string; branch?: string
+  /** Who created the asset, or "Courtesy" when unknown (the docs: "[array|string]"). */
+  credit?: { name?: string; rank?: string }[] | string
+  dimensions?: { width?: string | number; height?: string | number }
+}
+/**
+ * A DVIDS asset as a photo candidate, only when it is plainly a U.S. government work (coordinator review of #209):
+ * its description carries the "(U.S. Army photo by …)" credit line, and nothing on it says otherwise, no courtesy or
+ * "provided by" notice, no copyright notice, no credit of "Courtesy", no foreign forces' credit. DVIDS's own terms make
+ * its media public domain only "unless other copyright status is indicated", and a contractor's or an ally's photo on
+ * DVIDS is not a federal work, so anything short of that is not offered: its rights could not be read from the record.
+ * The credit is that line, as on a DVIDS page. The photo is the asset's rendition at no more than the original's width
+ * (no upscaling), from DVIDS's own image host.
+ */
+export function dvidsCandidate(a: DvidsAsset): MediaCandidate | null {
+  const thumb = typeof a.thumbnail === "string" ? a.thumbnail : a.thumbnail?.url
+  if (!a.url || !isDvidsImagePage(a.url) || !thumb || !/^https:\/\//.test(thumb) || !GOV_MEDIA_HOSTS.includes(new URL(thumb).hostname.toLowerCase())) return null
+  const description = strip(a.description), credit = typeof a.credit === "string" ? a.credit : (a.credit ?? []).map(c => `${c.rank ?? ""} ${c.name ?? ""}`).join(" ")
+  const govCredit = DVIDS_GOV_CREDIT.exec(description)?.[1]
+  if (!govCredit || DVIDS_NOT_FEDERAL.test(`${description} ${credit}`)) return null
+  const date = /^\d{4}-\d{2}-\d{2}/.exec(a.date ?? "")?.[0]
+  return {
+    origin: "dvids", url: thumb, thumbUrl: thumb, pageUrl: a.url, title: strip(a.title).slice(0, 200) || "DVIDS image", description: description.slice(0, 400),
+    width: 0, height: 0, creator: govCredit.slice(0, 200), license: "Public domain (U.S. government work)", credit: govCredit.slice(0, 200), usGovernment: true,
+    ...(date ? { date } : {}),
+  }
+}
+/** The U.S. government credit line in a DVIDS description: "(U.S. Army photo by Sgt. A)", "(U.S. Air Force graphic)". */
+const DVIDS_GOV_CREDIT = /\(((?:U\.S\.|US) (?:Army|Navy|Air Force|Marine Corps|Space Force|Coast Guard|Army National Guard|Air National Guard|National Guard|Army Reserve|Navy Reserve|Air Force Reserve|Marine Corps Reserve|Department of (?:Defense|War)|Defense Department)[A-Za-z .-]{0,60}? (?:photo|illustration|graphic|image)(?: by [^)]{2,80})?)\)/
+/**
+ * Anything that says a photo isn't a federal work: courtesy, "provided by", a copyright notice, or a foreign forces'
+ * photo credit ("Royal Navy photo", "(Australian Defence Force photo by …)"). A foreign force merely named in the
+ * description, beside a U.S. credit line, is not one.
+ */
+const DVIDS_NOT_FEDERAL = /\bcourtesy\b|\bprovided by\b|\bused with permission\b|©|\(c\)\s*(19|20)\d{2}|\bcopyright(ed)?\b|all rights reserved|\b(Royal|British|Australian|Canadian|German|French|Italian|Polish|Japan(ese)?|Korean|Ukrainian|Israeli|NATO|Bundeswehr|Philippine|Taiwan(ese)?|Dutch|Norwegian|Spanish)\b[A-Za-z .-]{0,40}\b(photo|image|graphic|illustration)\b/i
+/** The rendition width asked of DVIDS: its largest thumbnail (2000 px), or the original's width when smaller. */
+export const DVIDS_RENDITION = 2000
+/**
+ * DVIDS image search through its API with the public key (api.dvidshub.net/docs/search_api), then each hit's asset
+ * record (asset_api) for its full description, credit and a rendition. A hit whose short side is under MIN_SHORT_SIDE
+ * is skipped before its asset is read. An asset the API reports as not published (403) is skipped: DVIDS's terms
+ * oblige users to stop using it. The key is sent only to api.dvidshub.net and never appears in an error or a log.
+ */
+export async function searchDvids(query: string, apiKey: string, fetcher: Fetcher = fetch as Fetcher, limit = 4): Promise<MediaCandidate[]> {
+  if (!apiKey) return []
+  const get = async (path: string, params: Record<string, string>) => {
+    const u = new URL(`https://api.dvidshub.net/${path}`)
+    u.search = new URLSearchParams({ ...params, api_key: apiKey }).toString()
+    let res: Response
+    // A network error names no URL here, so the key can't reach a log through it.
+    try { res = await fetcher(u, { headers: { "user-agent": USER_AGENT, accept: "application/json" }, cache: "no-store", signal: AbortSignal.timeout(15_000) }) } catch { throw new Error(`dvids_${path}_unreachable`) }
+    if (!res.ok) throw new Error(`dvids_${path}_http_${res.status}`)
+    return res.json() as Promise<unknown>
+  }
+  const found = await get("search", { q: query, type: "image", max_results: String(Math.min(limit * 3, 50)) }) as { results?: { id?: string; type?: string; width?: number; height?: number }[] }
+  const out: MediaCandidate[] = [], seen = new Set<string>()
+  for (const r of found.results ?? []) {
+    if (out.length >= limit) break
+    if (r.type !== "image" || !r.id || !/^image:\d+$/.test(r.id) || seen.has(r.id)) continue
+    seen.add(r.id)
+    if (r.width && r.height && Math.min(r.width, r.height) < MIN_SHORT_SIDE) continue
+    const width = Math.min(DVIDS_RENDITION, r.width || DVIDS_RENDITION)
+    const asset = await get("asset", { id: r.id, thumb_width: String(width) }).catch(() => null) as { results?: DvidsAsset } | null
+    const c = asset?.results ? dvidsCandidate(asset.results) : null
+    if (c && !out.some(o => o.pageUrl === c.pageUrl)) out.push(c)
+  }
+  return out
+}

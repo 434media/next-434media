@@ -11,7 +11,7 @@ import type { McuSeeds } from "../../lib/content-pipeline/seeds"
 import { SERIES, overLimits, type SeriesKey } from "../../lib/content-pipeline/series"
 import { usableLicense, type MediaCandidate, type SourcePage } from "../../lib/content-pipeline/sources"
 import { WORKING, type McuDraft, type McuJob, type McuStore, type Story } from "../../lib/content-pipeline/store"
-import { DOD_NOTICE, KIND_CODE, RETRY_MS, runDue, unsourcedNumbers, type WorkerDeps } from "../../lib/content-pipeline/worker"
+import { DOD_NOTICE, KIND_CODE, NO_PHOTO_FIRST, RETRY_MS, confirmPhoto, runDue, unsourcedNumbers, type WorkerDeps } from "../../lib/content-pipeline/worker"
 import { storyOf, type CapturedPages, type ReplayStory } from "./fixtures"
 
 /** The in-memory store, with the Firestore store's lease rules (as the offline tests use). A draft that reaches the
@@ -50,6 +50,12 @@ export interface ReplayDeps {
   fetchImage(url: string): Promise<{ bytes: Uint8Array; mime: "image/jpeg" | "image/png" }>
   searchCommons(query: string): Promise<MediaCandidate[]>
   searchMore?(query: string): Promise<MediaCandidate[]>
+  searchDvids?(query: string): Promise<MediaCandidate[]>
+  /**
+   * Photo first (plan v10), as research runs it: the story's photo is confirmed before it is written. Research is fixed
+   * here, so a story without one can't move to the next candidate: it is held, and counted as skipped by photo first.
+   */
+  photoFirst?: boolean
   /** The fact check on copy that reached the Canva step (score.ts factCheck), or none. */
   factCheck?(input: { story: Story; frames: McuDraft["frames"]; caption: string; onCall: (call: ModelCall) => void }): Promise<string[]>
 }
@@ -88,6 +94,8 @@ export interface StoryRun {
   history: string[]; calls: ModelCall[]; ms: number
   /** An ICYMI roundup's stories, as the engine chose them. */
   roundup?: string[]
+  /** Photo first: the story's photo confirmed before writing (kept), none found (skipped: production would try the next story), or not run. */
+  photoFirst?: "kept" | "skipped"
   /** Style problems the draft went to Review with (plan v9: notes, not holds). */
   notes?: string[]
   story?: Story
@@ -110,7 +118,8 @@ export async function replayStory(s: ReplayStory, captured: CapturedPages | null
     },
     seeds: async () => deps.seeds,
     icymiWindow: async () => ({ lookbackDays: null }),
-    fetchPage: deps.fetchPage, fetchImage: deps.fetchImage, searchCommons: deps.searchCommons, ...(deps.searchMore ? { searchMore: deps.searchMore } : {}),
+    fetchPage: deps.fetchPage, fetchImage: deps.fetchImage, searchCommons: deps.searchCommons, ...(deps.searchMore ? { searchMore: deps.searchMore } : {}), ...(deps.searchDvids ? { searchDvids: deps.searchDvids } : {}),
+    ...(deps.photoFirst ? { photoFirst: true } : {}),
     notify: async () => {},
     nowMs: () => base + offset,
   }
@@ -123,6 +132,13 @@ export async function replayStory(s: ReplayStory, captured: CapturedPages | null
   } else {
     if (!captured) throw new Error(`${s.id}: no captured pages (run capture.ts)`)
     story = storyOf(s, captured)
+    // Photo first, where research would run it (worker.ts researchStories): before the draft opens.
+    if (deps.photoFirst) {
+      // A check that errors leaves the story unchecked, as research does.
+      const found = await confirmPhoto(workerDeps, workerDeps.ai(() => {}), story, s.kind, "feed").catch(() => null)
+      if (found && "why" in found) return { id: s.id, kind: s.kind, end: "held", status: "held", reason: `${NO_PHOTO_FIRST}: ${found.why}`.slice(0, 1000), frames: [], caption: null, media: [], history: [], calls, ms: Date.now() - started, photoFirst: "skipped", story }
+      if (found) story.photo = found.photo
+    }
     const id = `${BRAND.draftPrefix}-${KIND_CODE[s.kind]}-${day}-01`
     job.drafts = [id]
     await store.createJob(job, false)
@@ -148,6 +164,7 @@ export async function replayStory(s: ReplayStory, captured: CapturedPages | null
     history: d.history.map(h => h.event), calls, ms: Date.now() - started,
     ...(d.story.roundup ? { roundup: d.story.roundup.map(p => p.title) } : {}),
     ...(d.copyNotes?.length ? { notes: d.copyNotes } : {}),
+    ...(d.story.photo ? { photoFirst: "kept" as const } : {}),
     story: d.story,
   }
 }
