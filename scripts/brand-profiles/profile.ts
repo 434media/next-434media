@@ -2,7 +2,10 @@
  * Brand profiles from the command line: the same publish path as the admin routes (lib/firestore-brand-profiles.ts),
  * for working sessions until the Brands area's editing screens exist (plan v11, Step 4).
  *
- *   npx tsx --env-file=.env.local scripts/brand-profiles/profile.ts <command> …
+ *   npx tsx scripts/brand-profiles/profile.ts <command> … [--env-dir ~/434]
+ *
+ * --env-dir loads that directory's .env files the way Next does (@next/env). Node's own --env-file does not unescape
+ * the quoted GOOGLE_SERVICE_ACCOUNT_KEY, so it cannot be used for production.
  *
  *   create <id> --identity-source <s> --identity-record <r> [--brand-type owned|client] [--client-id <id>] [--seeds <path>]
  *   draft <id> <file.json>            save the draft from {profile, examples?} (a private file outside this repository)
@@ -29,13 +32,19 @@ import { backupPath, backupRecord } from "../../lib/content-pipeline/profile-bac
 
 const argv = process.argv.slice(2)
 const flag = (name: string) => { const i = argv.indexOf(name); return i >= 0 ? argv[i + 1] : undefined }
-const VALUE_FLAGS = new Set(["--actor", "--brand-type", "--client-id", "--identity-source", "--identity-record", "--seeds", "--mark-commit"])
+const VALUE_FLAGS = new Set(["--env-dir", "--actor", "--brand-type", "--client-id", "--identity-source", "--identity-record", "--seeds", "--mark-commit"])
 const positional = argv.filter((a, i) => !a.startsWith("--") && !(i > 0 && VALUE_FLAGS.has(argv[i - 1])))
 
 async function main() {
   const [command, id, a, b] = positional
   if (!command || !id) throw new Error("usage: profile.ts <create|draft|publish|restore|show|history|export|backup-pending> <id> …")
   const writes = ["create", "draft", "publish", "restore"].includes(command) || (command === "backup-pending" && !!flag("--mark-commit"))
+  const envDir = flag("--env-dir")
+  if (envDir) {
+    const { createRequire } = await import("node:module")
+    const fromNext = createRequire(createRequire(import.meta.url).resolve("next/package.json"))
+    ;(fromNext("@next/env") as { loadEnvConfig: (dir: string, dev?: boolean, log?: unknown) => unknown }).loadEnvConfig(envDir, false, { info: () => {}, error: console.error })
+  }
   const { db, target } = await scriptDb(argv.includes("--production"))
   console.log(`target: ${target}`)
   const actor = flag("--actor") ?? ""
