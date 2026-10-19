@@ -36,6 +36,8 @@ interface SocialCalendarViewProps {
   onBulkDelete?: (ids: string[]) => void | Promise<void>
   // Optional control beside "Add post" (the content pipeline's Generate, for super-admins).
   headerAction?: React.ReactNode
+  /** The Create table replaces the header's Add post for the people who run it (plan v11 Step 2). */
+  hideAddPost?: boolean
   // Closes a content-pipeline "no new content" card ("Confirm no new content"), for super-admins.
   onCloseOutcome?: (post: ContentPost) => void
 }
@@ -288,7 +290,7 @@ function FilterSection({ title, options, selectedValues, onToggle, renderOption 
   )
 }
 
-export function SocialCalendarView({ contentPosts, onOpenPost, onAddPost, onMovePost, onBulkDelete, headerAction, onCloseOutcome }: SocialCalendarViewProps) {
+export function SocialCalendarView({ contentPosts, onOpenPost, onAddPost, onMovePost, onBulkDelete, headerAction, hideAddPost, onCloseOutcome }: SocialCalendarViewProps) {
   // Top-level surface: "board" is the pipeline kanban (where date-less drafts &
   // in-review work live), "calendar" is the date grid (scheduled/posted only).
   // The pipeline belongs on the board, not as a filter over a date grid — a
@@ -546,13 +548,15 @@ export function SocialCalendarView({ contentPosts, onOpenPost, onAddPost, onMove
         </div>
         <div className="flex items-center gap-2 shrink-0">
           {headerAction}
-          <button
-            onClick={onAddPost}
-            className="inline-flex items-center gap-2 h-9 px-4 bg-neutral-900 text-white rounded-md hover:bg-neutral-800 transition-colors text-sm font-medium shrink-0"
-          >
-            <Plus className="w-4 h-4" />
-            Add post
-          </button>
+          {!hideAddPost && (
+            <button
+              onClick={onAddPost}
+              className="inline-flex items-center gap-2 h-9 px-4 bg-neutral-900 text-white rounded-md hover:bg-neutral-800 transition-colors text-sm font-medium shrink-0"
+            >
+              <Plus className="w-4 h-4" />
+              Add post
+            </button>
+          )}
         </div>
       </div>
 

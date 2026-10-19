@@ -104,6 +104,8 @@ jobs:
       # unchanged one, Restore republishes without losing draft edits, the engine reads the profile in scope, and posts
       # are stamped.
       - run: tsx --test lib/__tests__/brand-profile.test.ts lib/__tests__/brand-profile-store.test.ts
+      # The Create table (plan v11 Step 2): templates from the profile, Human+ on the writer, media, Run job.
+      - run: tsx --test lib/__tests__/create-table.test.ts
 
       # Optional: the same suites again on MilCityUSA's real published profile, when the BRAND_PROFILE_FIXTURE Actions
       # secret holds a published version's 434-context backup record. Secrets are not given to pull requests from

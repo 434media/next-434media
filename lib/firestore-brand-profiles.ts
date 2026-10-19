@@ -130,6 +130,15 @@ export async function readPublishedProfile(id: string, db?: FirebaseFirestore.Fi
   return { active: { profile: doc.published.profile as BrandProfile, versionId: doc.published.version_id } }
 }
 
+/**
+ * Every brand template in a published profile: the Canva allow-list (lib/canva-create.ts profileTemplateIds), read from
+ * the database on every call like the profiles themselves. A brand with no published profile adds nothing.
+ */
+export async function publishedTemplateIds(db?: FirebaseFirestore.Firestore): Promise<ReadonlySet<string>> {
+  const { profileTemplateIds } = await import("./canva-create")
+  return profileTemplateIds((await firestoreBrandProfiles(db).list()).flatMap(d => d.published ? [d.published.profile as BrandProfile] : []))
+}
+
 /** readPublishedProfile, or an error naming why the brand cannot run. */
 export async function requirePublishedProfile(id: string, db?: FirebaseFirestore.Firestore): Promise<ActiveProfile> {
   const r = await readPublishedProfile(id, db)

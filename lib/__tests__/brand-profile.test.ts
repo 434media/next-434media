@@ -10,7 +10,7 @@ import { existsSync } from "node:fs"
 import { loadProfile, profileProblems, validateProfile } from "../content-pipeline/profile"
 import { PIPELINE_PROPERTIES, propertyCanGenerate, templatesOf } from "../content-pipeline/properties"
 import { SERIES } from "../content-pipeline/series"
-import { MCU_BRAND_TEMPLATES } from "../canva-create"
+import { profileTemplateIds } from "../canva-create"
 import { headlineProblems, longestSharedRun, originalityProblems, words } from "../content-pipeline/copy-checks"
 import type { SeriesKey } from "../content-pipeline/profile"
 import type { FrameCopy } from "../content-pipeline/store"
@@ -60,8 +60,9 @@ test("the Generate panel's templates come from the profile: each request kind wi
   assert.ok(propertyCanGenerate("milcity", "dt101", published.milcity) && !propertyCanGenerate("txmx", "news", published.milcity))
 })
 
-test("every template a real profile names is inside the publisher's Canva allowlist (the fixture's ids are invented)", { skip: !process.env.BRAND_PROFILE_FILE && !process.env.FIRESTORE_EMULATOR_HOST && "fixture profile" }, () => {
-  for (const s of Object.values(SERIES)) for (const id of Object.values(s.templates)) if (id) assert.ok(MCU_BRAND_TEMPLATES.has(id), `${s.key}: ${id}`)
+test("every template the profile names is inside the Canva allow-list built from it (plan v11 Step 2: no ids in code)", () => {
+  const allowed = profileTemplateIds([published.milcity])
+  for (const s of Object.values(SERIES)) for (const id of Object.values(s.templates)) if (id) assert.ok(allowed.has(id), `${s.key}: ${id}`)
 })
 
 // ── headline, deck and originality checks (behind the profile's `checks`) ──

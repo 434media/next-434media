@@ -2,11 +2,11 @@
 import { test } from "node:test"
 import assert from "node:assert/strict"
 import { seal, type CanvaDeps, type CanvaTokenRecord, type CanvaTokenStore } from "../canva-export"
-import { createFromTemplate, templateFields, MCU_BRAND_TEMPLATES, type CreateDeps, type CreatedDesign } from "../canva-create"
+import { createFromTemplate, templateFields, profileTemplateIds, type CreateDeps, type CreatedDesign } from "../canva-create"
 import { TOOL_SCOPE } from "../owned-meta-connector"
 import { SERVICE_TOOL_SCOPE } from "../owned-meta-service"
 
-const KEY = Buffer.alloc(32, 7), DT101 = "EAHXZIadVzM"
+const KEY = Buffer.alloc(32, 7), DT101 = "FXtpl05fe" // invented, like the fixture profile's: real ids live in the published profiles
 const JPEG = new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 1, 2, 3, 0xff, 0xd9])
 const DATASET = { dataset: { headline: { type: "text" }, deck: { type: "text" }, maker: { type: "text" }, media: { type: "image" } } }
 class Store implements CanvaTokenStore {
@@ -18,7 +18,7 @@ function setup(handler: (url: string, init: RequestInit) => Response) {
   const calls: { url: string; init: RequestInit }[] = [], ledger = new Map<string, CreatedDesign>()
   const canva: CanvaDeps = { client: { clientId: "c", clientSecret: "s", redirectUri: "https://x", tokenKey: KEY }, store: new Store(), fetcher: (async (u: URL, init: RequestInit) => { calls.push({ url: u.toString(), init }); return handler(u.toString(), init) }) as typeof fetch, nowMs: () => 1_000, sleep: async () => {} }
   const fetched: string[] = []
-  const deps: CreateDeps = { canva, ledger: { get: async k => ledger.get(k) ?? null, put: async (k, v) => { ledger.set(k, v) } }, allowedTemplates: MCU_BRAND_TEMPLATES, fetchImage: async url => { fetched.push(url); return JPEG } }
+  const deps: CreateDeps = { canva, ledger: { get: async k => ledger.get(k) ?? null, put: async (k, v) => { ledger.set(k, v) } }, allowedTemplates: profileTemplateIds([{ series: { dt101: { templates: { feed: DT101, reels: "" } } } }]), fetchImage: async url => { fetched.push(url); return JPEG } }
   return { deps, calls, ledger, fetched }
 }
 function happy(url: string, init: RequestInit): Response {
@@ -114,4 +114,40 @@ test("the real cropper (sharp) cuts the fractional box from the upright photo", 
   assert.equal(meta.format, "jpeg"); assert.equal(meta.width, 200); assert.equal(meta.height, 150)
   const { data } = await sharp(out).raw().toBuffer({ resolveWithObject: true })
   assert.ok(data[2] > 200 && data[0] < 60, "the right (blue) half was kept")
+})
+
+// ── video in the image field, and the allow-list from the profiles (plan v11 Step 2) ──
+test("a video goes into the template's image field: Canva fetches it by URL up to 100 MB", async () => {
+  const s = setup((url, init) => {
+    if (url.endsWith("/url-asset-uploads") && init.method === "POST") return Response.json({ job: { id: "uv1", status: "in_progress" } })
+    if (url.endsWith("/url-asset-uploads/uv1")) return Response.json({ job: { id: "uv1", status: "success", asset: { id: "MAvideo1", type: "video" } } })
+    return happy(url, init)
+  })
+  const { image: _image, ...rest } = INPUT
+  const r = await createFromTemplate(s.deps, { ...rest, requestId: "admin:create:row00001:reels", video: { field: "media", url: "https://abc.public.blob.vercel-storage.com/content-create/clip.mp4", name: "Clip", bytes: 40 * 1024 * 1024 } })
+  const upload = s.calls.find(c => c.url.endsWith("/url-asset-uploads"))!
+  assert.deepEqual(JSON.parse(String(upload.init.body)), { name: "Clip", url: "https://abc.public.blob.vercel-storage.com/content-create/clip.mp4" })
+  const fill = JSON.parse(String(s.calls.find(c => c.url.endsWith("/autofills"))!.init.body))
+  assert.deepEqual(fill.data.media, { type: "video", asset_id: "MAvideo1" })
+  assert.equal(r.design.video?.assetId, "MAvideo1")
+  assert.equal(s.fetched.length, 0, "no video bytes pass through the function")
+})
+
+test("a video over 100 MB is streamed into the asset upload; over 500 MB, or with a photo too, it is refused", async () => {
+  const s = setup(happy)
+  const streamed: string[] = []
+  s.deps.streamVideo = async url => { streamed.push(url); return { body: new Blob([new Uint8Array(4)]).stream(), bytes: 200 * 1024 * 1024 } }
+  const { image, ...rest } = INPUT
+  const video = { field: "media", url: "https://abc.public.blob.vercel-storage.com/content-create/long.mov", name: "Long", bytes: 200 * 1024 * 1024 }
+  await createFromTemplate(s.deps, { ...rest, requestId: "admin:create:row00002:feed", video })
+  assert.deepEqual(streamed, [video.url])
+  const up = s.calls.find(c => c.url.endsWith("/asset-uploads") && c.init.method === "POST")!
+  assert.equal((up.init.headers as Record<string, string>)["content-length"], String(200 * 1024 * 1024))
+  await assert.rejects(createFromTemplate(s.deps, { ...rest, requestId: "admin:create:row00003:feed", video: { ...video, bytes: 600 * 1024 * 1024 } }), /under 500 MB/)
+  await assert.rejects(createFromTemplate(s.deps, { ...rest, requestId: "admin:create:row00004:feed", image, video }), /not both/)
+})
+
+test("the allow-list is every feed and Reels template in the published profiles, and nothing else", () => {
+  const ids = profileTemplateIds([{ series: { news: { templates: { feed: "FXtpl01fe", reels: "FXtpl02re" } }, dt101: { templates: { feed: "FXtpl05fe", reels: "" } } } }, { series: { news: { templates: { feed: "bad id!", reels: "" } } } }])
+  assert.deepEqual([...ids].sort(), ["FXtpl01fe", "FXtpl02re", "FXtpl05fe"])
 })

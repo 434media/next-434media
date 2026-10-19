@@ -5,6 +5,7 @@ import { useSearchParams, useRouter, usePathname } from "next/navigation"
 import { AdminRoleGuard } from "@/components/AdminRoleGuard"
 import { Toast, SocialCalendarView, ContentDetailDrawer } from "@/components/crm"
 import { ContentGenerate } from "@/components/crm/ContentGenerate"
+import { CreateTable } from "@/components/crm/CreateTable"
 import type { Toast as ToastType } from "@/components/crm/types"
 import { useContentPostHandlers } from "@/hooks/useContentPostHandlers"
 
@@ -231,7 +232,10 @@ export default function ContentPage() {
               onAddPost={handleAddContentPost}
               onMovePost={handleMoveContentPost}
               onBulkDelete={handleBulkDeleteContentPosts}
-              headerAction={canReview ? <ContentGenerate onDraftsReady={loadContentPosts} /> : undefined}
+              // The global Create button opens the Create table (plan v11 Step 2), replacing Add post and the Generate
+              // panel for the people who run it. The parked Generate panel still opens for a pipeline draft's ICYMI choice.
+              headerAction={canReview ? <>{searchParams?.get("icymiDraft") && <ContentGenerate onDraftsReady={loadContentPosts} />}<CreateTable onPostsReady={loadContentPosts} /></> : undefined}
+              hideAddPost={canReview}
               onCloseOutcome={canReview ? closeNoContent : undefined}
             />
           )}

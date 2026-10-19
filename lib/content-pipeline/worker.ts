@@ -6,7 +6,7 @@ import { contentPropertyOf } from "./properties"
 import type { ContentProperty, PipelineMedia } from "@/components/crm/types"
 import type { McuSeeds } from "./seeds"
 import { MIN_SHORT_SIDE, archiveRelevant, federalHost, imageSize, isDvidsImagePage, isOutlet, pageImageCandidate, type MediaCandidate, type SourcePage } from "./sources"
-import { MAX_ATTEMPTS, WORKING, type CheckedPhoto, type ChosenMedia, type CropBox, type FrameCopy, type FrameDesign, type McuDraft, type McuJob, type McuStore, type RoundupItem, type SourcedFact, type Story } from "./store"
+import { MAX_ATTEMPTS, WORKING, type CheckedPhoto, type ChosenMedia, type CropBox, type FrameCopy, type FrameDesign, type McuDraft, type McuJob, type McuStore, type RequestRef, type RoundupItem, type SourcedFact, type Story } from "./store"
 
 /**
  * The pipeline worker: advances due jobs and drafts one step at a time, saving after every step, so an interrupted run
@@ -839,6 +839,22 @@ function introduced(after: { frames: FrameCopy[]; caption: string }, before: { f
   const now = copyProblems(after.frames, after.caption, story), had = new Set(copyProblems(before.frames, before.caption, story).style.map(ruleOf))
   return [...now.safety, ...now.style.filter(p => !had.has(ruleOf(p)))]
 }
+/**
+ * Human+ (plan v11 Step 2): the write step on one story the person chose, run in memory and returned to the Create
+ * table's cells. The same fact extraction, candidates, rewrites, fresh wording, fit and checks as a pipeline draft; a
+ * hold comes back as its reason, never as a replacement subject (fixedStory). Runs inside withProfile().
+ */
+export interface WrittenCopy { frames: FrameCopy[]; caption: string; facts: number; notes: string[]; hold?: string; history: string[] }
+export async function writeCopy(deps: Pick<WorkerDeps, "seeds" | "nowMs">, ai: McuAi, input: { kind: RequestKind; story: Story; direction?: string; requestedBy: RequestRef }): Promise<WrittenCopy> {
+  const at = iso(deps), placement: Placement = "feed"
+  const d: McuDraft = { id: "human-plus", jobId: "human-plus", kind: input.kind, placement, request: input.requestedBy, status: "writing", version: 1, ...(input.direction ? { direction: input.direction } : {}),
+    story: input.story, frames: [], media: [], designs: [], qa: [], notices: [], fixedStory: true, history: [], createdAt: at, updatedAt: at }
+  const memory = { saveDraft: async () => {} } as unknown as McuStore
+  await writeStep({ ...deps, store: memory } as WorkerDeps, ai, d)
+  const history = d.history.map(h => h.event)
+  if (d.status === "held") return { frames: d.frames, caption: d.caption ?? "", facts: d.story.facts?.length ?? 0, notes: [], hold: d.holdReason ?? "held", history }
+  return { frames: d.frames, caption: d.caption ?? "", facts: d.story.facts?.length ?? 0, notes: d.copyNotes ?? [], history }
+}
 /** Shortening attempts after the rewrites, before a draft is held for length alone. */
 export const MAX_FIT_ATTEMPTS = 3
 /** Each field that runs past its limits, with the measured problem (as validate words it). */
@@ -1279,7 +1295,7 @@ async function mediaStep(deps: WorkerDeps, ai: McuAi, d: McuDraft): Promise<void
     if (!field) { media[i] = null; continue }
     if (media[i]) { used.add(media[i]!.pageUrl); continue }
     // A template whose photo frame isn't an autofill field can't take a photo, so none is searched for or required
-    // (gate round 2: the News feed template, EAHXWo1LiF8, held NEWS-03 for a photo it could never place).
+    // (gate round 2: the News feed template held NEWS-03 for a photo it could never place).
     if (templateId && (await deps.content.templateFields(templateId))[field] !== "image") {
       media[i] = null
       d.notices = [...new Set([...d.notices, `${series.label} ${d.placement} template has no photo field, so no photo was searched for frame ${i + 1}: connect its photo frame as a data field in Canva`])]
@@ -1491,7 +1507,7 @@ async function postStep(deps: WorkerDeps, d: McuDraft): Promise<void> {
 
 /** A source that can't support the post: research a replacement subject, up to MAX_AUTO_REPLACE times (founder, 2026-10-16). */
 async function sourceHold(deps: WorkerDeps, ai: McuAi, d: McuDraft, reason: string): Promise<void> {
-  if (d.kind === "icymi" || (d.autoReplaced ?? 0) >= MAX_AUTO_REPLACE) return hold(deps, d, reason)
+  if (d.kind === "icymi" || d.fixedStory || (d.autoReplaced ?? 0) >= MAX_AUTO_REPLACE) return hold(deps, d, reason)
   const job = await deps.store.getJob(d.jobId)
   if (!job) return hold(deps, d, reason)
   d.autoReplaced = (d.autoReplaced ?? 0) + 1
