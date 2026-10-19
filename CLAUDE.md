@@ -118,11 +118,13 @@ renaming identifiers would break stored Firestore values for no user benefit.
 So expect any of these words in a request, and never rename the identifiers to
 match the display word.
 
-"Brands" here means 434's own brand roster. It is not the client brands in
-**"Platforms for Brands"** / **"Productions for Brands"** (Section 4.3), which
-are commercial models for *client* work — close to the opposite of
-434-owned IP. "Property" was dropped as the display word partly for a related
-collision; keep the two senses of "brand" apart in copy.
+"Brand" is one word for any brand the admin and content engine serve, 434-owned
+or client (founder, 2026-10-19): the Brands area, brand page, brand profile and
+onboarding SOP cover both, so nobody has to remember two names for the same
+thing. Today's CRM roster above holds 434's own brands; client brands join
+through the same Brands area. **"Platforms for Brands"** and **"Productions for
+Brands"** (master Section 4.3) are names of commercial engagement models, not a
+second meaning of brand — don't use them as labels for a brand.
 
 **Not to be confused with a GA4 property.** `propertyId` and `?property=` in
 `analytics-web` and `analytics-portfolio` are Google Analytics properties, an
