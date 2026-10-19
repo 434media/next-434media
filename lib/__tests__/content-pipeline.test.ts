@@ -1486,3 +1486,30 @@ test("v9 (b), writer hold: a hold field that says there is no hold is none, and 
   for (const v of ["Hold: none.", "Hold: None", "Not held. The headline and hook are drawn from Skydio's F10 announcement; the location line should be verified before publishing.", "No hold — the source supports every field.", "None", "N/A"]) assert.equal(meaningful(v), undefined, v)
   for (const v of ["None of the figures can be verified from the source.", "The source states no headquarters, which the brief requires.", "Not enough detail in the source for a mission brief."]) assert.equal(meaningful(v), v, v)
 })
+
+// Coordinator review of #208 (2026-10-19): two findings.
+test("v9 (b), review 1: a style problem the copy already has never turns a shortening or a rewording down", async () => {
+  // The hook a character over, and a mission brief with no "Tech:" line (style) that both rewrites leave as it is.
+  const noTech = LIGHTFISH_BRIEF.replace("Tech: Autonomous surface vessel\n\n", "")
+  const w = dt101World({ ...LIGHTFISH, brief: noTech }, i => i.fit ? "It patrols seas\nwith no crew" : "Solar power keeps\nit on patrol")
+  await w.start({ kind: "dt101" })
+  const d = onlyDraft(w)
+  assert.equal(d.status, "in_review", d.holdReason); assert.equal(w.writes.length, 4) // two rewrites, then one fit, taken
+  assert.equal(d.frames[0].fields.benefit_headline, "IT PATROLS SEAS\nWITH NO CREW")
+  assert.deepEqual(d.copyNotes, ['the mission brief has no "Tech:" line'])
+  // The rewording pass the same way: a News deck with no period (style) beside a caption that copies the source.
+  const copied = "The U.S. Army awarded contracts worth $93.6 million to nine companies on Oct. 15, 2026 to deliver next-generation command and control software to I Corps.\n\nSource: U.S. Army, 2026-10-15"
+  const fresh = "Nine companies will build I Corps command software under $93.6 million in Army awards.\n\nSource: U.S. Army, 2026-10-15"
+  const f = freshWorld(i => ({ fields: { ...NEWS_CARD, deck: "Awards worth $93.6 million fund I Corps command software" }, caption: i.fresh ? fresh : copied }))
+  await f.start({ kind: "news" })
+  const n = onlyDraft(f)
+  assert.equal(n.status, "in_review", n.holdReason); assert.equal(n.caption!.split("\n")[0], fresh.split("\n")[0])
+  assert.ok(n.copyNotes!.some(x => /^the deck/.test(x)), n.copyNotes!.join(" | "))
+})
+
+test("v9 (b), review 2: a paraphrase that ends a line on a whole word is not a cut-off word; a real cut still is", () => {
+  const src = "The aircraft completed testing before landing. Its firepower and the shipbuilding plan were shown, and its endurance, with precision strike."
+  for (const line of ["READY FOR AIR", "DONE WITH TEST", "CLEARED TO LAND", "MORE FIRE", "A NEW SHIP", "BUILT TO END"]) assert.deepEqual(cutOffWords({ headline: line }, src), [], line)
+  assert.deepEqual(cutOffWords({ benefit_headline: "STOPS DRONES AT\nSEA WITH PREC" }, src), ["PREC"])
+  assert.deepEqual(cutOffWords({ headline: "BUILT FOR ENDUR" }, src), ["ENDUR"])
+})

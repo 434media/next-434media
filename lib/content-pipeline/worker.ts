@@ -690,6 +690,18 @@ async function chooseCopy(deps: WorkerDeps, ai: McuAi, d: McuDraft, out: Awaited
   }
   return { ...out, frames, options: undefined }
 }
+/** A problem's rule, without the copy it quotes (a caption label such as "Tech:" is kept: it names the rule). */
+const ruleOf = (p: string) => p.replace(/"(?![A-Za-z]+:")[^"]*"/g, '""')
+/**
+ * What a fit or a rewording would break: every safety problem it leaves, and a style problem only when the copy before
+ * it didn't already have that rule's problem (coordinator review, 2026-10-19). Style isn't a hold (copyProblems), so a
+ * style problem the writer was told to leave alone, such as a caption with no "Tech:" line, never turns a shortening
+ * down; a shortening that adds one ("EYES ON. / SQUAD SEES ALL") still is.
+ */
+function introduced(after: { frames: FrameCopy[]; caption: string }, before: { frames: FrameCopy[]; caption: string }, story: Story): string[] {
+  const now = copyProblems(after.frames, after.caption, story), had = new Set(copyProblems(before.frames, before.caption, story).style.map(ruleOf))
+  return [...now.safety, ...now.style.filter(p => !had.has(ruleOf(p)))]
+}
 /** Shortening attempts after the rewrites, before a draft is held for length alone. */
 export const MAX_FIT_ATTEMPTS = 3
 /** Each field that runs past its limits, with the measured problem (as validate words it). */
@@ -723,7 +735,7 @@ async function fitStep(ai: McuAi, d: McuDraft, out: { frames: FrameCopy[]; capti
     turnedDown = []
     if (!shorter) { turnedDown = ["the last answer was not shorter: use fewer or shorter words"]; continue }
     const candidate = { frames: next, caption: cur.caption }
-    const broke = validate(candidate.frames, candidate.caption, d.story).filter(p => !overflow(candidate.frames).some(o => o.message === p))
+    const broke = introduced(candidate, cur, d.story).filter(p => !overflow(candidate.frames).some(o => o.message === p))
     if (broke.length) { turnedDown = [`the last shorter version was turned down because it broke these rules: ${broke.slice(0, 3).join("; ")}`]; continue }
     cur = candidate
     if (!overflow(cur.frames).length) { tries++; break }
@@ -770,7 +782,7 @@ async function freshStep(ai: McuAi, d: McuDraft, out: { frames: FrameCopy[]; cap
     turnedDown = []
     if (!changed) { turnedDown = ["the last answer still copied the same run of words: say it differently, in your own words"]; continue }
     const left = copiedFields(next.frames, next.caption, d.story)
-    const broke = validate(next.frames, next.caption, d.story).filter(p => !left.some(x => x.message === p) && !overflow(next.frames).some(o => o.message === p))
+    const broke = introduced(next, cur, d.story).filter(p => !left.some(x => x.message === p) && !overflow(next.frames).some(o => o.message === p))
     if (broke.length) { turnedDown = [`the last rewording was turned down because it broke these rules: ${broke.slice(0, 3).join("; ")}`]; continue }
     cur = next
     if (!left.length) { tries++; break }
