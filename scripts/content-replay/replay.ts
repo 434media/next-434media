@@ -119,9 +119,10 @@ function rescore(file: string): void {
 }
 
 async function main() {
-  // The published MilCityUSA profile: from the database, or --profile <a private copy outside this repository>.
+  // The published MilCityUSA profile: --profile <a private copy outside this repository>, or from the emulator, or
+  // from production Firestore with --production (never by default).
   const { profileForProcess } = await import("../brand-profiles/load")
-  const profile = await profileForProcess("milcity", arg("--profile") ?? process.env.REPLAY_PROFILE)
+  const profile = await profileForProcess("milcity", { file: arg("--profile") ?? process.env.REPLAY_PROFILE, allowProduction: process.argv.includes("--production") })
   console.log(`profile: ${profile.versionId} (${profile.profile.profileVersion})`)
   if (arg("--rescore")) return rescore(arg("--rescore")!)
   checkCredential()

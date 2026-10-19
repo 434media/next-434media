@@ -1,5 +1,5 @@
 import { gateway } from "@ai-sdk/gateway"
-import { BRAND, activeProfile, withProfile } from "./brand"
+import { BRAND, activeProfile, withProfile, type ActiveProfile } from "./brand"
 import { DEFAULT_PROPERTY } from "./properties"
 import { createMcuAi } from "./model"
 import { PIPELINE_MODELS } from "./models"
@@ -131,12 +131,19 @@ export async function pipelineDeps(): Promise<WorkerDeps> {
 }
 
 /**
- * Runs due pipeline work for up to budgetMs, under the brand's published profile read from the database for this run
- * (never cached: a Publish governs the next run). Only MilCityUSA runs today; when a second brand does, each job's
- * property chooses its profile. A brand with no valid published profile does not run.
+ * Runs due pipeline work for up to budgetMs, under the brand's published profile: the one the caller already read and
+ * checked for this request (Generate passes the version it validated), or else read from the database now (never
+ * cached: a Publish governs the next run). Only MilCityUSA runs today; when a second brand does, each job's property
+ * chooses its profile. With no valid published profile nothing runs, and the reason is returned rather than thrown,
+ * so the minute cron reports a skip, not an error.
  */
-export async function runPipeline(budgetMs: number): Promise<{ steps: number; profileVersionId: string }> {
-  const { requirePublishedProfile } = await import("@/lib/firestore-brand-profiles")
-  const active = await requirePublishedProfile(DEFAULT_PROPERTY)
-  return withProfile(active, async () => ({ steps: await runDue(await pipelineDeps(), budgetMs), profileVersionId: active.versionId }))
+export async function runPipeline(budgetMs: number, active?: ActiveProfile): Promise<{ steps: number; profileVersionId: string } | { steps: 0; skipped: string }> {
+  if (!active) {
+    const { readPublishedProfile } = await import("@/lib/firestore-brand-profiles")
+    const r = await readPublishedProfile(DEFAULT_PROPERTY)
+    if ("problems" in r) return { steps: 0, skipped: `no runnable ${DEFAULT_PROPERTY} brand profile: ${r.problems.slice(0, 3).join("; ")}` }
+    active = r.active
+  }
+  const run = active
+  return withProfile(run, async () => ({ steps: await runDue(await pipelineDeps(), budgetMs), profileVersionId: run.versionId }))
 }

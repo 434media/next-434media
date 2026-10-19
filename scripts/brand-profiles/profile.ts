@@ -7,7 +7,8 @@
  *   create <id> --identity-source <s> --identity-record <r> [--brand-type owned|client] [--client-id <id>] [--seeds <path>]
  *   draft <id> <file.json>            save the draft from {profile, examples?} (a private file outside this repository)
  *   publish <id>                      validate the draft and publish it as a new version
- *   restore <id> <id@vN>              republish an earlier version as a new version
+ *   restore <id> <id@vN> [--force]    republish an earlier version as a new version; --force replaces a draft with
+ *                                     unpublished edits, which is kept as draft_before_restore
  *   show <id>                         the published version and whether the draft differs from it
  *   history <id>                      every published version
  *   export <id> <id@vN> <file>        write a version's backup record to a file
@@ -15,8 +16,9 @@
  *                                     write each version whose backup is pending to <dir>/<backup path> (a 434-context
  *                                     worktree, committed there by pull request); with --mark-commit, record it as done
  *
- * Writes need --actor <email>. They go to the emulator when FIRESTORE_EMULATOR_HOST is set; to production only with
- * --production as well, which a working session passes only after the founder's go-ahead for that write.
+ * Writes need --actor <email>. Everything runs against the emulator when FIRESTORE_EMULATOR_HOST is set; against
+ * production only with --production (reads too), which a working session passes for a write only after the founder's
+ * go-ahead for that write.
  */
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs"
 import { dirname, join } from "node:path"
@@ -34,9 +36,8 @@ async function main() {
   const [command, id, a, b] = positional
   if (!command || !id) throw new Error("usage: profile.ts <create|draft|publish|restore|show|history|export|backup-pending> <id> …")
   const writes = ["create", "draft", "publish", "restore"].includes(command) || (command === "backup-pending" && !!flag("--mark-commit"))
-  const { db, target } = await scriptDb()
+  const { db, target } = await scriptDb(argv.includes("--production"))
   console.log(`target: ${target}`)
-  if (writes && !process.env.FIRESTORE_EMULATOR_HOST && !argv.includes("--production")) throw new Error("refusing to write to production without --production (the founder's go-ahead comes first)")
   const actor = flag("--actor") ?? ""
   if (writes && !/^[^@\s]+@[^@\s]+$/.test(actor)) throw new Error("writes need --actor <email>")
   const store = firestoreBrandProfiles(db), at = new Date().toISOString()
@@ -54,7 +55,7 @@ async function main() {
     console.log(`draft saved (sha256 ${profileSha256(raw.profile)}); ${problems.length ? `it would NOT publish:\n- ${problems.join("\n- ")}` : "it would publish"}`)
   } else if (command === "publish" || command === "restore") {
     if (command === "restore" && !a) throw new Error("restore <id> <id@vN>")
-    const r = command === "publish" ? await store.publish(id, actor, at) : await store.restore(id, a!, actor, at)
+    const r = command === "publish" ? await store.publish(id, actor, at) : await store.restore(id, a!, actor, at, argv.includes("--force"))
     if (!r.ok) { console.error(`REFUSED:\n- ${r.problems.join("\n- ")}`); process.exitCode = 2; return }
     console.log(`published ${r.version.version_id} (profile ${r.version.profile.profileVersion}, sha256 ${r.version.profile_sha256})${r.version.restored_from ? `, restored from ${r.version.restored_from}` : ""}; backup ${r.version.backup.status}`)
   } else if (command === "show") {

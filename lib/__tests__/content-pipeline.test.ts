@@ -26,6 +26,10 @@ import { sourcedFacts, MIN_FACTS, placeholderLines, unsourcedClaims } from "../c
 import { factsBrief, FACTS_RULE } from "../content-pipeline/model"
 
 loadPublishedProfileFirst()
+// The profile's own values, so the engine tests pass on any valid profile (the fixture, or a real one).
+const shortName = () => publishedProfile.milcity.shortName
+const kindLabelOf = (k: string) => publishedProfile.milcity.requestKinds.find(x => x.kind === k)!.label
+const fixedCoverHeadline = () => SERIES.icymi_cover.fields.find(f => f.name === "headline")!.fixed
 
 // ── in-memory store with the Firestore store's lease semantics ──
 class MemStore implements McuStore {
@@ -120,7 +124,7 @@ test("one Generate run: research → copy → licensed photo → Canva template 
   const d = onlyDraft(w)
   assert.equal(d.id, "MCU-DT101-20261016-01"); assert.equal(d.status, "in_review"); assert.equal(d.postId, "post-1")
   const create = w.designs[0]
-  assert.equal(create.templateId, "EAHYOAJhC_8"); assert.equal(create.requestId, "admin:MCU-DT101-20261016-01:v1:f1")
+  assert.equal(create.templateId, SERIES.dt101.templates.feed); assert.equal(create.requestId, "admin:MCU-DT101-20261016-01:v1:f1")
   assert.deepEqual(create.text, { benefit_headline: "LINK THE FIGHT.\nDECIDE FASTER.", subject_identifier: "NEXT-GEN C2 / LOCKHEED MARTIN", image_context: "IMAGE: U.S. ARMY" })
   assert.equal(create.image?.url, CANDIDATE.url)
   // The board write carries the design, the caption with its credits, the sources and the photo rights.
@@ -264,7 +268,7 @@ test("no new content: one thorough search, then a notice card in Review with the
   assert.equal(research, 2) // the first pass, then one pass avoiding what was tried; never more
   assert.equal(w.notices.length, 1); assert.equal(w.posts.length, 0); assert.equal(w.designs.length, 0); assert.equal(w.store.drafts.size, 0)
   const n = w.notices[0]
-  assert.equal(n.requestId, "admin:job-dt101-1:no-content"); assert.equal(n.jobId, "job-dt101-1"); assert.match(n.title, /^No new Defense Tech 101 content — 2026-10-16$/)
+  assert.equal(n.requestId, "admin:job-dt101-1:no-content"); assert.equal(n.jobId, "job-dt101-1"); assert.match(n.title, new RegExp(`^No new ${kindLabelOf("dt101")} content — 2026-10-16$`))
   assert.deepEqual(n.tried, [{ title: "Blocked page story", url: "https://blocked.example.com/a" }]); assert.match(n.reason, /source page unreachable/)
   const job = (await w.store.getJob("job-dt101-1"))!
   assert.equal(job.status, "held"); assert.equal(job.noContentPostId, "notice-1")
@@ -354,7 +358,7 @@ test("a template without a photo field gets the copy and a visible notice instea
 test("ICYMI with no story published in the previous week holds without creating anything", async () => {
   const w = world()
   await w.start({ kind: "icymi" })
-  assert.equal(w.store.drafts.size, 0); assert.match((await w.store.getJob("job-icymi-1"))!.note!, /no MCU News or Breaking story was published in the week of 2026-10-05, so there is no ICYMI/)
+  assert.equal(w.store.drafts.size, 0); assert.match((await w.store.getJob("job-icymi-1"))!.note!, new RegExp(`no ${shortName()} News or Breaking story was published in the week of 2026-10-05, so there is no ICYMI`))
 })
 
 test("sources: licenses, page dates, and only public https hosts", async () => {
@@ -653,13 +657,13 @@ test("open archives: Openverse keeps only usable licenses with credit; NASA skip
   assert.deepEqual({ url: nasa[0].url, page: nasa[0].pageUrl, license: nasa[0].license, credit: nasa[0].credit, date: nasa[0].date }, { url: "https://images-assets.nasa.gov/image/KSC-1/KSC-1~large.jpg", page: "https://images.nasa.gov/details/KSC-1", license: "Public domain (NASA)", credit: "NASA/Ben Smegelsky", date: "2022-06-14" })
 })
 
-test("the writer gets MCU's brand direction and the requester's instruction as proactive direction, in every round", async () => {
+test("the writer gets the brand's direction and the requester's instruction as proactive direction, in every round", async () => {
   const seen: { direction?: string; seeds?: McuSeeds | null }[] = []
   const w = world({ ai: { write: async input => { seen.push({ direction: input.direction, seeds: input.seeds }); return { frames: [{ series: "news" as SeriesKey, fields: { headline: "Army backs 9 C2 software vendors", deck: "Awards worth $93.6 million fund I Corps command software.", source: "ARMY.MIL" } }], caption: "The Army awarded $93.6 million.\n\nSource: U.S. Army, 2026-10-15" } } } })
   await w.start({ topic: "lead with what it means for I Corps soldiers" })
   assert.equal(onlyDraft(w).direction, "lead with what it means for I Corps soldiers")
   assert.ok(seen.length >= 1 && seen.every(s => s.direction === "lead with what it means for I Corps soldiers" && s.seeds?.purpose === SEEDS.purpose))
-  assert.match(brandDirection(SEEDS), /^MCU PURPOSE: Invented purpose for tests\.\nWho MCU covers:\n- Builders\n\n$/); assert.equal(brandDirection(null), "")
+  assert.equal(brandDirection(SEEDS), `${shortName()} PURPOSE: Invented purpose for tests.\nWho ${shortName()} covers:\n- Builders\n\n`); assert.equal(brandDirection(null), "")
 })
 
 test("seeds: the brief uses them when loaded and says so when not; a malformed set is refused", () => {
@@ -1013,10 +1017,10 @@ test("ICYMI with 4 eligible posts: one cover with the fixed headline and four ro
   assert.equal(d.frames.length, 1); assert.equal(d.frames[0].series, "icymi_cover"); assert.equal(writes.length, 1)
   assert.equal(w.designs.length, 1); assert.deepEqual(checked, ["icymi_cover"]); assert.equal(picks.length, 1)
   const cover = w.designs[0].text
-  assert.equal(cover.headline, "TOP DEFENSE DEVELOPMENTS") // the profile's fixed value, never the model's
+  assert.equal(cover.headline, fixedCoverHeadline()) // the profile's fixed value, never the model's
   assert.deepEqual([cover.story_01, cover.story_04, cover.story_05], ["Story 1 in one row", "Story 4 in one row", " "]) // the unused slot is blanked
-  assert.equal(cover.story_numbers, "01\n02\n03\n04") // only the rows used are numbered (EAHYYaSYfJI)
-  assert.equal(w.designs[0].templateId, "EAHYYaSYfJI")
+  assert.equal(cover.story_numbers, "01\n02\n03\n04") // only the rows used are numbered
+  assert.equal(w.designs[0].templateId, SERIES.icymi_cover.templates.feed)
   assert.ok(!d.notices.some(n => /ICYMI cover: 4 of 5 story slots used/.test(n)))
   // The board write: the cover's export, then each story's own staged card, exactly as posted, in order.
   assert.equal(w.posts.length, 1)
@@ -1034,7 +1038,7 @@ test("ICYMI with 2 eligible posts: no roundup; a no-content card says why (coord
   await w.start({ kind: "icymi" })
   assert.equal(w.store.drafts.size, 0); assert.equal(w.posts.length, 0); assert.equal(w.designs.length, 0)
   assert.equal(w.notices.length, 1)
-  assert.match(w.notices[0].reason, /^only 2 MCU News or Breaking stories with a published card were published in the week of 2026-10-05, and an ICYMI takes at least 3, so there is no ICYMI$/)
+  assert.match(w.notices[0].reason, new RegExp(`^only 2 ${shortName()} News or Breaking stories with a published card were published in the week of 2026-10-05, and an ICYMI takes at least 3, so there is no ICYMI$`))
   const j = (await w.store.getJob("job-icymi-1"))!
   assert.equal(j.status, "held"); assert.equal(j.noContentPostId, "notice-1"); assert.equal(w.alerts.length, 1)
 })
@@ -1066,9 +1070,9 @@ test("ICYMI with 7 eligible posts: the draft waits for the requester's choice, w
   await runDue(w.deps, 1e9)
   d = onlyDraft(w)
   assert.equal(d.status, "in_review"); assert.deepEqual(d.story.roundup!.map(r => r.postId), ["p2", "p3", "p4", "p6"])
-  assert.equal(d.choice!.chosenBy, "marcos@434media.com"); assert.match(d.story.sourceTitle, /^4 published MCU stories from the week of 2026-10-05$/)
+  assert.equal(d.choice!.chosenBy, "marcos@434media.com"); assert.match(d.story.sourceTitle, new RegExp(`^4 published ${shortName()} stories from the week of 2026-10-05$`))
   assert.deepEqual(w.posts[0].slides!.map(x => x.url), [2, 3, 4, 6].map(n => `https://blob.example/content-posts/p${n}-01-page-1.jpg`))
-  assert.equal(w.designs[0].text.headline, "TOP DEFENSE DEVELOPMENTS"); assert.equal(w.designs[0].text.story_04, "Story 4 in one row"); assert.equal(w.designs[0].text.story_05, " ")
+  assert.equal(w.designs[0].text.headline, fixedCoverHeadline()); assert.equal(w.designs[0].text.story_04, "Story 4 in one row"); assert.equal(w.designs[0].text.story_05, " ")
   assert.equal(w.designs[0].text.story_numbers, "01\n02\n03\n04")
   assert.match(w.posts[0].notes, /Chosen by marcos@434media\.com/)
   assert.equal(w.alerts.length, 1); assert.match((await w.store.getJob("job-icymi-1"))!.note!, /4 stories chosen by marcos@434media\.com/)
@@ -1263,7 +1267,7 @@ test("round 6, ICYMI: the engine decides eligibility (posted, not a review draft
   const two = world()
   two.deps.content.recentPosts = async () => [published(1), published(2), marconi, unpublished]
   await two.start({ kind: "icymi" })
-  assert.equal(two.store.drafts.size, 0); assert.match(two.notices[0].reason, /^only 2 MCU News or Breaking stories with a published card/)
+  assert.equal(two.store.drafts.size, 0); assert.match(two.notices[0].reason, new RegExp(`^only 2 ${shortName()} News or Breaking stories with a published card`))
 })
 
 const COPIED = "The U.S. Army awarded contracts worth $93.6 million to nine companies on Oct. 15, 2026 to deliver next-generation command and control software.\n\nSource: U.S. Army, 2026-10-15"

@@ -7,7 +7,7 @@
  */
 import { test } from "node:test"
 import assert from "node:assert/strict"
-import { preparePublish, publishProblems, profileSha256, type BrandProfileDoc } from "../content-pipeline/profile-store"
+import { MAX_PROFILE_BYTES, preparePublish, publishProblems, profileSha256, type BrandProfileDoc } from "../content-pipeline/profile-store"
 import { BRAND, activeProfile, setProcessProfile, withProfile } from "../content-pipeline/brand"
 import { SERIES } from "../content-pipeline/series"
 import { KIND_CODE } from "../content-pipeline/worker"
@@ -20,7 +20,7 @@ loadPublishedProfileFirst()
 const AT = "2026-10-19T18:00:00.000Z", BY = "founder@example.com"
 const docWith = (profile: unknown, over: Partial<BrandProfileDoc> = {}): BrandProfileDoc => ({
   id: "milcity", brand_type: "owned", client_id: null, identity: { source: "master Section 4", record: "MilCityUSA" }, sources: { seeds: "content_pipeline_config/mcu_seeds" },
-  draft: { profile, examples: { approved: [], rejected: [] }, updated_by: BY, updated_at: AT }, published: null, last_version: 0, ...over,
+  draft: { profile, examples: { approved: [], rejected: [] }, updated_by: BY, updated_at: AT }, published: null, last_version: 0, draft_before_restore: null, ...over,
 })
 const clone = () => structuredClone(published.milcity) as unknown as Record<string, unknown>
 
@@ -60,6 +60,28 @@ test("Restore republishes an earlier version as a new one, and it becomes the dr
   assert.ok(v3.ok)
   assert.equal(v3.version.version_id, "milcity@v3"); assert.equal(v3.version.restored_from, "milcity@v1")
   assert.equal(v3.version.profile_sha256, v1.version.profile_sha256); assert.equal(v3.doc.draft!.profile, v1.version.profile)
+  assert.equal(v3.doc.draft_before_restore, null, "nothing unpublished was replaced")
+})
+
+test("Restore never loses unpublished draft edits: refused unless forced, then kept; an unchanged draft is not republished", () => {
+  const v1 = preparePublish(docWith(published.milcity), BY, AT)
+  assert.ok(v1.ok)
+  // Publishing the draft that is already live adds no duplicate version.
+  const again = preparePublish(v1.doc, BY, AT)
+  assert.ok(!again.ok); assert.deepEqual(again.problems, ["nothing to publish: the draft is the published version milcity@v1"])
+  const editing = { ...v1.doc, draft: { profile: { ...structuredClone(published.milcity), rulesVersion: "unpublished-edit" }, examples: { approved: [], rejected: [] }, updated_by: BY, updated_at: AT } }
+  const refused = preparePublish(editing, BY, AT, { draft: { profile: v1.version.profile, examples: v1.version.examples }, restoredFrom: "milcity@v1" })
+  assert.ok(!refused.ok); assert.match(refused.problems.join(), /the draft has unpublished edits/)
+  const forced = preparePublish(editing, BY, AT, { draft: { profile: v1.version.profile, examples: v1.version.examples }, restoredFrom: "milcity@v1", force: true })
+  assert.ok(forced.ok)
+  assert.equal(forced.doc.draft_before_restore, editing.draft, "the replaced draft is kept")
+  assert.equal(forced.doc.draft!.profile, v1.version.profile)
+})
+
+test("the brand document's own fields and size are checked on Publish", () => {
+  assert.ok(publishProblems(docWith(published.milcity, { brand_type: "partner" as never })).includes("brand_type: owned or client"))
+  const huge = { ...structuredClone(published.milcity), editorial: "x".repeat(MAX_PROFILE_BYTES) }
+  assert.match(publishProblems(docWith(huge)).join(), /a profile and its examples must stay under 250000/)
 })
 
 test("the engine reads the profile in scope: concurrent scopes don't mix, and no scope means no run", async () => {
@@ -68,7 +90,7 @@ test("the engine reads the profile in scope: concurrent scopes don't mix, and no
     withProfile({ profile: published.milcity, versionId: "milcity@v1" }, async () => { await new Promise(r => setTimeout(r, 5)); return [BRAND.name, activeProfile().versionId, profileStamp().profile_version_id] }),
     withProfile({ profile: other, versionId: "other@v4" }, async () => [BRAND.name, activeProfile().versionId, profileStamp().profile_version_id]),
   ])
-  assert.deepEqual(seen, [["MilCityUSA", "milcity@v1", "milcity@v1"], ["Other Brand", "other@v4", "other@v4"]])
+  assert.deepEqual(seen, [[published.milcity.name, "milcity@v1", "milcity@v1"], ["Other Brand", "other@v4", "other@v4"]])
   assert.equal(withProfile({ profile: published.milcity, versionId: "milcity@v9" }, () => KIND_CODE.dt101), published.milcity.requestKinds.find(k => k.kind === "dt101")!.code)
   assert.deepEqual(Object.keys(SERIES), Object.keys(published.milcity.series))
   const saved = published.active
@@ -124,9 +146,13 @@ test("Firestore: publish, refuse a broken draft, restore, and read the published
   const edited = { ...structuredClone(profile), rulesVersion: "test-rules.2" }
   await store.saveDraft(id, { profile: edited, examples: { approved: [], rejected: [] } }, BY, AT)
   assert.ok((await store.publish(id, BY, AT)).ok)
+  assert.ok(!(await store.publish(id, BY, AT)).ok, "no duplicate version")
   const now = await readPublishedProfile(id, db)
   assert.ok("active" in now && now.active.profile.rulesVersion === "test-rules.2" && now.active.versionId === `${id}@v2`, "read fresh: the new version governs at once")
-  const restored = await store.restore(id, `${id}@v1`, BY, AT)
+  await store.saveDraft(id, { profile: { ...edited, rulesVersion: "unpublished" }, examples: { approved: [], rejected: [] } }, BY, AT)
+  assert.ok(!(await store.restore(id, `${id}@v1`, BY, AT)).ok, "unpublished draft edits are not overwritten")
+  const restored = await store.restore(id, `${id}@v1`, BY, AT, true)
+  assert.equal(((await store.get(id))!.draft_before_restore!.profile as { rulesVersion: string }).rulesVersion, "unpublished", "kept")
   assert.ok(restored.ok && restored.version.version_id === `${id}@v3` && restored.version.restored_from === `${id}@v1`)
   assert.ok(!(await store.restore(id, `${id}@v99`, BY, AT)).ok)
   const back = await readPublishedProfile(id, db)

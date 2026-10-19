@@ -1,7 +1,7 @@
 import { getDb } from "./firebase-admin"
 import { CRM_COLLECTIONS } from "../types/crm-types"
 import { profileProblems, type BrandProfile } from "./content-pipeline/profile"
-import { preparePublish, versionDocId, BRAND_ID, type BackupState, type BrandProfileDoc, type ProfileExamples, type ProfileVersion, type PublishResult } from "./content-pipeline/profile-store"
+import { preparePublish, versionDocId, BRAND_ID, MAX_PROFILE_BYTES, type BackupState, type BrandProfileDoc, type ProfileExamples, type ProfileVersion, type PublishResult } from "./content-pipeline/profile-store"
 import type { ActiveProfile } from "./content-pipeline/brand"
 
 /**
@@ -21,14 +21,20 @@ const clean = <T>(v: T): T => JSON.parse(JSON.stringify(v)) as T
 
 const normalize = (id: string, raw: FirebaseFirestore.DocumentData): BrandProfileDoc => ({
   id,
-  brand_type: raw.brand_type === "client" ? "client" : "owned",
+  // As stored, so documentProblems can refuse a value that is neither owned nor client.
+  brand_type: raw.brand_type as BrandProfileDoc["brand_type"],
   client_id: typeof raw.client_id === "string" && raw.client_id ? raw.client_id : null,
   identity: { source: String(raw.identity?.source ?? ""), record: String(raw.identity?.record ?? "") },
   sources: { seeds: typeof raw.sources?.seeds === "string" ? raw.sources.seeds : null, ...(typeof raw.sources?.note === "string" ? { note: raw.sources.note } : {}) },
   draft: raw.draft ?? null,
   published: raw.published ?? null,
   last_version: typeof raw.last_version === "number" ? raw.last_version : 0,
+  draft_before_restore: raw.draft_before_restore ?? null,
 })
+
+export class DraftTooLarge extends Error {
+  constructor(readonly bytes: number) { super(`the draft is ${bytes} bytes; a profile and its examples must stay under ${MAX_PROFILE_BYTES}`) }
+}
 
 export type NewBrandDoc = Pick<BrandProfileDoc, "id" | "brand_type" | "client_id" | "identity" | "sources">
 
@@ -40,8 +46,9 @@ export interface BrandProfileStore {
   /** Saves the draft. Nothing reads a draft for output; only Publish changes what runs. */
   saveDraft(id: string, draft: { profile: unknown; examples: ProfileExamples }, actor: string, at: string): Promise<BrandProfileDoc>
   publish(id: string, actor: string, at: string): Promise<PublishResult>
-  /** Republishes an earlier version as a new version (one action); it becomes the draft too. */
-  restore(id: string, versionId: string, actor: string, at: string): Promise<PublishResult>
+  /** Republishes an earlier version as a new version (one action); it becomes the draft too. A draft with unpublished
+   * edits is refused unless force, and then kept as draft_before_restore. */
+  restore(id: string, versionId: string, actor: string, at: string, force?: boolean): Promise<PublishResult>
   /** Every published version, newest first. */
   versions(id: string): Promise<ProfileVersion[]>
   markBackup(id: string, n: number, backup: BackupState): Promise<void>
@@ -52,7 +59,7 @@ export function firestoreBrandProfiles(db: FirebaseFirestore.Firestore = getDb()
   const missing = (id: string): PublishResult => ({ ok: false, problems: [`no brand profile document for ${id}`] })
   const write = (tx: FirebaseFirestore.Transaction, id: string, result: PublishResult & { ok: true }) => {
     tx.create(col.doc(id).collection(VERSIONS).doc(versionDocId(result.version.n)), clean(result.version))
-    tx.set(col.doc(id), clean({ draft: result.doc.draft, published: result.version, last_version: result.version.n }), { mergeFields: ["draft", "published", "last_version"] })
+    tx.set(col.doc(id), clean({ draft: result.doc.draft, published: result.version, last_version: result.version.n, draft_before_restore: result.doc.draft_before_restore }), { mergeFields: ["draft", "published", "last_version", "draft_before_restore"] })
   }
   return {
     get: async id => {
@@ -64,13 +71,15 @@ export function firestoreBrandProfiles(db: FirebaseFirestore.Firestore = getDb()
     create: doc => db.runTransaction(async tx => {
       const ref = col.doc(doc.id)
       if ((await tx.get(ref)).exists) return { created: false }
-      tx.create(ref, clean({ ...doc, draft: null, published: null, last_version: 0 }))
+      tx.create(ref, clean({ ...doc, draft: null, published: null, last_version: 0, draft_before_restore: null }))
       return { created: true }
     }),
     saveDraft: (id, draft, actor, at) => db.runTransaction(async tx => {
       if (!BRAND_ID.test(id)) throw new Error(`no brand profile document for ${id}`)
       const ref = col.doc(id), snap = await tx.get(ref)
       if (!snap.exists) throw new Error(`no brand profile document for ${id}`)
+      const size = Buffer.byteLength(JSON.stringify({ profile: draft.profile, examples: draft.examples }))
+      if (size >= MAX_PROFILE_BYTES) throw new DraftTooLarge(size)
       const next = { profile: draft.profile, examples: draft.examples, updated_by: actor, updated_at: at }
       tx.set(ref, clean({ draft: next }), { mergeFields: ["draft"] })
       return { ...normalize(id, snap.data()!), draft: next }
@@ -83,7 +92,7 @@ export function firestoreBrandProfiles(db: FirebaseFirestore.Firestore = getDb()
       if (result.ok) write(tx, id, result)
       return result
     }),
-    restore: (id, versionId, actor, at) => db.runTransaction(async tx => {
+    restore: (id, versionId, actor, at, force = false) => db.runTransaction(async tx => {
       if (!BRAND_ID.test(id)) return missing(id)
       const ref = col.doc(id), snap = await tx.get(ref)
       if (!snap.exists) return missing(id)
@@ -92,7 +101,7 @@ export function firestoreBrandProfiles(db: FirebaseFirestore.Firestore = getDb()
       if (!old?.exists) return { ok: false, problems: [`no published version ${versionId}`] }
       const v = old.data() as ProfileVersion
       // Validated again: a version published under older rules is not restored if the validator now refuses it.
-      const result = preparePublish(normalize(id, snap.data()!), actor, at, { draft: { profile: v.profile, examples: v.examples }, restoredFrom: versionId })
+      const result = preparePublish(normalize(id, snap.data()!), actor, at, { draft: { profile: v.profile, examples: v.examples }, restoredFrom: versionId, force })
       if (result.ok) write(tx, id, result)
       return result
     }),

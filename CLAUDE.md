@@ -175,10 +175,12 @@ history is not rewritten.
   `pending` and `profile.ts backup-pending` writes it out for a pull request.
   434-context is no longer where profiles are edited, and its
   `brand_profile_extract.py` is no longer the way in.
-- **Tests read the database too.** The content-pipeline tests load MilCityUSA's
-  published profile first: from the emulator (`FIRESTORE_EMULATOR_HOST`), from
-  production with the app's credentials, or from a private copy outside the
-  repository (`BRAND_PROFILE_FILE`). Without one of them they cannot run.
+- **Tests run on an invented fixture.** By default the content-pipeline and
+  brand-profile tests use `lib/__tests__/fixtures/brand-profile.fixture.json`,
+  an invented brand with made-up text and template ids, so they run anywhere,
+  CI included. `BRAND_PROFILE_FILE` (a private copy outside the repository) or
+  `FIRESTORE_EMULATOR_HOST` runs them on the real profile. Tests and scripts
+  never touch production by default: the scripts need `--production`.
 
 ## Working on the AI paths
 

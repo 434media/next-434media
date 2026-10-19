@@ -4,7 +4,7 @@ import { requireSuperAdmin } from "../auth"
 import { REQUEST_KINDS } from "@/lib/content-pipeline/series"
 import { DEFAULT_PROPERTY, propertyCanGenerate } from "@/lib/content-pipeline/properties"
 import type { McuJob } from "@/lib/content-pipeline/store"
-import type { BrandProfile } from "@/lib/content-pipeline/profile"
+import type { ActiveProfile } from "@/lib/content-pipeline/brand"
 
 export const runtime = "nodejs"
 // The run continues after the response (next/server after()) for up to this long; the cron picks up the rest.
@@ -33,16 +33,16 @@ export async function POST(req: NextRequest) {
   const a = parsed.data
   // The brand's published profile, read from the database for this request (no cache): an unpublished or invalid
   // profile offers nothing.
-  let profile: BrandProfile | null = null
+  let active: ActiveProfile | null = null
   try {
     const { readPublishedProfile } = await import("@/lib/firestore-brand-profiles")
     const r = await readPublishedProfile(a.property)
-    profile = "active" in r ? r.active.profile : null
+    active = "active" in r ? r.active : null
   } catch (err) {
     console.error("[POST /api/admin/content-pipeline/generate] profile not read:", err)
     return NextResponse.json({ error: "Could not read the brand profile" }, { status: 500 })
   }
-  if (!propertyCanGenerate(a.property, a.kind, profile)) return NextResponse.json({ error: "That brand has no published profile with that template yet" }, { status: 400 })
+  if (!propertyCanGenerate(a.property, a.kind, active?.profile ?? null) || !active) return NextResponse.json({ error: "That brand has no published profile with that template yet" }, { status: 400 })
   const job: McuJob = {
     id: `job-${a.requestId}`, property: a.property, kind: a.kind as McuJob["kind"], count: a.kind === "icymi" ? 1 : a.count, ...(a.topic ? { topic: a.topic } : {}),
     placement: "feed", request: { actorEmail: auth.session.email.toLowerCase(), actorName: auth.session.name || "" },
@@ -56,8 +56,10 @@ export async function POST(req: NextRequest) {
     console.error("[POST /api/admin/content-pipeline/generate] job not saved:", err)
     return NextResponse.json({ error: "Could not start the run" }, { status: 500 })
   }
+  // This request's run uses the version it just checked; later resumes (the cron, the panel) read the current one.
+  const checked = active
   if (created) after(async () => {
-    try { const { runPipeline } = await import("@/lib/content-pipeline/run"); console.info("[content-pipeline] run", JSON.stringify({ job: job.id, ...await runPipeline(RUN_BUDGET_MS) })) }
+    try { const { runPipeline } = await import("@/lib/content-pipeline/run"); console.info("[content-pipeline] run", JSON.stringify({ job: job.id, ...await runPipeline(RUN_BUDGET_MS, checked) })) }
     catch (err) { console.error("[content-pipeline] run failed; the cron resumes it:", err) }
   })
   return NextResponse.json({ ok: true, jobId: job.id, started: created }, { status: created ? 202 : 200 })

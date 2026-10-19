@@ -97,6 +97,7 @@ export function ContentGenerate({ onDraftsReady }: { onDraftsReady?: () => void 
   const [error, setError] = useState<string | null>(null)
   const [runs, setRuns] = useState<RunsResponse | null>(null)
   const [brands, setBrands] = useState<BrandView[]>([])
+  const [brandsError, setBrandsError] = useState<string | null>(null)
   const ready = useRef<Set<string>>(new Set())
   const ref = useRef<HTMLDivElement>(null)
 
@@ -117,7 +118,10 @@ export function ContentGenerate({ onDraftsReady }: { onDraftsReady?: () => void 
   // The brands and their templates, from the published profiles, each time the panel opens (a Publish shows at once).
   useEffect(() => {
     if (!open) return
-    void fetch("/api/admin/brand-profiles", { cache: "no-store" }).then(r => r.ok ? r.json() : null).then((d: { brands?: BrandView[] } | null) => { if (d?.brands) setBrands(d.brands) }).catch(() => {})
+    setBrandsError(null)
+    void fetch("/api/admin/brand-profiles", { cache: "no-store" })
+      .then(async r => { const d = await r.json().catch(() => ({})) as { brands?: BrandView[]; error?: string }; if (!r.ok || !d.brands) throw new Error(d.error || "Could not read the brand profiles"); setBrands(d.brands) })
+      .catch((e: unknown) => setBrandsError(e instanceof Error ? e.message : "Could not read the brand profiles"))
   }, [open])
   // Opened from the choice alert: show the picker for that draft.
   useEffect(() => { if (linked && /^[A-Z0-9-]{10,40}$/.test(linked)) { setChoosing(linked); setOpen(true) } }, [linked])
@@ -190,10 +194,11 @@ export function ContentGenerate({ onDraftsReady }: { onDraftsReady?: () => void 
           <div className="space-y-3">
             <div className="space-y-1">
               <label className="text-xs font-medium text-neutral-700" htmlFor="gen-property">Brand</label>
+              {brandsError && <p role="alert" className="text-xs text-red-600">{brandsError}</p>}
               <select id="gen-property" value={property} onChange={e => setProperty(e.target.value)} className="w-full h-8 rounded-md ring-1 ring-neutral-200 bg-white px-2 text-sm">
                 {PIPELINE_PROPERTIES.map(p => {
                   const b = brands.find(x => x.id === p.id), offered = !!b?.active
-                  return <option key={p.id} value={p.id} disabled={!offered}>{p.label}{offered ? "" : ` — ${b?.reason ?? (brands.length ? p.reason : "Loading…")}`}</option>
+                  return <option key={p.id} value={p.id} disabled={!offered}>{p.label}{offered ? "" : ` — ${b?.reason ?? (brands.length ? p.reason : brandsError ? "unavailable" : "Loading…")}`}</option>
                 })}
               </select>
             </div>

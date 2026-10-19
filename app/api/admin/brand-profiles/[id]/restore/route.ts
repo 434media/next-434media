@@ -5,12 +5,13 @@ import { BRAND_ID } from "@/lib/content-pipeline/profile-store"
 
 export const runtime = "nodejs"
 
-const input = z.object({ versionId: z.string().regex(/^[a-z][a-z0-9-]{1,30}@v\d{1,6}$/) }).strict()
+const input = z.object({ versionId: z.string().regex(/^[a-z][a-z0-9-]{1,30}@v\d{1,6}$/), force: z.boolean().default(false) }).strict()
 
 /**
- * POST /api/admin/brand-profiles/[id]/restore { versionId } — restore an earlier version in one action: it is
+ * POST /api/admin/brand-profiles/[id]/restore { versionId, force? } — restore an earlier version in one action: it is
  * validated again and republished as a new version (restored_from names the one it came from), and becomes the
- * draft. History is never rewritten.
+ * draft. A draft with unpublished edits is refused (400) unless force, and then kept as draft_before_restore.
+ * History is never rewritten.
  */
 export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
   const auth = await requireSuperAdmin()
@@ -22,7 +23,7 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
   try {
     const [{ firestoreBrandProfiles }, { backupPublished }] = await Promise.all([import("@/lib/firestore-brand-profiles"), import("@/lib/content-pipeline/profile-backup")])
     const store = firestoreBrandProfiles()
-    const result = await store.restore(id, parsed.data.versionId, auth.session.email.toLowerCase(), new Date().toISOString())
+    const result = await store.restore(id, parsed.data.versionId, auth.session.email.toLowerCase(), new Date().toISOString(), parsed.data.force)
     if (!result.ok) return NextResponse.json({ error: "That version cannot be restored", problems: result.problems }, { status: result.problems[0]?.startsWith("no ") ? 404 : 400 })
     const v = result.version
     after(async () => { await backupPublished(v, b => store.markBackup(id, v.n, b)) })

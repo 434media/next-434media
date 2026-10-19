@@ -1,0 +1,528 @@
+{
+  "_note": "An INVENTED brand profile for the offline tests. Not any brand's rules: real profiles live in Firestore (brand_profiles), never in this public repository. Its structure (series, fields, limits, request kinds) is the engine's vocabulary; its text and template ids are made up.",
+  "profile": {
+    "schema": "434-brand-profile/1",
+    "generatedBy": "lib/__tests__/fixtures: invented for the offline tests",
+    "profile": "fixture",
+    "profileVersion": "0.1.0-fixture",
+    "profileDate": "October 19, 2026",
+    "profileSha256": "0000000000000000",
+    "id": "milcity",
+    "name": "Fixture Brand",
+    "shortName": "FXB",
+    "draftPrefix": "MCU",
+    "rulesVersion": "fixture-rules-1",
+    "timeZone": "America/Chicago",
+    "never": [
+      {
+        "id": "fixture-never-1",
+        "what": "An invented subject the fixture brand never revives."
+      }
+    ],
+    "checks": {
+      "headline": {
+        "enabled": true,
+        "fields": [
+          "headline"
+        ],
+        "hookFields": [
+          "benefit_headline"
+        ],
+        "maxCommas": 1,
+        "deckField": "deck"
+      },
+      "originality": {
+        "enabled": true,
+        "headlineMaxRun": 4,
+        "captionMaxRun": 12,
+        "exempt": [
+          "icymi_cover",
+          "icymi_story"
+        ]
+      }
+    },
+    "editorial": "FIXTURE EDITORIAL RULES (invented for tests; not any brand's rules).\n- Write plainly and use only facts in the source.\n- Headlines are short, specific and active.\n- Captions end with a Source line.",
+    "headlineRules": "FIXTURE HEADLINE RULES (invented): one idea per headline; at most one comma.",
+    "series": {
+      "news": {
+        "key": "news",
+        "label": "News",
+        "templates": {
+          "feed": "FXtpl01fe",
+          "reels": "FXtpl02re"
+        },
+        "fields": [
+          {
+            "name": "headline",
+            "label": "Headline",
+            "perLine": 15,
+            "maxLines": 3,
+            "uppercase": true
+          },
+          {
+            "name": "deck",
+            "label": "Deck",
+            "perLine": 50,
+            "maxLines": 2
+          },
+          {
+            "name": "date",
+            "label": "Date",
+            "date": true
+          },
+          {
+            "name": "source",
+            "label": "Source outlet",
+            "maxChars": 28,
+            "uppercase": true
+          }
+        ],
+        "media": {
+          "feed": "media",
+          "reels": "media"
+        },
+        "requestable": true,
+        "representative": true
+      },
+      "breaking": {
+        "key": "breaking",
+        "label": "Breaking News",
+        "templates": {
+          "feed": "FXtpl03fe",
+          "reels": "FXtpl04re"
+        },
+        "fields": [
+          {
+            "name": "headline",
+            "label": "Headline",
+            "perLine": 17,
+            "maxLines": 3,
+            "uppercase": true
+          },
+          {
+            "name": "deck",
+            "label": "Deck",
+            "perLine": 50,
+            "maxLines": 2
+          },
+          {
+            "name": "date",
+            "label": "Date",
+            "date": true
+          },
+          {
+            "name": "source",
+            "label": "Source outlet",
+            "maxChars": 28,
+            "uppercase": true
+          }
+        ],
+        "media": {
+          "feed": "media",
+          "reels": "media"
+        },
+        "requestable": true,
+        "representative": true
+      },
+      "dt101": {
+        "key": "dt101",
+        "label": "Tech Explainer",
+        "templates": {
+          "feed": "FXtpl05fe",
+          "reels": ""
+        },
+        "fields": [
+          {
+            "name": "benefit_headline",
+            "label": "Benefit hook",
+            "perLine": 16,
+            "exactLines": 2,
+            "uppercase": true
+          },
+          {
+            "name": "subject_identifier",
+            "label": "Subject",
+            "maxChars": 40,
+            "uppercase": true
+          },
+          {
+            "name": "image_context",
+            "label": "Image label",
+            "serverFilled": true,
+            "uppercase": true
+          }
+        ],
+        "media": {
+          "feed": "media",
+          "reels": null
+        },
+        "requestable": true,
+        "caption": {
+          "firstLines": [
+            "^MISSION BRIEF \\/\\/ \\S",
+            "^\\/\\/\\S"
+          ],
+          "labels": [
+            "Tech:",
+            "Platform:",
+            "Goal:"
+          ],
+          "format": "the Tech Explainer caption must be the mission brief: \"MISSION BRIEF // <SUBJECT>\", then \"//<Company>\", then the labelled lines, each on its own line with a blank line between",
+          "missingLabel": "the mission brief has no \"{label}\" line"
+        }
+      },
+      "icymi_cover": {
+        "key": "icymi_cover",
+        "label": "ICYMI cover",
+        "templates": {
+          "feed": "FXtpl06fe",
+          "reels": "FXtpl07re"
+        },
+        "fields": [
+          {
+            "name": "headline",
+            "label": "Cover headline",
+            "perLine": 17,
+            "maxLines": 3,
+            "uppercase": true,
+            "fixed": "FIXTURE ROUNDUP"
+          },
+          {
+            "name": "story_numbers",
+            "label": "Story numbers",
+            "serverFilled": true
+          },
+          {
+            "name": "date",
+            "label": "Date",
+            "date": true
+          },
+          {
+            "name": "story_01",
+            "label": "Story 1",
+            "perLine": 38,
+            "maxLines": 1
+          },
+          {
+            "name": "story_02",
+            "label": "Story 2",
+            "perLine": 38,
+            "maxLines": 1
+          },
+          {
+            "name": "story_03",
+            "label": "Story 3",
+            "perLine": 38,
+            "maxLines": 1
+          },
+          {
+            "name": "story_04",
+            "label": "Story 4",
+            "perLine": 38,
+            "maxLines": 1
+          },
+          {
+            "name": "story_05",
+            "label": "Story 5",
+            "perLine": 38,
+            "maxLines": 1
+          }
+        ],
+        "media": {
+          "feed": "media",
+          "reels": "media"
+        },
+        "requestable": true
+      },
+      "icymi_story": {
+        "key": "icymi_story",
+        "label": "ICYMI story",
+        "templates": {
+          "feed": "FXtpl08fe",
+          "reels": "FXtpl09re"
+        },
+        "fields": [
+          {
+            "name": "counter",
+            "label": "Counter"
+          },
+          {
+            "name": "headline",
+            "label": "Headline",
+            "perLine": 15,
+            "maxLines": 2,
+            "uppercase": true
+          },
+          {
+            "name": "deck",
+            "label": "Deck",
+            "perLine": 50,
+            "maxLines": 2
+          }
+        ],
+        "media": {
+          "feed": "media",
+          "reels": "media"
+        },
+        "requestable": false,
+        "representative": true
+      },
+      "followon_graphic": {
+        "key": "followon_graphic",
+        "label": "Follow-on graphic",
+        "templates": {
+          "feed": "FXtpl10fe",
+          "reels": "FXtpl11re"
+        },
+        "fields": [],
+        "media": {
+          "feed": "media",
+          "reels": "media"
+        },
+        "requestable": false
+      },
+      "followon_text": {
+        "key": "followon_text",
+        "label": "Follow-on text",
+        "templates": {
+          "feed": "FXtpl12fe",
+          "reels": "FXtpl13re"
+        },
+        "fields": [
+          {
+            "name": "kicker",
+            "label": "Kicker",
+            "allowed": [
+              "WHAT HAPPENED",
+              "WHY IT MATTERS",
+              "WHAT'S NEXT"
+            ]
+          },
+          {
+            "name": "headline",
+            "label": "Headline",
+            "perLine": 24,
+            "maxLines": 3,
+            "uppercase": true
+          },
+          {
+            "name": "body",
+            "label": "Body",
+            "perLine": 50,
+            "maxLines": 3
+          },
+          {
+            "name": "source",
+            "label": "Source outlet",
+            "maxChars": 28,
+            "uppercase": true
+          },
+          {
+            "name": "counter",
+            "label": "Counter"
+          }
+        ],
+        "media": {
+          "feed": "media",
+          "reels": "media"
+        },
+        "requestable": false
+      },
+      "tentpole_talent": {
+        "key": "tentpole_talent",
+        "label": "Tentpole talent",
+        "templates": {
+          "feed": "FXtpl14fe",
+          "reels": "FXtpl15re"
+        },
+        "fields": [
+          {
+            "name": "talent_name",
+            "label": "Talent name",
+            "perLine": 12,
+            "maxLines": 2,
+            "uppercase": true
+          },
+          {
+            "name": "proof_line",
+            "label": "Proof line",
+            "perLine": 40,
+            "maxLines": 1
+          },
+          {
+            "name": "date",
+            "label": "Date",
+            "date": true
+          },
+          {
+            "name": "venue",
+            "label": "Venue",
+            "maxChars": 30,
+            "uppercase": true
+          }
+        ],
+        "media": {
+          "feed": "media",
+          "reels": "media"
+        },
+        "requestable": false
+      },
+      "tentpole_ceremonial": {
+        "key": "tentpole_ceremonial",
+        "label": "Tentpole ceremonial",
+        "templates": {
+          "feed": "FXtpl16fe",
+          "reels": "FXtpl17re"
+        },
+        "fields": [
+          {
+            "name": "talent_name",
+            "label": "Talent name",
+            "perLine": 12,
+            "maxLines": 2,
+            "uppercase": true
+          },
+          {
+            "name": "proof_line",
+            "label": "Proof line",
+            "perLine": 40,
+            "maxLines": 1
+          },
+          {
+            "name": "date",
+            "label": "Date",
+            "date": true
+          },
+          {
+            "name": "venue",
+            "label": "Venue",
+            "maxChars": 30,
+            "uppercase": true
+          }
+        ],
+        "media": {
+          "feed": "media",
+          "reels": "media"
+        },
+        "requestable": false
+      }
+    },
+    "requestKinds": [
+      {
+        "kind": "news",
+        "label": "News",
+        "detail": "One story, one card",
+        "series": [
+          "news"
+        ],
+        "code": "NEWS",
+        "recencyDays": 7,
+        "datedByReport": true
+      },
+      {
+        "kind": "breaking",
+        "label": "Breaking News",
+        "detail": "Primary source in the last 24 hours",
+        "series": [
+          "breaking"
+        ],
+        "code": "BN",
+        "freshHours": 24,
+        "datedByReport": true
+      },
+      {
+        "kind": "dt101",
+        "label": "Tech Explainer",
+        "detail": "Benefit-led card, mission-brief caption",
+        "series": [
+          "dt101"
+        ],
+        "code": "DT101",
+        "recencyDays": 90,
+        "undatedOk": true
+      },
+      {
+        "kind": "icymi",
+        "label": "ICYMI roundup",
+        "detail": "Cover + 3\u20135 published story cards",
+        "series": [
+          "icymi_cover"
+        ],
+        "code": "ICYMI",
+        "minStories": 3,
+        "maxStories": 5
+      }
+    ],
+    "research": {
+      "scope": "FIXTURE research scope (invented).",
+      "outletExamples": "Example News, Sample Daily",
+      "writeNote": "",
+      "kinds": {
+        "news": {
+          "want": "invented news stories",
+          "guidance": ""
+        },
+        "breaking": {
+          "want": "invented breaking stories",
+          "guidance": ""
+        },
+        "dt101": {
+          "want": "invented dt101 stories",
+          "guidance": ""
+        }
+      }
+    },
+    "photos": {
+      "card": "a fixture card (invented)",
+      "searchSubject": "fixture subjects"
+    },
+    "posts": {
+      "match": "fixture|\\bfxb\\b",
+      "tag": "fixture",
+      "metaBrand": "fixture",
+      "homeUrl": "https://example.com/fixture",
+      "roundupExclude": "icymi|dt101|tech explainer|tentpole",
+      "roundupExcludeCaption": "MISSION BRIEF \\/\\/"
+    },
+    "seeds": {
+      "orgKinds": [
+        "neo-prime",
+        "prime",
+        "government",
+        "research",
+        "ecosystem",
+        "outlet"
+      ],
+      "outletKind": "outlet",
+      "lookFirst": [
+        {
+          "label": "Look first at builders",
+          "kinds": [
+            "neo-prime"
+          ],
+          "sites": true
+        },
+        {
+          "label": "Majors",
+          "kinds": [
+            "prime"
+          ],
+          "sites": false
+        },
+        {
+          "label": "Public, research and community",
+          "kinds": [
+            "government",
+            "research",
+            "ecosystem"
+          ],
+          "sites": true
+        }
+      ],
+      "backlog": {
+        "kind": "dt101",
+        "label": "Explainer ideas waiting to be made"
+      }
+    }
+  }
+}

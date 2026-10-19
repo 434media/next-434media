@@ -57,7 +57,16 @@ export interface BrandProfileDoc {
   published: ProfileVersion | null
   /** The highest version number kept (0 before the first Publish). */
   last_version: number
+  /** The unpublished draft a forced Restore replaced, kept so no edit is lost (drafts are not versioned). */
+  draft_before_restore: ProfileDraft | null
 }
+
+/** A draft or a version this size or larger is refused: three of them (draft, published, the draft a restore kept) stay
+ * well under Firestore's 1 MiB document limit. */
+export const MAX_PROFILE_BYTES = 250_000
+const contentSha = (d: { profile: unknown; examples: unknown }) => profileSha256({ profile: d.profile, examples: d.examples })
+/** The draft holds edits that are not published (or nothing is published yet). */
+export const draftDiffers = (doc: Pick<BrandProfileDoc, "draft" | "published">) => !!doc.draft && (!doc.published || contentSha(doc.draft) !== contentSha(doc.published))
 
 export const versionDocId = (n: number) => `v${n}`
 export const versionIdOf = (brandId: string, n: number) => `${brandId}@${versionDocId(n)}`
@@ -104,6 +113,8 @@ export function documentProblems(doc: Pick<BrandProfileDoc, "id" | "brand_type" 
 /** Everything that stops a draft from being published (empty = it can be). */
 export function publishProblems(doc: BrandProfileDoc, draft: { profile: unknown; examples: unknown } | null = doc.draft): string[] {
   if (!draft) return ["there is no draft to publish"]
+  const size = Buffer.byteLength(JSON.stringify({ profile: draft.profile, examples: draft.examples }))
+  if (size >= MAX_PROFILE_BYTES) return [`the draft is ${size} bytes; a profile and its examples must stay under ${MAX_PROFILE_BYTES}`]
   return [...documentProblems(doc), ...profileProblems(doc.id, { [doc.id]: draft.profile }), ...exampleProblems(draft.examples)]
 }
 
@@ -113,10 +124,15 @@ export type PublishResult = { ok: true; version: ProfileVersion; doc: BrandProfi
  * The next version from a draft: validated, numbered after the highest version kept, with who and
  * when. Pure; the store writes the version and the document together in one transaction.
  */
-export function preparePublish(doc: BrandProfileDoc, actor: string, at: string, opts: { draft?: { profile: unknown; examples: ProfileExamples }; restoredFrom?: string } = {}): PublishResult {
+export function preparePublish(doc: BrandProfileDoc, actor: string, at: string, opts: { draft?: { profile: unknown; examples: ProfileExamples }; restoredFrom?: string; force?: boolean } = {}): PublishResult {
   const draft = opts.draft ?? doc.draft
   const problems = publishProblems(doc, draft)
   if (!actor.trim()) problems.push("who is publishing is required")
+  // Publishing what is already live would only add a duplicate version.
+  if (!opts.restoredFrom && draft && doc.published && contentSha(draft) === contentSha(doc.published)) problems.push(`nothing to publish: the draft is the published version ${doc.published.version_id}`)
+  // A restore replaces the draft; unpublished edits there are refused unless forced, and then kept (draft_before_restore).
+  const unpublished = !!opts.restoredFrom && draftDiffers(doc)
+  if (unpublished && !opts.force) problems.push("the draft has unpublished edits: publish or discard them first, or restore with force (the draft is then kept as draft_before_restore)")
   if (problems.length || !draft) return { ok: false, problems }
   const profile = draft.profile as BrandProfile, n = (doc.last_version || 0) + 1
   const version: ProfileVersion = {
@@ -125,5 +141,5 @@ export function preparePublish(doc: BrandProfileDoc, actor: string, at: string, 
   }
   // A restore also becomes the draft, so the next edit starts from what is live.
   const nextDraft = opts.restoredFrom ? { profile, examples: draft.examples, updated_by: actor, updated_at: at } : doc.draft
-  return { ok: true, version, doc: { ...doc, draft: nextDraft, published: version, last_version: n } }
+  return { ok: true, version, doc: { ...doc, draft: nextDraft, published: version, last_version: n, ...(unpublished ? { draft_before_restore: doc.draft } : {}) } }
 }

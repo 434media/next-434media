@@ -39,14 +39,17 @@ export async function PUT(req: NextRequest, ctx: { params: Promise<{ id: string 
   if (!BRAND_ID.test(id)) return NextResponse.json({ error: "Unknown brand" }, { status: 404 })
   const parsed = draftInput.safeParse(await req.json().catch(() => null))
   if (!parsed.success) return NextResponse.json({ error: "Send {profile, examples: {approved, rejected}}" }, { status: 400 })
-  if (JSON.stringify(parsed.data).length > 400_000) return NextResponse.json({ error: "That draft is too large" }, { status: 400 })
   try {
     const { firestoreBrandProfiles } = await import("@/lib/firestore-brand-profiles")
     const store = firestoreBrandProfiles()
     if (!await store.get(id)) return NextResponse.json({ error: "No profile for that brand" }, { status: 404 })
     const doc = await store.saveDraft(id, parsed.data as { profile: unknown; examples: { approved: never[]; rejected: never[] } }, auth.session.email.toLowerCase(), new Date().toISOString())
-    return NextResponse.json({ ok: true, draft: doc.draft })
+    // The problems Publish would raise, so the editor sees them before publishing (saving is still allowed).
+    const { publishProblems } = await import("@/lib/content-pipeline/profile-store")
+    return NextResponse.json({ ok: true, draft: doc.draft, publishProblems: publishProblems(doc) })
   } catch (err) {
+    const { DraftTooLarge } = await import("@/lib/firestore-brand-profiles")
+    if (err instanceof DraftTooLarge) return NextResponse.json({ error: "The draft is too large", problems: [err.message] }, { status: 400 })
     console.error("[PUT /api/admin/brand-profiles/[id]]", err)
     return NextResponse.json({ error: "Could not save the draft" }, { status: 500 })
   }
