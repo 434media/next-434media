@@ -104,7 +104,8 @@ export default function ContentPage() {
         const email = (data.user.email || "").toLowerCase()
         const isSuper =
           SUPER_ADMIN_EMAILS.includes(email) || data.user.role === "crm_super_admin"
-        setCanReview(isSuper)
+        // The content permission (lib/auth.ts canRunContent) opens Create and the review actions too.
+        setCanReview(isSuper || data.contentRunner === true)
       })
       .catch(() => {
         /* non-fatal — defaults to no review actions */

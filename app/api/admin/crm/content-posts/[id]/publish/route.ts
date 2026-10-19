@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
 import type { NextRequest } from "next/server"
-import { getSession, isAuthorizedAdmin, canSend, isCrmSuperAdmin } from "@/lib/auth"
+import { getSession, isAuthorizedAdmin, canSend, canRunContent } from "@/lib/auth"
 import { getContentPostById, updateContentPost } from "@/lib/firestore-crm"
 import type { ContentPostStatus, TaskComment } from "@/components/crm/types"
 import { outcomeStatusRefusal } from "@/lib/content-post-guards"
@@ -38,7 +38,7 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
   }
   // Marking content posted is an outbound publish action — gate it to elevated
   // roles. Producers (intern / crm_only) can draft and submit, not publish.
-  if (!canSend(session.role) && !(await isCrmSuperAdmin(session.email))) {
+  if (!canSend(session.role) && !(await canRunContent(session.email))) {
     return NextResponse.json(
       { error: "Forbidden: your role can draft but not publish content" },
       { status: 403 },

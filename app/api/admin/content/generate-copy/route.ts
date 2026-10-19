@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server"
 import { z } from "zod4"
-import { requireSuperAdmin } from "../../content-pipeline/auth"
+import { requireContentRunner } from "../../content-pipeline/auth"
 import { createProfile } from "../profile"
 
 export const runtime = "nodejs"
@@ -20,7 +20,7 @@ const input = z.object({
  * (read fresh). Writes nothing: the cells come back to the table, where the person edits them before Run job.
  */
 export async function POST(req: NextRequest) {
-  const auth = await requireSuperAdmin()
+  const auth = await requireContentRunner()
   if ("error" in auth) return NextResponse.json({ error: auth.error }, { status: auth.status })
   const parsed = input.safeParse(await req.json().catch(() => null))
   if (!parsed.success) return NextResponse.json({ error: "Give a Brand, a Template and an https reference link (notes optional)" }, { status: 400 })

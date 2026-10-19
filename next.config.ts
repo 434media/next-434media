@@ -6,6 +6,12 @@ const nextConfig: NextConfig = {
     ignoreBuildErrors: true,
   },
   // Increase body size limit for file uploads (App Router uses route config, not this)
+  // The Create table's video conversion (lib/content-pipeline/transcode.ts) runs the ffmpeg-static binary: kept out of
+  // the bundle and traced into that one route.
+  serverExternalPackages: ['ffmpeg-static'],
+  outputFileTracingIncludes: {
+    '/api/admin/content/media-optimize': ['./node_modules/ffmpeg-static/ffmpeg', './node_modules/.pnpm/ffmpeg-static@*/node_modules/ffmpeg-static/ffmpeg'],
+  },
   experimental: {
     serverActions: {
       bodySizeLimit: '50mb',

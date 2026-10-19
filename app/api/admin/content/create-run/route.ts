@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server"
 import { z } from "zod4"
-import { requireSuperAdmin } from "../../content-pipeline/auth"
+import { requireContentRunner } from "../../content-pipeline/auth"
 import { createProfile } from "../profile"
 import { isCreateUpload } from "@/lib/content-pipeline/create-media"
 
@@ -29,7 +29,7 @@ const row = z.object({
  * per request so the table shows each row's progress; idempotent on the row id, so a retry reuses what it made.
  */
 export async function POST(req: NextRequest) {
-  const auth = await requireSuperAdmin()
+  const auth = await requireContentRunner()
   if ("error" in auth) return NextResponse.json({ error: auth.error }, { status: auth.status })
   const parsed = row.safeParse((await req.json().catch(() => null))?.row)
   if (!parsed.success) return NextResponse.json({ error: "The row is incomplete or malformed" }, { status: 400 })

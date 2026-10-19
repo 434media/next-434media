@@ -1,6 +1,6 @@
 import { z } from "zod"
 import { NextResponse, type NextRequest } from "next/server"
-import { getSession, isAuthorizedAdmin, canSend, isCrmSuperAdmin } from "@/lib/auth"
+import { getSession, isAuthorizedAdmin, canSend, canRunContent, isCrmSuperAdmin } from "@/lib/auth"
 import { ownedMetaStore, ownedMetaPermissionBlocked } from "@/lib/firestore-crm"
 import { resetUnpublishedPreparation, assertOperatorSettlement, confirmStoppedRun, MetaBlocked, META_BRANDS, type MetaBrand } from "@/lib/owned-meta-publisher"
 import { readTrustedAsset, verifyAssetBytes } from "@/lib/owned-meta-assets"
@@ -24,7 +24,7 @@ export const runtime = "nodejs"
 async function authorize() {
   const session=await getSession()
   if (!session) return { error:"Unauthorized",status:401 as const }
-  if (!isAuthorizedAdmin(session.email) || !canSend(session.role) && !await isCrmSuperAdmin(session.email)) return { error:"Publishing role required",status:403 as const }
+  if (!isAuthorizedAdmin(session.email) || !canSend(session.role) && !await canRunContent(session.email)) return { error:"Publishing role required",status:403 as const }
   return { session }
 }
 export async function GET(req:NextRequest,ctx:{params:Promise<{id:string}>}) {

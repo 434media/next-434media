@@ -361,6 +361,29 @@ export async function isCrmSuperAdmin(email?: string | null): Promise<boolean> {
 }
 
 /**
+ * The content permission (founder, 2026-10-19: the person who runs a brand's posts "needs to be able to create,
+ * approve and schedule, full loop"). A team member whose `crm_team_members.permissions` includes "content" may use
+ * the Create table (Human+, Run job), approve or reject content, and schedule and publish it, whatever their role;
+ * their role still governs the rest of the Admin. Super-admins have it always. Recovery confirmations on the publisher
+ * and connecting Canva stay super-admin only. Read from Firestore on every call; a failed lookup grants nothing beyond
+ * the super-admin fallback.
+ */
+export const CONTENT_PERMISSION = 'content'
+export async function canRunContent(email?: string | null): Promise<boolean> {
+  if (!email) return false
+  if (await isCrmSuperAdmin(email)) return true
+  try {
+    const { getDb } = await import('./firebase-admin')
+    const snap = await getDb().collection('crm_team_members').where('email', '==', email.toLowerCase()).limit(1).get()
+    const permissions = snap.empty ? [] : snap.docs[0].data().permissions
+    return Array.isArray(permissions) && permissions.includes(CONTENT_PERMISSION)
+  } catch (error) {
+    console.error('[auth] canRunContent Firestore lookup failed:', error)
+    return false
+  }
+}
+
+/**
  * Roles permitted to trigger OUTBOUND sends (Resend) on a user's behalf.
  * `crm_only` and `intern` can draft, not send.
  *

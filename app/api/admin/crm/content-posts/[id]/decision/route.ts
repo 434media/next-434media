@@ -1,5 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { getSession, isAuthorizedAdmin, isCrmSuperAdmin } from "@/lib/auth"
+import { canRunContent, getSession, isAuthorizedAdmin } from "@/lib/auth"
 import { getContentPostById, updateContentPost, decideOwnedMeta, ownedMetaStore, ownedMetaRuntimeEnabled } from "@/lib/firestore-crm"
 import { sendCommentNotification } from "@/lib/notifications"
 import { TEAM_MEMBERS } from "@/components/crm/types"
@@ -51,10 +51,10 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
   if (!isAuthorizedAdmin(session.email)) {
     return NextResponse.json({ error: "Forbidden: Admin access required" }, { status: 403 })
   }
-  // Approve/reject is super-admin only.
-  if (!(await isCrmSuperAdmin(session.email))) {
+  // Approve/reject: super-admins and the team members with the content permission (lib/auth.ts canRunContent).
+  if (!(await canRunContent(session.email))) {
     return NextResponse.json(
-      { error: "Forbidden: Only super admins can approve or reject content" },
+      { error: "Forbidden: approving or rejecting content needs the content permission" },
       { status: 403 },
     )
   }

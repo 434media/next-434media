@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server"
-import { requireSuperAdmin } from "../../content-pipeline/auth"
+import { requireContentRunner } from "../../content-pipeline/auth"
 import { PIPELINE_PROPERTIES } from "@/lib/content-pipeline/properties"
 import { CREATE_PLATFORMS, createTemplates, type CreateTemplate } from "@/lib/content-pipeline/create-table"
 import type { BrandProfile } from "@/lib/content-pipeline/profile"
@@ -12,7 +12,7 @@ export const dynamic = "force-dynamic"
  * a valid published profile, its templates (from the profile's template map, read fresh) and their card fields.
  */
 export async function GET() {
-  const auth = await requireSuperAdmin()
+  const auth = await requireContentRunner()
   if ("error" in auth) return NextResponse.json({ error: auth.error }, { status: auth.status })
   try {
     const { readPublishedProfile } = await import("@/lib/firestore-brand-profiles")
