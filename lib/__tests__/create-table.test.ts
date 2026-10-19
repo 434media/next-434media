@@ -8,6 +8,7 @@ import assert from "node:assert/strict"
 import { published, loadPublishedProfileFirst } from "./published-profile"
 import { CREATE_PLATFORMS, cellRoles, createTemplates, ddmmmyy, designText, formatsOf, rowProblems, type CreateRow } from "../content-pipeline/create-table"
 import { blobStoreHost, isCreateUpload, mediaKind, transcodeArgs, videoContainer, videoPlan } from "../content-pipeline/create-media"
+import { cardSubject } from "../content-pipeline/series"
 import { humanPlus, HumanPlusError, type HumanPlusDeps } from "../content-pipeline/human-plus"
 import { CreateRowError, createRequestId, runCreateRow, serverRowProblems, type CreateRunDeps } from "../content-pipeline/create-run"
 import type { McuAi } from "../content-pipeline/model"
@@ -194,4 +195,11 @@ test("Run job: two runs of one row at once make one set of designs; the second i
   assert.ok(b.status === "rejected" && b.reason instanceof CreateRowError && b.reason.status === 409)
   assert.equal(s.made.length, (a as PromiseFulfilledResult<{ posts: unknown[] }>).value.posts.length)
   assert.equal(s.running.size, 0, "the claim is released when the run ends")
+})
+
+test("cardSubject: the DT101 masters name the subject in the deck and the company in maker; older cards in subject_identifier", () => {
+  assert.deepEqual(cardSubject({ headline: "SEES THROUGH SMOKE AND DARK", deck: "Skydio X10D, a small reconnaissance drone.", maker: "Skydio", domain: "Air", status: "Fielded" }), { subject: "Skydio X10D", maker: "Skydio" })
+  assert.deepEqual(cardSubject({ deck: "Coyote Block 2 — a drone interceptor", maker: "RTX" }), { subject: "Coyote Block 2", maker: "RTX" })
+  assert.deepEqual(cardSubject({ benefit_headline: "X", subject_identifier: "COYOTE / RAYTHEON" }), { subject: "COYOTE", maker: "RAYTHEON" })
+  assert.deepEqual(cardSubject({ headline: "A NEWS HEADLINE", deck: "A deck, with a comma" }), { subject: "", maker: "" })
 })

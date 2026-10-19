@@ -1,4 +1,4 @@
-import { SERIES, candidateFields, checkFields, clippedWords, cutOffWords, ddmmmyy, measure, normalizeFields, overLimits, type Placement, type RequestKind } from "./series"
+import { SERIES, candidateFields, cardSubject, checkFields, clippedWords, cutOffWords, ddmmmyy, measure, normalizeFields, overLimits, type Placement, type RequestKind } from "./series"
 import { BRAND, live } from "./brand"
 import { headlineProblems, originalityFindings, originalityProblems, type Copied } from "./copy-checks"
 import { framesFor, icymiCount, meaningful, normalizeUrl, unusedStorySlot, type Candidate, type McuAi, type ModelCall, type RankedPhoto, type SubjectBox } from "./model"
@@ -1022,9 +1022,9 @@ function validate(frames: FrameCopy[], caption: string, story: Story): string[] 
   return [...c.safety, ...c.style]
 }
 
-/** The maker named on the card ("ULTRA / OVERLAND AI" → "OVERLAND AI"), else the story's publisher. */
+/** The maker named on the card (its maker field, or "ULTRA / OVERLAND AI" → "OVERLAND AI"), else the story's publisher. */
 export function makerOf(frame: FrameCopy, story: Pick<Story, "publisher">): string {
-  return (frame.fields.subject_identifier ?? "").split("/")[1]?.trim() || story.publisher
+  return cardSubject(frame.fields).maker || story.publisher
 }
 /**
  * A page the photo search found is used only when its photo's rights can be read from it: a federal or DVIDS page
@@ -1257,8 +1257,8 @@ const KIND_WORDS = new Set(["interceptor", "interceptors", "drone", "drones", "m
  * name words (Coyote, Lightfish), the maker's and kind words aside. With nothing distinctive to compare, it matches.
  */
 export function subjectMatches(checked: string, frame: FrameCopy): boolean {
-  const written = Object.entries(frame.fields).filter(([k]) => !["date", "source", "image_context", "counter"].includes(k)).map(([, v]) => v).join(" ").toLowerCase()
-  const maker = (frame.fields.subject_identifier ?? "").split("/")[1]?.toLowerCase() ?? ""
+  const written = Object.entries(frame.fields).filter(([k]) => !["date", "source", "image_context", "counter", "domain", "status"].includes(k)).map(([, v]) => v).join(" ").toLowerCase()
+  const maker = cardSubject(frame.fields).maker.toLowerCase()
   const tokens = [...new Set(checked.toLowerCase().match(/[a-z0-9][a-z0-9.\-+]*[a-z0-9+]|[a-z0-9]/g) ?? [])]
   const distinct = tokens.filter(t => /\d/.test(t) ? /[a-z]/.test(t) : t.length >= 3 && !COMMON.has(t) && !KIND_WORDS.has(t) && !maker.includes(t))
   if (!distinct.length) return true
@@ -1279,7 +1279,7 @@ export const photoChecksFor = (count: number) => count + 2
 export async function confirmPhoto(deps: WorkerDeps, ai: McuAi, story: Story, kind: RequestKind, placement: Placement, avoid: string[] = []): Promise<{ photo: CheckedPhoto } | { why: string }> {
   const named = ai.photoSubject ? await ai.photoSubject({ story }).catch(() => null) : null
   const subject = named?.subject?.trim() || story.title.split(":")[0].trim(), maker = named?.maker?.trim() || story.publisher
-  const frame: FrameCopy = { series: framesFor(kind)[0], fields: { subject_identifier: `${subject} / ${maker}` }, ...(named?.query?.trim() ? { mediaQuery: named.query.trim() } : {}) }
+  const frame: FrameCopy = { series: framesFor(kind)[0], fields: { deck: subject, maker }, ...(named?.query?.trim() ? { mediaQuery: named.query.trim() } : {}) }
   const r = await searchPhoto(deps, ai, story, frame, placement, avoid, [], (pass, x) => console.info("[content-pipeline] photo first", JSON.stringify({ story: story.primaryUrl, subject, query: frame.mediaQuery ?? null, pass, shown: shownLog(x.shown), ranked: x.pick.ranked ?? null, chosen: x.chosen.index, why: x.chosen.index === null ? x.chosen.why : null })))
   if (r.chosen.index === null) return { why: `${r.chosen.why} (${r.pick.reason})${r.repTried ? `; a representative photo was searched for too, and ${r.shown.length ? "none of the photos found qualified" : "none was found"}` : ""}` }
   return { photo: { candidate: r.shown[r.chosen.index].candidate, ranked: r.chosen.ranked, crop: r.chosen.crop, placement, subject } }
@@ -1347,7 +1347,7 @@ async function mediaStep(deps: WorkerDeps, ai: McuAi, d: McuDraft): Promise<void
 export function mediaQueries(frame: FrameCopy, story: Pick<Story, "title">): string[] {
   const words = (t: string, n: number) => t.split(/\s+/).filter(Boolean).slice(0, n).join(" ")
   const mq = frame.mediaQuery?.trim() ?? ""
-  const [subject = "", maker = ""] = (frame.fields.subject_identifier ?? "").split("/").map(x => x.trim())
+  const { subject, maker } = cardSubject(frame.fields)
   const out = [mq, words(mq.split(",")[0], 6), words(mq, 3), subject && maker ? `${subject} ${maker}` : "", subject, maker, story.title.split(":")[0], story.title]
   return [...new Set(out.map(q => q.replace(/[^\p{L}\p{N}\s.\-'&]/gu, " ").replace(/\s+/g, " ").trim()).filter(q => q.length > 2))]
 }
@@ -1401,7 +1401,7 @@ async function designStep(deps: WorkerDeps, d: McuDraft): Promise<void> {
     }
     const missing = Object.keys(frame.fields).filter(k => dataset[k] !== "text")
     if (missing.length) notices.add(`${series.label} template has no field for ${missing.join(", ")}`)
-    const title = `${d.id} v${d.version}${d.frames.length > 1 ? ` · ${i + 1}/${d.frames.length}` : ""} — ${(frame.fields.headline || frame.fields.subject_identifier || frame.fields.counter || series.label).slice(0, 120)}`
+    const title = `${d.id} v${d.version}${d.frames.length > 1 ? ` · ${i + 1}/${d.frames.length}` : ""} — ${(frame.fields.headline || cardSubject(frame.fields).subject || frame.fields.counter || series.label).slice(0, 120)}`
     const r = await deps.content.createDesign({ requestId: `${KEY_PREFIX}${d.id}:v${d.version}:f${i + 1}${d.autoReplaced ? `:r${d.autoReplaced}` : ""}${d.mediaRetries ? `:m${d.mediaRetries}` : ""}${d.labelRefit ? `:l${d.labelRefit}` : ""}`, templateId, title, text, ...(image ? { image } : {}) })
     designs.push({ templateId, ...r })
   }
@@ -1491,7 +1491,7 @@ export function reviewNotes(d: McuDraft): string {
 
 async function postStep(deps: WorkerDeps, d: McuDraft): Promise<void> {
   if (d.postId) { d.status = "in_review"; return save(deps, d, "already on the board") }
-  const head = d.frames[0]?.fields.headline || d.frames[0]?.fields.subject_identifier || d.story.title
+  const head = d.frames[0]?.fields.headline || (d.frames[0] && cardSubject(d.frames[0].fields).subject) || d.story.title
   const links = [...new Set([d.story.primaryUrl, ...(d.story.supporting ?? []).map(x => x.url), ...(d.story.roundup ?? []).flatMap(p => p.publishedUrl ? [p.publishedUrl] : []), ...d.media.filter((m): m is ChosenMedia => !!m).map(m => m.pageUrl)])]
   // An ICYMI roundup: after the cover, each story's own published card, exactly as posted, in order.
   const slides = d.kind === "icymi" ? (d.story.roundup ?? []).filter(p => p.card).map((p, i) => ({ url: p.card!.url, label: `story-${i + 1}` })) : []
