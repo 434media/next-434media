@@ -30,6 +30,8 @@ export async function POST(req: NextRequest) {
   const safe = await isSafeRemoteUrl(url)
   if (!safe) return NextResponse.json({ error: "That link is not a public https address" }, { status: 400 })
   const own = isCreateUpload(url)
+  // A pasted link is kept with the media, so Human+ can credit a DVIDS photo.
+  const from = own ? {} : { source: url }
   let res: Response
   try { res = await fetchAllowingSafeRedirects(safe.url, safe.addresses) } catch { return NextResponse.json({ error: "The media could not be fetched" }, { status: 502 }) }
   if (!res.ok || !res.body) return NextResponse.json({ error: `The media link answered ${res.status}` }, { status: 502 })
@@ -61,7 +63,7 @@ export async function POST(req: NextRequest) {
         const out = await transcodeToMp4(rest, { deadline, maxBytes: Math.min(cap, TRANSCODE_MAX_BYTES) })
         const blob = await put(`${UPLOAD_PREFIX}${randomUUID()}-${safeName.replace(/\.[^.]*$/, "")}.mp4`, out.bytes, { access: "public", addRandomSuffix: false, contentType: "video/mp4" })
         console.info("[content/media-optimize] converted", JSON.stringify({ by: auth.session.email, why: plan.why, inBytes: bytes, outBytes: out.bytes.byteLength, ms: out.ms }))
-        return NextResponse.json({ media: { url: blob.url, kind: "video", name, bytes: out.bytes.byteLength, optimized: "done" }, action: "converted", ms: out.ms })
+        return NextResponse.json({ media: { url: blob.url, kind: "video", name, bytes: out.bytes.byteLength, optimized: "done", ...from }, action: "converted", ms: out.ms })
       } catch (err) {
         console.error("[POST /api/admin/content/media-optimize] conversion:", err instanceof Error ? err.message : err)
         return NextResponse.json({ error: `This video (${plan.why}) could not be converted: ${err instanceof Error ? err.message : "unknown error"}. Save it as MP4 and drop it again.` }, { status: 422 })
@@ -73,7 +75,7 @@ export async function POST(req: NextRequest) {
     let size = 0
     for await (const c of rest as unknown as AsyncIterable<Uint8Array>) { size += c.byteLength; if (size > cap) return NextResponse.json({ error: "A pasted video link must be under 100 MB; drop the file instead" }, { status: 400 }); chunks.push(c) }
     const stored = await put(`${UPLOAD_PREFIX}${randomUUID()}-${safeName}`, Buffer.concat(chunks), { access: "public", addRandomSuffix: false, contentType: res.headers.get("content-type") || "video/mp4" })
-    return NextResponse.json({ media: { url: stored.url, kind: "video", name, bytes: size, optimized: "done" }, action: "passthrough" })
+    return NextResponse.json({ media: { url: stored.url, kind: "video", name, bytes: size, optimized: "done", ...from }, action: "passthrough" })
   }
 
   const chunks: Uint8Array[] = []
@@ -85,9 +87,9 @@ export async function POST(req: NextRequest) {
   }
   try {
     const sharp = (await import("sharp")).default
-    const out = await sharp(Buffer.concat(chunks), { animated: false }).rotate().flatten({ background: "#ffffff" }).resize({ width: IMAGE_MAX_PX, height: IMAGE_MAX_PX, fit: "inside", withoutEnlargement: true }).jpeg({ quality: 90, mozjpeg: true }).toBuffer({ resolveWithObject: true })
+    const out = await sharp(Buffer.concat(chunks), { animated: false, limitInputPixels: 100e6 }).rotate().flatten({ background: "#ffffff" }).resize({ width: IMAGE_MAX_PX, height: IMAGE_MAX_PX, fit: "inside", withoutEnlargement: true }).jpeg({ quality: 90, mozjpeg: true }).toBuffer({ resolveWithObject: true })
     const blob = await put(`${UPLOAD_PREFIX}${randomUUID()}-optimized.jpg`, out.data, { access: "public", addRandomSuffix: false, contentType: "image/jpeg" })
-    return NextResponse.json({ media: { url: blob.url, kind: "image", name, bytes: out.data.byteLength, width: out.info.width, height: out.info.height, optimized: "done" }, action: "resized" })
+    return NextResponse.json({ media: { url: blob.url, kind: "image", name, bytes: out.data.byteLength, width: out.info.width, height: out.info.height, optimized: "done", ...from }, action: "resized" })
   } catch (err) {
     console.error("[POST /api/admin/content/media-optimize] image:", err instanceof Error ? err.message : err)
     return NextResponse.json({ error: "That photo could not be read" }, { status: 400 })

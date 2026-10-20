@@ -1,12 +1,13 @@
 import { gateway } from "@ai-sdk/gateway"
 import { createMcuAi, framesFor, type McuAi, type ModelCall } from "./model"
 import { PIPELINE_MODELS } from "./models"
-import { fetchSourcePage, type SourcePage } from "./sources"
+import { fetchSourcePage, pageImageCandidate, type SourcePage } from "./sources"
 import { SERIES, type RequestKind } from "./series"
-import { DOD_NOTICE, normalizeDate, writeCopy, type WrittenCopy } from "./worker"
+import { DOD_NOTICE, normalizeDate, withCredits, writeCopy, type WrittenCopy } from "./worker"
 import type { McuSeeds } from "./seeds"
 import type { RequestRef, Story } from "./store"
 import { cellRoles } from "./create-table"
+import { dvidsImagePage } from "./create-media"
 
 /**
  * Human+ (plan v11 Step 2): the per-row copy assist in the Create table. The person gives a reference link (and
@@ -14,7 +15,11 @@ import { cellRoles } from "./create-table"
  * fact extraction and every copy check (worker.ts writeCopy). The story is the person's: nothing is researched and no
  * other subject is chosen. Runs inside withProfile() with the brand's published profile, read fresh by the route.
  */
-export interface HumanPlusInput { kind: RequestKind; url: string; notes?: string; requestedBy: RequestRef }
+export interface HumanPlusInput {
+  kind: RequestKind; url: string; notes?: string; requestedBy: RequestRef
+  /** The link the row's media was pasted from, when it was pasted (RowMedia.source): a DVIDS photo keeps its credit. */
+  mediaFrom?: string
+}
 export interface HumanPlusCopy {
   /** Fields of the template's first card, by name, as the writer set them (date included). */
   fields: Record<string, string>
@@ -60,18 +65,37 @@ export async function storyFromLink(deps: Pick<HumanPlusDeps, "fetchPage">, ai: 
 
 /** Told to the writer with the person's notes: the row's photo or video is theirs, not the source's. */
 export const OWN_MEDIA_DIRECTION = "The person adds the photo or video to this post themselves. Write no Photo, Image, Video or credit line, and never describe the source article's photo."
+/** Labels of a line about a photo or video; the line is the label's when it starts with one. */
+const MEDIA_LABEL = /^\s*(?:Archive image|Photo credit|Image credit|Photo|Image|Video|Credit|Courtesy)s?:\s/i
 /**
  * The caption without lines about media: in the Create table the person supplies the photo or video, so a line the writer
  * took from the source's photo caption ("Photo: … during a test flight at Dugway", Step 2 run, 2026-10-19) describes a
- * picture the post doesn't carry. Whole credit lines and the government notice go, and a trailing "Photo: …" clause on
- * another line (the source line) is cut.
+ * picture the post doesn't carry. A line that starts with a media label goes, as does the government notice; on the
+ * Source: line only, a trailing "Photo: …" clause is cut. Any other line is kept whole ("federal tax credit: up to
+ * $7,500", "Watch the video: link in bio").
  */
 export function withoutMediaLines(caption: string): string {
-  const media = /(?:^|\s)(?:Archive image|Photo credit|Image credit|Photo|Image|Video|Credit|Courtesy)s?:\s.*$/i
+  const clause = /\s(?:Archive image|Photo credit|Image credit|Photo|Image|Video|Credit|Courtesy)s?:\s.*$/i
   return caption.split("\n")
-    .filter(l => l.trim() !== DOD_NOTICE && !/^\s*(?:Archive image|Photo credit|Image credit|Photo|Image|Video|Credit|Courtesy)s?:\s/i.test(l))
-    .map(l => l.replace(media, "").trimEnd())
+    .filter(l => l.trim() !== DOD_NOTICE && !MEDIA_LABEL.test(l))
+    .map(l => /^\s*Source:\s/i.test(l) ? l.replace(clause, "").trimEnd() : l.trimEnd())
     .join("\n").replace(/\n{3,}/g, "\n\n").trim()
+}
+
+/**
+ * The caption's media lines for the row's own media. The person's own photo or video gets none. A photo pasted from
+ * DVIDS gets its credit and the DoW notice, as the pipeline gives a DVIDS photo (worker.ts withCredits): the credit is
+ * read from the image's DVIDS page. When that page can't be read, the notice is added and the person is told to add
+ * the credit.
+ */
+async function mediaCredit(deps: Pick<HumanPlusDeps, "fetchPage">, caption: string, mediaFrom?: string): Promise<{ caption: string; note?: string }> {
+  const bare = withoutMediaLines(caption)
+  const dvids = dvidsImagePage(mediaFrom)
+  if (!dvids) return { caption: bare }
+  const page = await deps.fetchPage(dvids).catch(() => null)
+  const photo = page ? pageImageCandidate(page, "dvids") : null
+  if (photo?.credit) return { caption: withCredits(bare, [{ ...photo, title: photo.title }]) }
+  return { caption: `${bare}\n\n${DOD_NOTICE}`, note: `The DVIDS page ${dvids} could not be read for the photo's credit: add its "Image: U.S. … photo by …" line above the notice` }
 }
 
 export async function humanPlus(deps: HumanPlusDeps, input: HumanPlusInput): Promise<HumanPlusCopy> {
@@ -87,12 +111,13 @@ export async function humanPlus(deps: HumanPlusDeps, input: HumanPlusInput): Pro
   const frame = written.frames[0], series = framesFor(input.kind)[0]
   const fields = { ...(frame?.fields ?? {}) }
   const roles = cellRoles(SERIES[series])
+  const credited = await mediaCredit(deps, written.caption, input.mediaFrom)
   return {
     fields,
     headline: (roles.headline && fields[roles.headline]) || "",
     subHeadline: (roles.subHeadline && fields[roles.subHeadline]) || "",
-    caption: withoutMediaLines(written.caption),
-    notes: written.notes,
+    caption: credited.caption,
+    notes: credited.note ? [...written.notes, credited.note] : written.notes,
     facts: written.facts,
     ...(written.hold ? { hold: written.hold } : {}),
     source: { url: story.primaryUrl, title: story.sourceTitle, ...(story.publishedAt ? { publishedAt: story.publishedAt } : {}), ...(viaSearch ? { readViaSearch: true } : {}) },

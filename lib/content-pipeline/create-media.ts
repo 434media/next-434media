@@ -67,11 +67,23 @@ export function isCreateUpload(url: string, host = blobStoreHost()): boolean {
 }
 
 /** What the media cell says when a link is a web page (a YouTube watch page, an article) rather than the file itself. */
-export const PAGE_LINK_MESSAGE = "That's a web page, not a media file. Download the clip and drop it in, or paste a direct link to a .jpg/.png/.mp4/.mov."
+export const PAGE_LINK_MESSAGE = "That's a web page, not a media file. Download the clip or photo and drop it in, or paste a direct link to the file itself (.jpg, .png, .webp, .avif, .gif, .tif, .mp4 or .mov)."
 /** Video and social sites whose links are pages, never the file: refused before anything is fetched. */
 const PAGE_HOSTS = /(^|\.)(youtube\.com|youtu\.be|vimeo\.com|instagram\.com|facebook\.com|fb\.watch|tiktok\.com|x\.com|twitter\.com|linkedin\.com)$/i
 export function isPageLink(url: string): boolean {
   try { return PAGE_HOSTS.test(new URL(url).hostname) } catch { return false }
+}
+/** DVIDS's image CDNs, which name the image's id in the path (…/thumbs/photos/2601/9500068/1000w_q95.jpg). */
+const DVIDS_MEDIA_HOSTS = ["d1ldvf68ux039x.cloudfront.net", "d34w7g4gy10iej.cloudfront.net"]
+/** The DVIDS image page a media link comes from: the page itself, or the one its CDN path names. Null for anything else. */
+export function dvidsImagePage(url: string | undefined): string | null {
+  if (!url) return null
+  try {
+    const u = new URL(url), host = u.hostname.toLowerCase()
+    const id = /(^|\.)dvidshub\.net$/.test(host) ? /^\/image\/(\d+)/.exec(u.pathname)?.[1]
+      : DVIDS_MEDIA_HOSTS.includes(host) ? /\/photos\/\d{4}\/(\d+)\//.exec(u.pathname)?.[1] : undefined
+    return u.protocol === "https:" && id ? `https://www.dvidshub.net/image/${id}` : null
+  } catch { return null }
 }
 /** Whether a fetched link answered with a web page rather than a media file. */
 export const isPageType = (contentType: string) => /^(text\/html|application\/xhtml\+xml)\b/i.test(contentType.trim())

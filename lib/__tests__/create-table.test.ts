@@ -7,9 +7,10 @@ import { test } from "node:test"
 import assert from "node:assert/strict"
 import { published, loadPublishedProfileFirst } from "./published-profile"
 import { CREATE_PLATFORMS, cellRoles, createTemplates, ddmmmyy, designText, formatsOf, rowProblems, type CreateRow } from "../content-pipeline/create-table"
-import { PAGE_LINK_MESSAGE, blobStoreHost, isCreateUpload, isPageLink, isPageType, mediaKind, transcodeArgs, videoContainer, videoPlan } from "../content-pipeline/create-media"
+import { PAGE_LINK_MESSAGE, blobStoreHost, dvidsImagePage, isCreateUpload, isPageLink, isPageType, mediaKind, transcodeArgs, videoContainer, videoPlan } from "../content-pipeline/create-media"
 import { cardSubject } from "../content-pipeline/series"
 import { humanPlus, HumanPlusError, withoutMediaLines, type HumanPlusDeps } from "../content-pipeline/human-plus"
+import { DOD_NOTICE } from "../content-pipeline/worker"
 import { CreateRowError, createRequestId, runCreateRow, serverRowProblems, type CreateRunDeps } from "../content-pipeline/create-run"
 import type { McuAi } from "../content-pipeline/model"
 import type { ContentPost } from "../../components/crm/types"
@@ -108,7 +109,7 @@ function stubAi(over: Partial<McuAi> = {}): McuAi {
     ...over,
   } as McuAi
 }
-const hpDeps = (ai: McuAi, fetchPage = async () => page): HumanPlusDeps => ({ ai: () => ai, fetchPage, seeds: async () => null, nowMs: () => Date.parse("2026-10-19T15:00:00Z") })
+const hpDeps = (ai: McuAi, fetchPage: HumanPlusDeps["fetchPage"] = async () => page): HumanPlusDeps => ({ ai: () => ai, fetchPage, seeds: async () => null, nowMs: () => Date.parse("2026-10-19T15:00:00Z") })
 
 test("Human+ drafts the cells from the reference link with the pipeline's writer, and never researches another story", async () => {
   let researched = 0
@@ -218,4 +219,30 @@ test("Human+: no Photo or credit line about the source's photo, since the person
   assert.equal(withoutMediaLines(caption), "MISSION BRIEF // COYOTE BLOCK 2C+RM\n\n//Raytheon\n\nTech: Counter-drone interceptor\n\nSource: Janes, 12 October 2026.")
   const plain = "Raytheon has begun field testing.\n\nSource: Janes, Oct. 12, 2026"
   assert.equal(withoutMediaLines(plain), plain)
+})
+
+test("Human+: only a line that starts with a media label goes; other text with the same words is kept whole", () => {
+  const tax = "Veterans can claim the federal tax credit: up to $7,500 for a qualifying EV.\n\nSource: IRS, 14 Oct 2026"
+  assert.equal(withoutMediaLines(tax), tax)
+  const video = "Watch the video: link in bio.\n\nSource: U.S. Army, 18 Oct 2026"
+  assert.equal(withoutMediaLines(video), video)
+  assert.equal(withoutMediaLines("The Army fielded it.\n\nCredit: Raytheon\n\nVideo: U.S. Army footage\n\nSource: Janes, 12 Oct 2026. Image: Raytheon"), "The Army fielded it.\n\nSource: Janes, 12 Oct 2026.")
+})
+
+test("Human+: a photo pasted from DVIDS keeps its credit and the DoW notice; the person's own photo gets neither", async () => {
+  assert.equal(dvidsImagePage("https://d1ldvf68ux039x.cloudfront.net/thumbs/photos/2601/9500068/1000w_q95.jpg"), "https://www.dvidshub.net/image/9500068")
+  assert.equal(dvidsImagePage("https://www.dvidshub.net/image/9500068/coyote-launch"), "https://www.dvidshub.net/image/9500068")
+  assert.equal(dvidsImagePage("https://news.inbox.eu/w/img/b0/ca/b0ca9649ff4bf2bc92-800x0.webp"), null)
+  assert.equal(dvidsImagePage(undefined), null)
+  const dvidsPage = { url: "https://www.dvidshub.net/image/9500068/coyote-launch", title: "Coyote launch", text: "", image: "https://d1ldvf68ux039x.cloudfront.net/thumbs/photos/2601/9500068/1000w_q95.jpg", description: "A Coyote launches at Yuma Proving Ground, Ariz., Jan. 29, 2026. (U.S. Army photo by Mark Schauer)" }
+  const ai = stubAi({ write: async () => ({ frames: [{ series: "news", fields: { headline: "ARMY FIELDS KESTREL KIT", deck: "Soldiers train.", source: "U.S. ARMY" } }], caption: "The Army put the Kestrel kit in soldiers' hands.\n\nSource: U.S. Army, 18 Oct 2026. Photo: a soldier at Fort Hood" }) })
+  const fetchPage = async (u: string) => u.startsWith("https://www.dvidshub.net/") ? dvidsPage : page
+  const input = { kind: "news" as const, url: page.url, requestedBy: { actorEmail: "a@b.co", actorName: "A" } }
+  const fromDvids = await humanPlus(hpDeps(ai, fetchPage), { ...input, mediaFrom: dvidsPage.image })
+  assert.equal(fromDvids.caption, `The Army put the Kestrel kit in soldiers' hands.\n\nSource: U.S. Army, 18 Oct 2026.\n\nImage: U.S. Army photo by Mark Schauer\n\n${DOD_NOTICE}`)
+  const own = await humanPlus(hpDeps(ai, fetchPage), { ...input, mediaFrom: "https://news.inbox.eu/w/img/b0/ca/b0ca9649ff4bf2bc92-800x0.webp" })
+  assert.equal(own.caption, "The Army put the Kestrel kit in soldiers' hands.\n\nSource: U.S. Army, 18 Oct 2026.")
+  const unread = await humanPlus(hpDeps(ai, async (u: string) => { if (u.includes("dvidshub")) throw new Error("http_503"); return page }), { ...input, mediaFrom: dvidsPage.image })
+  assert.ok(unread.caption.endsWith(`\n\n${DOD_NOTICE}`))
+  assert.ok(unread.notes.some(n => /could not be read for the photo's credit/.test(n)))
 })
