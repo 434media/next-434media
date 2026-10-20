@@ -17,7 +17,8 @@ export const VIDEO_MAX_BYTES = 500 * 1024 * 1024
  */
 export const TRANSCODE_MAX_BYTES = 200 * 1024 * 1024
 export const UPLOAD_PREFIX = "content-create/"
-export const IMAGE_TYPES = ["image/jpeg", "image/png"] as const
+/** Photos the table takes; anything but a JPEG is converted to one when it lands (sharp reads all of these). */
+export const IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp", "image/avif", "image/gif", "image/tiff"] as const
 /** Containers Canva imports as video (canva.dev, read 2026-10-19). */
 export const VIDEO_TYPES = ["video/mp4", "video/quicktime", "video/x-m4v", "video/x-matroska", "video/mpeg", "video/webm"] as const
 
@@ -64,6 +65,16 @@ export function isCreateUpload(url: string, host = blobStoreHost()): boolean {
     return !!host && u.protocol === "https:" && u.hostname === host && u.pathname.startsWith(`/${UPLOAD_PREFIX}`)
   } catch { return false }
 }
+
+/** What the media cell says when a link is a web page (a YouTube watch page, an article) rather than the file itself. */
+export const PAGE_LINK_MESSAGE = "That's a web page, not a media file. Download the clip and drop it in, or paste a direct link to a .jpg/.png/.mp4/.mov."
+/** Video and social sites whose links are pages, never the file: refused before anything is fetched. */
+const PAGE_HOSTS = /(^|\.)(youtube\.com|youtu\.be|vimeo\.com|instagram\.com|facebook\.com|fb\.watch|tiktok\.com|x\.com|twitter\.com|linkedin\.com)$/i
+export function isPageLink(url: string): boolean {
+  try { return PAGE_HOSTS.test(new URL(url).hostname) } catch { return false }
+}
+/** Whether a fetched link answered with a web page rather than a media file. */
+export const isPageType = (contentType: string) => /^(text\/html|application\/xhtml\+xml)\b/i.test(contentType.trim())
 
 /** The kind of an upload by its declared type, or null when the table doesn't take it. */
 export function mediaKind(contentType: string): "image" | "video" | null {

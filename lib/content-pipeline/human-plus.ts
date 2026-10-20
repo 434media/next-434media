@@ -3,7 +3,7 @@ import { createMcuAi, framesFor, type McuAi, type ModelCall } from "./model"
 import { PIPELINE_MODELS } from "./models"
 import { fetchSourcePage, type SourcePage } from "./sources"
 import { SERIES, type RequestKind } from "./series"
-import { normalizeDate, writeCopy, type WrittenCopy } from "./worker"
+import { DOD_NOTICE, normalizeDate, writeCopy, type WrittenCopy } from "./worker"
 import type { McuSeeds } from "./seeds"
 import type { RequestRef, Story } from "./store"
 import { cellRoles } from "./create-table"
@@ -58,12 +58,28 @@ export async function storyFromLink(deps: Pick<HumanPlusDeps, "fetchPage">, ai: 
   }
 }
 
+/** Told to the writer with the person's notes: the row's photo or video is theirs, not the source's. */
+export const OWN_MEDIA_DIRECTION = "The person adds the photo or video to this post themselves. Write no Photo, Image, Video or credit line, and never describe the source article's photo."
+/**
+ * The caption without lines about media: in the Create table the person supplies the photo or video, so a line the writer
+ * took from the source's photo caption ("Photo: … during a test flight at Dugway", Step 2 run, 2026-10-19) describes a
+ * picture the post doesn't carry. Whole credit lines and the government notice go, and a trailing "Photo: …" clause on
+ * another line (the source line) is cut.
+ */
+export function withoutMediaLines(caption: string): string {
+  const media = /(?:^|\s)(?:Archive image|Photo credit|Image credit|Photo|Image|Video|Credit|Courtesy)s?:\s.*$/i
+  return caption.split("\n")
+    .filter(l => l.trim() !== DOD_NOTICE && !/^\s*(?:Archive image|Photo credit|Image credit|Photo|Image|Video|Credit|Courtesy)s?:\s/i.test(l))
+    .map(l => l.replace(media, "").trimEnd())
+    .join("\n").replace(/\n{3,}/g, "\n\n").trim()
+}
+
 export async function humanPlus(deps: HumanPlusDeps, input: HumanPlusInput): Promise<HumanPlusCopy> {
   const calls: ModelCall[] = []
   const ai = deps.ai(c => { calls.push(c) })
   const { story, viaSearch } = await storyFromLink(deps, ai, input.url)
   let written: WrittenCopy
-  try { written = await writeCopy(deps, ai, { kind: input.kind, story, ...(input.notes?.trim() ? { direction: input.notes.trim() } : {}), requestedBy: input.requestedBy }) }
+  try { written = await writeCopy(deps, ai, { kind: input.kind, story, direction: [input.notes?.trim(), OWN_MEDIA_DIRECTION].filter(Boolean).join("\n"), requestedBy: input.requestedBy }) }
   catch (err) {
     console.error("[human-plus] write failed:", err instanceof Error ? err.message : err)
     throw new HumanPlusError("The writer could not answer just now; try Human+ again", 502)
@@ -75,7 +91,7 @@ export async function humanPlus(deps: HumanPlusDeps, input: HumanPlusInput): Pro
     fields,
     headline: (roles.headline && fields[roles.headline]) || "",
     subHeadline: (roles.subHeadline && fields[roles.subHeadline]) || "",
-    caption: written.caption,
+    caption: withoutMediaLines(written.caption),
     notes: written.notes,
     facts: written.facts,
     ...(written.hold ? { hold: written.hold } : {}),

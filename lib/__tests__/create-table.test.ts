@@ -7,9 +7,9 @@ import { test } from "node:test"
 import assert from "node:assert/strict"
 import { published, loadPublishedProfileFirst } from "./published-profile"
 import { CREATE_PLATFORMS, cellRoles, createTemplates, ddmmmyy, designText, formatsOf, rowProblems, type CreateRow } from "../content-pipeline/create-table"
-import { blobStoreHost, isCreateUpload, mediaKind, transcodeArgs, videoContainer, videoPlan } from "../content-pipeline/create-media"
+import { PAGE_LINK_MESSAGE, blobStoreHost, isCreateUpload, isPageLink, isPageType, mediaKind, transcodeArgs, videoContainer, videoPlan } from "../content-pipeline/create-media"
 import { cardSubject } from "../content-pipeline/series"
-import { humanPlus, HumanPlusError, type HumanPlusDeps } from "../content-pipeline/human-plus"
+import { humanPlus, HumanPlusError, withoutMediaLines, type HumanPlusDeps } from "../content-pipeline/human-plus"
 import { CreateRowError, createRequestId, runCreateRow, serverRowProblems, type CreateRunDeps } from "../content-pipeline/create-run"
 import type { McuAi } from "../content-pipeline/model"
 import type { ContentPost } from "../../components/crm/types"
@@ -79,7 +79,7 @@ test("a row runs only when it is complete; the server adds the template's limits
 })
 
 test("media: photos and Canva's video containers are taken; a phone MP4 or MOV passes through, others are converted", () => {
-  assert.equal(mediaKind("image/jpeg"), "image"); assert.equal(mediaKind("video/quicktime"), "video"); assert.equal(mediaKind("image/gif"), null)
+  assert.equal(mediaKind("image/jpeg"), "image"); assert.equal(mediaKind("video/quicktime"), "video"); assert.equal(mediaKind("image/webp"), "image"); assert.equal(mediaKind("image/gif"), "image"); assert.equal(mediaKind("image/svg+xml"), null); assert.equal(mediaKind("text/html; charset=utf-8"), null)
   const ftyp = (brand: string) => new Uint8Array([0, 0, 0, 0x20, 0x66, 0x74, 0x79, 0x70, ...[...brand.padEnd(4)].map(c => c.charCodeAt(0))])
   assert.deepEqual(videoContainer(ftyp("qt")), { kind: "isobmff", brand: "qt" })
   assert.deepEqual(videoPlan(ftyp("isom"), 30e6), { action: "passthrough" })
@@ -202,4 +202,20 @@ test("cardSubject: the DT101 masters name the subject in the deck and the compan
   assert.deepEqual(cardSubject({ deck: "Coyote Block 2 — a drone interceptor", maker: "RTX" }), { subject: "Coyote Block 2", maker: "RTX" })
   assert.deepEqual(cardSubject({ benefit_headline: "X", subject_identifier: "COYOTE / RAYTHEON" }), { subject: "COYOTE", maker: "RAYTHEON" })
   assert.deepEqual(cardSubject({ headline: "A NEWS HEADLINE", deck: "A deck, with a comma" }), { subject: "", maker: "" })
+})
+
+test("Media cell: a web-page link (YouTube, an article) gets the plain page message; a direct file link does not", () => {
+  assert.ok(isPageLink("https://www.youtube.com/watch?v=BaER7Txge2s"))
+  assert.ok(isPageLink("https://youtu.be/BaER7Txge2s") && isPageLink("https://www.instagram.com/reel/abc/"))
+  assert.ok(!isPageLink("https://news.inbox.eu/w/img/b0/ca/b0ca9649ff4bf2bc92-800x0.webp"))
+  assert.ok(!isPageLink("https://notyoutube.com.example.org/clip.mp4"))
+  assert.ok(isPageType("text/html; charset=utf-8") && !isPageType("image/webp"))
+  assert.match(PAGE_LINK_MESSAGE, /^That's a web page, not a media file\./)
+})
+
+test("Human+: no Photo or credit line about the source's photo, since the person supplies the media", () => {
+  const caption = "MISSION BRIEF // COYOTE BLOCK 2C+RM\n\n//Raytheon\n\nTech: Counter-drone interceptor\n\nSource: Janes, 12 October 2026. Photo: Raytheon Coyote 2C+RM during a test flight in July 2026 at Dugway Proving Ground, Utah.\n\nImage: U.S. Army photo by Sgt. A\n\nThe appearance of U.S. Department of War (DoW) visual information does not imply or constitute DoW endorsement."
+  assert.equal(withoutMediaLines(caption), "MISSION BRIEF // COYOTE BLOCK 2C+RM\n\n//Raytheon\n\nTech: Counter-drone interceptor\n\nSource: Janes, 12 October 2026.")
+  const plain = "Raytheon has begun field testing.\n\nSource: Janes, Oct. 12, 2026"
+  assert.equal(withoutMediaLines(plain), plain)
 })
