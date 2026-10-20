@@ -390,6 +390,9 @@ export interface ContentPost {
   create_row_id?: string
   create_format?: "feed" | "reels"
   copy_profile_version_id?: string
+  // Platforms the publisher doesn't post to (TikTok, YouTube Shorts, LinkedIn: plan v11.1 Step 3) are posted by hand
+  // from the approved export; each hand post's live link is recorded here from the drawer. Optional; server-owned.
+  hand_posts?: HandPost[]
   // Set when the publisher's connector created the post; requestId makes creation idempotent. source marks a post
   // the content pipeline created (only run.ts sets it); the pipeline adopts no other post for its request ids.
   intake?: { requestId: string; metaBrand: string; requestedBy: string; at: string; source?: "content-pipeline" }
@@ -452,6 +455,15 @@ export interface PipelineMedia {
   rightsNote?: string
 }
 
+export interface HandPost {
+  platform: SocialPlatform
+  url: string
+  by: string
+  at: string
+  // The export set the person posted (the post's export_fingerprint when it was recorded).
+  export_fingerprint: string
+}
+
 export interface PipelineOutcome {
   kind: "no_new_content"
   job_id: string
@@ -466,6 +478,8 @@ export interface PipelineOutcome {
 export interface ContentApproval {
   manifest_hash?: string
   manifest_revision?: number
+  // A variation posted only by hand has no publisher manifest: its approval binds the exact export set instead.
+  export_fingerprint?: string
 
   decision: "approved" | "rejected"
   by_name: string

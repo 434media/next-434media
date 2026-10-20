@@ -6,6 +6,7 @@ import { AdminRoleGuard } from "@/components/AdminRoleGuard"
 import { Toast, SocialCalendarView, ContentDetailDrawer } from "@/components/crm"
 import { ContentGenerate } from "@/components/crm/ContentGenerate"
 import { CreateTable } from "@/components/crm/CreateTable"
+import { RowApprovalDrawer } from "@/components/crm/RowApprovalDrawer"
 import type { Toast as ToastType } from "@/components/crm/types"
 import { useContentPostHandlers } from "@/hooks/useContentPostHandlers"
 
@@ -79,6 +80,22 @@ export default function ContentPage() {
     dismissedContentIdRef.current = searchParams?.get("openContent") ?? null
     openContentPost(post)
   }, [searchParams, openContentPost])
+
+  // ?openRow=<create_row_id> — the approval drawer for a Create row's variations (plan v11.1 Step 3). The people who
+  // review open it from any of the row's cards; everyone else, and every other post, keeps the post drawer.
+  const openRowId = searchParams?.get("openRow") ?? null
+  const setRowParam = useCallback((rowId: string | null, contentId?: string) => {
+    const params = new URLSearchParams(searchParams?.toString() ?? "")
+    if (rowId) params.set("openRow", rowId)
+    else params.delete("openRow")
+    if (contentId) params.set("openContent", contentId)
+    const qs = params.toString()
+    router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false })
+  }, [searchParams, router, pathname])
+  const handleOpenBoardPost = useCallback((post: Parameters<typeof openContentPost>[0]) => {
+    if (canReview && post.create_row_id) setRowParam(post.create_row_id)
+    else handleOpenContentPost(post)
+  }, [canReview, setRowParam, handleOpenContentPost])
 
   const handleAddContentPost = useCallback(() => {
     dismissedContentIdRef.current = searchParams?.get("openContent") ?? null
@@ -231,7 +248,7 @@ export default function ContentPage() {
             <SocialCalendarView
               // A closed "no new content" card has done its job; it stays in Firestore but leaves the board.
               contentPosts={contentPosts.filter((p) => !p.pipeline_outcome?.closed_at)}
-              onOpenPost={handleOpenContentPost}
+              onOpenPost={handleOpenBoardPost}
               onAddPost={handleAddContentPost}
               onMovePost={handleMoveContentPost}
               onBulkDelete={handleBulkDeleteContentPosts}
@@ -257,6 +274,13 @@ export default function ContentPage() {
             closeContentDrawer()
             loadContentPosts()
           }}
+        />
+        <RowApprovalDrawer
+          rowId={openRowId}
+          open={canReview && !!openRowId}
+          onClose={() => setRowParam(null)}
+          onChanged={loadContentPosts}
+          onOpenDetails={postId => setRowParam(null, postId)}
         />
       </div>
     </AdminRoleGuard>

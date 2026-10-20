@@ -1833,6 +1833,55 @@ export async function findContentPostByIntakeRequest(requestId: string): Promise
   const doc = snap.docs[0], data = doc.data()
   return { ...data, id: doc.id, assets: normalizeAssets(data.assets), created_at: convertTimestamp(data.created_at), updated_at: convertTimestamp(data.updated_at) } as ContentPost
 }
+/** A Create row's variations (plan v11.1 Step 3's drawer): its live posts, feed first. Read fresh, never cached. */
+export async function getContentPostsByCreateRow(rowId: string): Promise<ContentPost[]> {
+  const snap = await getDb().collection(CRM_COLLECTIONS.CONTENT_POSTS).where("create_row_id", "==", rowId).limit(20).get()
+  return snap.docs.filter(d => d.data().archived !== true).map(doc => {
+    const data = doc.data()
+    return { ...data, id: doc.id, assets: normalizeAssets(data.assets), created_at: convertTimestamp(data.created_at), updated_at: convertTimestamp(data.updated_at) } as ContentPost
+  }).sort((a, b) => (a.create_format === b.create_format ? a.id.localeCompare(b.id) : a.create_format === "feed" ? -1 : 1))
+}
+/**
+ * Approves a variation posted only by hand (TikTok, YouTube Shorts, LinkedIn): there is no publisher manifest, so the
+ * approval binds the exact export set the reviewer saw (export_fingerprint). Publisher variations use decideOwnedMeta.
+ */
+export async function approveHandPost(id: string, expectedFingerprint: string, reviewer: { email: string; name: string }, handPosted: (platform: string) => boolean): Promise<void> {
+  const ref = getDb().collection(CRM_COLLECTIONS.CONTENT_POSTS).doc(id)
+  await getDb().runTransaction(async tx => {
+    const data = (await tx.get(ref)).data()
+    if (!data || data.archived || data.pipeline_outcome) throw new MetaBlocked("Content post unavailable")
+    if (data.owned_meta) throw new MetaBlocked("This variation goes through the publisher; approve its manifest")
+    if (["approved", "scheduled", "posted"].includes(data.status)) throw new MetaBlocked("This variation is already approved")
+    const platforms: string[] = Array.isArray(data.social_platforms) ? data.social_platforms : []
+    if (!platforms.length || !platforms.every(handPosted)) throw new MetaBlocked("This variation has a publisher platform; approve it through the publisher")
+    if (!data.canva_design_id || !Array.isArray(data.assets) || !data.assets.length || data.export_fingerprint !== expectedFingerprint) throw new MetaBlocked("The design changed since it was shown; reload before approving")
+    const at = new Date().toISOString()
+    tx.update(ref, { status: "approved", approvals: [...(data.approvals || []), { decision: "approved", by_name: reviewer.name, by_email: reviewer.email, at, export_fingerprint: expectedFingerprint }], updated_at: admin.firestore.FieldValue.serverTimestamp() })
+  })
+  invalidateCache(CRM_COLLECTIONS.CONTENT_POSTS)
+}
+/**
+ * Records the live link of a hand post (one per platform), for the exact approved export set. A variation posted only
+ * by hand becomes "posted" once every platform has its link; a publisher variation's status stays with the publisher.
+ */
+export async function recordHandPost(id: string, input: { platform: string; url: string; by: string; expectedFingerprint: string }, handPosted: (platform: string) => boolean): Promise<void> {
+  const ref = getDb().collection(CRM_COLLECTIONS.CONTENT_POSTS).doc(id)
+  await getDb().runTransaction(async tx => {
+    const data = (await tx.get(ref)).data()
+    if (!data || data.archived || data.pipeline_outcome) throw new MetaBlocked("Content post unavailable")
+    if (!["approved", "scheduled", "posted"].includes(data.status)) throw new MetaBlocked("Approve the variation before recording a hand post")
+    if (data.export_fingerprint !== input.expectedFingerprint) throw new MetaBlocked("The design changed since it was shown; reload")
+    const platforms: string[] = Array.isArray(data.social_platforms) ? data.social_platforms : []
+    if (!handPosted(input.platform) || !platforms.includes(input.platform)) throw new MetaBlocked("That platform is not posted by hand on this variation")
+    const posts: { platform: string; url: string }[] = Array.isArray(data.hand_posts) ? data.hand_posts : []
+    if (posts.some(p => p.platform === input.platform)) throw new MetaBlocked("This platform's post is already recorded")
+    const at = new Date().toISOString()
+    const next = [...posts, { platform: input.platform, url: input.url, by: input.by, at, export_fingerprint: input.expectedFingerprint }]
+    const allHand = platforms.every(handPosted), done = platforms.filter(handPosted).every(p => next.some(x => x.platform === p))
+    tx.update(ref, { hand_posts: next, ...(allHand && done && data.status !== "posted" ? { status: "posted", posted_at: at, published_url: next[0].url } : {}), updated_at: admin.firestore.FieldValue.serverTimestamp() })
+  })
+  invalidateCache(CRM_COLLECTIONS.CONTENT_POSTS)
+}
 /** Approved batches that have started; the cron filters them to Meta-processing jobs. */
 export async function listStartedOwnedMetaPostIds(limit = 50): Promise<string[]> {
   const snap = await getDb().collection(CRM_COLLECTIONS.CONTENT_POSTS).where("owned_meta.started", "==", true).where("status", "==", "approved").limit(limit).get()

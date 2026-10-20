@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react"
 import { upload } from "@vercel/blob/client"
 import { Check, Loader2, PenLine, Play, Plus, Trash2, Upload, X, ArrowUpRight } from "lucide-react"
-import { FORMAT_LABEL, formatsOf, rowProblems, type CellField, type CreatePlatform, type CreateRow, type CreateTemplate, type RowMedia } from "@/lib/content-pipeline/create-table"
+import { FORMAT_LABEL, formatsOf, rowProblems, templateGap, type CellField, type CreatePlatform, type CreateRow, type CreateTemplate, type RowMedia } from "@/lib/content-pipeline/create-table"
 import { UPLOAD_PREFIX } from "@/lib/content-pipeline/create-media"
 
 /**
@@ -211,11 +211,14 @@ export function CreateTable({ onPostsReady }: { onPostsReady?: () => void }) {
                           {config.platforms.map(p => {
                             const available = !!t?.templates[p.format]
                             return (
-                              <label key={p.id} className={`flex items-center gap-1.5 text-xs py-0.5 ${available ? "" : "text-neutral-400"}`} title={available ? "" : `No ${FORMAT_LABEL[p.format]} template for ${t?.label ?? "this template"} yet`}>
+                              <label key={p.id} className={`flex items-center gap-1.5 text-xs py-0.5 ${available ? "" : "text-neutral-400"}`}>
                                 <input type="checkbox" disabled={locked || !available} checked={available && r.platforms.includes(p.id)} onChange={e => patch(r.id, { platforms: e.target.checked ? [...r.platforms, p.id] : r.platforms.filter(x => x !== p.id) })} /> {p.label}
+                                {p.posting === "hand" && <span className="text-neutral-400">· by hand</span>}
                               </label>
                             )
                           })}
+                          {/* A missing template is a gap with a note, never a fallback (plan v11.1 Step 3 item 3). */}
+                          {(["feed", "reels"] as const).map(f => templateGap(t, brand?.label ?? "this Brand", f)).filter(Boolean).map(note => <p key={note} className="mt-1 text-[11px] text-amber-700">{note}</p>)}
                           {formats.length > 0 && <p className="mt-1 text-[11px] text-neutral-400">{formats.map(f => FORMAT_LABEL[f.format]).join(" + ")}</p>}
                         </td>
                         <td className="px-2 py-2 w-52"><Cell field={head} value={r.headline} disabled={locked} rows={3} onChange={v => patch(r.id, { headline: v })} /></td>
