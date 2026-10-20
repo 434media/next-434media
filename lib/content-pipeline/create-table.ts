@@ -7,24 +7,49 @@ import type { FieldSpec, RequestKind, SeriesKey } from "./series"
  * then fills every Canva template the row's platforms need. Client-safe: the profile is passed in, never imported, and
  * nothing here reads the profile in scope (brand.ts), so the table and the routes share it.
  *
- * Instagram and Facebook take the same 4:5 feed design and the same 9:16 Reels design (profile-store templateMap), so a
+ * Every platform takes the 4:5 feed design or the 9:16 Reels design (profile-store templateMap; see CREATE_PLATFORMS), so a
  * row makes one design per format, and each design is its own content post: the publisher binds one Canva design to a
  * post, and publishes a Reel only as video. A row's posts share its row id (create_row_id) for Step 3's drawer.
  */
 export type CreateFormat = "feed" | "reels"
-export interface CreatePlatform { id: string; label: string; platform: "instagram" | "facebook"; format: CreateFormat }
+/** Where a platform's post goes: through the owned-Meta publisher, or posted by hand until its vendor approves API publishing (plan v11.1 Step 8). */
+export type Posting = "publisher" | "hand"
+export interface CreatePlatform { id: string; label: string; platform: "instagram" | "facebook" | "tiktok" | "youtube" | "linkedin"; format: CreateFormat; posting: Posting }
+/**
+ * Platform → format routing (plan v11.1 Step 3 item 1). TikTok and YouTube Shorts take the 9:16 Reels design and
+ * LinkedIn the 4:5 feed design, so they need no templates of their own; they are posted by hand for now.
+ */
 export const CREATE_PLATFORMS: readonly CreatePlatform[] = [
-  { id: "instagram_feed", label: "Instagram feed", platform: "instagram", format: "feed" },
-  { id: "instagram_reels", label: "Instagram Reels", platform: "instagram", format: "reels" },
-  { id: "facebook_feed", label: "Facebook feed", platform: "facebook", format: "feed" },
-  { id: "facebook_reels", label: "Facebook Reels", platform: "facebook", format: "reels" },
+  { id: "instagram_feed", label: "Instagram feed", platform: "instagram", format: "feed", posting: "publisher" },
+  { id: "instagram_reels", label: "Instagram Reels", platform: "instagram", format: "reels", posting: "publisher" },
+  { id: "facebook_feed", label: "Facebook feed", platform: "facebook", format: "feed", posting: "publisher" },
+  { id: "facebook_reels", label: "Facebook Reels", platform: "facebook", format: "reels", posting: "publisher" },
+  { id: "tiktok", label: "TikTok", platform: "tiktok", format: "reels", posting: "hand" },
+  { id: "youtube_shorts", label: "YouTube Shorts", platform: "youtube", format: "reels", posting: "hand" },
+  { id: "linkedin", label: "LinkedIn", platform: "linkedin", format: "feed", posting: "hand" },
 ]
 export const FORMAT_LABEL: Record<CreateFormat, string> = { feed: "Feed 4:5", reels: "Reels 9:16" }
+/** The aspect alone, for a template-gap note ("No 9:16 News template for MilCityUSA yet"). */
+export const FORMAT_ASPECT: Record<CreateFormat, string> = { feed: "4:5", reels: "9:16" }
+/** The social platforms the publisher posts to; every other platform is posted by hand. */
+export const PUBLISHER_PLATFORMS = ["instagram", "facebook"] as const
+export const isHandPosted = (platform: string) => !(PUBLISHER_PLATFORMS as readonly string[]).includes(platform)
 
 /** The formats a row's ticked platforms need, feed first, each with the social platforms it goes to. */
-export function formatsOf(platformIds: readonly string[]): { format: CreateFormat; platforms: ("instagram" | "facebook")[] }[] {
+export function formatsOf(platformIds: readonly string[]): { format: CreateFormat; platforms: CreatePlatform["platform"][] }[] {
   const picked = CREATE_PLATFORMS.filter(p => platformIds.includes(p.id))
   return (["feed", "reels"] as const).map(format => ({ format, platforms: picked.filter(p => p.format === format).map(p => p.platform) })).filter(f => f.platforms.length)
+}
+
+/** The table's ids for a variation's social platforms (the drawer edits them in the table's terms). */
+export function platformIdsOf(format: CreateFormat, socialPlatforms: readonly string[]): string[] {
+  return CREATE_PLATFORMS.filter(p => p.format === format && socialPlatforms.includes(p.platform)).map(p => p.id)
+}
+
+/** Why a platform can't be ticked for a template, or null when it can: a missing template is a gap, never a fallback. */
+export function templateGap(t: Pick<CreateTemplate, "label" | "templates"> | undefined, brandLabel: string, format: CreateFormat): string | null {
+  if (!t || t.templates[format]) return null
+  return `No ${FORMAT_ASPECT[format]} ${t.label} template for ${brandLabel} yet`
 }
 
 /** A card field as the table shows it. role: which column holds it; "extra" fields show under the row's More fields. */
@@ -122,7 +147,7 @@ export function rowProblems(row: CreateRow, t: CreateTemplate | undefined): stri
   if (!t) { p.push("Choose a Template"); return p }
   const formats = formatsOf(row.platforms)
   if (!formats.length) p.push("Tick at least one platform")
-  for (const f of formats) if (!t.templates[f.format]) p.push(`${t.label} has no ${FORMAT_LABEL[f.format]} template yet`)
+  for (const f of formats) if (!t.templates[f.format]) p.push(`${t.label} has no ${FORMAT_ASPECT[f.format]} template yet`)
   if (formats.some(f => t.media[f.format]) && !row.media) p.push("Add media (a photo or a video)")
   if (row.media && row.media.optimized !== "done") p.push("Wait for the media to finish optimizing")
   if (!row.headline.trim()) p.push("Write the Headline")

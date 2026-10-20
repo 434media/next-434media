@@ -74,6 +74,16 @@ test("actual preview handlers stop before authentication, storage and provider w
 
 
 test("runtime kill state is fail-closed globally and per brand",()=>{assert.equal(runtimePublishingEnabled(undefined,"milcity"),false);assert.equal(runtimePublishingEnabled({enabled:true},"milcity"),false);assert.equal(runtimePublishingEnabled({enabled:true,brands:{milcity:true}},"milcity"),true);assert.equal(runtimePublishingEnabled({enabled:false,brands:{milcity:true}},"milcity"),false)})
+test("a drawer hand-post approval is reset by an edit from any path, and a variation with a hand post out is fixed",()=>{
+  const approved={status:"approved",social_copy:"a",export_fingerprint:"f",approvals:[{decision:"approved",export_fingerprint:"f"}]}
+  assert.deepEqual(guardedContentUpdate(approved,{social_copy:"b",status:"approved"}),{social_copy:"b",status:"needs_approval"})
+  assert.deepEqual(guardedContentUpdate(approved,{date_to_post:"2026-10-30"}),{date_to_post:"2026-10-30",status:"needs_approval"})
+  assert.deepEqual(guardedContentUpdate(approved,{social_copy:"a",comments:[]}),{social_copy:"a",comments:[]},"an unchanged value is not an edit")
+  // A manual post approved without the drawer keeps today's behaviour.
+  assert.deepEqual(guardedContentUpdate({status:"approved",social_copy:"a",approvals:[{decision:"approved"}]},{social_copy:"b"}),{social_copy:"b"})
+  assert.throws(()=>guardedContentUpdate({...approved,hand_posts:[{platform:"tiktok"}]},{social_copy:"b"}),/hand post/)
+  assert.deepEqual(guardedContentUpdate({...approved,hand_posts:[{platform:"tiktok"}]},{comments:[]}),{comments:[]})
+})
 test("existing manual posted records and generation fields are unchanged",()=>{const updates={status:"posted",published_url:"https://www.instagram.com/p/manual",posted_at:"now",comments:[]};assert.deepEqual(guardedContentUpdate({status:"approved"},updates),updates);const generated={assets:[],generation_status:"completed",generation_request_id:"existing-job"};assert.deepEqual(guardedContentUpdate({},generated),generated)})
 test("publishing credentials have no analytics-token fallback",async()=>{const previous=process.env;process.env={NODE_ENV:"test"};try{const {getOwnedMetaPublishingConfig}=await import("../instagram-config");const m=manifest(),env={VERCEL_ENV:"production",INSTAGRAM_APP_ID:"1",FACEBOOK_PAGE_ID_MILCITY:"2",INSTAGRAM_BUSINESS_ACCOUNT_ID_MILCITY:"3",INSTAGRAM_ACCESS_TOKEN_MILCITY:"fake-analytics-token",OWNED_META_EVIDENCE_MILCITY:JSON.stringify(evidence(m))};assert.throws(()=>getOwnedMetaPublishingConfig("milcity",env),/credential/);assert.equal(getOwnedMetaPublishingConfig("milcity",{...env,OWNED_META_TOKEN_MILCITY:"fake-publishing-token"}).accessToken,"fake-publishing-token");assert.throws(()=>getOwnedMetaPublishingConfig("milcity",{...env,OWNED_META_TOKEN_MILCITY:"fake",OWNED_META_EVIDENCE_MILCITY:JSON.stringify({...evidence(m),formats:{}})}),/evidence/)}finally{process.env=previous}})
 

@@ -6,7 +6,7 @@
 import { test } from "node:test"
 import assert from "node:assert/strict"
 import { published, loadPublishedProfileFirst } from "./published-profile"
-import { CREATE_PLATFORMS, cellRoles, createTemplates, ddmmmyy, designText, formatsOf, rowProblems, type CreateRow } from "../content-pipeline/create-table"
+import { CREATE_PLATFORMS, cellRoles, isHandPosted, platformIdsOf, templateGap, createTemplates, ddmmmyy, designText, formatsOf, rowProblems, type CreateRow } from "../content-pipeline/create-table"
 import { PAGE_LINK_MESSAGE, blobStoreHost, dvidsImagePage, isCreateUpload, isPageLink, isPageType, mediaKind, transcodeArgs, videoContainer, videoPlan } from "../content-pipeline/create-media"
 import { cardSubject } from "../content-pipeline/series"
 import { humanPlus, HumanPlusError, withoutMediaLines, type HumanPlusDeps } from "../content-pipeline/human-plus"
@@ -47,7 +47,23 @@ test("the first written field is the Headline, the second the Sub-headline; serv
 test("platforms make formats: Instagram and Facebook share one feed and one Reels design", () => {
   assert.deepEqual(formatsOf(["instagram_feed", "facebook_feed"]), [{ format: "feed", platforms: ["instagram", "facebook"] }])
   assert.deepEqual(formatsOf(["facebook_reels", "instagram_feed"]), [{ format: "feed", platforms: ["instagram"] }, { format: "reels", platforms: ["facebook"] }])
-  assert.equal(CREATE_PLATFORMS.length, 4)
+  assert.equal(CREATE_PLATFORMS.length, 7)
+})
+
+test("TikTok and YouTube Shorts take the 9:16 design and LinkedIn the 4:5 one; all three are posted by hand", () => {
+  assert.deepEqual(formatsOf(["tiktok", "youtube_shorts", "linkedin"]), [{ format: "feed", platforms: ["linkedin"] }, { format: "reels", platforms: ["tiktok", "youtube"] }])
+  assert.deepEqual(formatsOf(["instagram_reels", "tiktok"]), [{ format: "reels", platforms: ["instagram", "tiktok"] }])
+  assert.deepEqual(CREATE_PLATFORMS.filter(p => p.posting === "hand").map(p => p.id), ["tiktok", "youtube_shorts", "linkedin"])
+  assert.ok(isHandPosted("tiktok") && isHandPosted("linkedin") && isHandPosted("youtube") && !isHandPosted("instagram") && !isHandPosted("facebook"))
+  assert.deepEqual(platformIdsOf("reels", ["instagram", "youtube"]), ["instagram_reels", "youtube_shorts"])
+})
+
+test("a format with no template is a gap with a note: it can't be ticked, and a row asking for it doesn't run", () => {
+  const t = { ...news(), templates: { feed: news().templates.feed } }
+  assert.equal(templateGap(t, "MilCityUSA", "reels"), `No 9:16 ${t.label} template for MilCityUSA yet`)
+  assert.equal(templateGap(t, "MilCityUSA", "feed"), null)
+  assert.equal(templateGap(undefined, "MilCityUSA", "reels"), null, "no template chosen yet is not a gap")
+  assert.ok(rowProblems(row({ platforms: ["tiktok"] }), t).includes(`${t.label} has no 9:16 template yet`))
 })
 
 test("the card text goes under the template's own names, or a generic master's headline and deck", () => {
@@ -72,7 +88,7 @@ test("a row runs only when it is complete; the server adds the template's limits
   assert.ok(rowProblems(row({ media: null }), t).includes("Add media (a photo or a video)"))
   assert.ok(rowProblems(row({ media: { ...row().media!, optimized: "running" } }), t).includes("Wait for the media to finish optimizing"))
   const dt = createTemplates(published.milcity).find(x => x.kind === "dt101")!
-  if (!dt.templates.reels) assert.ok(rowProblems(row({ kind: "dt101", platforms: ["instagram_reels"] }), dt).some(p => /no Reels 9:16 template/.test(p)))
+  if (!dt.templates.reels) assert.ok(rowProblems(row({ kind: "dt101", platforms: ["instagram_reels"] }), dt).some(p => /no 9:16 template/.test(p)))
   assert.deepEqual(serverRowProblems(row()).problems, [])
   const long = serverRowProblems(row({ headline: "A HEADLINE FAR FAR TOO LONG FOR ANY CARD THIS BRAND HAS EVER PRINTED ON ITS FEED" })).problems
   assert.ok(long.some(p => /Headline/.test(p)), long.join("; "))
@@ -174,6 +190,17 @@ test("Run job: one design and one Review post per format, stamped, keyed by the 
   const again = await runCreateRow(s.deps, row({ platforms: ["instagram_feed", "facebook_feed", "instagram_reels"] }), { email: "audrey@x.co", name: "Audrey" })
   assert.ok(again.posts.every(p => p.reused))
   assert.equal(s.made.length, r.posts.length)
+})
+
+test("Run job: TikTok and Shorts ride the 9:16 design, LinkedIn the 4:5 one, each post carrying its hand-posted platforms", async (t) => {
+  if (!news().templates.reels) return t.skip("the profile under test has no 9:16 News template")
+  const s = runDeps()
+  const r = await runCreateRow(s.deps, row({ platforms: ["linkedin", "tiktok", "youtube_shorts", "instagram_reels", "facebook_reels"] }), { email: "a@x.co", name: "A" })
+  assert.deepEqual(r.posts.map(p => p.format), ["feed", "reels"])
+  const posts = [...s.posts.values()]
+  assert.deepEqual(posts.find(p => p.create_format === "feed")!.social_platforms, ["linkedin"])
+  assert.deepEqual(posts.find(p => p.create_format === "reels")!.social_platforms, ["instagram", "facebook", "tiktok", "youtube"])
+  assert.ok(s.exports.some(e => e.endsWith(":mp4")), "the 9:16 design is exported as video, as TikTok and Shorts need")
 })
 
 test("Run job: a video row puts the video in the image field and exports MP4 for feed too; an incomplete row is refused", async () => {
