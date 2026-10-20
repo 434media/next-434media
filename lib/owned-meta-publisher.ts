@@ -127,7 +127,15 @@ export function dryRun(r: MetaRecord): { batchId: string; hash: string; destinat
 export function guardedContentUpdate(existing: Record<string, unknown>, updates: Record<string, unknown>): Record<string, unknown> {
   if (Object.keys(updates).some(k => k.startsWith("owned_meta") || k === "archived")) throw new MetaBlocked("Publisher fields are server-owned")
   const relevant = ["assets", "social_copy", "social_platforms", "platform", "tags", "date_to_post"]
-  if (existing.owned_meta && relevant.some(k => k in updates && canonicalJson(updates[k]) !== canonicalJson(existing[k]))) {
+  const changed = relevant.some(k => k in updates && canonicalJson(updates[k]) !== canonicalJson(existing[k]))
+  // A variation with a hand post out (TikTok, Shorts, LinkedIn) is fixed: what went out is what the record says.
+  if (changed && Array.isArray(existing.hand_posts) && existing.hand_posts.length) throw new MetaBlocked("A hand post of this content is already out; it can't be edited")
+  // A hand-post approval from the approval drawer names its files (export_fingerprint) and covers its caption, date and
+  // platforms: any edit from another path sends the post back for approval, as a publisher approval is reset below.
+  const approvals = Array.isArray(existing.approvals) ? existing.approvals as { decision?: string; export_fingerprint?: string }[] : []
+  const handApproved = !existing.owned_meta && ["approved", "scheduled"].includes(String(existing.status)) && !!approvals[approvals.length - 1]?.export_fingerprint
+  if (changed && handApproved) return { ...updates, status: "needs_approval" }
+  if (existing.owned_meta && changed) {
     if ((existing.owned_meta as { started?: boolean }).started) throw new MetaBlocked("Publishing batch is frozen; create a separately reviewed revision")
     return { ...updates, owned_meta_revision: Number(existing.owned_meta_revision || 0) + 1, owned_meta: null, status: "needs_approval" }
   }

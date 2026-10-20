@@ -85,7 +85,8 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ rowId: st
   if (!production()) return refuse("Edits happen on the live site only", 423)
   const posts = await getContentPostsByCreateRow(rowId)
   if (!posts.length) return refuse("No posts for this row", 404)
-  // Everything is checked before anything is written, so an edit lands on every variation or on none.
+  // Every variation is checked before anything is written, so a refusal changes nothing. The writes then go one
+  // variation at a time (each through the guarded update); if one fails, the response says to reload and see what saved.
   const plan: { post: ContentPost; updates: Partial<ContentPost> }[] = []
   for (const id of Object.keys(edit.platforms ?? {})) if (!posts.some(x => x.id === id)) return refuse("A variation changed; reload", 409)
   for (const p of posts) {
@@ -140,7 +141,12 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ rowId: str
         const id = canvaDesignIdFromLink(body.designLink)
         if (!id) return refuse("Paste a Canva design link (canva.com/design/…)", 400)
         designId = id; format = body.format
-        if (body.postId) { post = inRow(body.postId); if (!post) return refuse("A variation changed; reload", 409); if (frozen(post)) return refuse("This variation is already out or publishing; its design can't change", 409) }
+        if (body.postId) {
+          post = inRow(body.postId)
+          if (!post) return refuse("A variation changed; reload", 409)
+          if (frozen(post)) return refuse("This variation is already out or publishing; its design can't change", 409)
+          format = formatOf(post) // an existing variation keeps its own format
+        }
         else post = posts.find(p => formatOf(p) === format && !p.canva_design_id)
       }
       const [{ ownedMetaConnectorDeps, canvaDeps }, { attachExports }, { exportDesignJpg, exportDesignMp4, CanvaError }, crm] = await Promise.all([
