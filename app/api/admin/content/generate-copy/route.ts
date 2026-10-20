@@ -12,6 +12,7 @@ const input = z.object({
   kind: z.string().regex(/^[a-z0-9_]{2,30}$/),
   referenceLink: z.string().trim().url().max(2000).refine(u => u.startsWith("https://"), "https only"),
   notes: z.string().trim().max(1000).optional(),
+  mediaFrom: z.string().trim().url().max(2000).optional(),
 }).strict()
 
 /**
@@ -34,7 +35,7 @@ export async function POST(req: NextRequest) {
   if (!template) return NextResponse.json({ error: "That brand has no such template in its published profile" }, { status: 400 })
   try {
     const copy = await withProfile(p.active, async () => humanPlus(await humanPlusDeps(), {
-      kind: template.kind, url: a.referenceLink, ...(a.notes ? { notes: a.notes } : {}), requestedBy: { actorEmail: auth.session.email.toLowerCase(), actorName: auth.session.name || "" },
+      kind: template.kind, url: a.referenceLink, ...(a.notes ? { notes: a.notes } : {}), ...(a.mediaFrom ? { mediaFrom: a.mediaFrom } : {}), requestedBy: { actorEmail: auth.session.email.toLowerCase(), actorName: auth.session.name || "" },
     }))
     console.info("[content/generate-copy]", JSON.stringify({ by: auth.session.email, brand: a.brand, kind: a.kind, url: a.referenceLink, version: p.active.versionId, facts: copy.facts, hold: copy.hold ?? null, calls: copy.calls.map(c => c.model) }))
     // The model calls are logged above, not returned.

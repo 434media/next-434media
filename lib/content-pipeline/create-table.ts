@@ -74,7 +74,7 @@ export function createTemplates(profile: BrandProfile): CreateTemplate[] {
   })
 }
 
-export interface RowMedia { url: string; kind: "image" | "video"; name: string; bytes?: number; width?: number; height?: number; durationSec?: number; optimized?: string }
+export interface RowMedia { url: string; kind: "image" | "video"; name: string; bytes?: number; width?: number; height?: number; durationSec?: number; optimized?: string; /** The link it was pasted from (a dropped file has none): a DVIDS photo keeps its credit. */ source?: string }
 export interface CreateRow {
   /** Stable per row: the Run job's idempotency key (each design and post is keyed by it). */
   id: string
