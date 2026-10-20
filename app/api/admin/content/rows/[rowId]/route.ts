@@ -4,7 +4,7 @@ import { requireContentRunner } from "../../../content-pipeline/auth"
 import { getContentPostsByCreateRow, updateContentPost, ownedMetaStore, decideOwnedMeta, approveHandPost, recordHandPost } from "@/lib/firestore-crm"
 import { MetaBlocked } from "@/lib/owned-meta-publisher"
 import { isHandPosted, FORMAT_LABEL, type CreateFormat } from "@/lib/content-pipeline/create-table"
-import { approveRow, canvaDesignIdFromLink, exportAs, formatOf, isApproved, platformsFor, RowApprovalError } from "@/lib/content-pipeline/row-approval"
+import { approveRow, canvaDesignIdFromLink, exportAs, formatOf, frozen, isApproved, platformsFor, RowApprovalError } from "@/lib/content-pipeline/row-approval"
 import { createRequestId } from "@/lib/content-pipeline/create-run"
 import { pipelineMarked } from "@/lib/content-pipeline/ownership"
 import type { ContentPost, SocialPlatform } from "@/components/crm/types"
@@ -16,14 +16,15 @@ export const maxDuration = 800
 
 /**
  * /api/admin/content/rows/[rowId] — the approval drawer for one Create row (plan v11.1 Step 3 item 2). Gate: the admin
- * gate plus the content permission (super-admins and team members who run content). Approvals, publishing and hand-post
- * records are production-only, like the publisher's own routes, since previews may share production Firestore.
+ * gate plus the content permission (super-admins and team members who run content). Every write is production-only,
+ * like the publisher's own routes, since previews may share production Firestore; a preview can read.
  *
  *   GET    the row's variations, each with its publisher state
  *   PATCH  { caption?, date?, platforms?: { [postId]: SocialPlatform[] } } — edits never touch a design
  *   POST   { action: "refresh", postId }                         re-export the design from Canva (never refill)
  *          { action: "attach", designLink, format, postId? }     attach an existing Canva design by its link
- *          { action: "approve", shown: { [postId]: fingerprint }, aiGenerated }   Approve & Schedule
+ *          { action: "approve", shown: { [postId]: { fingerprint, caption, date, platforms } }, aiGenerated, aiRealisticMedia? }
+ *                                                                Approve & Schedule, bound to everything shown
  *          { action: "publish", postId, hash }                   publish an approved variation to Instagram and Facebook
  *          { action: "hand-post", postId, platform, url, fingerprint }   record a hand post's live link
  */
@@ -37,7 +38,9 @@ const patchBody = z.object({
 const postBody = z.discriminatedUnion("action", [
   z.object({ action: z.literal("refresh"), postId: z.string().max(64) }),
   z.object({ action: z.literal("attach"), designLink: z.string().max(2000), format: z.enum(["feed", "reels"]), postId: z.string().max(64).optional() }),
-  z.object({ action: z.literal("approve"), shown: z.record(z.string().max(64), z.string().regex(/^[a-f0-9]{64}$/)), aiGenerated: z.boolean() }),
+  z.object({ action: z.literal("approve"), aiGenerated: z.boolean(), aiRealisticMedia: z.boolean().optional(), shown: z.record(z.string().max(64), z.object({
+    fingerprint: z.string().regex(/^[a-f0-9]{64}$/), caption: z.string().max(2200), date: z.string().max(10), platforms: z.array(PLATFORM).max(5),
+  }).strict()) }),
   z.object({ action: z.literal("publish"), postId: z.string().max(64), hash: z.string().max(128) }),
   z.object({ action: z.literal("hand-post"), postId: z.string().max(64), platform: PLATFORM, url: z.string().max(2000), fingerprint: z.string().regex(/^[a-f0-9]{64}$/) }),
 ])
@@ -79,32 +82,37 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ rowId: st
   const parsed = patchBody.safeParse(await req.json().catch(() => null))
   if (!ROW_ID.test(rowId) || !parsed.success) return refuse("Invalid edit", 400)
   const edit = parsed.data
+  if (!production()) return refuse("Edits happen on the live site only", 423)
   const posts = await getContentPostsByCreateRow(rowId)
   if (!posts.length) return refuse("No posts for this row", 404)
-  for (const id of Object.keys(edit.platforms ?? {})) {
-    const p = posts.find(x => x.id === id)
-    if (!p) return refuse("A variation changed; reload", 409)
-    const bad = edit.platforms![id].filter(x => !platformsFor(formatOf(p)).includes(x))
-    if (bad.length) return refuse(`${FORMAT_LABEL[formatOf(p)]} can't go to ${bad.join(", ")}`, 400)
-  }
-  try {
-    for (const p of posts) {
-      const updates: Partial<ContentPost> = {}
+  // Everything is checked before anything is written, so an edit lands on every variation or on none.
+  const plan: { post: ContentPost; updates: Partial<ContentPost> }[] = []
+  for (const id of Object.keys(edit.platforms ?? {})) if (!posts.some(x => x.id === id)) return refuse("A variation changed; reload", 409)
+  for (const p of posts) {
+    const updates: Partial<ContentPost> = {}
+    const platforms = edit.platforms?.[p.id]
+    if (platforms && [...new Set(platforms)].sort().join() !== [...(p.social_platforms ?? [])].sort().join()) {
+      const bad = platforms.filter(x => !platformsFor(formatOf(p)).includes(x))
+      if (bad.length) return refuse(`${FORMAT_LABEL[formatOf(p)]} can't go to ${bad.join(", ")}`, 400)
+      if (frozen(p)) return refuse(`${FORMAT_LABEL[formatOf(p)]} is already out or publishing; its platforms can't change`, 409)
+      updates.social_platforms = [...new Set(platforms)] as SocialPlatform[]
+    }
+    // A variation already out keeps the caption and date it went out with; the rest of the row takes the edit.
+    if (!frozen(p)) {
       if (edit.caption !== undefined && edit.caption !== (p.social_copy ?? "")) updates.social_copy = edit.caption
       if (edit.date !== undefined && edit.date !== p.date_to_post) updates.date_to_post = edit.date
-      const platforms = edit.platforms?.[p.id]
-      if (platforms && [...platforms].sort().join() !== [...(p.social_platforms ?? [])].sort().join()) updates.social_platforms = [...new Set(platforms)] as SocialPlatform[]
-      if (!Object.keys(updates).length) continue
-      if (p.status === "posted" || p.owned_meta?.started) return refuse(`${FORMAT_LABEL[formatOf(p)]} is already publishing or posted; it can't be edited`, 409)
-      // A publisher approval is reset by the guarded update (owned-meta-publisher guardedContentUpdate); a hand-post
-      // approval is reset here, so an approval always covers what goes out.
-      if (isApproved(p) && !p.owned_meta) updates.status = "needs_approval"
-      await updateContentPost(p.id, updates)
     }
+    // A publisher approval is reset by the guarded update (owned-meta-publisher guardedContentUpdate); a hand-post
+    // approval is reset here, so an approval always covers what goes out.
+    if (Object.keys(updates).length && isApproved(p) && !p.owned_meta) updates.status = "needs_approval"
+    if (Object.keys(updates).length) plan.push({ post: p, updates })
+  }
+  try {
+    for (const { post, updates } of plan) await updateContentPost(post.id, updates)
     return NextResponse.json(await rowView(rowId))
   } catch (err) {
     console.error("[PATCH /api/admin/content/rows] edit failed:", rowId, err)
-    return refuse("Could not save the edit", 500)
+    return NextResponse.json({ ...(await rowView(rowId).catch(() => ({}))), error: "Could not save the edit; reload to see what was saved" }, { status: 500 })
   }
 }
 
@@ -115,6 +123,7 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ rowId: str
   const parsed = postBody.safeParse(await req.json().catch(() => null))
   if (!ROW_ID.test(rowId) || !parsed.success) return refuse("Invalid request", 400)
   const body = parsed.data, email = auth.session.email.toLowerCase(), name = auth.session.name?.trim() || auth.session.email
+  if (!production()) return refuse("Approving, publishing and changing designs happen on the live site only", 423)
   try {
     const posts = await getContentPostsByCreateRow(rowId)
     if (!posts.length) return refuse("No posts for this row", 404)
@@ -126,11 +135,12 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ rowId: str
         post = inRow(body.postId)
         if (!post?.canva_design_id) return refuse("This variation has no Canva design to refresh", 409)
         designId = post.canva_design_id; format = formatOf(post)
+        if (frozen(post)) return refuse("This variation is already out or publishing; its design can't change", 409)
       } else {
         const id = canvaDesignIdFromLink(body.designLink)
         if (!id) return refuse("Paste a Canva design link (canva.com/design/…)", 400)
         designId = id; format = body.format
-        if (body.postId) { post = inRow(body.postId); if (!post) return refuse("A variation changed; reload", 409) }
+        if (body.postId) { post = inRow(body.postId); if (!post) return refuse("A variation changed; reload", 409); if (frozen(post)) return refuse("This variation is already out or publishing; its design can't change", 409) }
         else post = posts.find(p => formatOf(p) === format && !p.canva_design_id)
       }
       const [{ ownedMetaConnectorDeps, canvaDeps }, { attachExports }, { exportDesignJpg, exportDesignMp4, CanvaError }, crm] = await Promise.all([
@@ -161,14 +171,14 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ rowId: str
         } as Omit<ContentPost, "id" | "created_at" | "updated_at">))
       }
       const items = as === "mp4" ? [{ url: urls[0], label: `${format}-video` }] : urls.map((url, n) => ({ url, label: `${format}-page-${n + 1}` }))
-      const attached = await attachExports(tools.intake, { postId: post.id, items, randomId: tools.randomId, canva: { designId } })
-      // New files void an approval: the publisher's guarded update resets its own; a hand-post approval is reset here.
-      if (!attached.reused && isApproved(post) && !post.owned_meta) await updateContentPost(post.id, { status: "needs_approval" })
+      // New files void an approval: the publisher's guarded update resets its own; a hand-post approval is reset in
+      // the same write as the files, so the post is never "approved" with files nobody saw.
+      const resetHand = isApproved(post) && !post.owned_meta
+      const intake = { ...tools.intake, setAssets: (id: string, assets: ContentPost["assets"], record: { export_fingerprint: string; export_staged_at: string; canva_design_id?: string }) => updateContentPost(id, { assets, ...record, ...(resetHand ? { status: "needs_approval" as const } : {}) }) }
+      const attached = await attachExports(intake, { postId: post.id, items, randomId: tools.randomId, canva: { designId } })
       console.info("[content/rows]", JSON.stringify({ by: email, row: rowId, action: body.action, post: post.id, design: designId, reused: attached.reused }))
       return NextResponse.json({ ...(await rowView(rowId)), holds: attached.holds, unchanged: attached.reused })
     }
-
-    if (!production()) return refuse("Approving, publishing and recording posts happen on the live site only", 423)
 
     if (body.action === "approve") {
       const [{ prepareOwnedMetaBatch }, { preflightFor }, { exportFingerprint }] = await Promise.all([import("@/lib/owned-meta-execution"), import("@/lib/owned-meta-tool"), import("@/lib/owned-meta-intake")])
@@ -178,9 +188,9 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ rowId: str
         prepare: prepareOwnedMetaBatch,
         preflight: b => preflightFor(b.manifest),
         decide: (id, revision, hash) => decideOwnedMeta(id, revision, hash, "approved", reviewer, "Approved in the drawer"),
-        approveHand: (id, fingerprint) => approveHandPost(id, fingerprint, reviewer, isHandPosted),
+        approveHand: (id, shown) => approveHandPost(id, shown, reviewer, isHandPosted),
         fingerprintOf: exportFingerprint,
-      }, rowId, body.shown, body.aiGenerated)
+      }, rowId, body.shown, { aiGenerated: body.aiGenerated, ...(body.aiRealisticMedia !== undefined ? { aiRealisticMedia: body.aiRealisticMedia } : {}) })
       console.info("[content/rows]", JSON.stringify({ by: email, row: rowId, action: "approve", approved }))
       return NextResponse.json({ ...(await rowView(rowId)), approved })
     }

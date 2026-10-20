@@ -23,6 +23,24 @@ export const goesOut = (p: Pick<ContentPost, "social_platforms">) => (p.social_p
 export const publisherPlatforms = (p: Pick<ContentPost, "social_platforms">) => (p.social_platforms ?? []).filter(x => !isHandPosted(x))
 export const handPlatforms = (p: Pick<ContentPost, "social_platforms">) => (p.social_platforms ?? []).filter(isHandPosted)
 
+/** Something already went out (or is going out): the variation's files, caption, date and platforms are fixed. */
+export const frozen = (p: Pick<ContentPost, "status" | "owned_meta" | "hand_posts">) => p.status === "posted" || !!p.owned_meta?.started || !!p.hand_posts?.length
+
+/**
+ * Whether the variation's approval covers what it holds now. A publisher approval is reset by the publisher's guarded
+ * update whenever files, caption, platforms or date change, so its status says it. A hand-post approval must name the
+ * current export fingerprint: a status set any other way (the post drawer's status menu) doesn't count.
+ */
+export function approvalCovers(p: Pick<ContentPost, "status" | "owned_meta" | "approvals" | "export_fingerprint" | "hand_posts">): boolean {
+  if (p.status === "posted" || p.hand_posts?.length) return true
+  if (!isApproved(p)) return false
+  if (p.owned_meta) return true
+  const last = p.approvals?.[p.approvals.length - 1]
+  return last?.decision === "approved" && !!last.export_fingerprint && last.export_fingerprint === p.export_fingerprint
+}
+/** Waiting for the row's approval: it goes out, its current files aren't approved, and nothing of it is out yet. */
+export const awaitingApproval = (p: ContentPost) => goesOut(p) && !approvalCovers(p) && !frozen(p)
+
 /** Why a variation can't be approved yet, in the person's words; null when it can. The server checks the same. */
 export function readiness(p: ContentPost): string | null {
   if (p.pipeline_outcome) return "This card is a notice, not a post"
@@ -34,8 +52,16 @@ export function readiness(p: ContentPost): string | null {
   return null
 }
 
+/** What the reviewer was shown of a variation; an approval binds all of it, not only the files. */
+export interface Shown { fingerprint: string; caption: string; date: string; platforms: string[] }
+export const shownOf = (p: ContentPost): Shown => ({ fingerprint: p.export_fingerprint ?? "", caption: p.social_copy ?? "", date: p.date_to_post ?? "", platforms: [...(p.social_platforms ?? [])].sort() })
+export const sameShown = (a: Shown, b: Shown) => a.fingerprint === b.fingerprint && a.caption === b.caption && a.date === b.date && [...a.platforms].sort().join() === [...b.platforms].sort().join()
+
+/** The AI declarations a reviewer makes for the row: AI media at all, and (for a video) whether it is photorealistic. */
+export interface AiChoice { aiGenerated: boolean; aiRealisticMedia?: boolean }
+
 /** The publisher's choices for a variation's saved exports: format and placements follow the files and the design. */
-export function prepareChoices(p: ContentPost, aiGenerated: boolean): PrepareChoices {
+export function prepareChoices(p: ContentPost, ai: AiChoice): PrepareChoices {
   const video = p.assets.some(a => a.kind === "video")
   const format: MetaFormat = video ? "video" : p.assets.length > 1 ? "carousel" : "still"
   const reels = formatOf(p) === "reels"
@@ -45,7 +71,10 @@ export function prepareChoices(p: ContentPost, aiGenerated: boolean): PrepareCho
     placements: video ? { instagram: "reels", facebook: reels ? "reels" : "video" } : { instagram: "feed", facebook: "feed" },
     // The 4:5 video is the feed variation, so its Reel shows on the grid; the 9:16 Reel stays in Reels.
     instagramShareToFeed: video && !reels,
-    aiGenerated, publicHostingApproved: true,
+    aiGenerated: ai.aiGenerated,
+    // Meta's disclosure rule asks an AI video whether it is photorealistic or has realistic audio.
+    ...(video && ai.aiGenerated ? { aiRealisticMedia: ai.aiRealisticMedia === true } : {}),
+    publicHostingApproved: true,
     templateRevision: p.profile_version_id ?? "unknown",
   }
 }
@@ -59,49 +88,63 @@ export interface ApproveRowDeps {
   prepare(postId: string, choices: PrepareChoices): Promise<MetaBatch>
   preflight(batch: MetaBatch): Record<MetaDestination, string | null>
   decide(postId: string, revision: number, hash: string): Promise<MetaBatch>
-  approveHand(postId: string, fingerprint: string): Promise<void>
+  /** Approves a hand-only variation in one transaction that checks it still holds exactly what was shown. */
+  approveHand(postId: string, shown: Shown): Promise<void>
   /** SHA-256 of the ordered file hashes (owned-meta-intake exportFingerprint). */
   fingerprintOf(sha256s: string[]): string
 }
 export interface ApprovedVariation { postId: string; format: CreateFormat; via: "publisher" | "hand"; hash: string }
 
+/** Every variation waiting for approval still holds exactly what was shown, and nothing else is waiting. */
+function shownProblems(posts: ContentPost[], shown: Record<string, Shown>): string[] {
+  const waiting = posts.filter(awaitingApproval)
+  if (!waiting.length) return ["Nothing in this row is waiting for approval"]
+  if (Object.keys(shown).sort().join() !== waiting.map(p => p.id).sort().join()) return ["The row changed since it was shown; reload before approving"]
+  return waiting.filter(p => !sameShown(shownOf(p), shown[p.id])).map(p => `${FORMAT_LABEL[formatOf(p)]}: it changed since it was shown (design, caption, date or platforms); reload`)
+}
+
 /**
- * Approves every variation of the row that goes out, together, bound to what the reviewer was shown: `shown` maps each
- * such post to the export fingerprint the drawer displayed. Everything is checked first; then every publisher manifest
- * is prepared and checked (same files, no format hold); only then is anything approved. A failure before that point
- * approves nothing (an unapproved manifest is harmless and is replaced on the next try).
+ * Approves every variation of the row that is waiting, together, bound to what the reviewer was shown (`shown`: each
+ * variation's export fingerprint, caption, date and platforms). Everything is checked first; then every publisher
+ * manifest is prepared and checked (same files, same caption, no format hold); the row is read again; only then is
+ * anything approved. A failure before that point approves nothing (an unapproved manifest is harmless and is replaced
+ * on the next try). A failure while approving names what was approved, so the person sees the row's real state.
  */
-export async function approveRow(deps: ApproveRowDeps, rowId: string, shown: Record<string, string>, aiGenerated: boolean): Promise<ApprovedVariation[]> {
-  const posts = (await deps.listRow(rowId)).filter(p => goesOut(p) && !isApproved(p))
-  if (!posts.length) throw new RowApprovalError(["Nothing in this row is waiting for approval"])
-  const ids = Object.keys(shown).sort()
-  if (ids.join() !== posts.map(p => p.id).sort().join()) throw new RowApprovalError(["The row changed since it was shown; reload before approving"])
-  const problems: string[] = []
-  for (const p of posts) {
-    const why = readiness(p)
-    if (why) problems.push(`${FORMAT_LABEL[formatOf(p)]}: ${why}`)
-    else if (p.export_fingerprint !== shown[p.id]) problems.push(`${FORMAT_LABEL[formatOf(p)]}: the design changed since it was shown; reload`)
-  }
+export async function approveRow(deps: ApproveRowDeps, rowId: string, shown: Record<string, Shown>, ai: AiChoice): Promise<ApprovedVariation[]> {
+  const posts = await deps.listRow(rowId)
+  let problems = shownProblems(posts, shown)
+  if (problems.length) throw new RowApprovalError(problems)
+  const waiting = posts.filter(awaitingApproval)
+  for (const p of waiting) { const why = readiness(p); if (why) problems.push(`${FORMAT_LABEL[formatOf(p)]}: ${why}`) }
   if (problems.length) throw new RowApprovalError(problems)
 
   const prepared: { post: ContentPost; batch: MetaBatch }[] = []
-  for (const p of posts.filter(x => publisherPlatforms(x).length)) {
-    const batch = await deps.prepare(p.id, prepareChoices(p, aiGenerated))
+  for (const p of waiting.filter(x => publisherPlatforms(x).length)) {
+    const batch = await deps.prepare(p.id, prepareChoices(p, ai))
     const label = FORMAT_LABEL[formatOf(p)]
-    if (deps.fingerprintOf(batch.manifest.assets.map(a => a.sha256)) !== shown[p.id]) problems.push(`${label}: the files read for approval differ from the design shown; reload`)
+    if (deps.fingerprintOf(batch.manifest.assets.map(a => a.sha256)) !== shown[p.id].fingerprint) problems.push(`${label}: the files read for approval differ from the design shown; reload`)
+    if (batch.manifest.captions.instagram !== shown[p.id].caption || batch.manifest.captions.facebook !== shown[p.id].caption) problems.push(`${label}: the caption changed since it was shown; reload`)
     for (const [d, hold] of Object.entries(deps.preflight(batch))) if (hold) problems.push(`${label}, ${d === "instagram" ? "Instagram" : "Facebook"}: ${hold}`)
     prepared.push({ post: p, batch })
   }
   if (problems.length) throw new RowApprovalError(problems)
+  // Read again just before approving: an edit made meanwhile (another person, the post drawer) stops the row.
+  problems = shownProblems(await deps.listRow(rowId), shown)
+  if (problems.length) throw new RowApprovalError(problems)
 
   const out: ApprovedVariation[] = []
-  for (const { post, batch } of prepared) {
-    await deps.decide(post.id, batch.manifest.revision, batch.hash)
-    out.push({ postId: post.id, format: formatOf(post), via: "publisher", hash: batch.hash })
-  }
-  for (const p of posts.filter(x => !publisherPlatforms(x).length)) {
-    await deps.approveHand(p.id, shown[p.id])
-    out.push({ postId: p.id, format: formatOf(p), via: "hand", hash: shown[p.id] })
+  try {
+    for (const { post, batch } of prepared) {
+      await deps.decide(post.id, batch.manifest.revision, batch.hash)
+      out.push({ postId: post.id, format: formatOf(post), via: "publisher", hash: batch.hash })
+    }
+    for (const p of waiting.filter(x => !publisherPlatforms(x).length)) {
+      await deps.approveHand(p.id, shown[p.id])
+      out.push({ postId: p.id, format: formatOf(p), via: "hand", hash: shown[p.id].fingerprint })
+    }
+  } catch (err) {
+    const done = out.map(o => FORMAT_LABEL[o.format]).join(", ")
+    throw new RowApprovalError([`Approval stopped: ${err instanceof Error ? err.message : "a variation changed"}. ${done ? `Approved before it stopped: ${done}.` : "Nothing was approved."} Reload to see the row.`])
   }
   return out
 }

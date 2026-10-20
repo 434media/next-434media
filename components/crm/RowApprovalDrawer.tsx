@@ -5,7 +5,7 @@ import { CheckCircle2, ExternalLink, Link2, Loader2, RefreshCw, Download, Send }
 import { DetailDrawer } from "@/components/admin/DetailDrawer"
 import { CONTENT_POST_STATUS_OPTIONS, SOCIAL_PLATFORM_OPTIONS, type ContentPost, type SocialPlatform } from "./types"
 import { FORMAT_LABEL, isHandPosted, type CreateFormat } from "@/lib/content-pipeline/create-table"
-import { formatOf, goesOut, handPlatforms, isApproved, platformsFor, publisherPlatforms, readiness } from "@/lib/content-pipeline/row-approval"
+import { approvalCovers, awaitingApproval, formatOf, frozen, goesOut, handPlatforms, platformsFor, publisherPlatforms, readiness, shownOf } from "@/lib/content-pipeline/row-approval"
 
 /**
  * The approval drawer (plan v11.1 Step 3 item 2): a Create row's format variations side by side. The designs come from
@@ -31,6 +31,7 @@ export function RowApprovalDrawer({ rowId, open, onClose, onChanged, onOpenDetai
   const [date, setDate] = useState("")
   const [platforms, setPlatforms] = useState<Record<string, SocialPlatform[]>>({})
   const [ai, setAi] = useState(false)
+  const [realistic, setRealistic] = useState(false)
   const [reviewed, setReviewed] = useState(false)
   const [link, setLink] = useState("")
   const [linkFormat, setLinkFormat] = useState<CreateFormat>("feed")
@@ -73,18 +74,25 @@ export function RowApprovalDrawer({ rowId, open, onClose, onChanged, onOpenDetai
 
   const variations = useMemo(() => view?.variations ?? [], [view])
   const first = variations[0]?.post
-  const dirty = !!first && (caption !== (first.social_copy ?? "") || date !== (first.date_to_post ?? "") ||
-    variations.some(v => [...(platforms[v.post.id] ?? [])].sort().join() !== [...(v.post.social_platforms ?? [])].sort().join()))
-  const pending = variations.filter(v => goesOut(v.post) && !isApproved(v.post))
+  const captionChanged = !!first && caption !== (first.social_copy ?? ""), dateChanged = !!first && date !== (first.date_to_post ?? "")
+  const changedPlatforms = Object.fromEntries(variations.filter(v => [...(platforms[v.post.id] ?? [])].sort().join() !== [...(v.post.social_platforms ?? [])].sort().join()).map(v => [v.post.id, platforms[v.post.id]]))
+  const dirty = captionChanged || dateChanged || Object.keys(changedPlatforms).length > 0
+  // Only what changed is sent, so a platform edit never rewrites a variation's own caption or date.
+  const save = () => call("save", "PATCH", { ...(captionChanged ? { caption } : {}), ...(dateChanged ? { date } : {}), ...(Object.keys(changedPlatforms).length ? { platforms: changedPlatforms } : {}) })
+  const captionsDiffer = new Set(variations.filter(v => !frozen(v.post)).map(v => v.post.social_copy ?? "")).size > 1
+  const pending = variations.filter(v => awaitingApproval(v.post))
+  const aiVideo = pending.some(v => publisherPlatforms(v.post).length && v.post.assets.some(a => a.kind === "video"))
   const blockers = [
     ...(dirty ? ["Save your edits first"] : []),
     ...(!pending.length && variations.length ? ["Nothing in this row is waiting for approval"] : []),
     ...pending.flatMap(v => { const why = readiness(v.post); return why ? [`${FORMAT_LABEL[formatOf(v.post)]}: ${why}`] : [] }),
     ...(pending.some(v => publisherPlatforms(v.post).length) && view && !view.publisher ? ["The publisher works on the live site only"] : []),
   ]
-  const approve = () => call("approve", "POST", { action: "approve", aiGenerated: ai, shown: Object.fromEntries(pending.map(v => [v.post.id, v.post.export_fingerprint])) })
+  // The approval binds everything shown for each variation: its files, caption, date and platforms.
+  const approve = () => call("approve", "POST", { action: "approve", aiGenerated: ai, ...(ai && aiVideo ? { aiRealisticMedia: realistic } : {}), shown: Object.fromEntries(pending.map(v => [v.post.id, shownOf(v.post)])) })
   const publishable = variations.filter(v => v.batch?.approval && !v.batch.claim && (["instagram", "facebook"] as const).some(d => !["verified", "operator_confirmed"].includes(v.batch!.jobs[d].status)))
-  const publishAll = async () => { for (const v of publishable) await call(`publish-${v.post.id}`, "POST", { action: "publish", postId: v.post.id, hash: v.batch!.hash }) }
+  // Stops at the first failure, so its error stays on screen.
+  const publishAll = async () => { for (const v of publishable) if (!await call(`publish-${v.post.id}`, "POST", { action: "publish", postId: v.post.id, hash: v.batch!.hash })) return }
 
   return (
     <DetailDrawer open={open} onClose={onClose} width="xl" closeOnOverlayClick={!dirty}
@@ -107,7 +115,7 @@ export function RowApprovalDrawer({ rowId, open, onClose, onChanged, onOpenDetai
       {problems.length > 0 && <ul role="status" className="mt-1 text-xs text-red-700 list-disc pl-4">{problems.map(p => <li key={p}>{p}</li>)}</ul>}
       {view && <div className="space-y-5">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          {variations.map(v => <VariationCard key={v.post.id} v={v} busy={busy} picked={platforms[v.post.id] ?? []}
+          {variations.map(v => <VariationCard key={v.post.id} v={v} busy={busy} dirty={dirty} showCaption={captionsDiffer} picked={platforms[v.post.id] ?? []}
             onPick={next => setPlatforms(s => ({ ...s, [v.post.id]: next }))}
             onRefresh={() => call(`refresh-${v.post.id}`, "POST", { action: "refresh", postId: v.post.id })}
             onDetails={() => onOpenDetails(v.post.id)}
@@ -119,11 +127,12 @@ export function RowApprovalDrawer({ rowId, open, onClose, onChanged, onOpenDetai
           <label className="block text-sm font-medium text-neutral-800">Caption
             <textarea value={caption} onChange={e => setCaption(e.target.value)} rows={7} maxLength={2200} className="mt-1 block w-full rounded border border-neutral-300 px-2 py-1.5 text-sm leading-relaxed font-normal" />
           </label>
+          {captionsDiffer && <p className="text-xs text-amber-700">The variations have different captions (shown on each card). Saving a caption here sets it on every variation that isn&apos;t out yet.</p>}
           <p className="text-xs text-neutral-500">Editing the caption never changes a design. Saving it after approval sends the row back for approval.</p>
           <label className="block text-sm font-medium text-neutral-800">Post date
             <input type="date" value={date} onChange={e => setDate(e.target.value)} className="mt-1 block h-9 rounded border border-neutral-300 px-2 text-sm font-normal" />
           </label>
-          <button type="button" disabled={!dirty || !!busy} onClick={() => call("save", "PATCH", { caption, date, platforms })} className="inline-flex items-center gap-2 h-8 px-3 border border-neutral-300 rounded-md text-sm disabled:opacity-40">
+          <button type="button" disabled={!dirty || !!busy} onClick={save} className="inline-flex items-center gap-2 h-8 px-3 border border-neutral-300 rounded-md text-sm disabled:opacity-40">
             {busy === "save" && <Loader2 className="w-4 h-4 animate-spin" />} Save changes
           </button>
         </section>
@@ -135,26 +144,29 @@ export function RowApprovalDrawer({ rowId, open, onClose, onChanged, onOpenDetai
             <select value={linkFormat} onChange={e => setLinkFormat(e.target.value as CreateFormat)} className="h-8 rounded border border-neutral-300 px-1 text-sm bg-white">
               <option value="feed">{FORMAT_LABEL.feed}</option><option value="reels">{FORMAT_LABEL.reels}</option>
             </select>
-            <button type="button" disabled={!link.trim() || !!busy} onClick={async () => { if (await call("attach", "POST", { action: "attach", designLink: link, format: linkFormat })) setLink("") }} className="inline-flex items-center gap-1.5 h-8 px-3 border border-neutral-300 rounded-md text-sm disabled:opacity-40">
+            <button type="button" disabled={!link.trim() || !!busy || dirty} onClick={async () => { if (await call("attach", "POST", { action: "attach", designLink: link, format: linkFormat })) setLink("") }} className="inline-flex items-center gap-1.5 h-8 px-3 border border-neutral-300 rounded-md text-sm disabled:opacity-40">
               {busy === "attach" ? <Loader2 className="w-4 h-4 animate-spin" /> : <Link2 className="w-4 h-4" />} Attach
             </button>
           </div>
           <p className="text-xs text-neutral-500">The design is exported and added to this row as its own variation (or fills a variation that has no design yet).</p>
         </section>
 
-        {pending.some(v => publisherPlatforms(v.post).length) && <label className="flex items-start gap-2 text-xs text-neutral-700 border-t border-neutral-200 pt-4"><input type="checkbox" className="mt-0.5" checked={ai} onChange={e => setAi(e.target.checked)} />These designs contain AI-generated media (adds Meta&apos;s AI label where the API supports it)</label>}
+        {pending.some(v => publisherPlatforms(v.post).length) && <div className="space-y-1 border-t border-neutral-200 pt-4">
+          <label className="flex items-start gap-2 text-xs text-neutral-700"><input type="checkbox" className="mt-0.5" checked={ai} onChange={e => setAi(e.target.checked)} />These designs contain AI-generated media (adds Meta&apos;s AI label where the API supports it)</label>
+          {ai && aiVideo && <label className="flex items-start gap-2 text-xs text-neutral-700 pl-5"><input type="checkbox" className="mt-0.5" checked={realistic} onChange={e => setRealistic(e.target.checked)} />The AI video is photorealistic or has realistic-sounding audio (Meta requires disclosure for these)</label>}
+        </div>}
       </div>}
     </DetailDrawer>
   )
 }
 
-function VariationCard({ v, busy, picked, onPick, onRefresh, onDetails, handLink, setHandLink, onHandPost }: {
-  v: Variation; busy: string | null; picked: SocialPlatform[]; onPick(next: SocialPlatform[]): void; onRefresh(): void; onDetails(): void
+function VariationCard({ v, busy, dirty, showCaption, picked, onPick, onRefresh, onDetails, handLink, setHandLink, onHandPost }: {
+  v: Variation; busy: string | null; dirty: boolean; showCaption: boolean; picked: SocialPlatform[]; onPick(next: SocialPlatform[]): void; onRefresh(): void; onDetails(): void
   handLink(p: string): string; setHandLink(p: string, url: string): void; onHandPost(p: string): void
 }) {
   const { post, batch } = v
   const format = formatOf(post), status = CONTENT_POST_STATUS_OPTIONS.find(s => s.value === post.status)
-  const why = goesOut(post) && !isApproved(post) ? readiness(post) : null
+  const why = awaitingApproval(post) ? readiness(post) : null, out = frozen(post)
   const canvaUrl = post.canva_design_id ? `https://www.canva.com/design/${encodeURIComponent(post.canva_design_id)}/edit` : ""
   const posted = (p: string) => post.hand_posts?.find(h => h.platform === p)
   return (
@@ -172,7 +184,7 @@ function VariationCard({ v, busy, picked, onPick, onRefresh, onDetails, handLink
       </div>
       <div className="flex flex-wrap gap-2 text-xs">
         {canvaUrl && <a href={canvaUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 underline"><ExternalLink className="w-3.5 h-3.5" /> Open in Canva</a>}
-        {post.canva_design_id && <button type="button" onClick={onRefresh} disabled={!!busy || post.status === "posted"} className="inline-flex items-center gap-1 underline disabled:opacity-40">
+        {post.canva_design_id && <button type="button" onClick={onRefresh} disabled={!!busy || dirty || out} title={dirty ? "Save your edits first" : out ? "Already out" : ""} className="inline-flex items-center gap-1 underline disabled:opacity-40">
           {busy === `refresh-${post.id}` ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />} Refresh from Canva</button>}
         <button type="button" onClick={onDetails} className="underline text-neutral-500">All details</button>
       </div>
@@ -180,25 +192,26 @@ function VariationCard({ v, busy, picked, onPick, onRefresh, onDetails, handLink
         <legend className="text-xs font-medium text-neutral-700">Platforms</legend>
         {platformsFor(format).map(p => (
           <label key={p} className="flex items-center gap-1.5 text-xs">
-            <input type="checkbox" disabled={post.status === "posted" || !!post.owned_meta?.started} checked={picked.includes(p)} onChange={e => onPick(e.target.checked ? [...picked, p] : picked.filter(x => x !== p))} />
+            <input type="checkbox" disabled={out} checked={picked.includes(p)} onChange={e => onPick(e.target.checked ? [...picked, p] : picked.filter(x => x !== p))} />
             {platformLabel(p)}{isHandPosted(p) && <span className="text-neutral-400">· posted by hand</span>}
           </label>
         ))}
         {!goesOut(post) && <p className="text-xs text-neutral-500">No platforms ticked: this variation stays in Review and isn&apos;t approved with the row.</p>}
       </fieldset>
+      {showCaption && <p className="text-xs text-neutral-600 whitespace-pre-wrap line-clamp-4 border-l-2 border-neutral-200 pl-2">{post.social_copy || "No caption"}</p>}
       {why && <p className="text-xs text-amber-700">{why}</p>}
       {batch && <div className="text-xs space-y-0.5">
         {batch.approval && <p className="text-neutral-600">Approved by {batch.approval.by} · version {batch.hash.slice(0, 12)}</p>}
         {(["instagram", "facebook"] as const).map(d => <p key={d}>{d === "instagram" ? "Instagram" : "Facebook"}: {batch.jobs[d].status}{batch.jobs[d].permalink && <> · <a className="underline" href={safeUrl(batch.jobs[d].permalink)} target="_blank" rel="noreferrer">live post</a></>}{batch.jobs[d].blocker && <span className="text-amber-700"> · {batch.jobs[d].blocker}</span>}</p>)}
       </div>}
-      {isApproved(post) && handPlatforms(post).length > 0 && <div className="space-y-1.5 border-t border-neutral-100 pt-2">
+      {approvalCovers(post) && handPlatforms(post).length > 0 && <div className="space-y-1.5 border-t border-neutral-100 pt-2">
         <p className="text-xs font-medium text-neutral-700">Post by hand</p>
         <div className="flex flex-wrap gap-2 text-xs">{post.assets.map((a, i) => <a key={a.url} href={safeUrl(a.url)} download className="inline-flex items-center gap-1 underline"><Download className="w-3.5 h-3.5" /> {a.kind === "video" ? "Video" : `Page ${i + 1}`}</a>)}</div>
         {handPlatforms(post).map(p => posted(p)
           ? <p key={p} className="text-xs">{platformLabel(p)}: <a className="underline" href={safeUrl(posted(p)!.url)} target="_blank" rel="noreferrer">live post</a></p>
           : <div key={p} className="flex gap-1">
               <input value={handLink(p)} onChange={e => setHandLink(p, e.target.value)} placeholder={`${platformLabel(p)} post link`} className="flex-1 h-7 rounded border border-neutral-300 px-1.5 text-xs" />
-              <button type="button" disabled={!handLink(p).trim() || !!busy} onClick={() => onHandPost(p)} className="h-7 px-2 border border-neutral-300 rounded text-xs disabled:opacity-40">Record</button>
+              <button type="button" disabled={!handLink(p).trim() || !!busy || dirty} onClick={() => onHandPost(p)} className="h-7 px-2 border border-neutral-300 rounded text-xs disabled:opacity-40">Record</button>
             </div>)}
       </div>}
     </div>

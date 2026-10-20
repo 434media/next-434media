@@ -1843,26 +1843,31 @@ export async function getContentPostsByCreateRow(rowId: string): Promise<Content
 }
 /**
  * Approves a variation posted only by hand (TikTok, YouTube Shorts, LinkedIn): there is no publisher manifest, so the
- * approval binds the exact export set the reviewer saw (export_fingerprint). Publisher variations use decideOwnedMeta.
+ * approval binds what the reviewer was shown, checked here in the same transaction: the exact export set
+ * (export_fingerprint), the caption, the post date and the platforms. Publisher variations use decideOwnedMeta.
  */
-export async function approveHandPost(id: string, expectedFingerprint: string, reviewer: { email: string; name: string }, handPosted: (platform: string) => boolean): Promise<void> {
+export async function approveHandPost(id: string, shown: { fingerprint: string; caption: string; date: string; platforms: string[] }, reviewer: { email: string; name: string }, handPosted: (platform: string) => boolean): Promise<void> {
   const ref = getDb().collection(CRM_COLLECTIONS.CONTENT_POSTS).doc(id)
   await getDb().runTransaction(async tx => {
     const data = (await tx.get(ref)).data()
     if (!data || data.archived || data.pipeline_outcome) throw new MetaBlocked("Content post unavailable")
     if (data.owned_meta) throw new MetaBlocked("This variation goes through the publisher; approve its manifest")
-    if (["approved", "scheduled", "posted"].includes(data.status)) throw new MetaBlocked("This variation is already approved")
+    if (data.status === "posted" || (Array.isArray(data.hand_posts) && data.hand_posts.length)) throw new MetaBlocked("This variation is already out")
     const platforms: string[] = Array.isArray(data.social_platforms) ? data.social_platforms : []
     if (!platforms.length || !platforms.every(handPosted)) throw new MetaBlocked("This variation has a publisher platform; approve it through the publisher")
-    if (!data.canva_design_id || !Array.isArray(data.assets) || !data.assets.length || data.export_fingerprint !== expectedFingerprint) throw new MetaBlocked("The design changed since it was shown; reload before approving")
+    if (!data.canva_design_id || !Array.isArray(data.assets) || !data.assets.length || data.export_fingerprint !== shown.fingerprint
+      || (data.social_copy ?? "") !== shown.caption || (data.date_to_post ?? "") !== shown.date || [...platforms].sort().join() !== [...shown.platforms].sort().join()) throw new MetaBlocked("The variation changed since it was shown; reload before approving")
     const at = new Date().toISOString()
-    tx.update(ref, { status: "approved", approvals: [...(data.approvals || []), { decision: "approved", by_name: reviewer.name, by_email: reviewer.email, at, export_fingerprint: expectedFingerprint }], updated_at: admin.firestore.FieldValue.serverTimestamp() })
+    tx.update(ref, { status: "approved", approvals: [...(data.approvals || []), { decision: "approved", by_name: reviewer.name, by_email: reviewer.email, at, export_fingerprint: shown.fingerprint }], updated_at: admin.firestore.FieldValue.serverTimestamp() })
   })
   invalidateCache(CRM_COLLECTIONS.CONTENT_POSTS)
 }
 /**
- * Records the live link of a hand post (one per platform), for the exact approved export set. A variation posted only
- * by hand becomes "posted" once every platform has its link; a publisher variation's status stays with the publisher.
+ * Records the live link of a hand post (one per platform), for the exact approved export set: the approval must cover
+ * the post's current files (a hand-post approval naming its fingerprint, or the publisher's approved manifest holding
+ * the same files), so a status set some other way, or new files after approval, can't be recorded as posted. A
+ * variation posted only by hand becomes "posted" once every platform has its link; a publisher variation's status
+ * stays with the publisher.
  */
 export async function recordHandPost(id: string, input: { platform: string; url: string; by: string; expectedFingerprint: string }, handPosted: (platform: string) => boolean): Promise<void> {
   const ref = getDb().collection(CRM_COLLECTIONS.CONTENT_POSTS).doc(id)
@@ -1870,7 +1875,17 @@ export async function recordHandPost(id: string, input: { platform: string; url:
     const data = (await tx.get(ref)).data()
     if (!data || data.archived || data.pipeline_outcome) throw new MetaBlocked("Content post unavailable")
     if (!["approved", "scheduled", "posted"].includes(data.status)) throw new MetaBlocked("Approve the variation before recording a hand post")
-    if (data.export_fingerprint !== input.expectedFingerprint) throw new MetaBlocked("The design changed since it was shown; reload")
+    if (!data.export_fingerprint || data.export_fingerprint !== input.expectedFingerprint) throw new MetaBlocked("The design changed since it was shown; reload")
+    let covered = false
+    if (data.owned_meta?.batchId) {
+      const batch = (await tx.get(ref.collection(META_BATCHES).doc(data.owned_meta.batchId))).data() as MetaBatch | undefined
+      covered = !!batch?.approval && !batch.revoked && createHash("sha256").update(batch.manifest.assets.map(a => a.sha256).join("\n")).digest("hex") === data.export_fingerprint
+    } else {
+      const approvals: { decision?: string; export_fingerprint?: string }[] = Array.isArray(data.approvals) ? data.approvals : []
+      const last = approvals[approvals.length - 1]
+      covered = last?.decision === "approved" && last.export_fingerprint === data.export_fingerprint
+    }
+    if (!covered) throw new MetaBlocked("These files aren't the approved ones; approve the row in the drawer first")
     const platforms: string[] = Array.isArray(data.social_platforms) ? data.social_platforms : []
     if (!handPosted(input.platform) || !platforms.includes(input.platform)) throw new MetaBlocked("That platform is not posted by hand on this variation")
     const posts: { platform: string; url: string }[] = Array.isArray(data.hand_posts) ? data.hand_posts : []
