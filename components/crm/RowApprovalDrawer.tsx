@@ -1,8 +1,9 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useState } from "react"
-import { CheckCircle2, ExternalLink, Link2, Loader2, RefreshCw, Download, Send, Undo2 } from "lucide-react"
+import { CheckCircle2, ExternalLink, Link2, Loader2, Maximize2, RefreshCw, Download, Send, Undo2 } from "lucide-react"
 import { DetailDrawer } from "@/components/admin/DetailDrawer"
+import { DesignPreview } from "./DesignPreview"
 import { CONTENT_POST_STATUS_OPTIONS, SOCIAL_PLATFORM_OPTIONS, type ContentPost, type SocialPlatform } from "./types"
 import { FORMAT_LABEL, isHandPosted, type CreateFormat } from "@/lib/content-pipeline/create-table"
 import { approvalCovers, awaitingApproval, formatOf, frozen, futureDated, goesOut, handPlatforms, isApproved, parsePages, platformsFor, publisherPlatforms, readiness, shownOf } from "@/lib/content-pipeline/row-approval"
@@ -17,6 +18,8 @@ import { approvalCovers, awaitingApproval, formatOf, frozen, futureDated, goesOu
  * Step 3 part 2: Refresh all re-exports every design that can still change; attach by link takes a canva.link share
  * link and can fill each format from chosen pages of one design; Publish now asks before posting a post dated after
  * today (scheduling is Step 5); Send back to Review withdraws an approval before anything goes out.
+ *
+ * Step 3 part 3: clicking a design opens it full size in a Preview, for review only; the card stays the same size.
  */
 interface BatchView { id: string; hash: string; revision: number; approval: { by: string; at: string } | null; revoked: boolean; claim: boolean; jobs: Record<"instagram" | "facebook", { status: string; permalink: string | null; blocker: string | null }> }
 interface Variation { post: ContentPost; batch: BatchView | null }
@@ -209,6 +212,7 @@ function VariationCard({ v, busy, dirty, showCaption, picked, onPick, onRefresh,
   const why = awaitingApproval(post) ? readiness(post) : null, out = frozen(post)
   const canvaUrl = post.canva_design_id ? `https://www.canva.com/design/${encodeURIComponent(post.canva_design_id)}/edit` : ""
   const posted = (p: string) => post.hand_posts?.find(h => h.platform === p)
+  const [preview, setPreview] = useState<number | null>(null)
   return (
     <div className="rounded-md ring-1 ring-neutral-200 bg-white p-3 space-y-2">
       <div className="flex items-center justify-between gap-2">
@@ -217,11 +221,19 @@ function VariationCard({ v, busy, dirty, showCaption, picked, onPick, onRefresh,
       </div>
       <div className={`grid gap-1 ${post.assets.length > 1 ? "grid-cols-2" : "grid-cols-1"}`}>
         {post.assets.length ? post.assets.map((a, i) => a.kind === "video"
-          ? <video key={a.url} src={safeUrl(a.url)} controls playsInline className="w-full max-h-80 rounded bg-neutral-100 object-contain" />
-          // eslint-disable-next-line @next/next/no-img-element
-          : <img key={a.url} src={safeUrl(a.url)} alt={`${FORMAT_LABEL[format]} design, page ${i + 1}`} className="w-full max-h-80 rounded bg-neutral-100 object-contain" />)
+          // The video keeps its own controls on the card, so Preview is a corner button rather than the whole video.
+          ? <div key={a.url} className="relative">
+              <video src={safeUrl(a.url)} controls playsInline className="w-full max-h-80 rounded bg-neutral-100 object-contain" />
+              <button type="button" onClick={() => setPreview(i)} aria-label={`Preview ${FORMAT_LABEL[format]} video`} title="Preview" className="absolute top-1 right-1 grid place-items-center h-7 w-7 rounded bg-black/55 text-white hover:bg-black/75"><Maximize2 className="w-3.5 h-3.5" /></button>
+            </div>
+          : <button key={a.url} type="button" onClick={() => setPreview(i)} aria-label={`Preview ${FORMAT_LABEL[format]} design, page ${i + 1}`} title="Preview" className="group relative block w-full self-start rounded cursor-zoom-in focus-visible:outline-2 focus-visible:outline-neutral-900">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={safeUrl(a.url)} alt={`${FORMAT_LABEL[format]} design, page ${i + 1}`} className="w-full max-h-80 rounded bg-neutral-100 object-contain" />
+              <span aria-hidden="true" className="absolute top-1 right-1 grid place-items-center h-7 w-7 rounded bg-black/55 text-white opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100"><Maximize2 className="w-3.5 h-3.5" /></span>
+            </button>)
           : <div className="h-40 rounded bg-neutral-100 grid place-items-center text-xs text-neutral-500">No design exported yet</div>}
       </div>
+      <DesignPreview assets={post.assets} index={preview} label={FORMAT_LABEL[format]} onIndex={setPreview} onClose={() => setPreview(null)} />
       <div className="flex flex-wrap gap-2 text-xs">
         {canvaUrl && <a href={canvaUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 underline"><ExternalLink className="w-3.5 h-3.5" /> Open in Canva</a>}
         {post.canva_design_id && <button type="button" onClick={onRefresh} disabled={!!busy || dirty || out} title={dirty ? "Save your edits first" : out ? "Already out" : ""} className="inline-flex items-center gap-1 underline disabled:opacity-40">

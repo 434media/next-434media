@@ -1,6 +1,7 @@
 "use client"
 
-import { futureDated } from "@/lib/content-pipeline/row-approval"
+import { formatOf, futureDated } from "@/lib/content-pipeline/row-approval"
+import { FORMAT_LABEL } from "@/lib/content-pipeline/create-table"
 import type { MetaConnectionReport } from "@/lib/owned-meta-connection"
 
 import { useState, useEffect, useRef } from "react"
@@ -33,6 +34,7 @@ import { useTeamMembers } from "@/hooks/useTeamMembers"
 import { DetailDrawer } from "@/components/admin/DetailDrawer"
 import { GeneratePanel } from "./GeneratePanel"
 import { AssetLibraryPicker } from "./AssetLibraryPicker"
+import { DesignPreview } from "./DesignPreview"
 import type { MetaBatch, MetaBrand, MetaFormat, MetaDestination } from "@/lib/owned-meta-publisher"
 
 interface ContentDetailDrawerProps {
@@ -118,6 +120,8 @@ export function ContentDetailDrawer({
   // Shared roster (active Firestore members), fetched when the drawer opens.
   const { members: teamMembers, isLoading: isLoadingMembers } = useTeamMembers(open)
   const [showUserDropdown, setShowUserDropdown] = useState(false)
+  // The asset open in the full-size Preview (Step 3 part 3), for review only.
+  const [preview, setPreview] = useState<number | null>(null)
   const [newLink, setNewLink] = useState("")
   const [newComment, setNewComment] = useState("")
   const [editingCommentId, setEditingCommentId] = useState<string | null>(null)
@@ -747,8 +751,15 @@ export function ContentDetailDrawer({
                           ) : (
                             <img src={sanitizeUrl(asset.url)} alt={`Asset ${index + 1}`} className="w-full h-full object-cover" />
                           )}
+                          <button
+                            type="button"
+                            onClick={() => setPreview(index)}
+                            aria-label={`Preview asset ${index + 1}`}
+                            title="Preview"
+                            className="absolute inset-0 cursor-zoom-in focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-blue-500"
+                          />
                           {asset.kind === "video" && (
-                            <span className="absolute bottom-0.5 left-0.5 px-1 py-0.5 text-[9px] font-medium text-white bg-black/60 rounded">
+                            <span className="pointer-events-none absolute bottom-0.5 left-0.5 px-1 py-0.5 text-[9px] font-medium text-white bg-black/60 rounded">
                               video
                             </span>
                           )}
@@ -761,6 +772,13 @@ export function ContentDetailDrawer({
                           </button>
                         </div>
                       ))}
+                      <DesignPreview
+                        assets={formData.assets}
+                        index={preview}
+                        label={post?.create_format ? FORMAT_LABEL[formatOf(post)] : "Design"}
+                        onIndex={setPreview}
+                        onClose={() => setPreview(null)}
+                      />
                     </div>
                   )}
                   <label className="flex items-center gap-2 px-4 py-3 rounded-lg border border-dashed border-gray-300 hover:border-blue-400 cursor-pointer transition-colors bg-gray-50 hover:bg-blue-50/30">
