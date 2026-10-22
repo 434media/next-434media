@@ -8,7 +8,7 @@ import { DesignPreview } from "./DesignPreview"
 import { CanvaChoice } from "./CreateTable"
 import { isCanvaLink, mediaFromCanva, mediaFromFile, type MediaResult } from "./row-media"
 import { CONTENT_POST_STATUS_OPTIONS, SOCIAL_PLATFORM_OPTIONS, type ContentPost, type CreateText, type SocialPlatform } from "./types"
-import { CREATE_ROWS_STORE_KEY, FORMAT_LABEL, isHandPosted, type CreateFormat, type CreateRow, type RowMedia } from "@/lib/content-pipeline/create-table"
+import { CREATE_ROWS_STORE_KEY, FORMAT_LABEL, ddmmmyy, isHandPosted, type CreateFormat, type CreateRow, type RowMedia } from "@/lib/content-pipeline/create-table"
 import { approvalCovers, awaitingApproval, formatOf, frozen, futureDated, goesOut, handPlatforms, isApproved, parsePages, platformsFor, publisherPlatforms, readiness, shownOf } from "@/lib/content-pipeline/row-approval"
 
 /**
@@ -42,7 +42,8 @@ const fromTemplate = (p: ContentPost) => !!p.create_row_id && !!p.intake?.reques
 function browserCardText(rowId: string): CreateText | undefined {
   try {
     const r = (JSON.parse(localStorage.getItem(CREATE_ROWS_STORE_KEY) ?? "[]") as CreateRow[]).find(x => x.id === rowId)
-    return r ? { brand: r.brand, kind: r.kind, headline: r.headline, subHeadline: r.subHeadline, fields: r.fields } : undefined
+    // The card's printed date as the Run job printed it (create-run createTextOf), never the post date edited since.
+    return r ? { brand: r.brand, kind: r.kind, headline: r.headline, subHeadline: r.subHeadline, fields: { ...r.fields, date: r.fields.date?.trim() || ddmmmyy(r.date) } } : undefined
   } catch { return undefined }
 }
 
@@ -151,7 +152,8 @@ export function RowApprovalDrawer({ rowId, open, onClose, onChanged, onOpenDetai
   const pasteCanva = () => { const u = canvaLink.trim(); if (!u) return; if (!isCanvaLink(u)) { setMediaNote({ busy: false, text: "Paste a Canva design link (canva.com/design/… or canva.link/…), or choose a file", error: true }); return } setCanvaLink(""); setPendingCanva(u) }
   const replaceMedia = async () => {
     if (!newMedia || !rowId) return
-    if (variations.some(v => isApproved(v.post) && fromTemplate(v.post)) && !window.confirm("Replacing the media sends the approved sizes back to Review; they need approving again. Replace it?")) return
+    const approved = variations.some(v => isApproved(v.post) && fromTemplate(v.post))
+    if (!window.confirm(`Replace the media in every size? Each size is made again from its template, so any edits made by hand in Canva on these designs are lost.${approved ? " The approved sizes go back to Review and need approving again." : ""}`)) return
     const text = templated.find(v => v.post.create_text)?.post.create_text ?? browserCardText(rowId)
     if (await call("replace", "POST", { action: "replace-media", media: newMedia, ...(text ? { text } : {}) })) { setNewMedia(null); setMediaNote(null) }
   }

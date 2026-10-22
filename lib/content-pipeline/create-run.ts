@@ -2,8 +2,8 @@ import { BRAND, activeProfile } from "./brand"
 import { SERIES, checkFields, normalizeFields } from "./series"
 import { contentPropertyOf } from "./properties"
 import { pipelineMarked, adoptablePost, PIPELINE_KEY_PREFIX } from "./ownership"
-import { FORMAT_LABEL, createTemplates, designText, exportFileBase, formatsOf, rowProblems, type CreateFormat, type CreateRow, type CreateTemplate } from "./create-table"
-import { frozen } from "./row-approval"
+import { FORMAT_LABEL, createTemplates, ddmmmyy, designText, exportFileBase, formatsOf, rowProblems, type CreateFormat, type CreateRow, type CreateTemplate } from "./create-table"
+import { frozen, isApproved } from "./row-approval"
 import { createHash } from "node:crypto"
 import type { ContentPost, CreateText } from "@/components/crm/types"
 import { canvaEditUrl, type CreateInput, type CreatedDesign } from "../canva-create"
@@ -35,6 +35,8 @@ export interface CreateRunDeps {
    */
   claimRow(rowId: string, by: string): Promise<boolean>
   releaseRow(rowId: string): Promise<void>
+  /** Send back to Review: an approved post's approval is withdrawn (firestore-crm sendBackToReview). */
+  sendBack(postId: string, actor: { email: string; name: string }): Promise<void>
   now(): string
 }
 export interface CreatedPost { format: CreateFormat; postId: string; designId: string; editUrl: string; previewUrl?: string; holds: string[]; reused: boolean }
@@ -117,9 +119,12 @@ async function runClaimedRow(deps: CreateRunDeps, row: CreateRow, template: Crea
   return posts
 }
 
-/** The row's card text and template, kept on each post so Replace media can re-fill the designs (Step 3 part 4). */
-export const createTextOf = (row: Pick<CreateRow, "brand" | "kind" | "headline" | "subHeadline" | "fields">): CreateText =>
-  ({ brand: row.brand, kind: row.kind, headline: row.headline, subHeadline: row.subHeadline, fields: { ...row.fields } })
+/**
+ * The row's card text and template, kept on each post so Replace media can re-fill the designs (Step 3 part 4). The
+ * card's printed date is kept as it was printed (fields.date), so a later change of the post date never moves it.
+ */
+export const createTextOf = (row: Pick<CreateRow, "brand" | "kind" | "headline" | "subHeadline" | "fields" | "date">): CreateText =>
+  ({ brand: row.brand, kind: row.kind, headline: row.headline, subHeadline: row.subHeadline, fields: { ...row.fields, date: row.fields.date?.trim() || ddmmmyy(row.date) } })
 
 /**
  * One format's design input, checked against its template; make() fills the template in Canva and exports it. The
@@ -153,16 +158,21 @@ export interface ReplacedPost { format: CreateFormat; postId: string; designId: 
 
 /**
  * Replace media (Step 3 part 4): every variation of a Create row that a template made gets its template filled again
- * with the same card text and the new photo or video, exported, and put on the same post. The caption, date and
- * platforms stay as they are; the posts stay in Review, and the new files void any approval (the guarded update resets
- * it, as a re-run after the row changed does). A variation attached by link (One-off) has no template to re-fill and
- * is left as it is. Refused, with nothing changed, if any of them is already out or publishing. Runs inside
- * withProfile(), under the row's claim, like the Run job.
+ * with the same card text (and the same printed date) and the new photo or video, exported, and put on the same post.
+ * The caption, post date and platforms stay as they are; the posts stay in Review. A variation attached by link
+ * (One-off) has no template to re-fill and is left as it is. Refused, with nothing changed, if any of them is already
+ * out or publishing. Runs inside withProfile(), under the row's claim, like the Run job.
+ *
+ * Never a split row: every design is filled and exported in Canva first (a failure there changes no post); then every
+ * size about to change that is approved is sent back to Review, approval withdrawn, before any file is replaced; only
+ * then are the new files put on the posts (the guarded update voids what's left of an approval). A failure while
+ * attaching can leave one size with old files, but never one still approved and publishable beside a changed one.
  */
-export async function replaceRowMedia(deps: CreateRunDeps, rowId: string, text: CreateText, media: NonNullable<CreateRow["media"]>, actor: { email: string }): Promise<{ posts: ReplacedPost[]; profileVersionId: string }> {
+export async function replaceRowMedia(deps: CreateRunDeps, rowId: string, text: CreateText, media: NonNullable<CreateRow["media"]>, actor: { email: string; name: string }): Promise<{ posts: ReplacedPost[]; profileVersionId: string }> {
   const { versionId } = activeProfile()
   const template = createTemplates(activeProfile().profile).find(t => t.kind === text.kind)
   if (!template) throw new CreateRowError([`This brand's profile no longer has the template this row was made with (${text.kind})`])
+  if (!text.fields.date?.trim()) throw new CreateRowError(["The card's printed date isn't known for this row; run it again from Create"])
   const found = await Promise.all((["feed", "reels"] as const).map(async format => ({ format, post: adoptablePost(await deps.findByRequestId(createRequestId(rowId, format))) })))
   const made = found.filter((x): x is { format: CreateFormat; post: ContentPost } => !!x.post && x.post.create_row_id === rowId)
   if (!made.length) throw new CreateRowError(["Nothing in this row was made from a template; use One-off to attach a finished design"], 409)
@@ -174,17 +184,24 @@ export async function replaceRowMedia(deps: CreateRunDeps, rowId: string, text: 
     const plans = []
     for (const { format, post } of made) {
       if (!template.templates[format]) throw new CreateRowError([`${template.label} has no ${FORMAT_LABEL[format]} template any more`])
-      const filled = await fillFormat(deps, template, { ...text, date: post.date_to_post ?? "", media }, format)
+      // The printed date is the card's own (text.fields.date), never rebuilt from a post date edited since.
+      const filled = await fillFormat(deps, template, { ...text, date: "", media }, format)
       if (!filled.hasMedia) throw new CreateRowError([`The ${FORMAT_LABEL[format]} template has no photo or video frame`])
       plans.push({ format, post, filled })
     }
     const posts: ReplacedPost[] = []
-    for (const { format, post, filled } of plans) {
-      if (post.create_input_hash === filled.inputHash && post.canva_design_id && post.assets.length) { posts.push({ format, postId: post.id, designId: post.canva_design_id, reused: true, holds: [] }); continue }
-      const { design, urls, asVideo } = await filled.make(`${createRequestId(rowId, format)}:${filled.inputHash}`, post.title)
+    const changing = plans.filter(({ post, filled }) => !(post.create_input_hash === filled.inputHash && post.canva_design_id && post.assets.length))
+    for (const { format, post } of plans) if (!changing.some(c => c.post.id === post.id)) posts.push({ format, postId: post.id, designId: post.canva_design_id!, reused: true, holds: [] })
+    // 1. Every design, in Canva only.
+    const ready = []
+    for (const c of changing) ready.push({ ...c, ...await c.filled.make(`${createRequestId(rowId, c.format)}:${c.filled.inputHash}`, c.post.title) })
+    // 2. Every approved size that will change goes back to Review first.
+    for (const { post } of ready) if (isApproved(post)) await deps.sendBack(post.id, actor)
+    // 3. The new files.
+    for (const { format, post, filled, design, urls, asVideo } of ready) {
       const items = asVideo ? [{ url: urls[0], label: `${format}-video` }] : urls.map((url, n) => ({ url, label: `${format}-page-${n + 1}` }))
       const attached = await deps.attachExports({ postId: post.id, items, canva: { designId: design.designId }, fileBase: exportFileBase(BRAND.id, post.date_to_post ?? "", text.headline), rebind: true })
-      await deps.updatePost(post.id, { create_input_hash: filled.inputHash, create_text: createTextOf(text), canva_pages: [], profile_version_id: versionId })
+      await deps.updatePost(post.id, { create_input_hash: filled.inputHash, create_text: { ...text, fields: { ...text.fields } }, canva_pages: [], profile_version_id: versionId })
       posts.push({ format, postId: post.id, designId: design.designId, reused: false, holds: [...attached.holds, ...(design.folderProblem ? [design.folderProblem] : [])] })
     }
     return { posts, profileVersionId: versionId }
@@ -212,6 +229,7 @@ export async function createRunDeps(): Promise<CreateRunDeps> {
     attachExports: input => attachExports(tools.intake, { ...input, randomId: tools.randomId }),
     claimRow: (rowId, by) => crm.claimCreateRun(rowId, by, Date.now()),
     releaseRow: rowId => crm.releaseCreateRun(rowId),
+    sendBack: (postId, actor) => crm.sendBackToReview(postId, actor, "Media replaced in the drawer"),
     now: () => new Date().toISOString(),
   }
 }

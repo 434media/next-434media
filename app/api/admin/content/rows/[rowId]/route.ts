@@ -57,7 +57,7 @@ const postBody = z.discriminatedUnion("action", [
   }).strict()) }),
   z.object({ action: z.literal("publish"), postId: z.string().max(64), hash: z.string().max(128), early: z.boolean().optional() }),
   z.object({ action: z.literal("hand-post"), postId: z.string().max(64), platform: PLATFORM, url: z.string().max(2000), fingerprint: z.string().regex(/^[a-f0-9]{64}$/) }),
-  z.object({ action: z.literal("replace-media"), media: MEDIA, text: CARD_TEXT.optional() }),
+  z.object({ action: z.literal("replace-media"), media: MEDIA, text: CARD_TEXT.optional() }).strict(),
 ])
 
 const production = () => process.env.VERCEL_ENV === "production"
@@ -240,7 +240,7 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ rowId: str
       const profile = await createProfile(text.brand)
       if ("error" in profile) return refuse(profile.error, profile.status)
       const [{ withProfile }, { replaceRowMedia, createRunDeps }] = await Promise.all([import("@/lib/content-pipeline/brand"), import("@/lib/content-pipeline/create-run")])
-      const result = await withProfile(profile.active, async () => replaceRowMedia(await createRunDeps(), rowId, text, media, { email }))
+      const result = await withProfile(profile.active, async () => replaceRowMedia(await createRunDeps(), rowId, text, media, { email, name }))
       console.info("[content/rows]", JSON.stringify({ by: email, row: rowId, action: "replace-media", kind: media.kind, version: result.profileVersionId, posts: result.posts.map(x => ({ format: x.format, post: x.postId, design: x.designId, reused: x.reused })) }))
       // A One-off variation (attached by link) has no template to re-fill; the drawer says so.
       const oneOff = posts.filter(p => !result.posts.some(x => x.postId === p.id) && !frozen(p)).map(p => FORMAT_LABEL[formatOf(p)])
