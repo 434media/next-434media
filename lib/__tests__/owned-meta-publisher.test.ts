@@ -1,7 +1,7 @@
 /** Offline only. Run with tsx --test; all transport/persistence is injected. */
 import { test } from "node:test"
 import assert from "node:assert/strict"
-import { beginFacebookRecovery, guardFacebookRetryDispatch, draftBatch, manifestHash, dryRun, resetUnpublishedPreparation, assertOperatorSettlement, confirmStoppedRun, runtimePublishingEnabled, validateMetaMutationBoundary, runOwnedMeta, guardedContentUpdate, type MetaManifest, type MetaRecord, type MetaStore, type MetaProvider, type MetaDestination } from "../owned-meta-publisher"
+import { beginFacebookRecovery, guardFacebookRetryDispatch, draftBatch, manifestHash, dryRun, resetUnpublishedPreparation, assertOperatorSettlement, confirmStoppedRun, runtimePublishingEnabled, validateMetaMutationBoundary, runOwnedMeta, guardedContentUpdate, sendBackPlan, type MetaManifest, type MetaRecord, type MetaStore, type MetaProvider, type MetaDestination } from "../owned-meta-publisher"
 import { createMetaProvider, checkMetaCapability, type MetaPublishingEvidence } from "../instagram-publishing"
 import { assetDigest, assertApprovedBlobUrl, verifyAssetBytes, readTrustedAsset, measureExport } from "../owned-meta-assets"
 
@@ -358,4 +358,21 @@ test("recovery UI clears Cancel and locks repeated submissions through dismissal
     await act(async()=>{resolvePost!(Response.json({batch:uncertainFacebook().batch}));await Promise.resolve()})
     assert.equal(host.textContent,"");assert.equal(posts,1)
   } finally {await act(async()=>root.unmount());dom.window.close();for(const k of keys){if(saved[k])Object.defineProperty(globalThis,k,saved[k]!);else Reflect.deleteProperty(globalThis,k)}}
+})
+
+test("Send back to Review withdraws an approval before anything goes out, and is refused after", () => {
+  const actor = { email: "r@x.co", name: "R" }, at = "2026-10-21T00:00:00Z"
+  const r = record()
+  const publisher = sendBackPlan({ status: "approved", owned_meta: { batchId: r.batch.id, hash: r.batch.hash, started: false }, owned_meta_revision: 1, approvals: [{ decision: "approved" }] }, r.batch, actor, at, "n")
+  assert.equal(publisher.revokeBatch, true)
+  assert.equal(publisher.post.status, "needs_approval"); assert.equal(publisher.post.owned_meta, null); assert.equal(publisher.post.owned_meta_revision, 2)
+  assert.deepEqual((publisher.post.approvals as { decision: string }[]).map(a => a.decision), ["approved", "sent_back"])
+  const hand = sendBackPlan({ status: "approved", approvals: [{ decision: "approved", export_fingerprint: "f" }] }, undefined, actor, at, "n")
+  assert.equal(hand.revokeBatch, false); assert.equal("owned_meta" in hand.post, false)
+  assert.equal((hand.post.approvals as { decision: string }[]).at(-1)!.decision, "sent_back")
+  assert.throws(() => sendBackPlan({ status: "approved", owned_meta: { started: true } }, r.batch, actor, at, "n"), /Publishing has started/)
+  assert.throws(() => sendBackPlan({ status: "approved", owned_meta: { started: false } }, { ...r.batch, claim: "run-1" }, actor, at, "n"), /Publishing has started/)
+  assert.throws(() => sendBackPlan({ status: "approved", hand_posts: [{ platform: "tiktok" }] }, undefined, actor, at, "n"), /already out/)
+  assert.throws(() => sendBackPlan({ status: "posted" }, undefined, actor, at, "n"), /already out/)
+  assert.throws(() => sendBackPlan({ status: "needs_approval" }, undefined, actor, at, "n"), /Only an approved/)
 })

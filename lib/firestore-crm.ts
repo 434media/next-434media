@@ -1,4 +1,4 @@
-import { runtimePublishingEnabled, guardedContentUpdate, draftBatch, manifestHash, isExcludedPostId, MetaBlocked, type MetaManifest, type MetaBatch, type MetaStore, type MetaRecord, type MetaBrand } from "./owned-meta-publisher"
+import { runtimePublishingEnabled, guardedContentUpdate, sendBackPlan, draftBatch, manifestHash, isExcludedPostId, MetaBlocked, type MetaManifest, type MetaBatch, type MetaStore, type MetaRecord, type MetaBrand } from "./owned-meta-publisher"
 import { getDb, admin } from "./firebase-admin"
 import { createHash } from "node:crypto"
 import { normalizeAssigneeName } from "../components/crm/types"
@@ -1375,7 +1375,7 @@ export async function createContentPost(postData: Omit<ContentPost, "id" | "crea
   }
 }
 
-export async function updateContentPost(id: string, updates: Partial<ContentPost>): Promise<ContentPost> {
+export async function updateContentPost(id: string, updates: Partial<ContentPost>, actor?: { email: string; name: string }): Promise<ContentPost> {
   try {
     const db = getDb()
     const FieldValue = admin.firestore.FieldValue
@@ -1397,7 +1397,18 @@ export async function updateContentPost(id: string, updates: Partial<ContentPost
         // A new revision can supersede settled or unpublished work, never an active/unknown final call.
         if (batch && !batch.claim && Object.values(batch.jobs).every(j => !j.finalIntent || j.status === "verified" || j.status === "operator_confirmed")) guardView = { ...existing, owned_meta: { ...existing.owned_meta, started: false } }
       }
-      const protectedUpdates = guardedContentUpdate(guardView, updateData as Record<string, unknown>)
+      let protectedUpdates = guardedContentUpdate(guardView, updateData as Record<string, unknown>)
+      // Moving an approved or scheduled post out of Schedule (the status menu) withdraws its approval, exactly as Send
+      // back to Review does; otherwise its approved batch would stay publishable.
+      const leaving = typeof protectedUpdates.status === "string" && ["approved", "scheduled"].includes(String(existing.status)) && !["approved", "scheduled", "posted"].includes(protectedUpdates.status)
+      // A caller writing its own decision (the reject route) keeps it; publisher posts can't take one (guarded above).
+      if (leaving && !("approvals" in updateData) && protectedUpdates.owned_meta !== null) {
+        const batchRef = existing.owned_meta?.batchId ? docRef.collection(META_BATCHES).doc(existing.owned_meta.batchId) : null
+        const batch = batchRef ? (await tx.get(batchRef)).data() as MetaBatch | undefined : undefined
+        const plan = sendBackPlan(existing, batch, actor ?? { email: "", name: "Status change" }, new Date().toISOString(), "Status changed out of Schedule")
+        if (plan.revokeBatch && batchRef) tx.update(batchRef, { revoked: true })
+        protectedUpdates = { ...protectedUpdates, ...plan.post, status: protectedUpdates.status }
+      }
       tx.update(docRef, { ...protectedUpdates, updated_at: FieldValue.serverTimestamp() })
     })
     
@@ -1797,6 +1808,19 @@ export function canvaCreateLedger(): import("./canva-create").CreateLedger {
   }
 }
 /**
+ * The Canva team folder new designs move into (Step 3 part 2), found by name and its id kept beside the ledger. The
+ * name defaults to the folder the founder made ("434 Working Designs"); CANVA_WORKING_FOLDER_NAME overrides it.
+ */
+export function canvaWorkingFolder(): import("./canva-create").WorkingFolder {
+  const ref = () => getDb().collection("crm_meta").doc("owned_meta_canva")
+  const name = process.env.CANVA_WORKING_FOLDER_NAME?.trim() || "434 Working Designs"
+  return {
+    name,
+    async get() { const d = (await ref().get()).data()?.working_folder; return d && d.name === name && typeof d.id === "string" ? d.id : null },
+    async put(id) { await ref().set({ working_folder: id ? { id, name, at: new Date().toISOString() } : admin.firestore.FieldValue.delete() }, { merge: true }) },
+  }
+}
+/**
  * The Create table's per-row run claim (lib/content-pipeline/create-run.ts claimRow), beside the Canva ledger. The lease
  * outlives the create-run route's maxDuration (800 s), so a run that died without releasing frees the row on its own.
  */
@@ -1846,6 +1870,20 @@ export async function getContentPostsByCreateRow(rowId: string): Promise<Content
     const data = doc.data()
     return { ...data, id: doc.id, assets: normalizeAssets(data.assets), created_at: convertTimestamp(data.created_at), updated_at: convertTimestamp(data.updated_at) } as ContentPost
   }).sort((a, b) => (a.create_format === b.create_format ? a.id.localeCompare(b.id) : a.create_format === "feed" ? -1 : 1))
+}
+/** Send back to Review (Step 3 part 2): withdraws the post's approval in one transaction (owned-meta-publisher sendBackPlan). */
+export async function sendBackToReview(id: string, actor: { email: string; name: string }, note = "Sent back to Review"): Promise<void> {
+  const ref = getDb().collection(CRM_COLLECTIONS.CONTENT_POSTS).doc(id)
+  await getDb().runTransaction(async tx => {
+    const data = (await tx.get(ref)).data()
+    if (!data) throw new MetaBlocked("Content post not found")
+    const batchRef = data.owned_meta?.batchId ? ref.collection(META_BATCHES).doc(data.owned_meta.batchId) : null
+    const batch = batchRef ? (await tx.get(batchRef)).data() as MetaBatch | undefined : undefined
+    const plan = sendBackPlan(data, batch, actor, new Date().toISOString(), note)
+    if (plan.revokeBatch && batchRef) tx.update(batchRef, { revoked: true })
+    tx.update(ref, { ...plan.post, updated_at: admin.firestore.FieldValue.serverTimestamp() })
+  })
+  invalidateCache(CRM_COLLECTIONS.CONTENT_POSTS)
 }
 /**
  * Approves a variation posted only by hand (TikTok, YouTube Shorts, LinkedIn): there is no publisher manifest, so the

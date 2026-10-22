@@ -885,7 +885,7 @@ export function ContentDetailDrawer({
                       <div className="min-w-0 text-sm">
                         <p className={latestApproval.decision === "approved" ? "text-blue-800" : "text-red-800"}>
                           <span className="font-medium">
-                            {latestApproval.decision === "approved" ? "Approved" : "Changes requested"}
+                            {latestApproval.decision === "approved" ? "Approved" : latestApproval.decision === "sent_back" ? "Sent back to Review" : "Changes requested"}
                           </span>{" "}
                           by {latestApproval.by_name} · {formatDate(latestApproval.at)}
                         </p>

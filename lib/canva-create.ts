@@ -15,7 +15,13 @@ import { canvaAccessToken, CanvaError, exportDesignJpg, CANVA_API, type CanvaDep
  *  - POST /asset-uploads (octet-stream, Asset-Upload-Metadata {name_base64}); GET /asset-uploads/{job}  asset:write / asset:read
  *  - POST /autofills {brand_template_id, title, data}; GET /autofills/{job}   design:content:write / design:meta:read
  *    Available on Canva Pro, Teams and Enterprise; the new design's edit/view urls last 30 days.
+ *  - GET  /folders/root/items?item_types=folder; POST /folders/move {to_folder_id, item_id}   folder:read / folder:write
+ *    (read 2026-10-21). `root` is the top of the connected user's Projects; the move answers 204 with no body.
  * Idempotent per requestId through the injected ledger, so a retried request returns the design it already made.
+ *
+ * The team folder (founder, 2026-10-20: Canva Business): every new design is moved into the shared "434 Working
+ * Designs" folder right after autofill, so the team opens it with their own Canva logins. The folder is found by name
+ * once and its id kept (deps.folder); a design that can't be moved is still made, and says why (folderProblem).
  */
 export interface CreateLedger {
   get(requestId: string): Promise<CreatedDesign | null>
@@ -32,6 +38,14 @@ export interface CreateDeps {
   cropImage?(bytes: Uint8Array, box: CropBox): Promise<Uint8Array>
   /** Brand templates the service may fill. Anything else is refused. */
   allowedTemplates: ReadonlySet<string>
+  /** The shared team folder new designs are moved into, when configured. */
+  folder?: WorkingFolder
+}
+/** The team folder by name, with its id kept once found (never hard-coded). */
+export interface WorkingFolder {
+  name: string
+  get(): Promise<string | null>
+  put(id: string | null): Promise<void>
 }
 export interface CreateInput {
   requestId: string
@@ -58,7 +72,17 @@ export interface CreatedDesign {
   video?: { field: string; url: string; bytes: number; assetId: string }
   previewUrls: string[]
   createdAt: string
+  /** The team folder the design was moved into, or why it wasn't (the design is still made). */
+  folderId?: string
+  folderProblem?: string
 }
+
+/**
+ * A design's permanent links. The API's edit_url and view_url expire after 30 days; these don't, and open for anyone the
+ * design (or its folder) is shared with.
+ */
+export const canvaEditUrl = (designId: string) => `https://www.canva.com/design/${encodeURIComponent(designId)}/edit`
+export const canvaViewUrl = (designId: string) => `https://www.canva.com/design/${encodeURIComponent(designId)}/view`
 
 const ID = /^[A-Za-z0-9_-]{6,64}$/
 const FIELD = /^[a-z][a-z0-9_]{0,63}$/
@@ -149,10 +173,44 @@ export async function createFromTemplate(deps: CreateDeps, input: CreateInput, l
   const job = await poll(deps.canva, token, "/autofills", started.job as Job, limits)
   const d = job.result?.design
   if (!d?.id || !ID.test(d.id)) throw new CanvaError("Canva did not return the new design", "design")
+  const folder = deps.folder ? await moveToWorkingFolder(deps.canva, token, deps.folder, d.id).then(id => ({ folderId: id }), (err: unknown) => ({ folderProblem: `Not moved to the Canva folder "${deps.folder!.name}": ${err instanceof CanvaError ? err.message : "the move failed"}` })) : {}
   const previewUrls = await exportDesignJpg(deps.canva, { designId: d.id })
-  const design: CreatedDesign = { designId: d.id, title: d.title || title, editUrl: d.urls?.edit_url || "", viewUrl: d.urls?.view_url || "", templateId: input.templateId, fields: entries.map(([k]) => k), ...(image ? { image } : {}), ...(video ? { video } : {}), previewUrls, createdAt: new Date(deps.canva.nowMs()).toISOString() }
+  const design: CreatedDesign = { designId: d.id, title: d.title || title, editUrl: canvaEditUrl(d.id), viewUrl: canvaViewUrl(d.id), templateId: input.templateId, fields: entries.map(([k]) => k), ...(image ? { image } : {}), ...(video ? { video } : {}), previewUrls, createdAt: new Date(deps.canva.nowMs()).toISOString(), ...folder }
   await deps.ledger.put(input.requestId, design)
   return { design, reused: false }
+}
+
+/** The team folder's id: the kept one, else found by exact name (case aside) among the folders at the top of Projects. */
+async function findWorkingFolder(deps: CanvaDeps, token: string, folder: WorkingFolder): Promise<string> {
+  const kept = await folder.get()
+  if (kept) return kept
+  const want = folder.name.trim().toLowerCase()
+  let continuation = ""
+  for (let page = 0; page < 20; page++) {
+    const q = new URLSearchParams({ item_types: "folder", limit: "100", ...(continuation ? { continuation } : {}) })
+    const data = await api(deps, token, `/folders/root/items?${q}`)
+    const items = (Array.isArray(data.items) ? data.items : []) as { type?: string; folder?: { id?: string; name?: string } }[]
+    const hit = items.find(i => i.type === "folder" && i.folder?.id && ID.test(i.folder.id) && (i.folder.name ?? "").trim().toLowerCase() === want)
+    if (hit) { await folder.put(hit.folder!.id!); return hit.folder!.id! }
+    continuation = typeof data.continuation === "string" ? data.continuation : ""
+    if (!continuation) break
+  }
+  throw new CanvaError(`no folder named "${folder.name}" in the connected Canva account's Projects`, "folder_not_found")
+}
+
+/** Moves a new design into the team folder. A kept id that no longer resolves is forgotten and the folder found again. */
+export async function moveToWorkingFolder(deps: CanvaDeps, token: string, folder: WorkingFolder, designId: string): Promise<string> {
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const id = await findWorkingFolder(deps, token, folder)
+    try {
+      await api(deps, token, "/folders/move", { method: "POST", body: JSON.stringify({ to_folder_id: id, item_id: designId }) })
+      return id
+    } catch (err) {
+      if (attempt === 0 && err instanceof CanvaError && err.code === "folder_not_found") { await folder.put(null); continue }
+      throw err
+    }
+  }
+  throw new CanvaError("the folder could not be found", "folder_not_found")
 }
 
 /**

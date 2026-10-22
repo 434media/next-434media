@@ -193,7 +193,8 @@ export async function PUT(request: NextRequest) {
       }
     })
 
-    const post = await updateContentPost(id, updates)
+    // The actor is recorded when a status change withdraws an approval (updateContentPost, Step 3 part 2).
+    const post = await updateContentPost(id, updates, { email: authResult.session.email, name: authResult.session.name?.trim() || authResult.session.email })
 
     // Entered Review (from any other status) → alert the reviewers. Covers the
     // drawer status dropdown, the Board drag-to-Review, and re-submission after

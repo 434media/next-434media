@@ -133,6 +133,12 @@ export function designText(t: Pick<CreateTemplate, "fields">, row: Pick<CreateRo
   return { text, unfilled }
 }
 
+/** The readable part of a variation's file names: brand, post date and headline (milcity-2026-10-21-himars-at-fort-sill). */
+export function exportFileBase(brand: string, date: string, headline: string): string {
+  const slug = (v: string, max: number) => v.normalize("NFKD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, max).replace(/-+$/, "")
+  return [slug(brand, 20), /^\d{4}-\d{2}-\d{2}$/.test(date) ? date : "", slug(headline, 50)].filter(Boolean).join("-")
+}
+
 const MONTHS = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"]
 /** DDMMMYY (19OCT26) from YYYY-MM-DD, as the cards print it. */
 export function ddmmmyy(isoDate: string): string {

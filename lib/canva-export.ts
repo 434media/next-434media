@@ -16,9 +16,10 @@ import { createCipheriv, createDecipheriv, createHash, randomBytes } from "node:
 export const CANVA_AUTHORIZE_URL = "https://www.canva.com/api/oauth/authorize"
 export const CANVA_TOKEN_URL = "https://api.canva.com/rest/v1/oauth/token"
 export const CANVA_API = "https://api.canva.com/rest/v1"
-// Reading/exporting designs, plus creating working designs from brand templates (lib/canva-create.ts).
-// A new scope must also be enabled on the Canva integration, then a super-admin reconnects once.
-export const CANVA_SCOPES = "design:content:read design:meta:read design:content:write asset:read asset:write brandtemplate:meta:read brandtemplate:content:read"
+// Reading/exporting designs, plus creating working designs from brand templates (lib/canva-create.ts) and moving them
+// into the team folder (folder:read, folder:write; Step 3 part 2). A new scope must also be enabled on the Canva
+// integration, then a super-admin reconnects once.
+export const CANVA_SCOPES = "design:content:read design:meta:read design:content:write asset:read asset:write brandtemplate:meta:read brandtemplate:content:read folder:read folder:write"
 
 export interface CanvaClient { clientId: string; clientSecret: string; redirectUri: string; tokenKey: Buffer }
 export interface CanvaTokens { accessToken: string; refreshToken: string; expiresAt: number }
@@ -105,8 +106,8 @@ export async function exportDesignJpg(deps: CanvaDeps, input: { designId: string
  * quality names the resolution only; the design keeps its own aspect ratio (canva.dev, read 2026-10-19). A video takes
  * longer to render, so the polling is longer: up to five minutes.
  */
-export async function exportDesignMp4(deps: CanvaDeps, input: { designId: string }, limits = { polls: 150, intervalMs: 2_000 }): Promise<string[]> {
-  return exportDesign(deps, { designId: input.designId, format: { type: "mp4", quality: "vertical_1080p" } }, limits)
+export async function exportDesignMp4(deps: CanvaDeps, input: { designId: string; pages?: number[] }, limits = { polls: 150, intervalMs: 2_000 }): Promise<string[]> {
+  return exportDesign(deps, { designId: input.designId, pages: input.pages, format: { type: "mp4", quality: "vertical_1080p" } }, limits)
 }
 async function exportDesign(deps: CanvaDeps, input: { designId: string; pages?: number[]; format: { type: "jpg"; quality: number } | { type: "mp4"; quality: string } }, limits: { polls: number; intervalMs: number }): Promise<string[]> {
   if (!/^[A-Za-z0-9_-]{6,64}$/.test(input.designId)) throw new CanvaError("Invalid Canva design id")
@@ -126,7 +127,7 @@ async function exportDesign(deps: CanvaDeps, input: { designId: string; pages?: 
   }
   if (job.status === "failed") throw new CanvaError("Canva could not export this design", job.error?.code)
   if (job.status !== "success" || !Array.isArray(job.urls) || !job.urls.length) throw new CanvaError("Canva export is still running; try again shortly", "timeout")
-  if (input.pages && job.urls.length !== input.pages.length) throw new CanvaError("Canva returned a different number of pages than requested")
+  if (input.pages && input.format.type === "jpg" && job.urls.length !== input.pages.length) throw new CanvaError("Canva returned a different number of pages than requested")
   return job.urls
 }
 

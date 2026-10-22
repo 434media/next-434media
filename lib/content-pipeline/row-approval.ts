@@ -160,6 +160,48 @@ export function canvaDesignIdFromLink(raw: string): string | null {
   return m ? m[1] : null
 }
 
+/**
+ * A design id from a pasted link, following a canva.link short link (Canva's Share → Copy link) on the server: each
+ * hop must stay on canva.link or canva.com, at most five hops. Null when the link names no design.
+ */
+export async function resolveCanvaDesignLink(raw: string, fetcher: typeof fetch): Promise<string | null> {
+  const direct = canvaDesignIdFromLink(raw)
+  if (direct) return direct
+  let url: URL
+  try { url = new URL(raw.trim()) } catch { return null }
+  if (url.protocol !== "https:" || url.hostname !== "canva.link") return null
+  for (let hop = 0; hop < 5; hop++) {
+    const res = await fetcher(url, { method: "GET", redirect: "manual", cache: "no-store", signal: AbortSignal.timeout(10_000) })
+    const location = res.headers.get("location")
+    await res.body?.cancel().catch(() => {})
+    if (!location) return null
+    let next: URL
+    try { next = new URL(location, url) } catch { return null }
+    const id = canvaDesignIdFromLink(next.toString())
+    if (id) return id
+    if (next.protocol !== "https:" || !(next.hostname === "canva.link" || /(^|\.)canva\.com$/.test(next.hostname))) return null
+    url = next
+  }
+  return null
+}
+
+/** Pages typed as "2" or "1, 3" (1–10 page numbers, in order); null when it isn't that. */
+export function parsePages(raw: string): number[] | null {
+  const parts = raw.split(/[\s,]+/).filter(Boolean)
+  if (!parts.length || parts.length > 10 || parts.some(p => !/^\d{1,3}$/.test(p))) return null
+  const pages = parts.map(Number)
+  return pages.every(n => n >= 1 && n <= 200) && new Set(pages).size === pages.length ? pages : null
+}
+
+/** Today's date (YYYY-MM-DD) where the posts go out: 434 Media posts on San Antonio time. */
+export const POSTING_TIME_ZONE = "America/Chicago"
+export const todayIn = (timeZone = POSTING_TIME_ZONE, now = new Date()) => new Intl.DateTimeFormat("en-CA", { timeZone, year: "numeric", month: "2-digit", day: "2-digit" }).format(now)
+/**
+ * A variation dated after today. Publish now posts at once, whatever the date: scheduled publishing on a date is plan
+ * Step 5, so until then publishing such a post early needs an explicit confirmation.
+ */
+export const futureDated = (p: Pick<ContentPost, "date_to_post">, today = todayIn()) => /^\d{4}-\d{2}-\d{2}$/.test(p.date_to_post ?? "") && p.date_to_post! > today
+
 /** How a variation's design is exported: every 9:16 design and any design with a video as one MP4, else JPG pages. */
 export const exportAs = (p: Pick<ContentPost, "create_format" | "assets">, format: CreateFormat = formatOf(p)): "mp4" | "jpg" =>
   format === "reels" || p.assets.some(a => a.kind === "video") ? "mp4" : "jpg"

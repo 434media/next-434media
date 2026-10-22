@@ -3,8 +3,8 @@ import { z } from "zod4"
 import { requireContentRunner } from "../../../content-pipeline/auth"
 import { getContentPostsByCreateRow, updateContentPost, ownedMetaStore, decideOwnedMeta, approveHandPost, recordHandPost } from "@/lib/firestore-crm"
 import { MetaBlocked } from "@/lib/owned-meta-publisher"
-import { isHandPosted, FORMAT_LABEL, type CreateFormat } from "@/lib/content-pipeline/create-table"
-import { approveRow, canvaDesignIdFromLink, exportAs, formatOf, frozen, isApproved, platformsFor, RowApprovalError } from "@/lib/content-pipeline/row-approval"
+import { exportFileBase, isHandPosted, FORMAT_LABEL, type CreateFormat } from "@/lib/content-pipeline/create-table"
+import { approveRow, exportAs, formatOf, frozen, futureDated, isApproved, platformsFor, resolveCanvaDesignLink, RowApprovalError } from "@/lib/content-pipeline/row-approval"
 import { createRequestId } from "@/lib/content-pipeline/create-run"
 import { pipelineMarked } from "@/lib/content-pipeline/ownership"
 import type { ContentPost, SocialPlatform } from "@/components/crm/types"
@@ -22,14 +22,18 @@ export const maxDuration = 800
  *   GET    the row's variations, each with its publisher state
  *   PATCH  { caption?, date?, platforms?: { [postId]: SocialPlatform[] } } — edits never touch a design
  *   POST   { action: "refresh", postId }                         re-export the design from Canva (never refill)
- *          { action: "attach", designLink, format, postId? }     attach an existing Canva design by its link
+ *          { action: "attach", designLink, format, postId?, pages? }   attach an existing Canva design by its link (a
+ *                                                                canva.link short link is followed here); pages: {feed?, reels?}
+ *                                                                fills each format from those pages of one design
  *          { action: "approve", shown: { [postId]: { fingerprint, caption, date, platforms } }, aiGenerated, aiRealisticMedia? }
  *                                                                Approve & Schedule, bound to everything shown
- *          { action: "publish", postId, hash }                   publish an approved variation to Instagram and Facebook
+ *          { action: "publish", postId, hash, early? }           publish an approved variation to Instagram and Facebook;
+ *                                                                a post dated after today needs early: true (Step 5 schedules)
  *          { action: "hand-post", postId, platform, url, fingerprint }   record a hand post's live link
  */
 const ROW_ID = /^[A-Za-z0-9_-]{8,64}$/
 const PLATFORM = z.enum(["instagram", "facebook", "tiktok", "youtube", "linkedin"])
+const PAGES = z.array(z.number().int().min(1).max(200)).min(1).max(10)
 const patchBody = z.object({
   caption: z.string().max(2200).optional(),
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
@@ -37,15 +41,18 @@ const patchBody = z.object({
 }).strict()
 const postBody = z.discriminatedUnion("action", [
   z.object({ action: z.literal("refresh"), postId: z.string().max(64) }),
-  z.object({ action: z.literal("attach"), designLink: z.string().max(2000), format: z.enum(["feed", "reels"]), postId: z.string().max(64).optional() }),
+  z.object({ action: z.literal("attach"), designLink: z.string().max(2000), format: z.enum(["feed", "reels"]), postId: z.string().max(64).optional(),
+    pages: z.object({ feed: PAGES.optional(), reels: PAGES.optional() }).strict().optional() }),
   z.object({ action: z.literal("approve"), aiGenerated: z.boolean(), aiRealisticMedia: z.boolean().optional(), shown: z.record(z.string().max(64), z.object({
     fingerprint: z.string().regex(/^[a-f0-9]{64}$/), caption: z.string().max(2200), date: z.string().max(10), platforms: z.array(PLATFORM).max(5),
   }).strict()) }),
-  z.object({ action: z.literal("publish"), postId: z.string().max(64), hash: z.string().max(128) }),
+  z.object({ action: z.literal("publish"), postId: z.string().max(64), hash: z.string().max(128), early: z.boolean().optional() }),
   z.object({ action: z.literal("hand-post"), postId: z.string().max(64), platform: PLATFORM, url: z.string().max(2000), fingerprint: z.string().regex(/^[a-f0-9]{64}$/) }),
 ])
 
 const production = () => process.env.VERCEL_ENV === "production"
+/** A variation's readable file names: brand, post date and the headline from its generated title. */
+const fileBaseOf = (p: ContentPost) => exportFileBase(p.intake?.metaBrand || String(p.platform ?? ""), p.date_to_post ?? "", p.title.split(" — ").slice(1).join(" — ") || p.title)
 const refuse = (error: string, status: number) => NextResponse.json({ error }, { status })
 
 /** Each variation with its publisher batch (the exact manifest an approval binds), when it has one. */
@@ -131,59 +138,81 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ rowId: str
     const inRow = (id: string) => posts.find(p => p.id === id)
 
     if (body.action === "refresh" || body.action === "attach") {
-      let post: ContentPost | undefined, designId: string, format: CreateFormat
+      // What to export onto which variation: one target for a refresh or a plain attach, one per format when a design's
+      // pages fill several formats. Every target is checked before anything is exported.
+      const targets: { post?: ContentPost; format: CreateFormat; pages?: number[] }[] = []
+      let designId: string
       if (body.action === "refresh") {
-        post = inRow(body.postId)
+        const post = inRow(body.postId)
         if (!post?.canva_design_id) return refuse("This variation has no Canva design to refresh", 409)
-        designId = post.canva_design_id; format = formatOf(post)
         if (frozen(post)) return refuse("This variation is already out or publishing; its design can't change", 409)
+        designId = post.canva_design_id
+        targets.push({ post, format: formatOf(post), ...(post.canva_pages?.length ? { pages: post.canva_pages } : {}) })
       } else {
-        const id = canvaDesignIdFromLink(body.designLink)
-        if (!id) return refuse("Paste a Canva design link (canva.com/design/…)", 400)
-        designId = id; format = body.format
+        const id = await resolveCanvaDesignLink(body.designLink, fetch).catch(() => null)
+        if (!id) return refuse("Paste a Canva design link (canva.com/design/… or a canva.link share link)", 400)
+        designId = id
+        const byPage = Object.entries(body.pages ?? {}).filter((e): e is [CreateFormat, number[]] => !!e[1]?.length)
         if (body.postId) {
-          post = inRow(body.postId)
+          const post = inRow(body.postId)
           if (!post) return refuse("A variation changed; reload", 409)
           if (frozen(post)) return refuse("This variation is already out or publishing; its design can't change", 409)
-          format = formatOf(post) // an existing variation keeps its own format
-        }
-        else post = posts.find(p => formatOf(p) === format && !p.canva_design_id)
+          // An existing variation keeps its own format.
+          targets.push({ post, format: formatOf(post), ...(body.pages?.[formatOf(post)] ? { pages: body.pages[formatOf(post)] } : {}) })
+        } else if (byPage.length) {
+          for (const [format, pages] of byPage) targets.push({ post: posts.find(p => formatOf(p) === format && !p.canva_design_id), format, pages })
+        } else targets.push({ post: posts.find(p => formatOf(p) === body.format && !p.canva_design_id), format: body.format })
       }
       const [{ ownedMetaConnectorDeps, canvaDeps }, { attachExports }, { exportDesignJpg, exportDesignMp4, CanvaError }, crm] = await Promise.all([
         import("@/lib/owned-meta-execution"), import("@/lib/owned-meta-intake"), import("@/lib/canva-export"), import("@/lib/firestore-crm"),
       ])
       const tools = await ownedMetaConnectorDeps()
+      // One design may fill several variations of this row (by page); never a post outside it.
       const bound = await crm.findContentPostByCanvaDesignId(designId)
-      if (bound && !bound.archived && bound.id !== post?.id) return refuse(`That design is already on another post (${bound.title})`, 409)
+      if (bound && !bound.archived && bound.create_row_id !== rowId && !targets.some(t => t.post?.id === bound.id)) return refuse(`That design is already on another post (${bound.title})`, 409)
       const { deps } = await canvaDeps()
       if (!deps) throw new CanvaError("Canva integration is not configured")
-      const as = exportAs(post ?? { create_format: format, assets: [] }, format)
-      const urls = as === "mp4" ? await exportDesignMp4(deps, { designId }) : await exportDesignJpg(deps, { designId })
-      if (!urls.length) return refuse("Canva returned no export for this design", 502)
-      if (!post) {
-        // A new variation in this row, from the row's own values: its title is generated like the Run job's.
-        const base = posts[0], now = new Date().toISOString(), baseFormat = formatOf(base)
-        const allowed = platformsFor(format)
-        const platforms = (base.social_platforms ?? []).filter(x => allowed.includes(x))
-        post = await crm.createContentPost(pipelineMarked({
-          user: base.user, date_created: now.slice(0, 10), platform: base.platform ?? "", status: "needs_approval",
-          title: base.title.replace(FORMAT_LABEL[baseFormat], FORMAT_LABEL[format]).slice(0, 200),
-          notes: `Attached by link in the approval drawer (Canva design ${designId}).`,
-          social_copy: base.social_copy ?? "", links: base.links ?? [], assets: [], tags: base.tags,
-          social_platforms: platforms.length ? platforms : ["instagram", "facebook"], date_to_post: base.date_to_post,
-          ...(base.profile_version_id ? { profile_version_id: base.profile_version_id } : {}),
-          create_row_id: rowId, create_format: format,
-          intake: { requestId: `${createRequestId(rowId, format)}:link:${designId}`, metaBrand: base.intake?.metaBrand ?? "", requestedBy: email, at: now },
-        } as Omit<ContentPost, "id" | "created_at" | "updated_at">))
+      const exported: { target: typeof targets[number]; urls: string[]; as: "mp4" | "jpg" }[] = []
+      for (const target of targets) {
+        const as = exportAs(target.post ?? { create_format: target.format, assets: [] }, target.format)
+        const urls = as === "mp4" ? await exportDesignMp4(deps, { designId, ...(target.pages ? { pages: target.pages } : {}) }) : await exportDesignJpg(deps, { designId, ...(target.pages ? { pages: target.pages } : {}) })
+        if (!urls.length) return refuse("Canva returned no export for this design", 502)
+        exported.push({ target, urls, as })
       }
-      const items = as === "mp4" ? [{ url: urls[0], label: `${format}-video` }] : urls.map((url, n) => ({ url, label: `${format}-page-${n + 1}` }))
-      // New files void an approval: the publisher's guarded update resets its own; a hand-post approval is reset in
-      // the same write as the files, so the post is never "approved" with files nobody saw.
-      const resetHand = isApproved(post) && !post.owned_meta
-      const intake = { ...tools.intake, setAssets: (id: string, assets: ContentPost["assets"], record: { export_fingerprint: string; export_staged_at: string; canva_design_id?: string }) => updateContentPost(id, { assets, ...record, ...(resetHand ? { status: "needs_approval" as const } : {}) }) }
-      const attached = await attachExports(intake, { postId: post.id, items, randomId: tools.randomId, canva: { designId } })
-      console.info("[content/rows]", JSON.stringify({ by: email, row: rowId, action: body.action, post: post.id, design: designId, reused: attached.reused }))
-      return NextResponse.json({ ...(await rowView(rowId)), holds: attached.holds, unchanged: attached.reused })
+      const holds: string[] = []
+      let unchanged = true
+      for (const { target, urls, as } of exported) {
+        let post = target.post
+        const format = target.format
+        if (!post) {
+          // A new variation in this row, from the row's own values: its title is the row's (the board shows the format).
+          const base = posts[0], now = new Date().toISOString()
+          const allowed = platformsFor(format)
+          const platforms = (base.social_platforms ?? []).filter(x => allowed.includes(x))
+          post = await crm.createContentPost(pipelineMarked({
+            user: base.user, date_created: now.slice(0, 10), platform: base.platform ?? "", status: "needs_approval",
+            title: base.title.replace(/ · (Feed 4:5|Reels 9:16)/, "").slice(0, 200),
+            notes: `Attached by link in the approval drawer (Canva design ${designId}${target.pages ? `, page ${target.pages.join(", ")}` : ""}).`,
+            social_copy: base.social_copy ?? "", links: base.links ?? [], assets: [], tags: base.tags,
+            social_platforms: platforms.length ? platforms : ["instagram", "facebook"], date_to_post: base.date_to_post,
+            ...(base.profile_version_id ? { profile_version_id: base.profile_version_id } : {}),
+            create_row_id: rowId, create_format: format, ...(target.pages ? { canva_pages: target.pages } : {}),
+            intake: { requestId: `${createRequestId(rowId, format)}:link:${designId}${target.pages ? `:p${target.pages.join("-")}` : ""}`, metaBrand: base.intake?.metaBrand ?? "", requestedBy: email, at: now },
+          } as Omit<ContentPost, "id" | "created_at" | "updated_at">))
+          posts.push(post)
+        }
+        const items = as === "mp4" ? [{ url: urls[0], label: `${format}-video` }] : urls.map((url, n) => ({ url, label: `${format}-page-${target.pages?.[n] ?? n + 1}` }))
+        // New files void an approval: the publisher's guarded update resets its own; a hand-post approval is reset in
+        // the same write as the files, so the post is never "approved" with files nobody saw.
+        const resetHand = isApproved(post) && !post.owned_meta
+        const pagesChange = body.action === "attach" ? { canva_pages: target.pages ?? [] } : {}
+        const intake = { ...tools.intake, setAssets: (id: string, assets: ContentPost["assets"], record: { export_fingerprint: string; export_staged_at: string; canva_design_id?: string }) => updateContentPost(id, { assets, ...record, ...pagesChange, ...(resetHand ? { status: "needs_approval" as const } : {}) }) }
+        const attached = await attachExports(intake, { postId: post.id, items, randomId: tools.randomId, canva: { designId, ...(target.pages ? { pages: target.pages } : {}) }, fileBase: fileBaseOf(post), ...(body.action === "attach" && post.canva_design_id !== designId ? { rebind: true } : {}) })
+        holds.push(...attached.holds)
+        unchanged &&= attached.reused
+        console.info("[content/rows]", JSON.stringify({ by: email, row: rowId, action: body.action, post: post.id, design: designId, pages: target.pages ?? null, reused: attached.reused }))
+      }
+      return NextResponse.json({ ...(await rowView(rowId)), holds: [...new Set(holds)], unchanged })
     }
 
     if (body.action === "approve") {
@@ -207,6 +236,8 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ rowId: str
       const { executeOwnedMeta, recordOwnedMetaFailure } = await import("@/lib/owned-meta-execution")
       const store = ownedMetaStore(), record = await store.read(post.id)
       if (record.batch.hash !== body.hash || !record.batch.approval) return refuse("The approved version changed; reload", 409)
+      // Publish now posts at once; until scheduled publishing (plan Step 5), a post dated after today needs a confirmation.
+      if (futureDated(post) && !body.early) return NextResponse.json({ error: `This post is dated ${post.date_to_post}. Publish now posts it today; confirm to publish early, or wait for scheduling.`, futureDate: post.date_to_post }, { status: 409 })
       const runId = crypto.randomUUID(), startedAt = new Date().toISOString()
       try {
         await executeOwnedMeta({ id: post.id, runId, record, store, trigger: "admin-drawer" })

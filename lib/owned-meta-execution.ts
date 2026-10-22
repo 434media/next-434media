@@ -166,7 +166,7 @@ export async function ownedMetaConnectorDeps(): Promise<import("@/lib/owned-meta
       const [{ createFromTemplate }, { CanvaError }, { publishedTemplateIds }] = await Promise.all([import("@/lib/canva-create"), import("@/lib/canva-export"), import("@/lib/firestore-brand-profiles")])
       const { deps } = await canvaDeps()
       if (!deps) throw new CanvaError("Canva integration is not configured")
-      return createFromTemplate({ canva: deps, ledger: crm.canvaCreateLedger(), allowedTemplates: await publishedTemplateIds(), streamVideo: async url => {
+      return createFromTemplate({ canva: deps, ledger: crm.canvaCreateLedger(), folder: crm.canvaWorkingFolder(), allowedTemplates: await publishedTemplateIds(), streamVideo: async url => {
         const safe = url.startsWith("https://") ? await isSafeRemoteUrl(url) : null
         if (!safe) throw new CanvaError("Video must be a public https URL", "video_url")
         const res = await fetchAllowingSafeRedirects(safe.url, safe.addresses)

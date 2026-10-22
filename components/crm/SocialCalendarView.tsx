@@ -32,6 +32,8 @@ interface SocialCalendarViewProps {
   onAddPost: () => void
   // Drag-and-drop status move on the Board (Produce ↔ Review only).
   onMovePost?: (postId: string, newStatus: ContentPostStatus) => void
+  // Schedule → Review: Send back to Review, which withdraws the approval on the server (Step 3 part 2). Reviewers only.
+  onSendBack?: (postId: string) => void
   // Bulk delete from the Board's select mode.
   onBulkDelete?: (ids: string[]) => void | Promise<void>
   // Optional control beside "Add post" (the content pipeline's Generate, for super-admins).
@@ -214,7 +216,9 @@ function PostCard({
             <span className="text-[9px] font-medium tabular-nums text-neutral-400">+{post.social_platforms.length - (compact ? 2 : 3)}</span>
           )}
         </div>
-        <span className={`truncate leading-tight font-medium text-neutral-900 ${compact ? "text-[11px]" : "text-xs"}`}>{post.title}</span>
+        <span className={`truncate leading-tight font-medium text-neutral-900 ${compact ? "text-[11px]" : "text-xs"}`}>{post.create_format ? post.title.replace(/ · (Feed 4:5|Reels 9:16)/, "") : post.title}</span>
+        {/* A Create row's variations share a title (Step 3 part 2); the aspect tells them apart. */}
+        {post.create_format && <span className="shrink-0 text-[9px] font-medium tabular-nums text-neutral-400">{post.create_format === "reels" ? "9:16" : "4:5"}</span>}
       </div>
 
       {/* A "no new content" notice from the content pipeline: marked as not a post, closed with one action. */}
@@ -290,7 +294,7 @@ function FilterSection({ title, options, selectedValues, onToggle, renderOption 
   )
 }
 
-export function SocialCalendarView({ contentPosts, onOpenPost, onAddPost, onMovePost, onBulkDelete, headerAction, hideAddPost, onCloseOutcome }: SocialCalendarViewProps) {
+export function SocialCalendarView({ contentPosts, onOpenPost, onAddPost, onMovePost, onSendBack, onBulkDelete, headerAction, hideAddPost, onCloseOutcome }: SocialCalendarViewProps) {
   // Top-level surface: "board" is the pipeline kanban (where date-less drafts &
   // in-review work live), "calendar" is the date grid (scheduled/posted only).
   // The pipeline belongs on the board, not as a filter over a date grid — a
@@ -372,14 +376,15 @@ export function SocialCalendarView({ contentPosts, onOpenPost, onAddPost, onMove
     { label: "Live", sublabel: "Published", statuses: ["posted"] },
   ]
 
-  // Only Produce ↔ Review are drag-movable — Schedule (approve) and Live
-  // (mark posted) stay gated server actions in the drawer. Everything else is a
-  // no-op drop. The target status is the entry status of the destination phase.
-  const DRAGGABLE_GROUPS = new Set(["Produce", "Review"])
+  // Produce ↔ Review are drag-movable, and Schedule → Review sends an approved post back (its approval is withdrawn
+  // on the server). Approving (into Schedule) and Live (mark posted) stay gated server actions in the drawer.
+  // Everything else is a no-op drop. The target status is the entry status of the destination phase.
+  const DRAGGABLE_GROUPS = new Set(["Produce", "Review", ...(onSendBack ? ["Schedule"] : [])])
   const moveStatusFor = (fromGroup: string, toGroup: string): ContentPostStatus | null => {
     if (fromGroup === toGroup) return null
     if (toGroup === "Review" && fromGroup === "Produce") return "needs_approval"
     if (toGroup === "Produce" && fromGroup === "Review") return "in_progress"
+    if (toGroup === "Review" && fromGroup === "Schedule" && onSendBack) return "needs_approval"
     return null
   }
 
@@ -390,7 +395,8 @@ export function SocialCalendarView({ contentPosts, onOpenPost, onAddPost, onMove
     if (!dragged || !onMovePost) return
     const next = moveStatusFor(dragged.fromGroup, toGroup)
     if (!next) return
-    onMovePost(dragged.id, next)
+    if (dragged.fromGroup === "Schedule") onSendBack?.(dragged.id)
+    else onMovePost(dragged.id, next)
   }
 
   // Bulk-select helpers.
