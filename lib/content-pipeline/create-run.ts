@@ -92,6 +92,11 @@ async function runClaimedRow(deps: CreateRunDeps, row: CreateRow, template: Crea
       posts.push({ format, postId: existing.id, designId: existing.canva_design_id, editUrl: canvaEditUrl(existing.canva_design_id), previewUrl: existing.assets[0]?.url, holds: [], reused: true })
       continue
     }
+    // A post made before designs were hashed that is already out stays as it is: the run reuses it, as it did then.
+    if (existing?.canva_design_id && !existing.create_input_hash && frozen(existing)) {
+      posts.push({ format, postId: existing.id, designId: existing.canva_design_id, editUrl: canvaEditUrl(existing.canva_design_id), previewUrl: existing.assets[0]?.url, holds: [], reused: true })
+      continue
+    }
     if (existing && frozen(existing)) throw new CreateRowError([`The ${FORMAT_LABEL[format]} post from this row is already out or publishing; its design can't change. Start a new row.`], 409)
     // The board title leaves the format out (the card shows it); the files carry brand, date and headline.
     const title = `${BRAND.shortName} ${template.label} — ${row.headline.replace(/\s+/g, " ").trim()}`.slice(0, 200)

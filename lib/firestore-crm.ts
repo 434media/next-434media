@@ -1405,9 +1405,12 @@ export async function updateContentPost(id: string, updates: Partial<ContentPost
       if (leaving && !("approvals" in updateData) && protectedUpdates.owned_meta !== null) {
         const batchRef = existing.owned_meta?.batchId ? docRef.collection(META_BATCHES).doc(existing.owned_meta.batchId) : null
         const batch = batchRef ? (await tx.get(batchRef)).data() as MetaBatch | undefined : undefined
-        const plan = sendBackPlan(existing, batch, actor ?? { email: "", name: "Status change" }, new Date().toISOString(), "Status changed out of Schedule")
-        if (plan.revokeBatch && batchRef) tx.update(batchRef, { revoked: true })
-        protectedUpdates = { ...protectedUpdates, ...plan.post, status: protectedUpdates.status }
+        // Where Send back would refuse (a publish already started, a hand post out), the status change goes through as
+        // before: there the approval is history, not a pending publish.
+        let plan: ReturnType<typeof sendBackPlan> | null = null
+        try { plan = sendBackPlan(existing, batch, actor ?? { email: "", name: "Status change" }, new Date().toISOString(), "Status changed out of Schedule") } catch (err) { if (!(err instanceof MetaBlocked)) throw err }
+        if (plan?.revokeBatch && batchRef) tx.update(batchRef, { revoked: true })
+        if (plan) protectedUpdates = { ...protectedUpdates, ...plan.post, status: protectedUpdates.status }
       }
       tx.update(docRef, { ...protectedUpdates, updated_at: FieldValue.serverTimestamp() })
     })

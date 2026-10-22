@@ -305,3 +305,12 @@ test("Run job: a post already out isn't given a new design; the board title leav
   assert.equal(exportFileBase("MilCityUSA", "2026-10-21", "¿Qué es SDOH? — A Look"), "milcityusa-2026-10-21-que-es-sdoh-a-look")
   assert.equal(exportFileBase("x", "not a date", ""), "x")
 })
+
+test("Run job: a post made before designs were hashed that is already out is reused, not refused", async () => {
+  const s = runDeps()
+  const r = await runCreateRow(s.deps, row(), { email: "a@x.co", name: "A" })
+  const post = s.posts.get(r.posts[0].postId)!
+  s.posts.set(post.id, { ...post, status: "posted", create_input_hash: undefined })
+  const again = await runCreateRow(s.deps, row(), { email: "a@x.co", name: "A" })
+  assert.ok(again.posts.every(p => p.reused)); assert.equal(s.made.length, 1)
+})

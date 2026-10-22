@@ -206,7 +206,7 @@ export async function moveToWorkingFolder(deps: CanvaDeps, token: string, folder
       await api(deps, token, "/folders/move", { method: "POST", body: JSON.stringify({ to_folder_id: id, item_id: designId }) })
       return id
     } catch (err) {
-      if (attempt === 0 && err instanceof CanvaError && err.code === "folder_not_found") { await folder.put(null); continue }
+      if (attempt === 0 && err instanceof CanvaError && ["folder_not_found", "not_found", "http_404"].includes(err.code ?? "")) { await folder.put(null); continue }
       throw err
     }
   }
