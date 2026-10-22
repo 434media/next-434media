@@ -393,6 +393,10 @@ export interface ContentPost {
   // What the post's design was made from (template, card text, media), hashed by the Run job (Step 3 part 2): a re-run
   // with the same hash reuses the design, a different one makes a new design for the post. Optional.
   create_input_hash?: string
+  // The row's card text the Run job filled the design with (Step 3 part 4): Replace media re-fills every size from the
+  // templates with this text and new media. Optional; posts made before it have none (the drawer then sends the row
+  // kept in the browser's Create table).
+  create_text?: CreateText
   // The design's pages this post was attached from, when one design fills several formats by page (the drawer's attach
   // by link); Refresh from Canva exports the same pages. Optional; absent means every page.
   canva_pages?: number[]
@@ -460,6 +464,9 @@ export interface PipelineMedia {
   date?: string
   rightsNote?: string
 }
+
+/** A Create row's card text and template, as the Run job filled them (ContentPost.create_text). */
+export interface CreateText { brand: string; kind: string; headline: string; subHeadline: string; fields: Record<string, string> }
 
 export interface HandPost {
   platform: SocialPlatform
