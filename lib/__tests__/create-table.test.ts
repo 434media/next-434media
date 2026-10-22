@@ -6,7 +6,7 @@
 import { test } from "node:test"
 import assert from "node:assert/strict"
 import { published, loadPublishedProfileFirst } from "./published-profile"
-import { CREATE_PLATFORMS, cellRoles, isHandPosted, platformIdsOf, templateGap, createTemplates, ddmmmyy, designText, formatsOf, rowProblems, type CreateRow } from "../content-pipeline/create-table"
+import { CREATE_PLATFORMS, cellRoles, isHandPosted, platformIdsOf, templateGap, createTemplates, ddmmmyy, designText, exportFileBase, formatsOf, rowProblems, type CreateRow } from "../content-pipeline/create-table"
 import { PAGE_LINK_MESSAGE, blobStoreHost, dvidsImagePage, isCreateUpload, isPageLink, isPageType, mediaKind, transcodeArgs, videoContainer, videoPlan } from "../content-pipeline/create-media"
 import { cardSubject } from "../content-pipeline/series"
 import { humanPlus, HumanPlusError, withoutMediaLines, type HumanPlusDeps } from "../content-pipeline/human-plus"
@@ -156,6 +156,7 @@ test("Human+ refuses an unreadable link with a reason the person can act on", as
 // ── Run job ──
 function runDeps() {
   const running = new Set<string>()
+  const bases: string[] = []
   const posts = new Map<string, ContentPost>(), made: { requestId: string; templateId: string; text: Record<string, string>; video?: unknown; image?: unknown }[] = [], exports: string[] = []
   const deps: CreateRunDeps = {
     templateFields: async () => ({ headline: "text", deck: "text", date: "text", source: "text", media: "image" }),
@@ -163,12 +164,13 @@ function runDeps() {
     exportDesign: async (id, as) => { exports.push(`${id}:${as}`); return [`https://export/${id}.${as}`] },
     findByRequestId: async id => [...posts.values()].find(p => p.intake?.requestId === id) ?? null,
     createPost: async p => { const post = { ...p, id: `post${posts.size + 1}`, created_at: "t", updated_at: "t" } as ContentPost; posts.set(post.id, post); return post },
-    attachExports: async ({ postId, items, canva }) => { const p = posts.get(postId)!; posts.set(postId, { ...p, assets: items.map(i => ({ url: i.url, kind: i.url.endsWith(".mp4") ? "video" : "image" })), export_fingerprint: "fp", canva_design_id: canva.designId } as ContentPost); return { holds: [] } },
+    updatePost: async (id, u) => { const post = { ...posts.get(id)!, ...u } as ContentPost; posts.set(id, post); return post },
+    attachExports: async ({ postId, items, canva, fileBase, rebind }) => { const p = posts.get(postId)!; if (p.canva_design_id && p.canva_design_id !== canva.designId && !rebind) throw new Error("bound"); bases.push(fileBase); posts.set(postId, { ...p, assets: items.map(i => ({ url: i.url, kind: i.url.endsWith(".mp4") ? "video" : "image" })), export_fingerprint: "fp", canva_design_id: canva.designId } as ContentPost); return { holds: [] } },
     claimRow: async id => { if (running.has(id)) return false; running.add(id); return true },
     releaseRow: async id => { running.delete(id) },
     now: () => "2026-10-19T15:00:00.000Z",
   }
-  return { deps, posts, made, exports, running }
+  return { deps, posts, made, exports, running, bases }
 }
 
 test("Run job: one design and one Review post per format, stamped, keyed by the row, with video exported as MP4", async () => {
@@ -272,4 +274,43 @@ test("Human+: a photo pasted from DVIDS keeps its credit and the DoW notice; the
   const unread = await humanPlus(hpDeps(ai, async (u: string) => { if (u.includes("dvidshub")) throw new Error("http_503"); return page }), { ...input, mediaFrom: dvidsPage.image })
   assert.ok(unread.caption.endsWith(`\n\n${DOD_NOTICE}`))
   assert.ok(unread.notes.some(n => /could not be read for the photo's credit/.test(n)))
+})
+
+test("Run job after the row changed: a new design on the same post, never the old one (the TEST / 0:05 design)", async () => {
+  const s = runDeps()
+  const first = await runCreateRow(s.deps, row(), { email: "a@x.co", name: "A" })
+  const changed = await runCreateRow(s.deps, row({ headline: "ARMY FIELDS NEWER KIT", caption: "New body." }), { email: "a@x.co", name: "A" })
+  assert.equal(changed.posts[0].reused, false)
+  assert.equal(changed.posts[0].postId, first.posts[0].postId, "the same post takes the new design")
+  assert.notEqual(changed.posts[0].designId, first.posts[0].designId)
+  assert.notEqual(s.made[0].requestId, s.made[1].requestId, "the Canva ledger is keyed by what the design is made from")
+  const post = s.posts.get(changed.posts[0].postId)!
+  assert.equal(post.social_copy, "New body.")
+  assert.match(post.title, /NEWER KIT$/)
+  // The same text again reuses it; new media makes another.
+  assert.ok((await runCreateRow(s.deps, row({ headline: "ARMY FIELDS NEWER KIT", caption: "New body." }), { email: "a@x.co", name: "A" })).posts.every(p => p.reused))
+  const media = { ...row().media!, url: "https://abc.public.blob.vercel-storage.com/content-create/q.jpg" }
+  assert.equal((await runCreateRow(s.deps, row({ headline: "ARMY FIELDS NEWER KIT", caption: "New body.", media }), { email: "a@x.co", name: "A" })).posts[0].reused, false)
+  assert.equal(s.made.length, 3)
+})
+
+test("Run job: a post already out isn't given a new design; the board title leaves the format out; files are named for people", async () => {
+  const s = runDeps()
+  const r = await runCreateRow(s.deps, row(), { email: "a@x.co", name: "A" })
+  const post = s.posts.get(r.posts[0].postId)!
+  assert.doesNotMatch(post.title, /Feed 4:5|Reels 9:16/)
+  assert.match(s.bases[0], /^[a-z0-9]+-2026-10-21-army-fields-new-kit$/)
+  s.posts.set(post.id, { ...post, status: "posted" })
+  await assert.rejects(runCreateRow(s.deps, row({ headline: "CHANGED" }), { email: "a@x.co", name: "A" }), (e: unknown) => e instanceof CreateRowError && e.status === 409)
+  assert.equal(exportFileBase("MilCityUSA", "2026-10-21", "¿Qué es SDOH? — A Look"), "milcityusa-2026-10-21-que-es-sdoh-a-look")
+  assert.equal(exportFileBase("x", "not a date", ""), "x")
+})
+
+test("Run job: a post made before designs were hashed that is already out is reused, not refused", async () => {
+  const s = runDeps()
+  const r = await runCreateRow(s.deps, row(), { email: "a@x.co", name: "A" })
+  const post = s.posts.get(r.posts[0].postId)!
+  s.posts.set(post.id, { ...post, status: "posted", create_input_hash: undefined })
+  const again = await runCreateRow(s.deps, row(), { email: "a@x.co", name: "A" })
+  assert.ok(again.posts.every(p => p.reused)); assert.equal(s.made.length, 1)
 })

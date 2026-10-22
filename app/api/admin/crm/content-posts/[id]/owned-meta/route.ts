@@ -1,7 +1,8 @@
 import { z } from "zod"
 import { NextResponse, type NextRequest } from "next/server"
 import { getSession, isAuthorizedAdmin, canSend, canRunContent, isCrmSuperAdmin } from "@/lib/auth"
-import { ownedMetaStore, ownedMetaPermissionBlocked } from "@/lib/firestore-crm"
+import { ownedMetaStore, ownedMetaPermissionBlocked, getContentPostById } from "@/lib/firestore-crm"
+import { futureDated } from "@/lib/content-pipeline/row-approval"
 import { resetUnpublishedPreparation, assertOperatorSettlement, confirmStoppedRun, MetaBlocked, META_BRANDS, type MetaBrand } from "@/lib/owned-meta-publisher"
 import { readTrustedAsset, verifyAssetBytes } from "@/lib/owned-meta-assets"
 import { checkOwnedMetaConnection } from "@/lib/owned-meta-connection"
@@ -16,6 +17,7 @@ const actionBody = z.object({
   templateRevision: z.string().default("unknown"), batchId: z.string().default(""), hash: z.string().default(""),
   destination: z.enum(["instagram", "facebook"]).optional(), remoteId: z.string().default(""), permalink: z.string().default(""),
   expectedAttemptId: z.string().default(""), acceptDuplicateRisk: z.boolean().default(false),
+  early: z.boolean().default(false),
   expectedClaim: z.string().default(""), evidence: z.string().max(2000).default(""), confirmExact: z.boolean().default(false), confirmTerminated: z.boolean().default(false),
 })
 
@@ -131,6 +133,12 @@ export async function POST(req:NextRequest,ctx:{params:Promise<{id:string}>}) {
       return NextResponse.json({batch:(await store.read(id)).batch})
     }
     if (body.action!=="execute" && body.action!=="recover-facebook") throw new MetaBlocked("Unknown action")
+    // Publishing posts at once; until scheduled publishing (plan Step 5), a first publish of a post dated after today
+    // needs the same confirmation as the approval drawer's Publish now. Resuming a started publish is never held.
+    if (body.action==="execute" && !body.early && !Object.values(record.batch.jobs).some(j=>j.finalIntent || j.remoteId)) {
+      const post=await getContentPostById(id)
+      if (post && futureDated(post)) return NextResponse.json({error:`This post is dated ${post.date_to_post}. Publishing posts it today; confirm to publish early, or wait for scheduling.`,futureDate:post.date_to_post,batch:record.batch},{status:409})
+    }
     const batch=await executeOwnedMeta({id,runId,record,store,trigger:"admin",
       ...(body.action==="recover-facebook"?{facebookRecovery:{expectedAttemptId:body.expectedAttemptId,actor:auth.session.email,evidence:body.evidence,acceptDuplicateRisk:body.acceptDuplicateRisk}}:{})})
     return NextResponse.json({batch})

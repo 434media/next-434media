@@ -89,13 +89,16 @@ export interface ExportItem { url: string; label?: string }
 export interface AttachResult { post: PostSummary; assets: { url: string; mime: string; width: number; height: number; duration?: number; bytes: number }[]; holds: string[]; fingerprint: string; reused: boolean }
 /**
  * Fetches each export (SSRF-guarded by the injected fetcher), measures it from bytes,
- * stores it under the existing content-posts/<uuid>-name convention and replaces the
+ * stores it under the existing content-posts/<uuid>-name convention (the name readable when a fileBase is given:
+ * <uuid>-milcity-2026-10-21-headline-01-feed-page-1.jpg; the UUID stays first, as the publisher checks) and replaces the
  * post's assets in the given order. Nothing is stored for the post if any item fails.
  */
-export async function attachExports(deps: IntakeDeps, input: { postId: string; items: ExportItem[]; randomId: () => string; canva?: { designId: string; pages?: number[] } }): Promise<AttachResult> {
+export async function attachExports(deps: IntakeDeps, input: { postId: string; items: ExportItem[]; randomId: () => string; canva?: { designId: string; pages?: number[] }; fileBase?: string; rebind?: boolean }): Promise<AttachResult> {
   if (!input.items.length || input.items.length > META_FORMAT_RULES.instagramCarousel.maxItems) throw new MetaBlocked("Attach 1–10 exports in carousel order")
   const post = await assertAttachable(deps, input.postId)
-  if (input.canva && post.canva_design_id && post.canva_design_id !== input.canva.designId) throw new MetaBlocked(`This post is bound to Canva design ${post.canva_design_id}; use another post for ${input.canva.designId}`)
+  // rebind: the Create table's re-run after the row changed puts its new design on the same post (the caller checks
+  // that nothing of the post is out; new files reset any approval through the guarded update).
+  if (input.canva && post.canva_design_id && post.canva_design_id !== input.canva.designId && !input.rebind) throw new MetaBlocked(`This post is bound to Canva design ${post.canva_design_id}; use another post for ${input.canva.designId}`)
   const measured: { bytes: Uint8Array; sha256: string; mime: string; width: number; height: number; duration?: number; name: string }[] = []
   for (const [i, item] of input.items.entries()) {
     let fetched: { bytes: Uint8Array; contentType: string }
@@ -103,7 +106,8 @@ export async function attachExports(deps: IntakeDeps, input: { postId: string; i
     const m = measureExport(fetched.bytes) // signature-based; rejects anything but JPEG/PNG/MP4
     const ext = m.mime === "image/jpeg" ? "jpg" : m.mime === "image/png" ? "png" : "mp4"
     const label = (item.label || `export-${i + 1}`).toLowerCase().replace(/[^a-z0-9-]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 40) || `export-${i + 1}`
-    measured.push({ bytes: fetched.bytes, sha256: assetDigest(fetched.bytes), ...m, name: `${String(i + 1).padStart(2, "0")}-${label}.${ext}` })
+    const base = (input.fileBase ?? "").toLowerCase().replace(/[^a-z0-9-]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 90)
+    measured.push({ bytes: fetched.bytes, sha256: assetDigest(fetched.bytes), ...m, name: `${base ? `${base}-` : ""}${String(i + 1).padStart(2, "0")}-${label}.${ext}` })
   }
   const fingerprint = exportFingerprint(measured.map(m => m.sha256))
   // A retried attach of the identical ordered files reuses the stored copies and leaves any draft untouched.

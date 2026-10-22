@@ -2,16 +2,20 @@ import { BRAND, activeProfile } from "./brand"
 import { SERIES, checkFields, normalizeFields } from "./series"
 import { contentPropertyOf } from "./properties"
 import { pipelineMarked, adoptablePost, PIPELINE_KEY_PREFIX } from "./ownership"
-import { FORMAT_LABEL, createTemplates, designText, formatsOf, rowProblems, type CreateFormat, type CreateRow, type CreateTemplate } from "./create-table"
+import { FORMAT_LABEL, createTemplates, designText, exportFileBase, formatsOf, rowProblems, type CreateFormat, type CreateRow, type CreateTemplate } from "./create-table"
+import { frozen } from "./row-approval"
+import { createHash } from "node:crypto"
 import type { ContentPost } from "@/components/crm/types"
-import type { CreateInput, CreatedDesign } from "@/lib/canva-create"
+import { canvaEditUrl, type CreateInput, type CreatedDesign } from "../canva-create"
 
 /**
  * Run job for one Create row (plan v11 Step 2), inside withProfile() with the brand's published profile read fresh by
  * the route. Each format the row's platforms need gets its brand template filled (the row's text, its photo or video
  * in the template's image field), exported, and staged on its own content post in Review (needs_approval). Nothing is
- * prepared, approved or published. Idempotent on the row id: the Canva ledger and the post's intake.requestId are keyed
- * `admin:create:<row>:<format>` (the pipeline's reserved prefix), so a retried run reuses its designs and posts.
+ * prepared, approved or published. Idempotent on the row id and what the design is made from: the post's intake.requestId
+ * is keyed `admin:create:<row>:<format>` (the pipeline's reserved prefix), and the Canva ledger adds a hash of the
+ * template, the card text and the media, so a retried run reuses its designs and posts, while a run after the row's
+ * text or media changed makes a new design and puts it on the same post (Step 3 part 2: the "TEST" / 0:05 design).
  */
 export interface CreateRunDeps {
   templateFields(templateId: string): Promise<Record<string, string>>
@@ -20,7 +24,10 @@ export interface CreateRunDeps {
   exportDesign(designId: string, as: "jpg" | "mp4"): Promise<string[]>
   findByRequestId(requestId: string): Promise<ContentPost | null>
   createPost(post: Omit<ContentPost, "id" | "created_at" | "updated_at">): Promise<ContentPost>
-  attachExports(input: { postId: string; items: { url: string; label: string }[]; canva: { designId: string } }): Promise<{ holds: string[] }>
+  /** The guarded update: a changed caption, date or platforms sends an approved post back for approval. */
+  updatePost(id: string, updates: Partial<ContentPost>): Promise<ContentPost>
+  /** `rebind`: the post takes a new design in place of its old one (a re-run after the row changed). */
+  attachExports(input: { postId: string; items: { url: string; label: string }[]; canva: { designId: string }; fileBase: string; rebind?: boolean }): Promise<{ holds: string[] }>
   /**
    * Claims the row for one run, atomically (a Firestore transaction): false while another run of it holds an unexpired
    * lease. Two tabs or a double click can't then fill two designs and stage two Review posts, since the Canva ledger
@@ -36,6 +43,12 @@ export class CreateRowError extends Error {
 }
 
 export const createRequestId = (rowId: string, format: CreateFormat) => `${PIPELINE_KEY_PREFIX}create:${rowId}:${format}`
+
+/** What a design is made from: its template, card text and media. A change makes a new design. */
+export function designInputHash(input: { templateId: string; text: Record<string, string>; media?: { kind: string; url: string; bytes?: number } | null }): string {
+  const text = Object.fromEntries(Object.entries(input.text).sort(([a], [b]) => a.localeCompare(b)))
+  return createHash("sha256").update(JSON.stringify({ t: input.templateId, text, m: input.media ? { k: input.media.kind, u: input.media.url, b: input.media.bytes ?? 0 } : null })).digest("hex").slice(0, 16)
+}
 
 /** The row checked against the brand's published profile: the table's own checks, then the template's field limits. */
 export function serverRowProblems(row: CreateRow): { template?: CreateTemplate; problems: string[] } {
@@ -66,21 +79,29 @@ export async function runCreateRow(deps: CreateRunDeps, row: CreateRow, actor: {
 async function runClaimedRow(deps: CreateRunDeps, row: CreateRow, template: CreateTemplate, actor: { email: string; name: string }, versionId: string): Promise<CreatedPost[]> {
   const posts: CreatedPost[] = []
   for (const { format, platforms } of formatsOf(row.platforms)) {
-    const templateId = template.templates[format]!, requestId = createRequestId(row.id, format)
-    const existing = adoptablePost(await deps.findByRequestId(requestId))
-    if (existing?.assets.length && existing.export_fingerprint && existing.canva_design_id) {
-      posts.push({ format, postId: existing.id, designId: existing.canva_design_id, editUrl: "", previewUrl: existing.assets[0]?.url, holds: [], reused: true })
-      continue
-    }
+    const templateId = template.templates[format]!, postKey = createRequestId(row.id, format)
+    const existing = adoptablePost(await deps.findByRequestId(postKey))
     const dataset = await deps.templateFields(templateId)
     const { text, unfilled } = designText(template, row, dataset)
     if (unfilled.length) throw new CreateRowError([`The ${FORMAT_LABEL[format]} template has no place for: ${unfilled.join(", ")}`])
     const mediaField = template.media[format]
     if (mediaField && dataset[mediaField] !== "image") throw new CreateRowError([`The ${FORMAT_LABEL[format]} template has no media field "${mediaField}"`])
     const media = row.media && mediaField ? row.media : null
-    const title = `${BRAND.shortName} ${template.label} · ${FORMAT_LABEL[format]} — ${row.headline.replace(/\s+/g, " ").trim()}`.slice(0, 200)
+    const inputHash = designInputHash({ templateId, text, media })
+    if (existing?.assets.length && existing.export_fingerprint && existing.canva_design_id && existing.create_input_hash === inputHash) {
+      posts.push({ format, postId: existing.id, designId: existing.canva_design_id, editUrl: canvaEditUrl(existing.canva_design_id), previewUrl: existing.assets[0]?.url, holds: [], reused: true })
+      continue
+    }
+    // A post made before designs were hashed that is already out stays as it is: the run reuses it, as it did then.
+    if (existing?.canva_design_id && !existing.create_input_hash && frozen(existing)) {
+      posts.push({ format, postId: existing.id, designId: existing.canva_design_id, editUrl: canvaEditUrl(existing.canva_design_id), previewUrl: existing.assets[0]?.url, holds: [], reused: true })
+      continue
+    }
+    if (existing && frozen(existing)) throw new CreateRowError([`The ${FORMAT_LABEL[format]} post from this row is already out or publishing; its design can't change. Start a new row.`], 409)
+    // The board title leaves the format out (the card shows it); the files carry brand, date and headline.
+    const title = `${BRAND.shortName} ${template.label} — ${row.headline.replace(/\s+/g, " ").trim()}`.slice(0, 200)
     const design = await deps.createDesign({
-      requestId, templateId, title, text,
+      requestId: `${postKey}:${inputHash}`, templateId, title, text,
       ...(media?.kind === "image" ? { image: { field: mediaField!, url: media.url, name: media.name } } : {}),
       ...(media?.kind === "video" ? { video: { field: mediaField!, url: media.url, name: media.name, bytes: media.bytes ?? 0 } } : {}),
     })
@@ -88,18 +109,22 @@ async function runClaimedRow(deps: CreateRunDeps, row: CreateRow, template: Crea
     const urls = asVideo ? await deps.exportDesign(design.designId, "mp4") : design.previewUrls.length ? design.previewUrls : await deps.exportDesign(design.designId, "jpg")
     if (!urls.length) throw new CreateRowError([`Canva returned no export for the ${FORMAT_LABEL[format]} design`], 502)
     const now = deps.now()
-    const post = existing ?? await deps.createPost(pipelineMarked({
-      user: actor.name || actor.email, date_created: now.slice(0, 10), platform: contentPropertyOf(BRAND.id), status: "needs_approval", title,
-      notes: [`Made in the Create table (${template.label}, ${FORMAT_LABEL[format]}).`, row.referenceLink ? `Reference: ${row.referenceLink}` : "", row.notes.trim() ? `Notes: ${row.notes.trim()}` : ""].filter(Boolean).join("\n").slice(0, 4000),
-      social_copy: row.caption.trim(), links: row.referenceLink ? [row.referenceLink] : [], assets: [], tags: BRAND.posts.tag,
-      social_platforms: platforms, date_to_post: row.date, profile_version_id: versionId,
-      ...(row.copyVersionId && row.copyVersionId !== versionId ? { copy_profile_version_id: row.copyVersionId } : {}),
-      create_row_id: row.id, create_format: format,
-      intake: { requestId, metaBrand: BRAND.posts.metaBrand, requestedBy: actor.email, at: now },
-    } as Omit<ContentPost, "id" | "created_at" | "updated_at">))
+    const notes = [`Made in the Create table (${template.label}, ${FORMAT_LABEL[format]}).`, row.referenceLink ? `Reference: ${row.referenceLink}` : "", row.notes.trim() ? `Notes: ${row.notes.trim()}` : ""].filter(Boolean).join("\n").slice(0, 4000)
+    const post = existing
+      // A re-run after the row changed: the post takes the row's current text with the new design.
+      ? await deps.updatePost(existing.id, { title, notes, social_copy: row.caption.trim(), links: row.referenceLink ? [row.referenceLink] : [], social_platforms: platforms, date_to_post: row.date, profile_version_id: versionId })
+      : await deps.createPost(pipelineMarked({
+        user: actor.name || actor.email, date_created: now.slice(0, 10), platform: contentPropertyOf(BRAND.id), status: "needs_approval", title, notes,
+        social_copy: row.caption.trim(), links: row.referenceLink ? [row.referenceLink] : [], assets: [], tags: BRAND.posts.tag,
+        social_platforms: platforms, date_to_post: row.date, profile_version_id: versionId,
+        ...(row.copyVersionId && row.copyVersionId !== versionId ? { copy_profile_version_id: row.copyVersionId } : {}),
+        create_row_id: row.id, create_format: format,
+        intake: { requestId: postKey, metaBrand: BRAND.posts.metaBrand, requestedBy: actor.email, at: now },
+      } as Omit<ContentPost, "id" | "created_at" | "updated_at">))
     const items = asVideo ? [{ url: urls[0], label: `${format}-video` }] : urls.map((url, n) => ({ url, label: `${format}-page-${n + 1}` }))
-    const attached = await deps.attachExports({ postId: post.id, items, canva: { designId: design.designId } })
-    posts.push({ format, postId: post.id, designId: design.designId, editUrl: design.editUrl, previewUrl: design.previewUrls[0], holds: attached.holds, reused: false })
+    const attached = await deps.attachExports({ postId: post.id, items, canva: { designId: design.designId }, fileBase: exportFileBase(BRAND.id, row.date, row.headline), ...(existing ? { rebind: true } : {}) })
+    await deps.updatePost(post.id, { create_input_hash: inputHash })
+    posts.push({ format, postId: post.id, designId: design.designId, editUrl: canvaEditUrl(design.designId), previewUrl: design.previewUrls[0], holds: [...attached.holds, ...(design.folderProblem ? [design.folderProblem] : [])], reused: false })
   }
   return posts
 }
@@ -121,6 +146,7 @@ export async function createRunDeps(): Promise<CreateRunDeps> {
     },
     findByRequestId: id => tools.intake.findByRequestId(id),
     createPost: post => crm.createContentPost(post),
+    updatePost: (id, updates) => crm.updateContentPost(id, updates),
     attachExports: input => attachExports(tools.intake, { ...input, randomId: tools.randomId }),
     claimRow: (rowId, by) => crm.claimCreateRun(rowId, by, Date.now()),
     releaseRow: rowId => crm.releaseCreateRun(rowId),

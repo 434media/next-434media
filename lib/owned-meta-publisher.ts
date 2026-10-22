@@ -141,6 +141,25 @@ export function guardedContentUpdate(existing: Record<string, unknown>, updates:
   }
   return updates
 }
+/**
+ * Send back to Review (Step 3 part 2): an approved or scheduled post returns to Review with its approval withdrawn, so
+ * nothing publishes it. A publisher approval is revoked on its batch (assertApproved refuses a revoked batch) and the
+ * post lets go of the batch, as an edit does; a hand-post approval is covered by a "sent_back" entry, since an approval
+ * counts only while it is the latest entry. Refused once anything of the post is out or publishing has started.
+ */
+export function sendBackPlan(existing: Record<string, unknown>, batch: MetaBatch | undefined, actor: { email: string; name: string }, at: string, note: string): { post: Record<string, unknown>; revokeBatch: boolean } {
+  if (existing.archived || existing.pipeline_outcome) throw new MetaBlocked("Content post unavailable")
+  if (existing.status === "posted" || (Array.isArray(existing.hand_posts) && existing.hand_posts.length)) throw new MetaBlocked("This post is already out; it can't go back to Review")
+  if (!["approved", "scheduled"].includes(String(existing.status))) throw new MetaBlocked("Only an approved or scheduled post goes back to Review")
+  const om = existing.owned_meta as { started?: boolean } | null | undefined
+  if (om?.started || batch?.claim || (batch && Object.values(batch.jobs).some(j => j.finalIntent))) throw new MetaBlocked("Publishing has started; this post can't go back to Review")
+  const approvals = Array.isArray(existing.approvals) ? existing.approvals : []
+  const entry = { decision: "sent_back", by_name: actor.name, by_email: actor.email, at, note, ...(om && batch ? { manifest_hash: batch.hash, manifest_revision: batch.manifest.revision } : {}) }
+  return {
+    revokeBatch: !!(om && batch && !batch.revoked),
+    post: { status: "needs_approval", approvals: [...approvals, entry], ...(om ? { owned_meta: null, owned_meta_revision: Number(existing.owned_meta_revision || 0) + 1 } : {}) },
+  }
+}
 /** Atomic claim + persisted IDs; no lease, elapsed-time takeover or automatic final retry. */
 export async function runOwnedMeta(args: {
   id: string; runId: string; store: MetaStore; provider: MetaProvider

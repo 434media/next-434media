@@ -5,7 +5,7 @@
  */
 import { test } from "node:test"
 import assert from "node:assert/strict"
-import { approvalCovers, approveRow, awaitingApproval, canvaDesignIdFromLink, exportAs, frozen, platformsFor, prepareChoices, readiness, RowApprovalError, shownOf, type ApproveRowDeps } from "../content-pipeline/row-approval"
+import { approvalCovers, approveRow, awaitingApproval, canvaDesignIdFromLink, futureDated, parsePages, resolveCanvaDesignLink, todayIn, exportAs, frozen, platformsFor, prepareChoices, readiness, RowApprovalError, shownOf, type ApproveRowDeps } from "../content-pipeline/row-approval"
 import type { ContentPost } from "../../components/crm/types"
 import type { MetaBatch } from "../owned-meta-publisher"
 
@@ -130,4 +130,28 @@ test("routing and Canva links: 9:16 takes TikTok and Shorts, 4:5 takes LinkedIn;
   assert.equal(exportAs(reels), "mp4")
   assert.equal(exportAs(feed), "jpg")
   assert.equal(exportAs({ create_format: "feed", assets: [] }, "reels"), "mp4")
+})
+
+test("a canva.link share link is followed to its design, only through Canva's own hosts", async () => {
+  const hops: string[] = []
+  const redirects: Record<string, string> = { "https://canva.link/abc123": "https://www.canva.com/design/DAGxyz789/AbCd/edit?utm_source=share" }
+  const fetcher = (async (u: URL) => { hops.push(u.toString()); const to = redirects[u.toString()]; return new Response(null, { status: to ? 307 : 404, headers: to ? { location: to } : {} }) }) as typeof fetch
+  assert.equal(await resolveCanvaDesignLink("https://canva.link/abc123", fetcher), "DAGxyz789")
+  assert.equal(await resolveCanvaDesignLink("https://www.canva.com/design/DAGdirect1/view", fetcher), "DAGdirect1")
+  assert.equal(hops.length, 1, "a full design link needs no request")
+  redirects["https://canva.link/evil"] = "https://evil.example/design/DAGxyz789/edit"
+  assert.equal(await resolveCanvaDesignLink("https://canva.link/evil", fetcher), null)
+  assert.equal(await resolveCanvaDesignLink("https://canva.link/gone", fetcher), null)
+  assert.equal(await resolveCanvaDesignLink("http://canva.link/abc123", fetcher), null)
+  assert.equal(await resolveCanvaDesignLink("https://bit.ly/abc", fetcher), null)
+})
+
+test("pages for a format, and a post dated after today", () => {
+  assert.deepEqual(parsePages("2"), [2])
+  assert.deepEqual(parsePages("1, 3"), [1, 3])
+  for (const bad of ["", "0", "a", "1,1", "1.5"]) assert.equal(parsePages(bad), null, bad)
+  assert.equal(todayIn("America/Chicago", new Date("2026-10-22T03:30:00Z")), "2026-10-21", "evening in San Antonio is still that day")
+  assert.equal(futureDated({ date_to_post: "2026-10-22" }, "2026-10-21"), true)
+  assert.equal(futureDated({ date_to_post: "2026-10-21" }, "2026-10-21"), false)
+  assert.equal(futureDated({ date_to_post: undefined }, "2026-10-21"), false)
 })

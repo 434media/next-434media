@@ -2,7 +2,7 @@
 import { test } from "node:test"
 import assert from "node:assert/strict"
 import { seal, type CanvaDeps, type CanvaTokenRecord, type CanvaTokenStore } from "../canva-export"
-import { createFromTemplate, templateFields, profileTemplateIds, type CreateDeps, type CreatedDesign } from "../canva-create"
+import { createFromTemplate, templateFields, profileTemplateIds, canvaEditUrl, type CreateDeps, type CreatedDesign, type WorkingFolder } from "../canva-create"
 import { TOOL_SCOPE } from "../owned-meta-connector"
 import { SERVICE_TOOL_SCOPE } from "../owned-meta-service"
 
@@ -150,4 +150,42 @@ test("a video over 100 MB is streamed into the asset upload; over 500 MB, or wit
 test("the allow-list is every feed and Reels template in the published profiles, and nothing else", () => {
   const ids = profileTemplateIds([{ series: { news: { templates: { feed: "FXtpl01fe", reels: "FXtpl02re" } }, dt101: { templates: { feed: "FXtpl05fe", reels: "" } } } }, { series: { news: { templates: { feed: "bad id!", reels: "" } } } }])
   assert.deepEqual([...ids].sort(), ["FXtpl01fe", "FXtpl02re", "FXtpl05fe"])
+})
+
+function folderStore(kept: string | null = null): WorkingFolder & { kept: string | null } {
+  const f = { name: "434 Working Designs", kept, async get() { return f.kept }, async put(id: string | null) { f.kept = id } }
+  return f
+}
+const withFolders = (moveStatus = 204, folders = [{ type: "folder", folder: { id: "FAFother01", name: "Old" } }, { type: "folder", folder: { id: "FAFteam001", name: " 434 working designs " } }]) => (url: string, init: RequestInit) => {
+  if (url.includes("/folders/root/items")) return Response.json({ items: folders })
+  if (url.endsWith("/folders/move")) return moveStatus === 204 ? new Response(null, { status: 204 }) : Response.json({ code: moveStatus === 404 ? "folder_not_found" : "permission_denied" }, { status: moveStatus })
+  return happy(url, init)
+}
+
+test("a new design moves into the team folder found by name, keeps its id, and carries permanent links", async () => {
+  const s = setup(withFolders()), folder = folderStore()
+  const { design } = await createFromTemplate({ ...s.deps, folder }, INPUT, { polls: 3, intervalMs: 1 })
+  assert.equal(design.folderId, "FAFteam001"); assert.equal(folder.kept, "FAFteam001")
+  const move = s.calls.find(c => c.url.endsWith("/folders/move"))!
+  assert.deepEqual(JSON.parse(String(move.init.body)), { to_folder_id: "FAFteam001", item_id: "DAHnew0001" })
+  assert.ok(s.calls.find(c => c.url.includes("/folders/root/items"))!.url.includes("item_types=folder"))
+  assert.equal(design.editUrl, canvaEditUrl("DAHnew0001")); assert.equal(design.editUrl, "https://www.canva.com/design/DAHnew0001/edit")
+  // The kept id is used next time without listing again.
+  const t = setup(withFolders())
+  await createFromTemplate({ ...t.deps, folder }, { ...INPUT, requestId: "slack:Ev1:mcu:item2:v1" }, { polls: 3, intervalMs: 1 })
+  assert.ok(!t.calls.some(c => c.url.includes("/folders/root/items")))
+})
+
+test("a design that can't be moved is still made and says why; a stale folder id is found again", async () => {
+  const s = setup(withFolders(403))
+  const { design } = await createFromTemplate({ ...s.deps, folder: folderStore() }, INPUT, { polls: 3, intervalMs: 1 })
+  assert.equal(design.designId, "DAHnew0001"); assert.equal(design.folderId, undefined)
+  assert.match(design.folderProblem!, /Not moved to the Canva folder "434 Working Designs": .*reconnect Canva/)
+  const missing = setup(withFolders(204, []))
+  assert.match((await createFromTemplate({ ...missing.deps, folder: folderStore() }, INPUT, { polls: 3, intervalMs: 1 })).design.folderProblem!, /no folder named/)
+  let moves = 0
+  const stale = setup((url, init) => url.endsWith("/folders/move") && moves++ === 0 ? Response.json({ code: "folder_not_found" }, { status: 404 }) : withFolders()(url, init))
+  const folder = folderStore("FAFgone0001")
+  assert.equal((await createFromTemplate({ ...stale.deps, folder }, INPUT, { polls: 3, intervalMs: 1 })).design.folderId, "FAFteam001")
+  assert.equal(folder.kept, "FAFteam001")
 })

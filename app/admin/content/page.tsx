@@ -70,6 +70,7 @@ export default function ContentPage() {
     handleSaveContentPost,
     handleDeleteContentPost,
     handleMoveContentPost,
+    handleSendBackContentPost,
     handleBulkDeleteContentPosts,
   } = useContentPostHandlers({ setToast, onSaved: handleSaved })
 
@@ -251,6 +252,7 @@ export default function ContentPage() {
               onOpenPost={handleOpenBoardPost}
               onAddPost={handleAddContentPost}
               onMovePost={handleMoveContentPost}
+              onSendBack={canReview ? handleSendBackContentPost : undefined}
               onBulkDelete={handleBulkDeleteContentPosts}
               // The global Create button opens the Create table (plan v11 Step 2), replacing Add post and the Generate
               // panel for the people who run it. The parked Generate panel still opens for a pipeline draft's ICYMI choice,

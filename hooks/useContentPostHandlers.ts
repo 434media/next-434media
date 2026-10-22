@@ -195,6 +195,30 @@ export function useContentPostHandlers({ setToast, onSaved }: UseContentPostHand
     [setToast],
   )
 
+  // Send back to Review (plan v11.1 Step 3 part 2): the Board's Schedule → Review drag. The server withdraws the
+  // approval (revokes a publisher batch, voids a hand-post approval) or refuses once anything is out; the card reverts
+  // with the server's reason.
+  const handleSendBackContentPost = useCallback(
+    async (postId: string) => {
+      let previous: ContentPost | undefined
+      setContentPosts((prev) => prev.map((p) => (p.id === postId ? ((previous = p), { ...p, status: "needs_approval" as const }) : p)))
+      try {
+        const response = await fetch(`/api/admin/content/posts/${encodeURIComponent(postId)}/send-back`, { method: "POST", credentials: "include" })
+        const data = await response.json().catch(() => ({}))
+        if (!response.ok) throw new Error(data.error || "Could not send the post back to Review")
+        if (data.post) setContentPosts((prev) => prev.map((p) => (p.id === postId ? data.post : p)))
+        setToast({ message: "Sent back to Review; its approval is withdrawn", type: "success" })
+      } catch (err) {
+        if (previous) {
+          const reverted = previous
+          setContentPosts((prev) => prev.map((p) => (p.id === postId ? reverted : p)))
+        }
+        setToast({ message: err instanceof Error ? err.message : "Could not send the post back to Review", type: "error" })
+      }
+    },
+    [setToast],
+  )
+
   // Delete several posts at once (the clean-slate / housekeeping action). Best
   // effort per id against the existing single DELETE route; drops the
   // successfully-deleted ids from local state and reports the count.
@@ -267,6 +291,7 @@ export function useContentPostHandlers({ setToast, onSaved }: UseContentPostHand
     handleSaveContentPost,
     handleDeleteContentPost,
     handleMoveContentPost,
+    handleSendBackContentPost,
     handleBulkDeleteContentPosts,
   }
 }

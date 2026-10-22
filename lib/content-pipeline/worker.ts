@@ -7,6 +7,7 @@ import type { ContentProperty, PipelineMedia } from "@/components/crm/types"
 import type { McuSeeds } from "./seeds"
 import { MIN_SHORT_SIDE, archiveRelevant, federalHost, imageSize, isDvidsImagePage, isOutlet, pageImageCandidate, type MediaCandidate, type SourcePage } from "./sources"
 import { MAX_ATTEMPTS, WORKING, type CheckedPhoto, type ChosenMedia, type CropBox, type FrameCopy, type FrameDesign, type McuDraft, type McuJob, type McuStore, type RequestRef, type RoundupItem, type SourcedFact, type Story } from "./store"
+import { canvaEditUrl } from "../canva-create"
 
 /**
  * The pipeline worker: advances due jobs and drafts one step at a time, saving after every step, so an interrupted run
@@ -1481,7 +1482,7 @@ export function reviewNotes(d: McuDraft): string {
   if (d.story.whyNow) sections.push(`Why Breaking\n${d.story.whyNow}`)
   const media = d.media.map((m, i) => m ? `- ${d.media.length > 1 ? `${i + 1}: ` : ""}${m.title.slice(0, 80)} — ${m.license}${m.creator && m.creator !== "Unknown" ? `, ${m.creator}` : ""}\n  ${m.pageUrl}${m.note ? `\n  ${m.note}` : ""}` : null).filter(Boolean)
   sections.push(`Photo rights\n${media.length ? media.join("\n") : "- No photo on this card"}`)
-  sections.push(`Canva\n${d.designs.map((x, i) => `${d.designs.length > 1 ? `Frame ${i + 1}: ` : ""}${x.editUrl || x.viewUrl} (design ${x.designId})`).join("\n")}`)
+  sections.push(`Canva\n${d.designs.map((x, i) => `${d.designs.length > 1 ? `Frame ${i + 1}: ` : ""}${canvaEditUrl(x.designId)} (design ${x.designId})`).join("\n")}`)
   if (d.qa.length) sections.push(`Check before approving\n${d.qa.map(q => `- ${q}`).join("\n")}`)
   if (d.copyNotes?.length) sections.push(`Style notes (not held: fix through Open in Canva)\n${d.copyNotes.map(n => `- ${n}`).join("\n")}`)
   if (d.notices.length) sections.push(`Not done\n${d.notices.map(n => `- ${n}`).join("\n")}`)

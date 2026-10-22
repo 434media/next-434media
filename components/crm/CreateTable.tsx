@@ -12,6 +12,9 @@ import { UPLOAD_PREFIX } from "@/lib/content-pipeline/create-media"
  * Sub-headline, Caption, Date, and optional starter notes. Human+ drafts a row's cells from its reference link; the
  * person edits them; Run job fills every Canva template the row's platforms need and lands the designs in Review.
  * Rows are kept in this browser (localStorage) until they run, so a reload loses nothing.
+ *
+ * Step 3 part 2: choosing a Brand lists its templates in the row; ticking more than one expands the row into one row
+ * per template (each a post of its own), copied from the row with the fields the template doesn't use left out.
  */
 interface BrandConfig { id: string; label: string; active: boolean; reason: string | null; versionId: string | null; templates: CreateTemplate[] }
 interface Config { brands: BrandConfig[]; platforms: CreatePlatform[] }
@@ -74,6 +77,16 @@ export function CreateTable({ onPostsReady }: { onPostsReady?: () => void }) {
   const templateOf = (r: CreateRow) => brandOf(r)?.templates.find(t => t.kind === r.kind)
   const patch = (id: string, p: Partial<CreateRow>) => setRows(rs => rs.map(r => r.id === id ? { ...r, ...p } : r))
   const patchState = (id: string, s: RowState | ((cur: RowState) => RowState)) => setState(cur => ({ ...cur, [id]: typeof s === "function" ? s(cur[id] ?? {}) : s }))
+
+  /** Ticking a template: an empty row takes it; a row that has one gets a copy below it for the new template. */
+  function pickTemplate(r: CreateRow, kind: string) {
+    if (!r.kind) { patch(r.id, { kind }); return }
+    const next = brandOf(r)?.templates.find(x => x.kind === kind)
+    const fields = Object.fromEntries(Object.entries(r.fields).filter(([k]) => k === "date" || next?.fields.some(f => f.name === k)))
+    const platforms = r.platforms.filter(id => { const p = config?.platforms.find(x => x.id === id); return !!p && !!next?.templates[p.format] })
+    const copy: CreateRow = { ...r, id: newId(), kind, fields, platforms: platforms.length ? platforms : DEFAULT_PLATFORMS.filter(id => { const p = config?.platforms.find(x => x.id === id); return !!p && !!next?.templates[p.format] }) }
+    setRows(rs => { const i = rs.findIndex(x => x.id === r.id); return [...rs.slice(0, i + 1), copy, ...rs.slice(i + 1)] })
+  }
 
   async function humanPlus(r: CreateRow) {
     if (!r.referenceLink.startsWith("https://")) { patchState(r.id, { error: "Paste an https reference link first" }); return }
@@ -184,18 +197,26 @@ export function CreateTable({ onPostsReady }: { onPostsReady?: () => void }) {
                       <tr key={r.id} className={`align-top border-b border-neutral-100 ${s.done ? "bg-emerald-50/40" : ""}`}>
                         <td className="px-2 py-2 text-xs text-neutral-400 w-6">{n + 1}</td>
                         <td className="px-2 py-2 w-36">
-                          <select disabled={locked} value={r.brand} onChange={e => { const b = config.brands.find(x => x.id === e.target.value); patch(r.id, { brand: e.target.value, kind: b?.templates[0]?.kind ?? "" }) }} className="w-full h-8 rounded border border-neutral-300 px-1 bg-white">
+                          <select disabled={locked} value={r.brand} onChange={e => { const b = config.brands.find(x => x.id === e.target.value); patch(r.id, { brand: e.target.value, kind: b?.templates.length === 1 ? b.templates[0].kind : "" }) }} className="w-full h-8 rounded border border-neutral-300 px-1 bg-white">
                             <option value="">Brand…</option>
                             {config.brands.map(b => <option key={b.id} value={b.id} disabled={!b.active}>{b.label}{b.active ? "" : ` (${b.reason})`}</option>)}
                           </select>
                           {brand?.versionId && <p className="mt-1 text-[11px] text-neutral-400">{brand.versionId}</p>}
                         </td>
-                        <td className="px-2 py-2 w-40">
-                          <select disabled={locked || !brand} value={r.kind} onChange={e => patch(r.id, { kind: e.target.value })} className="w-full h-8 rounded border border-neutral-300 px-1 bg-white">
-                            <option value="">Template…</option>
-                            {brand?.templates.map(x => <option key={x.kind} value={x.kind}>{x.label}</option>)}
-                          </select>
+                        <td className="px-2 py-2 w-44">
+                          {!brand && <p className="text-xs text-neutral-400">Choose a Brand to see its templates</p>}
+                          {brand?.templates.map(x => {
+                            // Each row holds one template; ticking another adds a row for it.
+                            const mine = x.kind === r.kind
+                            return (
+                              <label key={x.kind} className="flex items-start gap-1.5 text-xs py-0.5" title={x.detail}>
+                                <input type="checkbox" className="mt-0.5" disabled={locked} checked={mine} onChange={e => e.target.checked ? pickTemplate(r, x.kind) : patch(r.id, { kind: "" })} />
+                                <span>{x.label}</span>
+                              </label>
+                            )
+                          })}
                           {t && <p className="mt-1 text-[11px] text-neutral-400">{t.detail}</p>}
+                          {brand && brand.templates.length > 1 && <p className="mt-1 text-[11px] text-neutral-400">Tick another template to add a row for it.</p>}
                         </td>
                         <td className="px-2 py-2 w-64">
                           <input disabled={locked} value={r.referenceLink} onChange={e => patch(r.id, { referenceLink: e.target.value.trim() })} placeholder="https://…" className="w-full h-8 rounded border border-neutral-300 px-2" />
@@ -240,6 +261,7 @@ export function CreateTable({ onPostsReady }: { onPostsReady?: () => void }) {
                           {s.hold && <p className="text-amber-700">Human+ held this row: {s.hold}</p>}
                           {s.notes?.map((x, i) => <p key={i} className="text-amber-700">Note: {x}</p>)}
                           {s.error && <p className="text-red-600">{s.error}</p>}
+                          {[...new Set(s.posts?.flatMap(p => p.holds) ?? [])].map(h => <p key={h} className="text-amber-700">{h}</p>)}
                           {s.posts?.map(p => (
                             <a key={p.postId} href={`/admin/content?openContent=${p.postId}`} className="mt-1 flex items-center gap-1 text-emerald-700 hover:underline"><Check className="w-3.5 h-3.5" /> {FORMAT_LABEL[p.format]} in Review <ArrowUpRight className="w-3 h-3" /></a>
                           ))}

@@ -390,6 +390,12 @@ export interface ContentPost {
   create_row_id?: string
   create_format?: "feed" | "reels"
   copy_profile_version_id?: string
+  // What the post's design was made from (template, card text, media), hashed by the Run job (Step 3 part 2): a re-run
+  // with the same hash reuses the design, a different one makes a new design for the post. Optional.
+  create_input_hash?: string
+  // The design's pages this post was attached from, when one design fills several formats by page (the drawer's attach
+  // by link); Refresh from Canva exports the same pages. Optional; absent means every page.
+  canva_pages?: number[]
   // Platforms the publisher doesn't post to (TikTok, YouTube Shorts, LinkedIn: plan v11.1 Step 3) are posted by hand
   // from the approved export; each hand post's live link is recorded here from the drawer. Optional; server-owned.
   hand_posts?: HandPost[]
@@ -481,7 +487,8 @@ export interface ContentApproval {
   // A variation posted only by hand has no publisher manifest: its approval binds the exact export set instead.
   export_fingerprint?: string
 
-  decision: "approved" | "rejected"
+  // sent_back: an approval withdrawn before anything went out (Send back to Review, Step 3 part 2); it covers nothing.
+  decision: "approved" | "rejected" | "sent_back"
   by_name: string
   by_email: string
   note?: string  // required on reject, optional on approve

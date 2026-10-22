@@ -1,11 +1,11 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useState } from "react"
-import { CheckCircle2, ExternalLink, Link2, Loader2, RefreshCw, Download, Send } from "lucide-react"
+import { CheckCircle2, ExternalLink, Link2, Loader2, RefreshCw, Download, Send, Undo2 } from "lucide-react"
 import { DetailDrawer } from "@/components/admin/DetailDrawer"
 import { CONTENT_POST_STATUS_OPTIONS, SOCIAL_PLATFORM_OPTIONS, type ContentPost, type SocialPlatform } from "./types"
 import { FORMAT_LABEL, isHandPosted, type CreateFormat } from "@/lib/content-pipeline/create-table"
-import { approvalCovers, awaitingApproval, formatOf, frozen, goesOut, handPlatforms, platformsFor, publisherPlatforms, readiness, shownOf } from "@/lib/content-pipeline/row-approval"
+import { approvalCovers, awaitingApproval, formatOf, frozen, futureDated, goesOut, handPlatforms, isApproved, parsePages, platformsFor, publisherPlatforms, readiness, shownOf } from "@/lib/content-pipeline/row-approval"
 
 /**
  * The approval drawer (plan v11.1 Step 3 item 2): a Create row's format variations side by side. The designs come from
@@ -13,6 +13,10 @@ import { approvalCovers, awaitingApproval, formatOf, frozen, goesOut, handPlatfo
  * platforms and post date are edited here without touching a design; the title is generated, so it isn't shown as a
  * field. Approve & Schedule approves every variation that goes out together, bound to the exact files shown, from the
  * signed-in session; it stays disabled, with the reasons, until every design is attached and exported.
+ *
+ * Step 3 part 2: Refresh all re-exports every design that can still change; attach by link takes a canva.link share
+ * link and can fill each format from chosen pages of one design; Publish now asks before posting a post dated after
+ * today (scheduling is Step 5); Send back to Review withdraws an approval before anything goes out.
  */
 interface BatchView { id: string; hash: string; revision: number; approval: { by: string; at: string } | null; revoked: boolean; claim: boolean; jobs: Record<"instagram" | "facebook", { status: string; permalink: string | null; blocker: string | null }> }
 interface Variation { post: ContentPost; batch: BatchView | null }
@@ -35,6 +39,7 @@ export function RowApprovalDrawer({ rowId, open, onClose, onChanged, onOpenDetai
   const [reviewed, setReviewed] = useState(false)
   const [link, setLink] = useState("")
   const [linkFormat, setLinkFormat] = useState<CreateFormat>("feed")
+  const [linkPages, setLinkPages] = useState<Record<CreateFormat, string>>({ feed: "", reels: "" })
   const [handLinks, setHandLinks] = useState<Record<string, string>>({})
 
   const take = useCallback((v: RowView) => {
@@ -90,9 +95,35 @@ export function RowApprovalDrawer({ rowId, open, onClose, onChanged, onOpenDetai
   ]
   // The approval binds everything shown for each variation: its files, caption, date and platforms.
   const approve = () => call("approve", "POST", { action: "approve", aiGenerated: ai, ...(ai && aiVideo ? { aiRealisticMedia: realistic } : {}), shown: Object.fromEntries(pending.map(v => [v.post.id, shownOf(v.post)])) })
-  const publishable = variations.filter(v => v.batch?.approval && !v.batch.claim && (["instagram", "facebook"] as const).some(d => !["verified", "operator_confirmed"].includes(v.batch!.jobs[d].status)))
-  // Stops at the first failure, so its error stays on screen.
-  const publishAll = async () => { for (const v of publishable) if (!await call(`publish-${v.post.id}`, "POST", { action: "publish", postId: v.post.id, hash: v.batch!.hash })) return }
+  const publishable = variations.filter(v => v.batch?.approval && !v.batch.revoked && !v.batch.claim && (["instagram", "facebook"] as const).some(d => !["verified", "operator_confirmed"].includes(v.batch!.jobs[d].status)))
+  // Publish now posts at once. Until scheduled publishing (Step 5), a post dated after today is published only after a
+  // confirmation; the server refuses it without one.
+  const early = publishable.filter(v => futureDated(v.post))
+  const publishAll = async () => {
+    if (early.length && !window.confirm(`This post is dated ${early[0].post.date_to_post}. Publish now posts it to Instagram and Facebook today, not on that date (scheduling on a date isn't built yet). Publish it now?`)) return
+    // Stops at the first failure, so its error stays on screen.
+    for (const v of publishable) if (!await call(`publish-${v.post.id}`, "POST", { action: "publish", postId: v.post.id, hash: v.batch!.hash, ...(early.length ? { early: true } : {}) })) return
+  }
+  // Refresh all: every design that can still change, one after another (a 9:16 MP4 render can take minutes).
+  const refreshable = variations.filter(v => v.post.canva_design_id && !frozen(v.post))
+  const refreshAll = async () => { for (const v of refreshable) if (!await call(`refresh-${v.post.id}`, "POST", { action: "refresh", postId: v.post.id })) return }
+  // Pages per format, when one design fills several formats; a typed value that isn't page numbers blocks Attach.
+  const pageEntries = (["feed", "reels"] as const).filter(f => linkPages[f].trim()).map(f => [f, parsePages(linkPages[f])] as const)
+  const badPages = pageEntries.some(([, p]) => !p)
+  const attach = async () => {
+    const pages = Object.fromEntries(pageEntries)
+    if (await call("attach", "POST", { action: "attach", designLink: link, format: linkFormat, ...(pageEntries.length ? { pages } : {}) })) { setLink(""); setLinkPages({ feed: "", reels: "" }) }
+  }
+  const sendBack = async (postId: string) => {
+    if (!rowId || busy) return
+    setBusy(`back-${postId}`); setError(""); setProblems([])
+    try {
+      const r = await fetch(`/api/admin/content/posts/${encodeURIComponent(postId)}/send-back`, { method: "POST", credentials: "include" })
+      const data = await r.json().catch(() => ({}))
+      if (!r.ok) throw new Error(data.error || "Could not send it back to Review")
+      onChanged()
+    } catch (e) { setError(e instanceof Error ? e.message : "Could not send it back to Review") } finally { setBusy(null); void load() }
+  }
 
   return (
     <DetailDrawer open={open} onClose={onClose} width="xl" closeOnOverlayClick={!dirty}
@@ -106,7 +137,10 @@ export function RowApprovalDrawer({ rowId, open, onClose, onChanged, onOpenDetai
             {busy === "approve" ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />} Approve &amp; Schedule
           </button>}
           {publishable.length > 0 && view.publisher && <button type="button" onClick={publishAll} disabled={!!busy} className="inline-flex items-center gap-2 h-9 px-4 border border-neutral-300 rounded-md disabled:opacity-40 text-sm font-medium">
-            {busy?.startsWith("publish") ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />} Publish now to Instagram and Facebook
+            {busy?.startsWith("publish") ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />} {early.length ? "Publish now, before its date" : "Publish now to Instagram and Facebook"}
+          </button>}
+          {refreshable.length > 1 && <button type="button" onClick={refreshAll} disabled={!!busy || dirty} title={dirty ? "Save your edits first" : "Re-export every design from Canva"} className="inline-flex items-center gap-2 h-9 px-3 border border-neutral-300 rounded-md disabled:opacity-40 text-sm">
+            {busy?.startsWith("refresh") ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />} Refresh all from Canva
           </button>}
         </div>
       </div>}>
@@ -118,6 +152,7 @@ export function RowApprovalDrawer({ rowId, open, onClose, onChanged, onOpenDetai
           {variations.map(v => <VariationCard key={v.post.id} v={v} busy={busy} dirty={dirty} showCaption={captionsDiffer} picked={platforms[v.post.id] ?? []}
             onPick={next => setPlatforms(s => ({ ...s, [v.post.id]: next }))}
             onRefresh={() => call(`refresh-${v.post.id}`, "POST", { action: "refresh", postId: v.post.id })}
+            onSendBack={() => sendBack(v.post.id)}
             onDetails={() => onOpenDetails(v.post.id)}
             handLink={p => handLinks[`${v.post.id}:${p}`] ?? ""} setHandLink={(p, u) => setHandLinks(s => ({ ...s, [`${v.post.id}:${p}`]: u }))}
             onHandPost={p => call(`hand-${v.post.id}-${p}`, "POST", { action: "hand-post", postId: v.post.id, platform: p, url: handLinks[`${v.post.id}:${p}`] ?? "", fingerprint: v.post.export_fingerprint })} />)}
@@ -140,15 +175,20 @@ export function RowApprovalDrawer({ rowId, open, onClose, onChanged, onOpenDetai
         <section className="space-y-2 border-t border-neutral-200 pt-4">
           <h3 className="text-sm font-medium text-neutral-800">Attach a Canva design by link</h3>
           <div className="flex flex-wrap gap-2">
-            <input value={link} onChange={e => setLink(e.target.value)} placeholder="https://www.canva.com/design/…" className="flex-1 min-w-48 h-8 rounded border border-neutral-300 px-2 text-sm" />
-            <select value={linkFormat} onChange={e => setLinkFormat(e.target.value as CreateFormat)} className="h-8 rounded border border-neutral-300 px-1 text-sm bg-white">
+            <input value={link} onChange={e => setLink(e.target.value)} placeholder="https://www.canva.com/design/… or https://canva.link/…" className="flex-1 min-w-48 h-8 rounded border border-neutral-300 px-2 text-sm" />
+            <select value={linkFormat} disabled={pageEntries.length > 0} onChange={e => setLinkFormat(e.target.value as CreateFormat)} className="h-8 rounded border border-neutral-300 px-1 text-sm bg-white disabled:opacity-40">
               <option value="feed">{FORMAT_LABEL.feed}</option><option value="reels">{FORMAT_LABEL.reels}</option>
             </select>
-            <button type="button" disabled={!link.trim() || !!busy || dirty} onClick={async () => { if (await call("attach", "POST", { action: "attach", designLink: link, format: linkFormat })) setLink("") }} className="inline-flex items-center gap-1.5 h-8 px-3 border border-neutral-300 rounded-md text-sm disabled:opacity-40">
+            <button type="button" disabled={!link.trim() || !!busy || dirty || badPages} onClick={attach} className="inline-flex items-center gap-1.5 h-8 px-3 border border-neutral-300 rounded-md text-sm disabled:opacity-40">
               {busy === "attach" ? <Loader2 className="w-4 h-4 animate-spin" /> : <Link2 className="w-4 h-4" />} Attach
             </button>
           </div>
-          <p className="text-xs text-neutral-500">The design is exported and added to this row as its own variation (or fills a variation that has no design yet).</p>
+          <div className="flex flex-wrap gap-3 text-xs text-neutral-700">
+            {(["feed", "reels"] as const).map(f => <label key={f} className="inline-flex items-center gap-1.5">{FORMAT_LABEL[f]} from page
+              <input value={linkPages[f]} onChange={e => setLinkPages(s => ({ ...s, [f]: e.target.value }))} placeholder="e.g. 2" className={`w-20 h-7 rounded border px-1.5 ${linkPages[f].trim() && !parsePages(linkPages[f]) ? "border-red-400" : "border-neutral-300"}`} />
+            </label>)}
+          </div>
+          <p className="text-xs text-neutral-500">The design is exported and added to this row as its own variation (or fills a variation that has no design yet). A design with several pages or sizes can fill both formats: give the page for each. The Run job already makes every size, so this is for designs made outside it.</p>
         </section>
 
         {pending.some(v => publisherPlatforms(v.post).length) && <div className="space-y-1 border-t border-neutral-200 pt-4">
@@ -160,8 +200,8 @@ export function RowApprovalDrawer({ rowId, open, onClose, onChanged, onOpenDetai
   )
 }
 
-function VariationCard({ v, busy, dirty, showCaption, picked, onPick, onRefresh, onDetails, handLink, setHandLink, onHandPost }: {
-  v: Variation; busy: string | null; dirty: boolean; showCaption: boolean; picked: SocialPlatform[]; onPick(next: SocialPlatform[]): void; onRefresh(): void; onDetails(): void
+function VariationCard({ v, busy, dirty, showCaption, picked, onPick, onRefresh, onSendBack, onDetails, handLink, setHandLink, onHandPost }: {
+  v: Variation; busy: string | null; dirty: boolean; showCaption: boolean; picked: SocialPlatform[]; onPick(next: SocialPlatform[]): void; onRefresh(): void; onSendBack(): void; onDetails(): void
   handLink(p: string): string; setHandLink(p: string, url: string): void; onHandPost(p: string): void
 }) {
   const { post, batch } = v
@@ -186,6 +226,8 @@ function VariationCard({ v, busy, dirty, showCaption, picked, onPick, onRefresh,
         {canvaUrl && <a href={canvaUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 underline"><ExternalLink className="w-3.5 h-3.5" /> Open in Canva</a>}
         {post.canva_design_id && <button type="button" onClick={onRefresh} disabled={!!busy || dirty || out} title={dirty ? "Save your edits first" : out ? "Already out" : ""} className="inline-flex items-center gap-1 underline disabled:opacity-40">
           {busy === `refresh-${post.id}` ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />} Refresh from Canva</button>}
+        {isApproved(post) && !out && <button type="button" onClick={onSendBack} disabled={!!busy} title="Withdraw the approval; nothing has gone out" className="inline-flex items-center gap-1 underline disabled:opacity-40">
+          {busy === `back-${post.id}` ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Undo2 className="w-3.5 h-3.5" />} Send back to Review</button>}
         <button type="button" onClick={onDetails} className="underline text-neutral-500">All details</button>
       </div>
       <fieldset className="space-y-0.5">
@@ -206,7 +248,7 @@ function VariationCard({ v, busy, dirty, showCaption, picked, onPick, onRefresh,
       </div>}
       {approvalCovers(post) && handPlatforms(post).length > 0 && <div className="space-y-1.5 border-t border-neutral-100 pt-2">
         <p className="text-xs font-medium text-neutral-700">Post by hand</p>
-        <div className="flex flex-wrap gap-2 text-xs">{post.assets.map((a, i) => <a key={a.url} href={safeUrl(a.url)} download className="inline-flex items-center gap-1 underline"><Download className="w-3.5 h-3.5" /> {a.kind === "video" ? "Video" : `Page ${i + 1}`}</a>)}</div>
+        <div className="flex flex-wrap gap-2 text-xs">{post.assets.map((a, i) => <a key={a.url} href={safeUrl(a.url) && `${safeUrl(a.url)}?download=1`} download className="inline-flex items-center gap-1 underline"><Download className="w-3.5 h-3.5" /> {a.kind === "video" ? "Video" : `Page ${i + 1}`}</a>)}</div>
         {handPlatforms(post).map(p => posted(p)
           ? <p key={p} className="text-xs">{platformLabel(p)}: <a className="underline" href={safeUrl(posted(p)!.url)} target="_blank" rel="noreferrer">live post</a></p>
           : <div key={p} className="flex gap-1">
