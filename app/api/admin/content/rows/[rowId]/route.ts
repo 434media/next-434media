@@ -5,7 +5,9 @@ import { getContentPostsByCreateRow, updateContentPost, ownedMetaStore, decideOw
 import { MetaBlocked } from "@/lib/owned-meta-publisher"
 import { exportFileBase, isHandPosted, FORMAT_LABEL, type CreateFormat } from "@/lib/content-pipeline/create-table"
 import { approveRow, exportAs, formatOf, frozen, futureDated, isApproved, platformsFor, resolveCanvaDesignLink, RowApprovalError } from "@/lib/content-pipeline/row-approval"
-import { createRequestId } from "@/lib/content-pipeline/create-run"
+import { CreateRowError, createRequestId } from "@/lib/content-pipeline/create-run"
+import { isCreateUpload } from "@/lib/content-pipeline/create-media"
+import { createProfile } from "../../profile"
 import { pipelineMarked } from "@/lib/content-pipeline/ownership"
 import type { ContentPost, SocialPlatform } from "@/components/crm/types"
 
@@ -30,6 +32,10 @@ export const maxDuration = 800
  *          { action: "publish", postId, hash, early? }           publish an approved variation to Instagram and Facebook;
  *                                                                a post dated after today needs early: true (Step 5 schedules)
  *          { action: "hand-post", postId, platform, url, fingerprint }   record a hand post's live link
+ *          { action: "replace-media", media, text? }             Replace media (Step 3 part 4): fill every size from its
+ *                                                                template again, with the row's card text and the new
+ *                                                                photo or video; text is the browser's copy of the row,
+ *                                                                used only for posts made before the text was kept
  */
 const ROW_ID = /^[A-Za-z0-9_-]{8,64}$/
 const PLATFORM = z.enum(["instagram", "facebook", "tiktok", "youtube", "linkedin"])
@@ -39,6 +45,9 @@ const patchBody = z.object({
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
   platforms: z.record(z.string().max(64), z.array(PLATFORM).max(5)).optional(),
 }).strict()
+const TEXT = (max: number) => z.string().max(max)
+const MEDIA = z.object({ url: z.string().url().max(2000), kind: z.enum(["image", "video"]), name: TEXT(120), bytes: z.number().int().nonnegative().optional(), width: z.number().optional(), height: z.number().optional(), durationSec: z.number().optional(), optimized: z.string().max(20).optional() }).strict()
+const CARD_TEXT = z.object({ brand: z.string().regex(/^[a-z0-9-]{2,40}$/), kind: z.string().regex(/^[a-z0-9_]{2,30}$/), headline: TEXT(400), subHeadline: TEXT(400), fields: z.record(z.string().regex(/^[a-z][a-z0-9_]{0,63}$/), TEXT(400)) }).strict()
 const postBody = z.discriminatedUnion("action", [
   z.object({ action: z.literal("refresh"), postId: z.string().max(64) }),
   z.object({ action: z.literal("attach"), designLink: z.string().max(2000), format: z.enum(["feed", "reels"]), postId: z.string().max(64).optional(),
@@ -48,6 +57,7 @@ const postBody = z.discriminatedUnion("action", [
   }).strict()) }),
   z.object({ action: z.literal("publish"), postId: z.string().max(64), hash: z.string().max(128), early: z.boolean().optional() }),
   z.object({ action: z.literal("hand-post"), postId: z.string().max(64), platform: PLATFORM, url: z.string().max(2000), fingerprint: z.string().regex(/^[a-f0-9]{64}$/) }),
+  z.object({ action: z.literal("replace-media"), media: MEDIA, text: CARD_TEXT.optional() }).strict(),
 ])
 
 const production = () => process.env.VERCEL_ENV === "production"
@@ -215,6 +225,29 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ rowId: str
       return NextResponse.json({ ...(await rowView(rowId)), holds: [...new Set(holds)], unchanged })
     }
 
+    if (body.action === "replace-media") {
+      const media = body.media
+      if (!isCreateUpload(media.url) || media.optimized !== "done") return refuse("Add the new media here (a file or a Canva design link) and wait for it to finish", 400)
+      // The size picks Canva's video upload path; it is read from the store, never taken from the browser.
+      const stored = await (await import("@vercel/blob")).head(media.url).catch(() => null)
+      if (!stored) return refuse("The new media is no longer in storage; add it again", 400)
+      media.bytes = stored.size
+      // The card text the Run job kept on the posts; a row made before it was kept uses the browser's copy of the row.
+      const made = posts.filter(p => p.intake?.requestId === createRequestId(rowId, formatOf(p)))
+      const text = made.find(p => p.create_text)?.create_text ?? body.text
+      if (!made.length) return refuse("Nothing in this row was made from a template; use One-off to attach a finished design", 409)
+      if (!text) return refuse("This row's card text isn't on the server; open the drawer in the browser whose Create table made the row, or use One-off", 409)
+      const profile = await createProfile(text.brand)
+      if ("error" in profile) return refuse(profile.error, profile.status)
+      const [{ withProfile }, { replaceRowMedia, createRunDeps }] = await Promise.all([import("@/lib/content-pipeline/brand"), import("@/lib/content-pipeline/create-run")])
+      const result = await withProfile(profile.active, async () => replaceRowMedia(await createRunDeps(), rowId, text, media, { email, name }))
+      console.info("[content/rows]", JSON.stringify({ by: email, row: rowId, action: "replace-media", kind: media.kind, version: result.profileVersionId, posts: result.posts.map(x => ({ format: x.format, post: x.postId, design: x.designId, reused: x.reused })) }))
+      // A One-off variation (attached by link) has no template to re-fill; the drawer says so.
+      const oneOff = posts.filter(p => !result.posts.some(x => x.postId === p.id) && !frozen(p)).map(p => FORMAT_LABEL[formatOf(p)])
+      const holds = [...result.posts.flatMap(x => x.holds), ...(oneOff.length ? [`Not changed (One-off design): ${oneOff.join(", ")}`] : [])]
+      return NextResponse.json({ ...(await rowView(rowId)), holds: [...new Set(holds)] })
+    }
+
     if (body.action === "approve") {
       const [{ prepareOwnedMetaBatch }, { preflightFor }, { exportFingerprint }] = await Promise.all([import("@/lib/owned-meta-execution"), import("@/lib/owned-meta-tool"), import("@/lib/owned-meta-intake")])
       const reviewer = { email, name }
@@ -257,6 +290,7 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ rowId: str
     await recordHandPost(post.id, { platform: body.platform, url: url.toString(), by: email, expectedFingerprint: body.fingerprint }, isHandPosted)
     return NextResponse.json(await rowView(rowId))
   } catch (err) {
+    if (err instanceof CreateRowError) return NextResponse.json({ error: err.message, problems: err.problems }, { status: err.status })
     if (err instanceof RowApprovalError) return NextResponse.json({ error: err.message, problems: err.problems }, { status: err.status })
     if (err instanceof MetaBlocked) return refuse(err.message, 409)
     const errName = err instanceof Error ? err.name : ""

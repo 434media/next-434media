@@ -1,10 +1,10 @@
 "use client"
 
 import { useCallback, useEffect, useRef, useState } from "react"
-import { upload } from "@vercel/blob/client"
 import { Check, Loader2, PenLine, Play, Plus, Trash2, Upload, X, ArrowUpRight } from "lucide-react"
-import { FORMAT_LABEL, formatsOf, rowProblems, templateGap, type CellField, type CreatePlatform, type CreateRow, type CreateTemplate, type RowMedia } from "@/lib/content-pipeline/create-table"
-import { UPLOAD_PREFIX } from "@/lib/content-pipeline/create-media"
+import { CREATE_ROWS_STORE_KEY, FORMAT_LABEL, formatsOf, rowProblems, templateGap, type CellField, type CreatePlatform, type CreateRow, type CreateTemplate } from "@/lib/content-pipeline/create-table"
+import { HelpTip } from "@/components/admin/HelpTip"
+import { isCanvaLink, mediaFromCanva, mediaFromFile, mediaFromLink, type MediaResult } from "./row-media"
 
 /**
  * The Create table (plan v11 Step 2): one global Create button opens one table, five rows by default. Each row is one
@@ -15,13 +15,16 @@ import { UPLOAD_PREFIX } from "@/lib/content-pipeline/create-media"
  *
  * Step 3 part 2: choosing a Brand lists its templates in the row; ticking more than one expands the row into one row
  * per template (each a post of its own), copied from the row with the fields the template doesn't use left out.
+ *
+ * Step 3 part 4: the Media cell also takes a Canva design link, which the app exports (MP4 or JPG); (?) tips explain
+ * the columns.
  */
 interface BrandConfig { id: string; label: string; active: boolean; reason: string | null; versionId: string | null; templates: CreateTemplate[] }
 interface Config { brands: BrandConfig[]; platforms: CreatePlatform[] }
 interface RunPost { format: "feed" | "reels"; postId: string; designId: string; editUrl: string; previewUrl?: string; holds: string[] }
 interface RowState { busy?: "human" | "media" | "run"; message?: string; error?: string; notes?: string[]; hold?: string; posts?: RunPost[]; done?: boolean }
 
-const STORE_KEY = "434-create-table-rows-v1"
+const STORE_KEY = CREATE_ROWS_STORE_KEY
 const DEFAULT_PLATFORMS = ["instagram_feed", "facebook_feed"]
 const today = () => new Date(Date.now() - new Date().getTimezoneOffset() * 60_000).toISOString().slice(0, 10)
 const newId = () => `row-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`
@@ -30,6 +33,16 @@ function loadRows(): CreateRow[] | null {
   try { const raw = localStorage.getItem(STORE_KEY); const rows = raw ? JSON.parse(raw) as CreateRow[] : null; return Array.isArray(rows) && rows.length ? rows : null } catch { return null }
 }
 function saveRows(rows: CreateRow[]) { try { localStorage.setItem(STORE_KEY, JSON.stringify(rows)) } catch { /* private window: rows live for this visit */ } }
+
+/** One or two plain lines per column, behind its (?) tip. */
+const COLUMN_HELP: Record<string, string> = {
+  Template: "The card design. Tick a second template to add a row for it; each row is its own post.",
+  "Reference link": "The story this post is about. Human+ reads it and drafts the Headline, Sub-headline and Caption.",
+  Media: "The photo or video for the card's frame. Drop a file, paste a link to the file, or paste a Canva design link and the app exports it.",
+  "Target platforms": "Where the post goes. Feed platforms get the 4:5 design, Reels, TikTok and Shorts the 9:16 one.",
+  Caption: "The text under the post. It never changes the design.",
+  Date: "The day the post goes out. The card's own printed date comes from the story, when Human+ finds one.",
+}
 
 /** "12 / 15" per line for a field with limits, red when over. */
 function limitNote(f: CellField | undefined, value: string): { text: string; over: boolean } | null {
@@ -103,29 +116,19 @@ export function CreateTable({ onPostsReady }: { onPostsReady?: () => void }) {
     } catch (e) { patchState(r.id, { error: e instanceof Error ? e.message : "Human+ failed" }) }
   }
 
-  async function optimize(r: CreateRow, url: string, name: string, size?: number) {
-    patchState(r.id, s => ({ ...s, busy: "media", message: "Optimizing…", error: undefined }))
-    const res = await fetch("/api/admin/content/media-optimize", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ url, name: name.slice(0, 120) }) })
-    const data = await res.json()
-    if (!res.ok) throw new Error(data.error || "The media could not be optimized")
-    const media = data.media as RowMedia
-    patch(r.id, { media: { ...media, bytes: media.bytes ?? size } })
-    patchState(r.id, s => ({ ...s, busy: undefined, message: data.action === "resized" ? "Photo resized ✓" : "Video ready ✓" }))
-  }
-  async function dropFile(r: CreateRow, file: File) {
+  /** Media for a row: a dropped file, a pasted file link, or a Canva design the app exports (row-media.ts). */
+  async function takeMedia(r: CreateRow, message: string, get: () => Promise<MediaResult>, failed: string) {
     patch(r.id, { media: null })
-    patchState(r.id, { busy: "media", message: `Uploading ${file.name}…` })
+    patchState(r.id, { busy: "media", message })
     try {
-      const blob = await upload(`${UPLOAD_PREFIX}${file.name.replace(/[^\w.-]+/g, "_").slice(0, 80)}`, file, { access: "public", handleUploadUrl: "/api/admin/content/media-upload", multipart: file.size > 50 * 1024 * 1024, contentType: file.type || undefined })
-      await optimize(r, blob.url, file.name, file.size)
-    } catch (e) { patchState(r.id, { error: e instanceof Error ? e.message : "Upload failed" }) }
+      const { media, message: done } = await get()
+      patch(r.id, { media })
+      patchState(r.id, s => ({ ...s, busy: undefined, message: done }))
+    } catch (e) { patchState(r.id, { error: e instanceof Error ? e.message : failed }) }
   }
-  async function pasteMedia(r: CreateRow, url: string) {
-    if (!url.startsWith("https://")) return
-    patch(r.id, { media: null })
-    try { await optimize(r, url, url.split("/").pop()?.split("?")[0] || "media") }
-    catch (e) { patchState(r.id, { error: e instanceof Error ? e.message : "That link could not be used" }) }
-  }
+  const dropFile = (r: CreateRow, file: File) => takeMedia(r, `Uploading ${file.name}…`, () => mediaFromFile(file), "Upload failed")
+  const pasteMedia = (r: CreateRow, url: string) => url.startsWith("https://") ? takeMedia(r, "Optimizing…", () => mediaFromLink(url), "That link could not be used") : undefined
+  const canvaMedia = (r: CreateRow, link: string, as: "video" | "photo") => takeMedia(r, `Exporting the Canva design as ${as === "video" ? "MP4" : "JPG"}…`, () => mediaFromCanva(link, as), "The Canva design could not be exported")
 
   async function runRow(r: CreateRow): Promise<boolean> {
     patchState(r.id, s => ({ ...s, busy: "run", message: "Filling Canva templates…", error: undefined }))
@@ -184,7 +187,9 @@ export function CreateTable({ onPostsReady }: { onPostsReady?: () => void }) {
               <table className="min-w-[1500px] w-full text-sm border-collapse">
                 <thead className="sticky top-0 bg-neutral-50 z-10">
                   <tr className="text-left text-xs font-medium text-neutral-500">
-                    {["", "Brand", "Template", "Reference link", "Media", "Target platforms", "Headline", "Sub-headline", "Caption", "Date", ""].map((h, i) => <th key={i} className="px-2 py-2 border-b border-neutral-200 font-medium">{h}</th>)}
+                    {["", "Brand", "Template", "Reference link", "Media", "Target platforms", "Headline", "Sub-headline", "Caption", "Date", ""].map((h, i) => <th key={i} className="px-2 py-2 border-b border-neutral-200 font-medium">
+                      <span className="inline-flex items-center gap-1">{h}{COLUMN_HELP[h] && <HelpTip label={h}>{COLUMN_HELP[h]}</HelpTip>}</span>
+                    </th>)}
                   </tr>
                 </thead>
                 <tbody>
@@ -226,7 +231,7 @@ export function CreateTable({ onPostsReady }: { onPostsReady?: () => void }) {
                           </button>
                         </td>
                         <td className="px-2 py-2 w-44">
-                          <MediaCell row={r} disabled={locked} onFile={f => dropFile(r, f)} onUrl={u => pasteMedia(r, u)} onClear={() => patch(r.id, { media: null })} />
+                          <MediaCell row={r} disabled={locked} onFile={f => dropFile(r, f)} onUrl={u => pasteMedia(r, u)} onCanva={(u, as) => canvaMedia(r, u, as)} onClear={() => patch(r.id, { media: null })} />
                         </td>
                         <td className="px-2 py-2 w-40">
                           {config.platforms.map(p => {
@@ -306,9 +311,12 @@ function Cell({ field, value, disabled, rows, onChange }: { field?: CellField; v
   )
 }
 
-function MediaCell({ row, disabled, onFile, onUrl, onClear }: { row: CreateRow; disabled?: boolean; onFile(f: File): void; onUrl(u: string): void; onClear(): void }) {
+function MediaCell({ row, disabled, onFile, onUrl, onCanva, onClear }: { row: CreateRow; disabled?: boolean; onFile(f: File): void; onUrl(u: string): void; onCanva(u: string, as: "video" | "photo"): void; onClear(): void }) {
   const input = useRef<HTMLInputElement>(null)
   const [url, setUrl] = useState("")
+  // A Canva design link waits for one choice: export it as a video (MP4) or a photo (JPG).
+  const [canva, setCanva] = useState("")
+  const take = () => { const u = url.trim(); setUrl(""); if (!u) return; if (isCanvaLink(u)) setCanva(u); else onUrl(u) }
   const m = row.media
   if (m) return (
     <div className="text-xs">
@@ -322,7 +330,22 @@ function MediaCell({ row, disabled, onFile, onUrl, onClear }: { row: CreateRow; 
     <div onDragOver={e => e.preventDefault()} onDrop={e => { e.preventDefault(); const f = e.dataTransfer.files?.[0]; if (f && !disabled) onFile(f) }} className="rounded border border-dashed border-neutral-300 p-2 text-xs text-neutral-500">
       <button disabled={disabled} onClick={() => input.current?.click()} className="inline-flex items-center gap-1 hover:text-neutral-900"><Upload className="w-3.5 h-3.5" /> Drop or choose an image or video</button>
       <input ref={input} type="file" accept="image/jpeg,image/png,image/webp,image/avif,image/gif,image/tiff,video/mp4,video/quicktime,video/x-m4v,video/webm" className="hidden" onChange={e => { const f = e.target.files?.[0]; if (f) onFile(f); e.target.value = "" }} />
-      <input disabled={disabled} value={url} onChange={e => setUrl(e.target.value)} onKeyDown={e => { if (e.key === "Enter") { onUrl(url.trim()); setUrl("") } }} onBlur={() => { if (url.trim()) { onUrl(url.trim()); setUrl("") } }} placeholder="or paste a link" className="mt-1 w-full h-7 rounded border border-neutral-200 px-1.5" />
+      {canva ? <CanvaChoice onPick={as => { const u = canva; setCanva(""); onCanva(u, as) }} onCancel={() => setCanva("")} disabled={disabled} />
+        : <input disabled={disabled} value={url} onChange={e => setUrl(e.target.value)} onKeyDown={e => { if (e.key === "Enter") take() }} onBlur={take} placeholder="or paste a link" className="mt-1 w-full h-7 rounded border border-neutral-200 px-1.5" />}
+    </div>
+  )
+}
+
+/** The one choice a Canva design link needs: the app exports it as MP4 or JPG. Shared with the drawer's Replace media. */
+export function CanvaChoice({ onPick, onCancel, disabled }: { onPick(as: "video" | "photo"): void; onCancel(): void; disabled?: boolean }) {
+  return (
+    <div className="mt-1 space-y-1">
+      <p className="text-neutral-700">Canva design: use it as</p>
+      <div className="flex flex-wrap gap-1">
+        <button type="button" disabled={disabled} onClick={() => onPick("video")} className="h-7 px-2 rounded border border-neutral-300 text-neutral-800 hover:bg-neutral-50 disabled:opacity-40">Video (MP4)</button>
+        <button type="button" disabled={disabled} onClick={() => onPick("photo")} className="h-7 px-2 rounded border border-neutral-300 text-neutral-800 hover:bg-neutral-50 disabled:opacity-40">Photo (JPG)</button>
+        <button type="button" onClick={onCancel} className="h-7 px-1.5 text-neutral-400 hover:text-neutral-700">Cancel</button>
+      </div>
     </div>
   )
 }

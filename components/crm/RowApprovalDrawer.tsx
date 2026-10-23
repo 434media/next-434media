@@ -1,11 +1,14 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useState } from "react"
-import { CheckCircle2, ExternalLink, Link2, Loader2, Maximize2, RefreshCw, Download, Send, Undo2 } from "lucide-react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { CheckCircle2, ChevronDown, ChevronRight, ExternalLink, ImageUp, Link2, Loader2, Maximize2, RefreshCw, Download, Send, Undo2, Upload } from "lucide-react"
 import { DetailDrawer } from "@/components/admin/DetailDrawer"
+import { HelpTip } from "@/components/admin/HelpTip"
 import { DesignPreview } from "./DesignPreview"
-import { CONTENT_POST_STATUS_OPTIONS, SOCIAL_PLATFORM_OPTIONS, type ContentPost, type SocialPlatform } from "./types"
-import { FORMAT_LABEL, isHandPosted, type CreateFormat } from "@/lib/content-pipeline/create-table"
+import { CanvaChoice } from "./CreateTable"
+import { isCanvaLink, mediaFromCanva, mediaFromFile, type MediaResult } from "./row-media"
+import { CONTENT_POST_STATUS_OPTIONS, SOCIAL_PLATFORM_OPTIONS, type ContentPost, type CreateText, type SocialPlatform } from "./types"
+import { CREATE_ROWS_STORE_KEY, FORMAT_LABEL, ddmmmyy, isHandPosted, type CreateFormat, type CreateRow, type RowMedia } from "@/lib/content-pipeline/create-table"
 import { approvalCovers, awaitingApproval, formatOf, frozen, futureDated, goesOut, handPlatforms, isApproved, parsePages, platformsFor, publisherPlatforms, readiness, shownOf } from "@/lib/content-pipeline/row-approval"
 
 /**
@@ -20,6 +23,11 @@ import { approvalCovers, awaitingApproval, formatOf, frozen, futureDated, goesOu
  * today (scheduling is Step 5); Send back to Review withdraws an approval before anything goes out.
  *
  * Step 3 part 3: clicking a design opens it full size in a Preview, for review only; the card stays the same size.
+ *
+ * Step 3 part 4: Replace media swaps the photo or video in every size (a new file, or a Canva design link the app
+ * exports): each template is filled again with the same card text, the posts stay in Review and the new files void any
+ * approval. Attach by link is now "One-off", collapsed, for the rare finished post made outside the templates. (?) tips
+ * explain the controls.
  */
 interface BatchView { id: string; hash: string; revision: number; approval: { by: string; at: string } | null; revoked: boolean; claim: boolean; jobs: Record<"instagram" | "facebook", { status: string; permalink: string | null; blocker: string | null }> }
 interface Variation { post: ContentPost; batch: BatchView | null }
@@ -28,6 +36,16 @@ interface RowView { variations: Variation[]; publisher: boolean }
 const platformLabel = (p: string) => p === "youtube" ? "YouTube Shorts" : SOCIAL_PLATFORM_OPTIONS.find(o => o.value === p)?.label ?? p
 const safeUrl = (u: string | null | undefined) => { try { const x = new URL(u ?? ""); return x.protocol === "https:" ? x.toString() : "" } catch { return "" } }
 const titleOf = (p: ContentPost) => p.title.replace(/ · (Feed 4:5|Reels 9:16)/, "")
+/** A variation the Run job filled from a template (Replace media re-fills it); one attached by link is a One-off. */
+const fromTemplate = (p: ContentPost) => !!p.create_row_id && !!p.intake?.requestId && !p.intake.requestId.includes(":link:")
+/** The browser's own copy of a row's card text, for a row made before the server kept it. */
+function browserCardText(rowId: string): CreateText | undefined {
+  try {
+    const r = (JSON.parse(localStorage.getItem(CREATE_ROWS_STORE_KEY) ?? "[]") as CreateRow[]).find(x => x.id === rowId)
+    // The card's printed date as the Run job printed it (create-run createTextOf), never the post date edited since.
+    return r ? { brand: r.brand, kind: r.kind, headline: r.headline, subHeadline: r.subHeadline, fields: { ...r.fields, date: r.fields.date?.trim() || ddmmmyy(r.date) } } : undefined
+  } catch { return undefined }
+}
 
 export function RowApprovalDrawer({ rowId, open, onClose, onChanged, onOpenDetails }: { rowId: string | null; open: boolean; onClose(): void; onChanged(): void; onOpenDetails(postId: string): void }) {
   const [view, setView] = useState<RowView | null>(null)
@@ -44,6 +62,12 @@ export function RowApprovalDrawer({ rowId, open, onClose, onChanged, onOpenDetai
   const [linkFormat, setLinkFormat] = useState<CreateFormat>("feed")
   const [linkPages, setLinkPages] = useState<Record<CreateFormat, string>>({ feed: "", reels: "" })
   const [handLinks, setHandLinks] = useState<Record<string, string>>({})
+  const [oneOff, setOneOff] = useState(false)
+  const [newMedia, setNewMedia] = useState<RowMedia | null>(null)
+  const [mediaNote, setMediaNote] = useState<{ busy: boolean; text: string; error?: boolean } | null>(null)
+  const [canvaLink, setCanvaLink] = useState("")
+  const [pendingCanva, setPendingCanva] = useState("")
+  const fileInput = useRef<HTMLInputElement>(null)
 
   const take = useCallback((v: RowView) => {
     setView(v)
@@ -64,7 +88,7 @@ export function RowApprovalDrawer({ rowId, open, onClose, onChanged, onOpenDetai
       take(data)
     } catch (e) { setError(e instanceof Error ? e.message : "Could not read the row") }
   }, [rowId, take])
-  useEffect(() => { if (open) { setView(null); void load() } }, [open, load])
+  useEffect(() => { if (open) { setView(null); setOneOff(false); setNewMedia(null); setMediaNote(null); setCanvaLink(""); setPendingCanva(""); void load() } }, [open, load])
 
   const call = async (label: string, method: "PATCH" | "POST", body: Record<string, unknown>) => {
     if (!rowId || busy) return
@@ -117,6 +141,22 @@ export function RowApprovalDrawer({ rowId, open, onClose, onChanged, onOpenDetai
     const pages = Object.fromEntries(pageEntries)
     if (await call("attach", "POST", { action: "attach", designLink: link, format: linkFormat, ...(pageEntries.length ? { pages } : {}) })) { setLink(""); setLinkPages({ feed: "", reels: "" }) }
   }
+  // Replace media: the new file or Canva export lands first; then every template-made size is filled again with it.
+  const templated = variations.filter(v => fromTemplate(v.post))
+  const replaceable = templated.length > 0 && !templated.some(v => frozen(v.post))
+  const takeMedia = async (text: string, get: () => Promise<MediaResult>) => {
+    setNewMedia(null); setMediaNote({ busy: true, text })
+    try { const r = await get(); setNewMedia(r.media); setMediaNote({ busy: false, text: `${r.message} ${r.media.name}` }) }
+    catch (e) { setMediaNote({ busy: false, text: e instanceof Error ? e.message : "That media could not be used", error: true }) }
+  }
+  const pasteCanva = () => { const u = canvaLink.trim(); if (!u) return; if (!isCanvaLink(u)) { setMediaNote({ busy: false, text: "Paste a Canva design link (canva.com/design/… or canva.link/…), or choose a file", error: true }); return } setCanvaLink(""); setPendingCanva(u) }
+  const replaceMedia = async () => {
+    if (!newMedia || !rowId) return
+    const approved = variations.some(v => isApproved(v.post) && fromTemplate(v.post))
+    if (!window.confirm(`Replace the media in every size? Each size is made again from its template, so any edits made by hand in Canva on these designs are lost.${approved ? " The approved sizes go back to Review and need approving again." : ""}`)) return
+    const text = templated.find(v => v.post.create_text)?.post.create_text ?? browserCardText(rowId)
+    if (await call("replace", "POST", { action: "replace-media", media: newMedia, ...(text ? { text } : {}) })) { setNewMedia(null); setMediaNote(null) }
+  }
   const sendBack = async (postId: string) => {
     if (!rowId || busy) return
     setBusy(`back-${postId}`); setError(""); setProblems([])
@@ -145,6 +185,7 @@ export function RowApprovalDrawer({ rowId, open, onClose, onChanged, onOpenDetai
           {refreshable.length > 1 && <button type="button" onClick={refreshAll} disabled={!!busy || dirty} title={dirty ? "Save your edits first" : "Re-export every design from Canva"} className="inline-flex items-center gap-2 h-9 px-3 border border-neutral-300 rounded-md disabled:opacity-40 text-sm">
             {busy?.startsWith("refresh") ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />} Refresh all from Canva
           </button>}
+          {refreshable.length > 1 && <HelpTip label="Refresh all from Canva">After editing designs in Canva, this pulls the latest version of every size. It never re-fills a template.</HelpTip>}
         </div>
       </div>}>
       {!view && !error && <p className="text-sm text-neutral-500 flex items-center gap-2"><Loader2 className="w-4 h-4 animate-spin" /> Loading the row…</p>}
@@ -162,40 +203,68 @@ export function RowApprovalDrawer({ rowId, open, onClose, onChanged, onOpenDetai
         </div>
 
         <section className="space-y-2">
-          <label className="block text-sm font-medium text-neutral-800">Caption
-            <textarea value={caption} onChange={e => setCaption(e.target.value)} rows={7} maxLength={2200} className="mt-1 block w-full rounded border border-neutral-300 px-2 py-1.5 text-sm leading-relaxed font-normal" />
-          </label>
+          <div className="flex items-center gap-1.5 text-sm font-medium text-neutral-800"><label htmlFor="row-caption">Caption</label>
+            <HelpTip label="Caption">Editing the caption never changes a design. Saving it after approval sends the row back for approval.</HelpTip></div>
+          <textarea id="row-caption" value={caption} onChange={e => setCaption(e.target.value)} rows={7} maxLength={2200} className="block w-full rounded border border-neutral-300 px-2 py-1.5 text-sm leading-relaxed font-normal" />
           {captionsDiffer && <p className="text-xs text-amber-700">The variations have different captions (shown on each card). Saving a caption here sets it on every variation that isn&apos;t out yet.</p>}
-          <p className="text-xs text-neutral-500">Editing the caption never changes a design. Saving it after approval sends the row back for approval.</p>
-          <label className="block text-sm font-medium text-neutral-800">Post date
-            <input type="date" value={date} onChange={e => setDate(e.target.value)} className="mt-1 block h-9 rounded border border-neutral-300 px-2 text-sm font-normal" />
-          </label>
+          <div className="flex items-center gap-1.5 text-sm font-medium text-neutral-800"><label htmlFor="row-date">Post date</label>
+            <HelpTip label="Post date">The day the post goes out. It doesn&apos;t change the date printed on the card.</HelpTip></div>
+          <input id="row-date" type="date" value={date} onChange={e => setDate(e.target.value)} className="block h-9 rounded border border-neutral-300 px-2 text-sm font-normal" />
           <button type="button" disabled={!dirty || !!busy} onClick={save} className="inline-flex items-center gap-2 h-8 px-3 border border-neutral-300 rounded-md text-sm disabled:opacity-40">
             {busy === "save" && <Loader2 className="w-4 h-4 animate-spin" />} Save changes
           </button>
         </section>
 
+        {templated.length > 0 && <section className="space-y-2 border-t border-neutral-200 pt-4" aria-labelledby="replace-media">
+          <div className="flex items-center gap-1.5"><h3 id="replace-media" className="text-sm font-medium text-neutral-800">Replace media</h3>
+            <HelpTip label="Replace media">Swap the photo or video in every size. The app fills each template again with the same text; the posts stay in Review and need approving again.</HelpTip></div>
+          {!replaceable && <p className="text-xs text-neutral-500">A size is already out or publishing, so its media can&apos;t change.</p>}
+          {replaceable && <>
+            <div className="flex flex-wrap items-center gap-2">
+              <button type="button" disabled={!!busy || mediaNote?.busy} onClick={() => fileInput.current?.click()} className="inline-flex items-center gap-1.5 h-8 px-3 border border-neutral-300 rounded-md text-sm disabled:opacity-40"><Upload className="w-4 h-4" /> Choose a file</button>
+              <input ref={fileInput} type="file" aria-label="New photo or video" accept="image/jpeg,image/png,image/webp,image/avif,image/gif,image/tiff,video/mp4,video/quicktime,video/x-m4v,video/webm" className="hidden" onChange={e => { const f = e.target.files?.[0]; e.target.value = ""; if (f) void takeMedia(`Uploading ${f.name}…`, () => mediaFromFile(f)) }} />
+              {!pendingCanva && <input value={canvaLink} disabled={!!busy || mediaNote?.busy} onChange={e => setCanvaLink(e.target.value)} onKeyDown={e => { if (e.key === "Enter") pasteCanva() }} onBlur={pasteCanva} aria-label="Canva design link for the new media" placeholder="or paste a Canva design link" className="flex-1 min-w-48 h-8 rounded border border-neutral-300 px-2 text-sm" />}
+            </div>
+            {pendingCanva && <div className="text-xs"><CanvaChoice disabled={!!busy} onCancel={() => setPendingCanva("")} onPick={as => { const u = pendingCanva; setPendingCanva(""); void takeMedia(`Exporting the Canva design as ${as === "video" ? "MP4" : "JPG"}…`, () => mediaFromCanva(u, as)) }} /></div>}
+            {mediaNote && <p role="status" className={`text-xs inline-flex items-center gap-1.5 ${mediaNote.error ? "text-red-700" : "text-neutral-600"}`}>{mediaNote.busy && <Loader2 className="w-3.5 h-3.5 animate-spin" />}{mediaNote.text}</p>}
+            {newMedia && <div className="flex items-end gap-3">
+              {/* eslint-disable-next-line @next/next/no-img-element -- a Blob thumbnail in the admin, not page content */}
+              {newMedia.kind === "image" ? <img src={safeUrl(newMedia.url)} alt="The new photo" className="h-24 w-24 object-cover rounded border border-neutral-200" /> : <video src={safeUrl(newMedia.url)} muted playsInline controls className="h-24 w-40 object-cover rounded border border-neutral-200 bg-black" />}
+              <button type="button" disabled={!!busy || dirty} title={dirty ? "Save your edits first" : ""} onClick={replaceMedia} className="inline-flex items-center gap-2 h-9 px-3 bg-neutral-900 text-white rounded-md disabled:opacity-40 text-sm font-medium">
+                {busy === "replace" ? <Loader2 className="w-4 h-4 animate-spin" /> : <ImageUp className="w-4 h-4" />} {busy === "replace" ? "Filling every size…" : `Replace in ${templated.length > 1 ? `all ${templated.length} sizes` : "this size"}`}
+              </button>
+            </div>}
+          </>}
+        </section>}
+
         <section className="space-y-2 border-t border-neutral-200 pt-4">
-          <h3 className="text-sm font-medium text-neutral-800">Attach a Canva design by link</h3>
-          <div className="flex flex-wrap gap-2">
-            <input value={link} onChange={e => setLink(e.target.value)} placeholder="https://www.canva.com/design/… or https://canva.link/…" className="flex-1 min-w-48 h-8 rounded border border-neutral-300 px-2 text-sm" />
-            <select value={linkFormat} disabled={pageEntries.length > 0} onChange={e => setLinkFormat(e.target.value as CreateFormat)} className="h-8 rounded border border-neutral-300 px-1 text-sm bg-white disabled:opacity-40">
-              <option value="feed">{FORMAT_LABEL.feed}</option><option value="reels">{FORMAT_LABEL.reels}</option>
-            </select>
-            <button type="button" disabled={!link.trim() || !!busy || dirty || badPages} onClick={attach} className="inline-flex items-center gap-1.5 h-8 px-3 border border-neutral-300 rounded-md text-sm disabled:opacity-40">
-              {busy === "attach" ? <Loader2 className="w-4 h-4 animate-spin" /> : <Link2 className="w-4 h-4" />} Attach
+          <div className="flex items-center gap-1.5">
+            <button type="button" aria-expanded={oneOff} aria-controls="one-off-attach" onClick={() => setOneOff(v => !v)} className="inline-flex items-center gap-1 text-sm font-medium text-neutral-800">
+              {oneOff ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />} One-off
             </button>
+            <HelpTip label="One-off">Rare: attach a finished design made outside the templates, by its Canva link. Everyday changes use Replace media or Open in Canva.</HelpTip>
           </div>
-          <div className="flex flex-wrap gap-3 text-xs text-neutral-700">
-            {(["feed", "reels"] as const).map(f => <label key={f} className="inline-flex items-center gap-1.5">{FORMAT_LABEL[f]} from page
-              <input value={linkPages[f]} onChange={e => setLinkPages(s => ({ ...s, [f]: e.target.value }))} placeholder="e.g. 2" className={`w-20 h-7 rounded border px-1.5 ${linkPages[f].trim() && !parsePages(linkPages[f]) ? "border-red-400" : "border-neutral-300"}`} />
-            </label>)}
-          </div>
-          <p className="text-xs text-neutral-500">The design is exported and added to this row as its own variation (or fills a variation that has no design yet). A design with several pages or sizes can fill both formats: give the page for each. The Run job already makes every size, so this is for designs made outside it.</p>
+          {oneOff && <div id="one-off-attach" className="space-y-2">
+            <div className="flex flex-wrap gap-2">
+              <input value={link} onChange={e => setLink(e.target.value)} aria-label="Canva design link" placeholder="https://www.canva.com/design/… or https://canva.link/…" className="flex-1 min-w-48 h-8 rounded border border-neutral-300 px-2 text-sm" />
+              <select value={linkFormat} aria-label="Size" disabled={pageEntries.length > 0} onChange={e => setLinkFormat(e.target.value as CreateFormat)} className="h-8 rounded border border-neutral-300 px-1 text-sm bg-white disabled:opacity-40">
+                <option value="feed">{FORMAT_LABEL.feed}</option><option value="reels">{FORMAT_LABEL.reels}</option>
+              </select>
+              <button type="button" disabled={!link.trim() || !!busy || dirty || badPages} onClick={attach} className="inline-flex items-center gap-1.5 h-8 px-3 border border-neutral-300 rounded-md text-sm disabled:opacity-40">
+                {busy === "attach" ? <Loader2 className="w-4 h-4 animate-spin" /> : <Link2 className="w-4 h-4" />} Attach
+              </button>
+            </div>
+            <div className="flex flex-wrap items-center gap-3 text-xs text-neutral-700">
+              {(["feed", "reels"] as const).map(f => <label key={f} className="inline-flex items-center gap-1.5">{FORMAT_LABEL[f]} from page
+                <input value={linkPages[f]} onChange={e => setLinkPages(s => ({ ...s, [f]: e.target.value }))} placeholder="e.g. 2" className={`w-20 h-7 rounded border px-1.5 ${linkPages[f].trim() && !parsePages(linkPages[f]) ? "border-red-400" : "border-neutral-300"}`} />
+              </label>)}
+              <HelpTip label="Pages">For a design with several pages or sizes: the page that fills each size. Leave empty for a one-page design.</HelpTip>
+            </div>
+          </div>}
         </section>
 
         {pending.some(v => publisherPlatforms(v.post).length) && <div className="space-y-1 border-t border-neutral-200 pt-4">
-          <label className="flex items-start gap-2 text-xs text-neutral-700"><input type="checkbox" className="mt-0.5" checked={ai} onChange={e => setAi(e.target.checked)} />These designs contain AI-generated media (adds Meta&apos;s AI label where the API supports it)</label>
+          <label className="flex items-start gap-2 text-xs text-neutral-700"><input type="checkbox" className="mt-0.5" checked={ai} onChange={e => setAi(e.target.checked)} />These designs contain AI-generated media (adds Meta&apos;s AI label where the API supports it)<HelpTip label="AI-generated media">Tick this if any photo, video or voice in the designs was made with AI, so the post carries Meta&apos;s AI label where it can.</HelpTip></label>
           {ai && aiVideo && <label className="flex items-start gap-2 text-xs text-neutral-700 pl-5"><input type="checkbox" className="mt-0.5" checked={realistic} onChange={e => setRealistic(e.target.checked)} />The AI video is photorealistic or has realistic-sounding audio (Meta requires disclosure for these)</label>}
         </div>}
       </div>}
@@ -216,7 +285,7 @@ function VariationCard({ v, busy, dirty, showCaption, picked, onPick, onRefresh,
   return (
     <div className="rounded-md ring-1 ring-neutral-200 bg-white p-3 space-y-2">
       <div className="flex items-center justify-between gap-2">
-        <p className="text-sm font-medium">{FORMAT_LABEL[format]}</p>
+        <p className="text-sm font-medium inline-flex items-center gap-1.5">{FORMAT_LABEL[format]}<HelpTip label={FORMAT_LABEL[format]}>{format === "feed" ? "The 4:5 design, for the Instagram and Facebook feeds and LinkedIn." : "The 9:16 design, for Reels, TikTok and YouTube Shorts."}{fromTemplate(post) ? "" : " This one was attached by link (One-off)."}</HelpTip></p>
         {status && <span className="text-[11px] px-1.5 py-0.5 rounded" style={{ color: status.color }}>{status.label}</span>}
       </div>
       <div className={`grid gap-1 ${post.assets.length > 1 ? "grid-cols-2" : "grid-cols-1"}`}>
@@ -238,12 +307,13 @@ function VariationCard({ v, busy, dirty, showCaption, picked, onPick, onRefresh,
         {canvaUrl && <a href={canvaUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 underline"><ExternalLink className="w-3.5 h-3.5" /> Open in Canva</a>}
         {post.canva_design_id && <button type="button" onClick={onRefresh} disabled={!!busy || dirty || out} title={dirty ? "Save your edits first" : out ? "Already out" : ""} className="inline-flex items-center gap-1 underline disabled:opacity-40">
           {busy === `refresh-${post.id}` ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />} Refresh from Canva</button>}
+        {post.canva_design_id && <HelpTip label="Refresh from Canva">Pulls this design again after you edit it in Canva. The text and media you set there are what goes out.</HelpTip>}
         {isApproved(post) && !out && <button type="button" onClick={onSendBack} disabled={!!busy} title="Withdraw the approval; nothing has gone out" className="inline-flex items-center gap-1 underline disabled:opacity-40">
           {busy === `back-${post.id}` ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Undo2 className="w-3.5 h-3.5" />} Send back to Review</button>}
         <button type="button" onClick={onDetails} className="underline text-neutral-500">All details</button>
       </div>
       <fieldset className="space-y-0.5">
-        <legend className="text-xs font-medium text-neutral-700">Platforms</legend>
+        <legend className="text-xs font-medium text-neutral-700 inline-flex items-center gap-1.5">Platforms<HelpTip label="Platforms">Where this size goes. Untick all and it stays in Review. Save changes to keep them.</HelpTip></legend>
         {platformsFor(format).map(p => (
           <label key={p} className="flex items-center gap-1.5 text-xs">
             <input type="checkbox" disabled={out} checked={picked.includes(p)} onChange={e => onPick(e.target.checked ? [...picked, p] : picked.filter(x => x !== p))} />
@@ -259,7 +329,7 @@ function VariationCard({ v, busy, dirty, showCaption, picked, onPick, onRefresh,
         {(["instagram", "facebook"] as const).map(d => <p key={d}>{d === "instagram" ? "Instagram" : "Facebook"}: {batch.jobs[d].status}{batch.jobs[d].permalink && <> · <a className="underline" href={safeUrl(batch.jobs[d].permalink)} target="_blank" rel="noreferrer">live post</a></>}{batch.jobs[d].blocker && <span className="text-amber-700"> · {batch.jobs[d].blocker}</span>}</p>)}
       </div>}
       {approvalCovers(post) && handPlatforms(post).length > 0 && <div className="space-y-1.5 border-t border-neutral-100 pt-2">
-        <p className="text-xs font-medium text-neutral-700">Post by hand</p>
+        <p className="text-xs font-medium text-neutral-700 inline-flex items-center gap-1.5">Post by hand<HelpTip label="Post by hand">Download the files, post them yourself, then paste each live post&apos;s link and Record it.</HelpTip></p>
         <div className="flex flex-wrap gap-2 text-xs">{post.assets.map((a, i) => <a key={a.url} href={safeUrl(a.url) && `${safeUrl(a.url)}?download=1`} download className="inline-flex items-center gap-1 underline"><Download className="w-3.5 h-3.5" /> {a.kind === "video" ? "Video" : `Page ${i + 1}`}</a>)}</div>
         {handPlatforms(post).map(p => posted(p)
           ? <p key={p} className="text-xs">{platformLabel(p)}: <a className="underline" href={safeUrl(posted(p)!.url)} target="_blank" rel="noreferrer">live post</a></p>

@@ -11,8 +11,10 @@ import { PAGE_LINK_MESSAGE, blobStoreHost, dvidsImagePage, isCreateUpload, isPag
 import { cardSubject } from "../content-pipeline/series"
 import { humanPlus, HumanPlusError, withoutMediaLines, type HumanPlusDeps } from "../content-pipeline/human-plus"
 import { DOD_NOTICE } from "../content-pipeline/worker"
-import { CreateRowError, createRequestId, runCreateRow, serverRowProblems, type CreateRunDeps } from "../content-pipeline/create-run"
+import { CreateRowError, createRequestId, replaceRowMedia, runCreateRow, serverRowProblems, type CreateRunDeps } from "../content-pipeline/create-run"
 import type { McuAi } from "../content-pipeline/model"
+import { guardedContentUpdate, sendBackPlan } from "../owned-meta-publisher"
+import { approvalCovers, isApproved } from "../content-pipeline/row-approval"
 import type { ContentPost } from "../../components/crm/types"
 
 loadPublishedProfileFirst()
@@ -168,6 +170,8 @@ function runDeps() {
     attachExports: async ({ postId, items, canva, fileBase, rebind }) => { const p = posts.get(postId)!; if (p.canva_design_id && p.canva_design_id !== canva.designId && !rebind) throw new Error("bound"); bases.push(fileBase); posts.set(postId, { ...p, assets: items.map(i => ({ url: i.url, kind: i.url.endsWith(".mp4") ? "video" : "image" })), export_fingerprint: "fp", canva_design_id: canva.designId } as ContentPost); return { holds: [] } },
     claimRow: async id => { if (running.has(id)) return false; running.add(id); return true },
     releaseRow: async id => { running.delete(id) },
+    // The real send-back plan (owned-meta-publisher sendBackPlan), as firestore-crm sendBackToReview applies it.
+    sendBack: async (id, actor) => { const p = posts.get(id)!; posts.set(id, { ...p, ...sendBackPlan(p as unknown as Record<string, unknown>, undefined, actor, "t", "Media replaced").post } as ContentPost) },
     now: () => "2026-10-19T15:00:00.000Z",
   }
   return { deps, posts, made, exports, running, bases }
@@ -313,4 +317,89 @@ test("Run job: a post made before designs were hashed that is already out is reu
   s.posts.set(post.id, { ...post, status: "posted", create_input_hash: undefined })
   const again = await runCreateRow(s.deps, row(), { email: "a@x.co", name: "A" })
   assert.ok(again.posts.every(p => p.reused)); assert.equal(s.made.length, 1)
+})
+
+// ── Replace media (Step 3 part 4) ──
+test("Replace media: every size is filled again with the same text and the new media, on the same posts, still in Review", async () => {
+  const s = runDeps()
+  const platforms = ["instagram_feed", "facebook_feed", "instagram_reels"]
+  const first = await runCreateRow(s.deps, row({ platforms }), { email: "a@x.co", name: "A" })
+  const feed = s.posts.get(first.posts[0].postId)!
+  assert.deepEqual(feed.create_text, { brand: "milcity", kind: "news", headline: "ARMY FIELDS NEW KIT", subHeadline: "Soldiers test it this week.", fields: { source: "U.S. Army", date: "21OCT26" } })
+  // An approval, and a caption and date edited in the drawer, before the media is replaced.
+  for (const p of s.posts.values()) s.posts.set(p.id, { ...p, status: "approved", social_copy: "Edited.", date_to_post: "2026-10-23" })
+  const video = { url: "https://abc.public.blob.vercel-storage.com/content-create/new.mp4", kind: "video" as const, name: "new.mp4", bytes: 2e7, optimized: "done" }
+  const made = s.made.length, before = new Map([...s.posts.values()].map(p => [p.id, p]))
+  const r = await replaceRowMedia(s.deps, "row-0001-abcd", feed.create_text!, video, { email: "a@x.co", name: "A" })
+  assert.deepEqual(r.posts.map(p => p.postId), first.posts.map(p => p.postId), "the same posts take the new designs")
+  assert.ok(r.posts.every(p => !p.reused))
+  assert.equal(s.made.length, made + first.posts.length, "one new design per size")
+  const fresh = s.made.slice(made)
+  assert.ok(fresh.every(d => d.video && (d.video as { url: string }).url === video.url), "the new video goes in every template")
+  assert.equal(fresh[0].text[Object.keys(fresh[0].text).find(k => /head/.test(k))!], "ARMY FIELDS NEW KIT", "the same card text")
+  assert.ok(s.exports.slice(-first.posts.length).every(e => e.endsWith(":mp4")))
+  for (const id of r.posts.map(p => p.postId)) {
+    const p = s.posts.get(id)!
+    assert.equal(p.social_copy, "Edited.", "the caption is left as it is")
+    assert.equal(p.date_to_post, "2026-10-23")
+    assert.notEqual(p.create_input_hash, before.get(id)!.create_input_hash, "the re-run hash moves with the media")
+    // The real update (owned-meta-publisher guardedContentUpdate) voids an approval when the files change.
+    const was = before.get(id)!
+    assert.equal(guardedContentUpdate({ ...was, owned_meta: { batchId: "b", started: false } } as unknown as Record<string, unknown>, { assets: p.assets }).status, "needs_approval")
+    assert.equal(guardedContentUpdate({ ...was, approvals: [{ decision: "approved", export_fingerprint: "fp" }] } as unknown as Record<string, unknown>, { assets: p.assets }).status, "needs_approval")
+  }
+  // The same media again reuses the designs; the claim is released.
+  assert.ok((await replaceRowMedia(s.deps, "row-0001-abcd", feed.create_text!, video, { email: "a@x.co", name: "A" })).posts.every(p => p.reused))
+  assert.equal(s.running.size, 0)
+})
+
+test("Replace media: refused, with nothing made, when a size is already out or the row has no template-made posts", async () => {
+  const s = runDeps()
+  const first = await runCreateRow(s.deps, row(), { email: "a@x.co", name: "A" })
+  const post = s.posts.get(first.posts[0].postId)!
+  const photo = { ...row().media!, url: "https://abc.public.blob.vercel-storage.com/content-create/other.jpg" }
+  s.posts.set(post.id, { ...post, status: "posted" })
+  const made = s.made.length
+  await assert.rejects(replaceRowMedia(s.deps, "row-0001-abcd", post.create_text!, photo, { email: "a@x.co", name: "A" }), (e: unknown) => e instanceof CreateRowError && e.status === 409)
+  await assert.rejects(replaceRowMedia(s.deps, "row-9999-none", post.create_text!, photo, { email: "a@x.co", name: "A" }), /One-off/)
+  await assert.rejects(replaceRowMedia(s.deps, "row-0001-abcd", { ...post.create_text!, kind: "no_such_kind" }, photo, { email: "a@x.co", name: "A" }), /no longer has the template/)
+  assert.equal(s.made.length, made)
+})
+
+test("Replace media: a failure part-way never leaves one size changed beside another still approved", async (t) => {
+  if (!news().templates.reels) return t.skip("the profile under test has no 9:16 News template")
+  const s = runDeps()
+  const first = await runCreateRow(s.deps, row({ platforms: ["linkedin", "tiktok"] }), { email: "a@x.co", name: "A" })
+  assert.equal(first.posts.length, 2)
+  // Both sizes approved for hand posting, bound to their files.
+  for (const p of s.posts.values()) s.posts.set(p.id, { ...p, status: "approved", approvals: [{ decision: "approved", export_fingerprint: "fp", by_name: "A", by_email: "a@x.co", at: "t" }] } as unknown as ContentPost)
+  const text = s.posts.get(first.posts[0].postId)!.create_text!
+  // Files go through the real guard; the second size's files fail to store.
+  let attaches = 0
+  s.deps.attachExports = async ({ postId, items, canva }) => {
+    if (++attaches === 2) throw new Error("Blob down")
+    const p = s.posts.get(postId)!
+    const updates = guardedContentUpdate(p as unknown as Record<string, unknown>, { assets: items.map(i => ({ url: i.url, kind: "image" })), export_fingerprint: "fp2", canva_design_id: canva.designId })
+    s.posts.set(postId, { ...p, ...updates } as ContentPost)
+    return { holds: [] }
+  }
+  const photo = { ...row().media!, url: "https://abc.public.blob.vercel-storage.com/content-create/new.jpg" }
+  await assert.rejects(replaceRowMedia(s.deps, "row-0001-abcd", text, photo, { email: "a@x.co", name: "A" }), /Blob down/)
+  for (const p of s.posts.values()) {
+    assert.equal(isApproved(p), false, `${p.create_format} is back in Review`)
+    assert.equal(approvalCovers(p), false, `${p.create_format} can't go out on the old approval`)
+  }
+  assert.equal(s.running.size, 0)
+})
+
+test("Replace media: the card keeps its printed date when the post date was changed in the drawer", async () => {
+  const s = runDeps()
+  const first = await runCreateRow(s.deps, row(), { email: "a@x.co", name: "A" })
+  const post = s.posts.get(first.posts[0].postId)!
+  assert.equal(post.create_text!.fields.date, "21OCT26")
+  s.posts.set(post.id, { ...post, date_to_post: "2026-11-05" })
+  const photo = { ...row().media!, url: "https://abc.public.blob.vercel-storage.com/content-create/other.jpg" }
+  await replaceRowMedia(s.deps, "row-0001-abcd", post.create_text!, photo, { email: "a@x.co", name: "A" })
+  assert.equal(s.made.at(-1)!.text.date, "21OCT26")
+  await assert.rejects(replaceRowMedia(s.deps, "row-0001-abcd", { ...post.create_text!, fields: {} }, photo, { email: "a@x.co", name: "A" }), /printed date/)
 })

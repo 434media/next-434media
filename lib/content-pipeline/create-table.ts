@@ -12,6 +12,8 @@ import type { FieldSpec, RequestKind, SeriesKey } from "./series"
  * post, and publishes a Reel only as video. A row's posts share its row id (create_row_id) for Step 3's drawer.
  */
 export type CreateFormat = "feed" | "reels"
+/** Where the Create table keeps its rows in the browser until they run (the drawer reads it for older rows' card text). */
+export const CREATE_ROWS_STORE_KEY = "434-create-table-rows-v1"
 /** Where a platform's post goes: through the owned-Meta publisher, or posted by hand until its vendor approves API publishing (plan v11.1 Step 8). */
 export type Posting = "publisher" | "hand"
 export interface CreatePlatform { id: string; label: string; platform: "instagram" | "facebook" | "tiktok" | "youtube" | "linkedin"; format: CreateFormat; posting: Posting }
