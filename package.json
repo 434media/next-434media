@@ -41,7 +41,7 @@
     "react-dom": "^19.2.1",
     "recharts": "^2.15.3",
     "resend": "^6.12.2",
-    "sanitize-html": "^2.18.0",
+    "sanitize-html": "^2.18.1",
     "sharp": "^0.35.5",
     "svix": "^1.92.2",
     "undici": ">=6.27.0 <7",
