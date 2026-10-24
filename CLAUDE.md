@@ -242,9 +242,11 @@ alone drops a translation from ~$0.019 to ~$0.0052 on the cached path.
 This repository is public, so it carries no business procedure. Every business
 skill is an SOP in `docs/context/"06 Standards/"`, its scripts in 434-context,
 and a thin adapter in 434-context's `.claude/skills/`. The Skill Building
-Standard is `docs/context/"06 Standards/Skill_Building_Standard.md"`. On this
-Mac, `python3 docs/context/"04 Build/link_skills.py"` links the adapters into
-`~/.claude/skills/` so they load here; without the link, read the SOP directly.
+Standard is `docs/context/"06 Standards/Skill_Building_Standard.md"`. **To run a
+business skill, work in a session opened on 434-context** (with this repository
+alongside for the website half); the skills load there natively, on any machine
+or in the cloud. Nothing is installed on a machine. A session here can read an
+SOP through `docs/context`, but does not run the skill from here.
 
 | Skill | SOP |
 |---|---|
