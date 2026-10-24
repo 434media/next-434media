@@ -26,6 +26,10 @@ const INTERNAL_FIELDS = new Set([
   "quotable",
   "notes",
   "internal_context",
+  // Master 4.5 Ownership: the owners, the IP holder and 434's stake. Portfolio
+  // rows already go out through an allowlist; this covers any other collection
+  // that ever carries the field.
+  "ownership",
   "proof_assets_as_written",
   "restrictions_as_written",
   "updated_by",

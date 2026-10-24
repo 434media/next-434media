@@ -145,7 +145,7 @@ export const WORK_RECORDS: WorkRecord[] = [
     status: "Completed",
     publicUrl: null,
     recordKey: "overdrive",
-    rightsDefaults: "Creator 434 MEDIA · Copyright notice © 2026 434 MEDIA · Credit line 434 MEDIA · Rights usage terms All rights reserved",
+    rightsDefaults: "Creator 434 MEDIA · Copyright notice © 2025 434 MEDIA · Credit line 434 MEDIA · Rights usage terms All rights reserved",
     registeredIdentifier: null,
     video: null,
     displayException: null,

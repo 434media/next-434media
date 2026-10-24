@@ -232,6 +232,29 @@ export interface PortfolioRecord {
   public_url?: string | null
   approved_public_description: string
   internal_context?: string | null
+  /**
+   * Master 4.5 Ownership. Internal: never emitted to the website and never returned to a public caller (lib/sor/visibility.ts). Optional; null where ownership is not documented.
+   */
+  ownership?: null | {
+    /**
+     * How 434 MEDIA came to its position: sole ownership, a fee for commissioned work, or an ownership stake taken in place of a fee.
+     */
+    basis: "sole" | "fee" | "equity in lieu of fee"
+    /**
+     * Every party that owns the work, 434 MEDIA included where it is one.
+     *
+     * @minItems 1
+     */
+    owners: [string, ...string[]]
+    /**
+     * The party that holds the underlying intellectual property. Aligns with schema.org CreativeWork copyrightHolder.
+     */
+    ip_holder: string
+    /**
+     * 434 MEDIA's stake, as a percentage or as the agreed terms; null where 434 holds none.
+     */
+    stake_434: string | null
+  }
   proof_assets_as_written?: string | null
   video?: string | null
   /**
@@ -381,7 +404,7 @@ export const sorSchemaHashes = {
     "launch_dependency.schema.json": "b60a01e2bf2af341",
     "partner_service.schema.json": "27d5fa1bf7ad7543",
     "policy_document.schema.json": "4e1d0184b8692961",
-    "portfolio_record.schema.json": "299576a4a45c00dc",
+    "portfolio_record.schema.json": "76c94999b0ea31ea",
     "pricing_exception.schema.json": "30bd46b76e2e2ded",
     "qualification_threshold.schema.json": "4b346713da931afd",
     "rate_card_line.schema.json": "099711957961ffe2",
