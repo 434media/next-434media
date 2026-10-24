@@ -51,8 +51,8 @@ export interface BrandProfileStore {
   restore(id: string, versionId: string, actor: string, at: string, force?: boolean): Promise<PublishResult>
   /** Every published version, newest first. */
   versions(id: string): Promise<ProfileVersion[]>
-  /** The published versions numbered above `n`, oldest first: what the 434-context backup does not hold yet. */
-  versionsAfter(id: string, n: number): Promise<ProfileVersion[]>
+  /** At most `limit` published versions numbered above `n`, oldest first: what the 434-context backup does not hold yet. */
+  versionsAfter(id: string, n: number, limit: number): Promise<ProfileVersion[]>
 }
 
 export function firestoreBrandProfiles(db: FirebaseFirestore.Firestore = getDb()): BrandProfileStore {
@@ -107,7 +107,7 @@ export function firestoreBrandProfiles(db: FirebaseFirestore.Firestore = getDb()
       return result
     }),
     versions: async id => (await col.doc(id).collection(VERSIONS).orderBy("n", "desc").get()).docs.map(d => d.data() as ProfileVersion),
-    versionsAfter: async (id, n) => (await col.doc(id).collection(VERSIONS).where("n", ">", n).orderBy("n", "asc").get()).docs.map(d => d.data() as ProfileVersion),
+    versionsAfter: async (id, n, limit) => (await col.doc(id).collection(VERSIONS).where("n", ">", n).orderBy("n", "asc").limit(limit).get()).docs.map(d => d.data() as ProfileVersion),
   }
 }
 

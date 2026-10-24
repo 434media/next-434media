@@ -14,6 +14,8 @@ import { versionDocId, BRAND_ID, type ProfileVersion } from "./profile-store"
 export const BACKUP_READ_TOKEN_ENV = "BRAND_PROFILE_BACKUP_READ_TOKEN"
 /** A configured credential shorter than this is treated as unset: the endpoint refuses rather than accept a weak one. */
 export const MIN_READ_TOKEN_LENGTH = 32
+/** The most versions one call returns; `more: true` tells the caller to ask again from what it now holds. */
+export const BACKUP_PAGE_SIZE = 50
 export const backupPath = (v: Pick<ProfileVersion, "brand_id" | "n">) => `06 Standards/Brand Profiles/Published/${v.brand_id}/${versionDocId(v.n)}.json`
 
 /** The backed-up record: the version as published, newline-terminated, keys in a stable order. Versions published
@@ -60,18 +62,19 @@ export function readTokenCheck(authorization: string | null, env: Record<string,
 /** What the endpoint reads: the brands, and each brand's versions above a number. Reads only. */
 export interface BackupSource {
   list(): Promise<{ id: string }[]>
-  versionsAfter(id: string, n: number): Promise<ProfileVersion[]>
+  versionsAfter(id: string, n: number, limit: number): Promise<ProfileVersion[]>
 }
 
 const json = (body: unknown, status: number) => Response.json(body, { status, headers: { "cache-control": "no-store" } })
 
 /**
  * GET /api/brand-profiles/backups?after=milcity:4 with `Authorization: Bearer <BRAND_PROFILE_BACKUP_READ_TOKEN>`:
- * every published version above the given numbers, all brands, oldest first per brand, each as its backup record.
+ * the published versions above the given numbers, all brands, oldest first per brand, each as its backup record, at
+ * most `pageSize` per call. `more: true` means the page was cut: the caller writes it and asks again with its new numbers.
  * 503 when the credential is not configured (refused for everyone), 401 for a wrong or missing one, 400 for a
  * malformed `after`, 500 when the database read fails. It writes nothing and sends no CORS headers.
  */
-export async function serveBackups(req: Request, source: () => Promise<BackupSource>, env: Record<string, string | undefined> = process.env): Promise<Response> {
+export async function serveBackups(req: Request, source: () => Promise<BackupSource>, env: Record<string, string | undefined> = process.env, pageSize = BACKUP_PAGE_SIZE): Promise<Response> {
   const check = readTokenCheck(req.headers.get("authorization"), env)
   if (check === "unset") {
     console.error(`[GET /api/brand-profiles/backups] ${BACKUP_READ_TOKEN_ENV} is not set (or shorter than ${MIN_READ_TOKEN_LENGTH}); refusing`)
@@ -84,8 +87,15 @@ export async function serveBackups(req: Request, source: () => Promise<BackupSou
     const store = await source()
     const brands = (await store.list()).map(d => d.id).filter(id => BRAND_ID.test(id)).sort()
     const versions: BackupEntry[] = []
-    for (const id of brands) for (const v of await store.versionsAfter(id, after[id] ?? 0)) versions.push(backupEntry(v))
-    return json({ versions }, 200)
+    let more = false
+    for (const id of brands) {
+      // One extra row says whether anything is left past the page.
+      const room = pageSize - versions.length
+      const rows = await store.versionsAfter(id, after[id] ?? 0, room + 1)
+      for (const v of rows.slice(0, room)) versions.push(backupEntry(v))
+      if (rows.length > room) { more = true; break }
+    }
+    return json({ versions, more }, 200)
   } catch (err) {
     console.error("[GET /api/brand-profiles/backups]", err)
     return json({ error: "Could not read brand profiles" }, 500)

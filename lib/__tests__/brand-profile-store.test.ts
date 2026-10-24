@@ -151,7 +151,7 @@ test("backup endpoint: lists only versions newer than 434-context holds, reads o
   const calls: string[] = []
   const source: BackupSource = {
     list: async () => [{ id: "milcity" }, { id: "Not A Brand" }],
-    versionsAfter: async (id, n) => { calls.push(`${id}>${n}`); return (versions[id] ?? []).filter(v => v.n > n) },
+    versionsAfter: async (id, n, limit) => { calls.push(`${id}>${n}`); return (versions[id] ?? []).filter(v => v.n > n).slice(0, limit) },
   }
   const get = (q: string, auth: string | null = `Bearer ${TOKEN}`, env: Record<string, string> = ENV) =>
     serveBackups(new Request(`https://example.test/api/brand-profiles/backups${q}`, { headers: auth ? { authorization: auth } : {} }), async () => source, env)
@@ -163,9 +163,16 @@ test("backup endpoint: lists only versions newer than 434-context holds, reads o
   assert.equal(body.versions[1].path, "06 Standards/Brand Profiles/Published/milcity/v3.json")
   assert.equal(body.versions[1].record, backupRecord(versions.milcity[2]), "the same record export writes")
   assert.deepEqual(calls, ["milcity>1"], "a non-brand document id is skipped")
-  assert.deepEqual((await (await get("?after=milcity:3")).json()), { versions: [] }, "up to date: nothing")
+  assert.equal((body as unknown as { more: boolean }).more, false)
+  assert.deepEqual((await (await get("?after=milcity:3")).json()), { versions: [], more: false }, "up to date: nothing")
   assert.equal(((await (await get("")).json()) as { versions: unknown[] }).versions.length, 3, "a brand 434-context does not hold yet starts from 0")
 
+  // Bounded: a page holds at most pageSize versions, and says when more are left.
+  const paged = (q: string) => serveBackups(new Request(`https://example.test/x${q}`, { headers: { authorization: `Bearer ${TOKEN}` } }), async () => source, ENV, 2)
+  const p1 = await (await paged("")).json() as { versions: { n: number }[]; more: boolean }
+  assert.deepEqual([p1.versions.map(v => v.n), p1.more], [[1, 2], true])
+  const p2 = await (await paged("?after=milcity:2")).json() as { versions: { n: number }[]; more: boolean }
+  assert.deepEqual([p2.versions.map(v => v.n), p2.more], [[3], false])
   assert.equal((await get("?after=milcity:1", null)).status, 401)
   assert.equal((await get("?after=milcity:1", `Bearer ${"u".repeat(40)}`)).status, 401)
   assert.equal((await get("?after=milcity:1", `Bearer ${TOKEN}`, {})).status, 503, "unset: refused for everyone")
@@ -211,6 +218,7 @@ test("Firestore: publish, refuse a broken draft, restore, and read the published
   const back = await readPublishedProfile(id, db)
   assert.ok("active" in back && back.active.profile.rulesVersion === profile.rulesVersion && back.active.versionId === `${id}@v3`)
   assert.deepEqual((await store.versions(id)).map(v => [v.version_id, v.published_by, v.restored_from]), [[`${id}@v3`, BY, `${id}@v1`], [`${id}@v2`, BY, null], [`${id}@v1`, BY, null]])
-  assert.deepEqual((await store.versionsAfter(id, 1)).map(v => v.version_id), [`${id}@v2`, `${id}@v3`], "oldest first")
-  assert.deepEqual(await store.versionsAfter(id, 3), [])
+  assert.deepEqual((await store.versionsAfter(id, 1, 50)).map(v => v.version_id), [`${id}@v2`, `${id}@v3`], "oldest first")
+  assert.deepEqual(await store.versionsAfter(id, 3, 50), [])
+  assert.deepEqual((await store.versionsAfter(id, 0, 2)).map(v => v.n), [1, 2], "limited")
 })
