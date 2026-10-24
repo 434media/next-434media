@@ -18,6 +18,14 @@ initBotId({
       method: 'POST',
     },
     {
+      path: '/api/thefeed-newsletter',
+      method: 'POST',
+    },
+    {
+      path: '/api/lead-with-ops/feedback',
+      method: 'POST',
+    },
+    {
       path: '/api/contact-form',
       method: 'POST',
     },

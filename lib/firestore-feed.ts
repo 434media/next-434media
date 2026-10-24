@@ -230,17 +230,22 @@ export async function getFeedItems(filters?: {
   }
 }
 
-// Get a specific feed item by slug
-export async function getFeedItemBySlug(slug: string, tableName?: string): Promise<FeedItem | null> {
+// Get a specific feed item by slug. Pass `status` to filter before limit(1):
+// slugs are not unique across statuses, so a draft sharing a published item's
+// slug could otherwise be the one document returned. Two equality filters need
+// no composite index.
+export async function getFeedItemBySlug(
+  slug: string,
+  tableName?: string,
+  opts?: { status?: FeedItem["status"] },
+): Promise<FeedItem | null> {
   try {
     const db = getDb()
     const collectionName = getCollectionForTable(tableName)
-    
-    const snapshot = await db
-      .collection(collectionName)
-      .where("slug", "==", slug)
-      .limit(1)
-      .get()
+
+    let query: admin.firestore.Query = db.collection(collectionName).where("slug", "==", slug)
+    if (opts?.status) query = query.where("status", "==", opts.status)
+    const snapshot = await query.limit(1).get()
 
     if (snapshot.empty) {
       return null
