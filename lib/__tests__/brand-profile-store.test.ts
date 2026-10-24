@@ -12,7 +12,8 @@ import { BRAND, activeProfile, setProcessProfile, withProfile } from "../content
 import { SERIES } from "../content-pipeline/series"
 import { KIND_CODE } from "../content-pipeline/worker"
 import { profileStamp } from "../content-pipeline/run"
-import { backupPath, backupRecord, backupToGitHub, backupPublished } from "../content-pipeline/profile-backup"
+import { backupPath, backupRecord, parseAfter, readTokenCheck, serveBackups, BACKUP_READ_TOKEN_ENV, type BackupSource } from "../content-pipeline/profile-backup"
+import type { ProfileVersion } from "../content-pipeline/profile-store"
 import type { BrandProfile } from "../content-pipeline/profile"
 import { published, loadPublishedProfileFirst } from "./published-profile"
 
@@ -29,7 +30,7 @@ test("Publish: a valid draft becomes version 1, with who, when, its hash and the
   assert.ok(r.ok)
   const v = r.version
   assert.equal(v.version_id, "milcity@v1"); assert.equal(v.n, 1); assert.equal(v.published_by, BY); assert.equal(v.published_at, AT)
-  assert.equal(v.profile_sha256, profileSha256(published.milcity)); assert.equal(v.restored_from, null); assert.deepEqual(v.backup, { status: "pending" })
+  assert.equal(v.profile_sha256, profileSha256(published.milcity)); assert.equal(v.restored_from, null); assert.ok(!("backup" in v), "no backup status is written on the site")
   assert.equal(v.template_map.instagram.feed.news, published.milcity.series.news!.templates.feed)
   assert.equal(v.template_map.facebook.reels.breaking, published.milcity.series.breaking!.templates.reels)
   assert.ok(!("dt101" in v.template_map.instagram.reels), "a series with no Reels template has no Reels entry")
@@ -107,30 +108,80 @@ test("the engine reads the profile in scope: concurrent scopes don't mix, and no
   try { assert.throws(() => BRAND.name, /No published brand profile is in scope/) } finally { setProcessProfile(saved) }
 })
 
-test("backup: the record is the version as published, to a records branch; without the token it stays pending", async () => {
+const TOKEN = "t".repeat(40)
+const ENV = { [BACKUP_READ_TOKEN_ENV]: TOKEN }
+
+test("backup: the record is the version as published, without the legacy backup status", () => {
   const r = preparePublish(docWith(published.milcity), BY, AT)
   assert.ok(r.ok)
   assert.equal(backupPath(r.version), "06 Standards/Brand Profiles/Published/milcity/v1.json")
   const record = JSON.parse(backupRecord(r.version))
-  assert.equal(record.version_id, "milcity@v1"); assert.ok(!("backup" in record)); assert.deepEqual(record.profile, published.milcity)
-  let marked = 0
-  assert.deepEqual(await backupPublished(r.version, async () => { marked++ }, {}), { status: "pending" }); assert.equal(marked, 0)
-  // With a token: the branch is created from main once, then the file is committed to it (scripted GitHub).
+  assert.equal(record.version_id, "milcity@v1"); assert.deepEqual(record.profile, published.milcity)
+  // A version stored before Step 2b carries backup: {status}; the record is the same bytes without it.
+  const legacy = { ...r.version, backup: { status: "done", commit: "abc" } } as ProfileVersion
+  assert.equal(backupRecord(legacy), backupRecord(r.version)); assert.ok(!("backup" in record))
+  assert.ok(backupRecord(r.version).endsWith("}\n"))
+})
+
+test("backup endpoint: the read credential is compared in constant time and refused when unset or short", () => {
+  assert.equal(readTokenCheck(`Bearer ${TOKEN}`, ENV), "ok")
+  assert.equal(readTokenCheck(`Bearer ${TOKEN}x`, ENV), "denied")
+  assert.equal(readTokenCheck(`Bearer ${TOKEN.slice(1)}`, ENV), "denied")
+  assert.equal(readTokenCheck(TOKEN, ENV), "denied", "the Bearer scheme is required")
+  assert.equal(readTokenCheck(null, ENV), "denied")
+  assert.equal(readTokenCheck(`Bearer ${TOKEN}`, {}), "unset")
+  assert.equal(readTokenCheck("Bearer short", { [BACKUP_READ_TOKEN_ENV]: "short" }), "unset", "a weak credential is not accepted")
+  assert.equal(readTokenCheck("Bearer ", { [BACKUP_READ_TOKEN_ENV]: "" }), "unset")
+})
+
+test("backup endpoint: after= parses brand:n pairs and refuses anything else", () => {
+  assert.deepEqual(parseAfter(null), {}); assert.deepEqual(parseAfter(""), {})
+  assert.deepEqual(parseAfter("milcity:4,txmx-boxing:0"), { milcity: 4, "txmx-boxing": 0 })
+  for (const bad of ["milcity", "milcity:-1", "milcity:4,milcity:5", "Milcity:4", "../x:1", "milcity:4;drop", "milcity:1234567"]) assert.equal(parseAfter(bad), null, bad)
+})
+
+test("backup endpoint: lists only versions newer than 434-context holds, reads only, no CORS", async () => {
+  const versions: Record<string, ProfileVersion[]> = {}
+  let doc = docWith(published.milcity)
+  for (let k = 0; k < 3; k++) {
+    const draft = { ...structuredClone(published.milcity), rulesVersion: `r${k}` }
+    const r = preparePublish({ ...doc, draft: { profile: draft, examples: { approved: [], rejected: [] }, updated_by: BY, updated_at: AT } }, BY, AT)
+    assert.ok(r.ok); doc = r.doc; (versions.milcity ??= []).push(r.version)
+  }
   const calls: string[] = []
-  const gh = (async (url: string, init?: RequestInit) => {
-    calls.push(`${init?.method} ${url.replace("https://api.github.com/repos/434media/434-context", "")}`)
-    const body = (status: number, json: unknown) => new Response(JSON.stringify(json), { status })
-    if (url.endsWith("/git/ref/heads/records/brand-profile-backups")) return body(404, {})
-    if (url.endsWith("/git/ref/heads/main")) return body(200, { object: { sha: "abc" } })
-    if (url.endsWith("/git/refs")) return body(201, {})
-    if (init?.method === "GET") return body(404, {})
-    assert.equal(JSON.parse(String(init?.body)).branch, "records/brand-profile-backups")
-    return body(201, { commit: { sha: "def" } })
-  }) as typeof fetch
-  const state = await backupToGitHub(r.version, "t", gh, () => AT)
-  assert.deepEqual(state, { status: "done", path: backupPath(r.version), commit: "def", at: AT })
-  assert.ok(calls.some(c => c.startsWith("PUT /contents/06%20Standards/Brand%20Profiles/Published/milcity/v1.json")), calls.join("\n"))
-  assert.ok(!calls.some(c => /heads\/main$/.test(c) && c.startsWith("PUT")), "never writes main")
+  const source: BackupSource = {
+    list: async () => [{ id: "milcity" }, { id: "Not A Brand" }],
+    versionsAfter: async (id, n, limit) => { calls.push(`${id}>${n}`); return (versions[id] ?? []).filter(v => v.n > n).slice(0, limit) },
+  }
+  const get = (q: string, auth: string | null = `Bearer ${TOKEN}`, env: Record<string, string> = ENV) =>
+    serveBackups(new Request(`https://example.test/api/brand-profiles/backups${q}`, { headers: auth ? { authorization: auth } : {} }), async () => source, env)
+
+  const newer = await get("?after=milcity:1")
+  assert.equal(newer.status, 200); assert.equal(newer.headers.get("cache-control"), "no-store"); assert.equal(newer.headers.get("access-control-allow-origin"), null)
+  const body = await newer.json() as { versions: { version_id: string; path: string; record: string }[] }
+  assert.deepEqual(body.versions.map(v => v.version_id), ["milcity@v2", "milcity@v3"])
+  assert.equal(body.versions[1].path, "06 Standards/Brand Profiles/Published/milcity/v3.json")
+  assert.equal(body.versions[1].record, backupRecord(versions.milcity[2]), "the same record export writes")
+  assert.deepEqual(calls, ["milcity>1"], "a non-brand document id is skipped")
+  assert.equal((body as unknown as { more: boolean }).more, false)
+  assert.deepEqual((await (await get("?after=milcity:3")).json()), { versions: [], more: false }, "up to date: nothing")
+  assert.equal(((await (await get("")).json()) as { versions: unknown[] }).versions.length, 3, "a brand 434-context does not hold yet starts from 0")
+
+  // Bounded: a page holds at most pageSize versions, and says when more are left.
+  const paged = (q: string) => serveBackups(new Request(`https://example.test/x${q}`, { headers: { authorization: `Bearer ${TOKEN}` } }), async () => source, ENV, 2)
+  const p1 = await (await paged("")).json() as { versions: { n: number }[]; more: boolean }
+  assert.deepEqual([p1.versions.map(v => v.n), p1.more], [[1, 2], true])
+  const p2 = await (await paged("?after=milcity:2")).json() as { versions: { n: number }[]; more: boolean }
+  assert.deepEqual([p2.versions.map(v => v.n), p2.more], [[3], false])
+  assert.equal((await get("?after=milcity:1", null)).status, 401)
+  assert.equal((await get("?after=milcity:1", `Bearer ${"u".repeat(40)}`)).status, 401)
+  assert.equal((await get("?after=milcity:1", `Bearer ${TOKEN}`, {})).status, 503, "unset: refused for everyone")
+  assert.equal((await get("?after=nope")).status, 400)
+  calls.length = 0
+  await get("?after=milcity:1", null)
+  assert.deepEqual(calls, [], "nothing is read before the credential is checked")
+  const failing = await serveBackups(new Request("https://example.test/x", { headers: { authorization: `Bearer ${TOKEN}` } }), async () => { throw new Error("db down") }, ENV)
+  assert.equal(failing.status, 500)
 })
 
 test("Firestore: publish, refuse a broken draft, restore, and read the published profile fresh", { skip: !process.env.FIRESTORE_EMULATOR_HOST && "no FIRESTORE_EMULATOR_HOST" }, async () => {
@@ -167,6 +218,7 @@ test("Firestore: publish, refuse a broken draft, restore, and read the published
   const back = await readPublishedProfile(id, db)
   assert.ok("active" in back && back.active.profile.rulesVersion === profile.rulesVersion && back.active.versionId === `${id}@v3`)
   assert.deepEqual((await store.versions(id)).map(v => [v.version_id, v.published_by, v.restored_from]), [[`${id}@v3`, BY, `${id}@v1`], [`${id}@v2`, BY, null], [`${id}@v1`, BY, null]])
-  await store.markBackup(id, 3, { status: "done", path: "p", commit: "c", at: AT })
-  assert.equal((await store.get(id))!.published!.backup.status, "done")
+  assert.deepEqual((await store.versionsAfter(id, 1, 50)).map(v => v.version_id), [`${id}@v2`, `${id}@v3`], "oldest first")
+  assert.deepEqual(await store.versionsAfter(id, 3, 50), [])
+  assert.deepEqual((await store.versionsAfter(id, 0, 2)).map(v => v.n), [1, 2], "limited")
 })
