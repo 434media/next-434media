@@ -451,6 +451,13 @@ test("FB Reel: the stuck job from the earlier flow (Xtv0HJeyPoJU2KLQA8gX) is nev
   assert.equal(fb.status,"manual_required"); assert.ok(fb.closed); assert.match(fb.blocker!,/closed without posting/)
   assert.equal(fb.finalIntent,undefined)
   assert.throws(()=>resetUnpublishedPreparation(s.value,"facebook"),/closed/,"an operator reset can't reopen it")
+  // Before it is closed, the per-post route's reset is refused too: a reset would upload and post a new Reel.
+  const open=reelsStore(); open.value.batch.jobs.facebook={status:"processing",preparation:{video:"1463737685855692",upload_url:"https://rupload.facebook.com/video-upload/v26.0/1463737685855692",uploaded:"true"}}
+  assert.throws(()=>resetUnpublishedPreparation(open.value,"facebook"),/earlier upload flow/)
+  const manual=reelsStore(); manual.value.batch.jobs.facebook={status:"manual_required",preparation:{video:"1463737685855692",uploaded:"true"}}
+  assert.throws(()=>resetUnpublishedPreparation(manual.value,"facebook"),/earlier upload flow/)
+  const fresh=reelsStore(); fresh.value.batch.jobs.facebook={status:"manual_required",preparation:{reels_flow:FB_REELS_FLOW,video:"777"}}
+  resetUnpublishedPreparation(fresh.value,"facebook"); assert.deepEqual(fresh.value.batch.jobs.facebook,{status:"ready",preparation:{}},"a new-flow preparation can still be reset")
   await run(s,reelsProvider(s.value.batch.manifest,fake.fetcher),"again")
   assert.deepEqual(fake.log,[],"a closed job is skipped")
 })

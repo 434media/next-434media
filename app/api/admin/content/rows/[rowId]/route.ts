@@ -4,7 +4,7 @@ import { requireContentRunner } from "../../../content-pipeline/auth"
 import { getContentPostsByCreateRow, updateContentPost, ownedMetaStore, decideOwnedMeta, approveHandPost, recordHandPost } from "@/lib/firestore-crm"
 import { MetaBlocked } from "@/lib/owned-meta-publisher"
 import { exportFileBase, isHandPosted, FORMAT_LABEL, type CreateFormat } from "@/lib/content-pipeline/create-table"
-import { allowedPlatforms, approveRow, exportAs, formatOf, frozen, futureDated, isApproved, platformConflicts, platformsFor, resolveCanvaDesignLink, RowApprovalError } from "@/lib/content-pipeline/row-approval"
+import { addedConflicts, allowedPlatforms, approveRow, exportAs, formatOf, frozen, futureDated, isApproved, platformConflicts, platformsFor, resolveCanvaDesignLink, RowApprovalError } from "@/lib/content-pipeline/row-approval"
 import { CreateRowError, createRequestId } from "@/lib/content-pipeline/create-run"
 import { isCreateUpload } from "@/lib/content-pipeline/create-media"
 import { createProfile } from "../../profile"
@@ -125,8 +125,8 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ rowId: st
     if (Object.keys(updates).length && isApproved(p) && !p.owned_meta) updates.status = "needs_approval"
     if (Object.keys(updates).length) plan.push({ post: p, updates })
   }
-  // One size per platform per row (Step 3 part 5): an edit that would put a platform on two sizes is refused whole.
-  const conflicts = platformConflicts(posts, Object.fromEntries(plan.filter(x => x.updates.social_platforms).map(x => [x.post.id, x.updates.social_platforms!])))
+  // One size per platform per row (Step 3 part 5): an edit that would put a platform on a second size is refused whole.
+  const conflicts = addedConflicts(posts, Object.fromEntries(plan.filter(x => x.updates.social_platforms).map(x => [x.post.id, x.updates.social_platforms!])))
   if (conflicts.length) return NextResponse.json({ error: conflicts.join("; "), problems: conflicts }, { status: 409 })
   try {
     for (const { post, updates } of plan) await updateContentPost(post.id, updates)

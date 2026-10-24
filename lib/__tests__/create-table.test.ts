@@ -418,7 +418,9 @@ test("each platform's sizes follow the media: a photo is 4:5 on Instagram and Fa
     assert.deepEqual(formatChoices("linkedin", shape), ["feed"])
   }
   assert.equal(choiceLabel("instagram", "reels", "video"), "9:16 Reel")
-  assert.equal(choiceLabel("facebook", "feed", "video"), "4:5 Reel")
+  assert.equal(choiceLabel("instagram", "feed", "video"), "4:5 Reel")
+  assert.equal(choiceLabel("facebook", "feed", "video"), "4:5 video", "Facebook posts a 4:5 video as a Page video, not a Reel")
+  assert.equal(choiceLabel("facebook", "reels", "video"), "9:16 Reel")
   assert.equal(choiceLabel("instagram", "feed", "photo"), "4:5")
   assert.equal(mediaShapeOf(null), "photo")
   assert.equal(mediaShapeOf(VIDEO), "video")

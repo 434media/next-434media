@@ -1,7 +1,9 @@
-import { createOwnedMetaDraft, getContentPostById, ownedMetaStore, blockOwnedMetaPermission, ownedMetaPermissionBlocked, ownedMetaRuntimeEnabled } from "@/lib/firestore-crm"
+import { createOwnedMetaDraft, getContentPostById, getContentPostsByCreateRow, ownedMetaStore, blockOwnedMetaPermission, ownedMetaPermissionBlocked, ownedMetaRuntimeEnabled } from "@/lib/firestore-crm"
 import { runOwnedMeta, guardFacebookRetryDispatch, validateMetaMutationBoundary, isExcludedPostId, MetaBlocked, MetaPermissionError, type MetaBatch, type MetaBrand, type MetaManifest, type MetaAsset, type MetaRecord, type MetaStore, type MetaDestination, type FacebookRecovery } from "@/lib/owned-meta-publisher"
 import { readTrustedAsset, assertApprovedBlobUrl, assetDigest, verifyAssetBytes, measureExport } from "@/lib/owned-meta-assets"
 import { createMetaProvider } from "@/lib/instagram-publishing"
+import { platformConflicts } from "@/lib/content-pipeline/row-approval"
+import type { ContentPost } from "@/components/crm/types"
 import { recordCronRun } from "@/lib/cron-auth"
 
 /**
@@ -62,9 +64,25 @@ export async function ownedMetaProviderFor(args: { id: string; record: MetaRecor
   return { provider, localEnabled, verifyUrls, config }
 }
 
+export interface RowReads { getPost(id: string): Promise<ContentPost | null>; listRow(rowId: string): Promise<ContentPost[]> }
+const rowReads: RowReads = { getPost: getContentPostById, listRow: getContentPostsByCreateRow }
+/**
+ * One size per platform per row (Step 3 part 5), on every path that publishes (the drawer, the per-post route, the
+ * connector/Slack tool, the cron): before a first dispatch (no job has a final intent or a remote ID), a Create row's
+ * post is refused if another size of its row goes to one of the same platforms. Started publications are only finished.
+ */
+export async function assertRowDispatch(id: string, record: MetaRecord, reads: RowReads = rowReads): Promise<void> {
+  if (Object.values(record.batch.jobs).some(j => j.finalIntent || j.remoteId)) return
+  const post = await reads.getPost(id)
+  if (!post?.create_row_id) return
+  const conflicts = platformConflicts(await reads.listRow(post.create_row_id), {}, post.social_platforms ?? [])
+  if (conflicts.length) throw new MetaBlocked(conflicts.join("; "))
+}
+
 /** Execute (or founder recovery) through the unchanged state machine, with the existing run log. */
-export async function executeOwnedMeta(args: { id: string; runId: string; record: MetaRecord; store: MetaStore; trigger: string; facebookRecovery?: FacebookRecovery; only?: MetaDestination[] }): Promise<MetaBatch> {
+export async function executeOwnedMeta(args: { id: string; runId: string; record: MetaRecord; store: MetaStore; trigger: string; facebookRecovery?: FacebookRecovery; only?: MetaDestination[]; rowReads?: RowReads }): Promise<MetaBatch> {
   const { id, runId, record, store } = args
+  if (!args.facebookRecovery) await assertRowDispatch(id, record, args.rowReads)
   const startedAt=new Date().toISOString()
   const { provider, localEnabled, verifyUrls } = await ownedMetaProviderFor({ id, record, runId, store, recovery: !!args.facebookRecovery })
   const batch=await runOwnedMeta({id,runId,store,provider,enabled:localEnabled,

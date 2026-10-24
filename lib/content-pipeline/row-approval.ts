@@ -30,13 +30,22 @@ export const allowedPlatforms = (p: Pick<ContentPost, "create_format" | "create_
  * words; empty when none. `picked` overrides a variation's saved platforms (the drawer's unsaved ticks, or an edit being
  * checked). A variation already out counts with the platforms it went to, so nothing can follow it to the same place.
  */
-export function platformConflicts(posts: Pick<ContentPost, "id" | "create_format" | "social_platforms" | "archived">[], picked: Record<string, readonly string[]> = {}): string[] {
+export function platformConflicts(posts: Pick<ContentPost, "id" | "create_format" | "social_platforms" | "archived">[], picked: Record<string, readonly string[]> = {}, onlyFor?: readonly string[]): string[] {
   const live = posts.filter(p => !p.archived)
-  return (Object.keys(SOCIAL_LABEL) as CreateSocial[]).flatMap(platform => {
+  return (Object.keys(SOCIAL_LABEL) as CreateSocial[]).filter(x => !onlyFor || onlyFor.includes(x)).flatMap(platform => {
     const on = live.filter(p => (picked[p.id] ?? p.social_platforms ?? []).includes(platform))
     const sizes = [...new Set(on.map(p => FORMAT_LABEL[formatOf(p)]))]
     return on.length > 1 ? [`${SOCIAL_LABEL[platform]} is ticked on ${sizes.length > 1 ? sizes.join(" and ") : `${on.length} ${sizes[0]} designs`}; a platform gets one size per row, so untick it on one`] : []
   })
+}
+
+/**
+ * The conflicts an edit adds (the drawer's PATCH): a conflict the row already had (a row made before the rule) doesn't
+ * block other edits, such as the caption or unticking the platform on one size; Approve and Publish still refuse it.
+ */
+export function addedConflicts(posts: Parameters<typeof platformConflicts>[0], picked: Record<string, readonly string[]>): string[] {
+  const before = new Set(platformConflicts(posts))
+  return platformConflicts(posts, picked).filter(c => !before.has(c))
 }
 
 /** A variation with no platforms ticked stays in Review and is left out of the row's approval. */

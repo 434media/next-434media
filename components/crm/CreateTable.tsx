@@ -20,7 +20,7 @@ import { isCanvaLink, mediaFromCanva, mediaFromFile, mediaFromLink, type MediaRe
  * the columns.
  *
  * Step 3 part 5: one size per platform per row. Each platform is ticked once; its size follows the row's media (a photo
- * goes to Instagram and Facebook at 4:5; a video as a 9:16 Reel, or a 4:5 Reel), and a (?) tip explains each choice.
+ * goes to Instagram and Facebook at 4:5; a video as a 9:16 Reel, or at 4:5), and a (?) tip explains each choice.
  */
 interface BrandConfig { id: string; label: string; active: boolean; reason: string | null; versionId: string | null; templates: CreateTemplate[] }
 interface Config { brands: BrandConfig[]; platforms: CreatePlatform[] }
@@ -52,9 +52,12 @@ function choiceHelp(platform: CreateSocial, format: CreateFormat, shape: MediaSh
   if (platform === "tiktok" || platform === "youtube") return `${SOCIAL_LABEL[platform]} takes the 9:16 design only. It is posted by hand for now.`
   if (platform === "linkedin") return "LinkedIn gets the 4:5 design. It is posted by hand for now."
   if (shape === "photo") return `A photo goes to ${SOCIAL_LABEL[platform]} as a 4:5 post, the size the feed shows in full.`
+  if (platform === "facebook") return format === "reels"
+    ? "A video goes to Facebook as a full-screen 9:16 Reel. Pick 4:5 video to post it at 4:5 instead."
+    : "Facebook posts the 4:5 video as a regular video on the Page, not as a Reel. Pick 9:16 Reel for a Reel."
   return format === "reels"
-    ? `A video goes to ${SOCIAL_LABEL[platform]} as a full-screen 9:16 Reel. Pick 4:5 Reel for a Reel that also fits the feed.`
-    : `The video goes to ${SOCIAL_LABEL[platform]} at 4:5, so it also fits the feed and grid. Pick 9:16 Reel for full screen.`
+    ? "A video goes to Instagram as a full-screen 9:16 Reel. Pick 4:5 Reel for a Reel that also shows on the grid."
+    : "The video goes to Instagram as a 4:5 Reel that also shows on the grid. Pick 9:16 Reel for full screen."
 }
 
 /** "12 / 15" per line for a field with limits, red when over. */

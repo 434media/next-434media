@@ -53,16 +53,20 @@ export const mediaShapeOf = (media: Pick<RowMedia, "kind"> | null | undefined): 
 
 /**
  * One format per platform per row (Step 3 part 5): the sizes a platform takes for the row's media, the default first.
- * Instagram and Facebook take a photo at 4:5, and a video as a 9:16 Reel or, as the alternative, a 4:5 Reel; TikTok and
+ * Instagram and Facebook take a photo at 4:5, and a video as a 9:16 Reel or, as the alternative, at 4:5; TikTok and
  * YouTube Shorts take 9:16 only; LinkedIn takes 4:5.
  */
 export function formatChoices(platform: CreateSocial, shape: MediaShape): CreateFormat[] {
   if (platform === "instagram" || platform === "facebook") return shape === "video" ? ["reels", "feed"] : ["feed"]
   return CREATE_PLATFORMS.filter(p => p.platform === platform).map(p => p.format)
 }
-/** A choice's name in the table: on Instagram and Facebook a video is a Reel at either size. */
+/**
+ * A choice's name in the table. On Instagram a video is a Reel at either size (the 4:5 one is shared to the feed); on
+ * Facebook the 9:16 is a Reel and the 4:5 goes out as a regular Page video (row-approval prepareChoices).
+ */
 export function choiceLabel(platform: CreateSocial, format: CreateFormat, shape: MediaShape): string {
-  if ((platform === "instagram" || platform === "facebook") && shape === "video") return format === "reels" ? "9:16 Reel" : "4:5 Reel"
+  if (platform === "instagram" && shape === "video") return format === "reels" ? "9:16 Reel" : "4:5 Reel"
+  if (platform === "facebook" && shape === "video") return format === "reels" ? "9:16 Reel" : "4:5 video"
   return FORMAT_ASPECT[format]
 }
 export const platformIdOf = (platform: CreateSocial, format: CreateFormat) => CREATE_PLATFORMS.find(p => p.platform === platform && p.format === format)?.id

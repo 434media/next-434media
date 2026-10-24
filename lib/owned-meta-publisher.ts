@@ -319,6 +319,8 @@ export async function runOwnedMeta(args: {
 export function resetUnpublishedPreparation(record: MetaRecord, destination: MetaDestination): void {
   const j=record.batch.jobs[destination]
   if(record.batch.claim || j.retry || j.finalIntent || j.remoteId || j.manualEvidence || j.closed || ["verified","operator_confirmed"].includes(j.status)) throw new MetaBlocked("Cannot reset active, uncertain, closed or completed publication")
+  // A Facebook Reel from the earlier flow is closed, never reset: a reset would upload and post a new Reel.
+  if(destination==="facebook" && legacyReelsPreparation(j.preparation)) throw new MetaBlocked("Cannot reset a Facebook Reel from the earlier upload flow; close it without posting")
   record.batch.jobs[destination]={status:"ready",preparation:{}}
 }
 export function assertOperatorSettlement(record: MetaRecord, expectedBatchId: string): void {

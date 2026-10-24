@@ -5,7 +5,7 @@
  */
 import { test } from "node:test"
 import assert from "node:assert/strict"
-import { allowedPlatforms, platformConflicts, approvalCovers, approveRow, awaitingApproval, canvaDesignIdFromLink, futureDated, parsePages, resolveCanvaDesignLink, todayIn, exportAs, frozen, platformsFor, prepareChoices, readiness, RowApprovalError, shownOf, type ApproveRowDeps } from "../content-pipeline/row-approval"
+import { addedConflicts, allowedPlatforms, platformConflicts, approvalCovers, approveRow, awaitingApproval, canvaDesignIdFromLink, futureDated, parsePages, resolveCanvaDesignLink, todayIn, exportAs, frozen, platformsFor, prepareChoices, readiness, RowApprovalError, shownOf, type ApproveRowDeps } from "../content-pipeline/row-approval"
 import type { ContentPost } from "../../components/crm/types"
 import type { MetaBatch } from "../owned-meta-publisher"
 
@@ -182,4 +182,11 @@ test("platform conflicts count what is already out and the drawer's unsaved tick
   assert.deepEqual(allowedPlatforms({ create_format: "reels", create_media: "video" }), ["instagram", "facebook", "tiktok", "youtube"])
   assert.deepEqual(allowedPlatforms({ create_format: "feed", create_media: "photo" }), ["instagram", "facebook", "linkedin"])
   assert.deepEqual(allowedPlatforms({ create_format: "reels" }), ["instagram", "facebook", "tiktok", "youtube"], "an older post allows all")
+})
+
+test("a drawer edit is refused only for a conflict it adds: a row made before the rule can still change its caption or untick one size", () => {
+  assert.deepEqual(addedConflicts([feed, reels], {}), [], "a caption-only edit on a conflicted row")
+  assert.deepEqual(addedConflicts([feed, reels], { reels: ["tiktok"] }), [], "unticking the conflict")
+  assert.equal(addedConflicts([feed, reelsHand], { reels: ["instagram", "tiktok"] }).length, 1, "ticking Instagram on a second size")
+  assert.equal(addedConflicts([feed, { ...reels, social_platforms: ["instagram", "tiktok"] }], { reels: ["instagram", "facebook", "tiktok"] }).length, 1, "a new conflict beside an old one")
 })

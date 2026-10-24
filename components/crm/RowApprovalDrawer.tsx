@@ -292,7 +292,7 @@ function VariationCard({ v, busy, dirty, showCaption, picked, taken, onPick, onR
   return (
     <div className="rounded-md ring-1 ring-neutral-200 bg-white p-3 space-y-2">
       <div className="flex items-center justify-between gap-2">
-        <p className="text-sm font-medium inline-flex items-center gap-1.5">{FORMAT_LABEL[format]}<HelpTip label={FORMAT_LABEL[format]}>{format === "feed" ? "The 4:5 design: a photo post, or a 4:5 Reel for a video, on Instagram and Facebook; and LinkedIn." : "The 9:16 design: a full-screen Reel on Instagram and Facebook (a video only), TikTok and YouTube Shorts."}{fromTemplate(post) ? "" : " This one was attached by link (One-off)."}</HelpTip></p>
+        <p className="text-sm font-medium inline-flex items-center gap-1.5">{FORMAT_LABEL[format]}<HelpTip label={FORMAT_LABEL[format]}>{format === "feed" ? "The 4:5 design: a photo post on Instagram and Facebook; for a video, a 4:5 Reel on Instagram and a regular video on Facebook; and LinkedIn." : "The 9:16 design: a full-screen Reel on Instagram and Facebook (a video only), TikTok and YouTube Shorts."}{fromTemplate(post) ? "" : " This one was attached by link (One-off)."}</HelpTip></p>
         {status && <span className="text-[11px] px-1.5 py-0.5 rounded" style={{ color: status.color }}>{status.label}</span>}
       </div>
       <div className={`grid gap-1 ${post.assets.length > 1 ? "grid-cols-2" : "grid-cols-1"}`}>
