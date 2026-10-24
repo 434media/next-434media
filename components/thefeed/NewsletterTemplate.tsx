@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import Image from "next/image"
+import { FeedImage } from "./FeedImage"
 import { motion } from "motion/react"
 import { ArrowRight } from "lucide-react"
 import type { NewsletterContent } from "@/lib/thefeed"
@@ -93,12 +93,12 @@ export function NewsletterTemplate({ content }: { content: NewsletterContent }) 
     <div className="space-y-16 md:space-y-24">
       {heroImage.mobile && (
         <div className="relative w-full aspect-4/5 overflow-hidden bg-neutral-100 md:hidden">
-          <Image src={heroImage.mobile} alt="Newsletter hero" fill sizes="100vw" className="object-contain" priority />
+          <FeedImage src={heroImage.mobile} alt="Newsletter hero" sizes="100vw" className="object-contain" priority />
         </div>
       )}
       {heroImage.desktop && (
         <div className="relative w-full aspect-video overflow-hidden hidden md:block">
-          <Image src={heroImage.desktop} alt="Newsletter hero" fill sizes="(min-width: 768px) 896px, 100vw" className="object-contain" priority />
+          <FeedImage src={heroImage.desktop} alt="Newsletter hero" sizes="(min-width: 768px) 896px, 100vw" className="object-contain" priority />
         </div>
       )}
 
@@ -116,7 +116,7 @@ export function NewsletterTemplate({ content }: { content: NewsletterContent }) 
             <div className={RICH} dangerouslySetInnerHTML={{ __html: foundersNote.text }} />
             {foundersNote.image && (
               <div className="relative aspect-4/5 overflow-hidden bg-neutral-100">
-                <Image src={foundersNote.image} alt="Founder's note" fill sizes="(min-width: 768px) 420px, 100vw" className="object-cover" />
+                <FeedImage src={foundersNote.image} alt="Founder's note" sizes="(min-width: 768px) 420px, 100vw" className="object-cover" />
               </div>
             )}
           </div>
@@ -126,7 +126,7 @@ export function NewsletterTemplate({ content }: { content: NewsletterContent }) 
       <section className="space-y-8">
         {content.lastMonthGif && (
           <div className="relative w-full aspect-3/1 overflow-hidden bg-neutral-100">
-            <Image src={content.lastMonthGif} alt="Last month in motion" fill className="object-cover" unoptimized />
+            <FeedImage src={content.lastMonthGif} alt="Last month in motion" className="object-cover" unoptimized />
           </div>
         )}
 
@@ -143,13 +143,13 @@ export function NewsletterTemplate({ content }: { content: NewsletterContent }) 
                   index % 2 === 1 ? "md:col-start-2" : ""
                 }`}
               >
-                <Image src={spotlight.image} alt={spotlight.title} fill sizes="(min-width: 768px) 420px, 100vw" className="object-cover" />
+                <FeedImage src={spotlight.image} alt={spotlight.title} sizes="(min-width: 768px) 420px, 100vw" className="object-cover" />
               </div>
             )}
             <div className="flex flex-col justify-center space-y-4">
               <h3 className="t-heading-m text-neutral-900">{spotlight.title}</h3>
               <TruncatedText html={spotlight.description} className={RICH} />
-              <Cta href={spotlight.ctaLink}>{spotlight.ctaText}</Cta>
+              {spotlight.ctaLink && <Cta href={spotlight.ctaLink}>{spotlight.ctaText}</Cta>}
             </div>
           </div>
         ))}
@@ -159,7 +159,7 @@ export function NewsletterTemplate({ content }: { content: NewsletterContent }) 
         <section className="border border-neutral-300 overflow-hidden">
           {featuredPost.image && (
             <div className="relative w-full aspect-2/1 bg-neutral-100">
-              <Image src={featuredPost.image} alt={featuredPost.title} fill sizes="(min-width: 768px) 896px, 100vw" className="object-cover" />
+              <FeedImage src={featuredPost.image} alt={featuredPost.title} sizes="(min-width: 768px) 896px, 100vw" className="object-cover" />
             </div>
           )}
           <div className="p-6 md:p-8 lg:p-12 space-y-6">
@@ -174,7 +174,7 @@ export function NewsletterTemplate({ content }: { content: NewsletterContent }) 
       <section className="space-y-8">
         {content.theDropGif && (
           <div className="relative w-full aspect-3/1 overflow-hidden bg-neutral-100">
-            <Image src={content.theDropGif} alt="The Drop" fill className="object-cover" unoptimized />
+            <FeedImage src={content.theDropGif} alt="The Drop" className="object-cover" unoptimized />
           </div>
         )}
 
@@ -182,12 +182,12 @@ export function NewsletterTemplate({ content }: { content: NewsletterContent }) 
           <div className="bg-[var(--color-chrome-bg)] text-[var(--color-on-dark-text)]">
             {upcomingEvent.image.mobile && (
               <div className="relative aspect-4/5 bg-neutral-900 md:hidden">
-                <Image src={upcomingEvent.image.mobile} alt={upcomingEvent.title} fill sizes="100vw" className="object-cover" />
+                <FeedImage src={upcomingEvent.image.mobile} alt={upcomingEvent.title} sizes="100vw" className="object-cover" />
               </div>
             )}
             {upcomingEvent.image.desktop && (
               <div className="relative aspect-video bg-neutral-900 hidden md:block">
-                <Image src={upcomingEvent.image.desktop} alt={upcomingEvent.title} fill sizes="896px" className="object-cover" />
+                <FeedImage src={upcomingEvent.image.desktop} alt={upcomingEvent.title} sizes="896px" className="object-cover" />
               </div>
             )}
             <div className="p-6 md:p-8 lg:p-12 space-y-4 md:space-y-6">
@@ -195,9 +195,11 @@ export function NewsletterTemplate({ content }: { content: NewsletterContent }) 
                 {upcomingEvent.title}
               </h3>
               <div className={RICH_INVERT} dangerouslySetInnerHTML={{ __html: upcomingEvent.description }} />
-              <Cta href={upcomingEvent.ctaLink} invert>
-                {upcomingEvent.ctaText}
-              </Cta>
+              {upcomingEvent.ctaLink && (
+                <Cta href={upcomingEvent.ctaLink} invert>
+                  {upcomingEvent.ctaText}
+                </Cta>
+              )}
             </div>
           </div>
         )}

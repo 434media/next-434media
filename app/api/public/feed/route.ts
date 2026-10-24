@@ -105,7 +105,7 @@ export async function GET(request: NextRequest) {
 
     // If slug is provided, return single item
     if (slug) {
-      const item = await getFeedItemBySlug(slug, tableName)
+      const item = await getFeedItemBySlug(slug, tableName, { status: "published" })
       
       if (!item) {
         return NextResponse.json(

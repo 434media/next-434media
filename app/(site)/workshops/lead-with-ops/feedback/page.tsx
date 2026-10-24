@@ -1,7 +1,9 @@
 "use client"
 
 import { useState, type FormEvent } from "react"
+import Link from "next/link"
 import {
+  MAX_LENGTH,
   SESSION_VALUE_MIN,
   SESSION_VALUE_MAX,
   SESSION_VALUE_LOW_LABEL,
@@ -205,7 +207,7 @@ export default function LeadWithOpsFeedbackPage() {
               {/* Q1 — Email */}
               <div>
                 <FieldLabel htmlFor="email">Email</FieldLabel>
-                <input id="email" name="email" type="email" required autoComplete="email" className={inputClass} placeholder="you@company.com" />
+                <input id="email" name="email" type="email" required maxLength={MAX_LENGTH.email} autoComplete="email" className={inputClass} placeholder="you@company.com" />
               </div>
 
               <SectionLabel>Today&apos;s session</SectionLabel>
@@ -241,7 +243,7 @@ export default function LeadWithOpsFeedbackPage() {
               {/* Q3 — Most useful */}
               <div>
                 <FieldLabel htmlFor="mostUseful">What was most useful — or what would&apos;ve made it better?</FieldLabel>
-                <textarea id="mostUseful" name="mostUseful" required rows={4} className={`${inputClass} resize-y`} placeholder="A sentence or two is plenty." />
+                <textarea id="mostUseful" name="mostUseful" required maxLength={MAX_LENGTH.mostUseful} rows={4} className={`${inputClass} resize-y`} placeholder="A sentence or two is plenty." />
               </div>
 
               <SectionLabel>Keep the conversation going</SectionLabel>
@@ -260,11 +262,11 @@ export default function LeadWithOpsFeedbackPage() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <FieldLabel htmlFor="name">Name</FieldLabel>
-                  <input id="name" name="name" type="text" required autoComplete="name" className={inputClass} placeholder="Jane Operator" />
+                  <input id="name" name="name" type="text" required maxLength={MAX_LENGTH.name} autoComplete="name" className={inputClass} placeholder="Jane Operator" />
                 </div>
                 <div>
                   <FieldLabel htmlFor="company">Company</FieldLabel>
-                  <input id="company" name="company" type="text" required autoComplete="organization" className={inputClass} placeholder="Acme Co." />
+                  <input id="company" name="company" type="text" required maxLength={MAX_LENGTH.company} autoComplete="organization" className={inputClass} placeholder="Acme Co." />
                 </div>
               </div>
 
@@ -278,6 +280,7 @@ export default function LeadWithOpsFeedbackPage() {
                   <input
                     name="industryOther"
                     type="text"
+                    maxLength={MAX_LENGTH.industryOther}
                     className={`${inputClass} mt-2`}
                     placeholder="Tell us your industry"
                     aria-label="Specify your industry"
@@ -288,7 +291,7 @@ export default function LeadWithOpsFeedbackPage() {
               {/* Q9 — Biggest question / blocker */}
               <div>
                 <FieldLabel htmlFor="biggestQuestion">What&apos;s your single biggest question or blocker with AI right now?</FieldLabel>
-                <textarea id="biggestQuestion" name="biggestQuestion" required rows={3} className={`${inputClass} resize-y`} placeholder="The one thing you'd most like answered." />
+                <textarea id="biggestQuestion" name="biggestQuestion" required maxLength={MAX_LENGTH.biggestQuestion} rows={3} className={`${inputClass} resize-y`} placeholder="The one thing you'd most like answered." />
               </div>
 
               <SectionLabel>Attribution</SectionLabel>
@@ -316,7 +319,11 @@ export default function LeadWithOpsFeedbackPage() {
               </button>
 
               <p className="t-caption text-neutral-500">
-                Presented by Digital Canvas · 434 MEDIA. Your responses are used to improve future sessions.
+                Presented by Digital Canvas · 434 MEDIA. Your responses are used to improve future sessions. See our{" "}
+                <Link href="/privacy-policy" className="underline hover:text-neutral-900">
+                  privacy policy
+                </Link>
+                .
               </p>
             </form>
           )}

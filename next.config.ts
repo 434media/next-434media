@@ -1,5 +1,6 @@
 import type { NextConfig } from "next";
 import { withBotId } from 'botid/next/config';
+import { REMOTE_IMAGE_PATTERNS } from './lib/image-hosts';
 
 const nextConfig: NextConfig = {
   typescript: {
@@ -21,40 +22,8 @@ const nextConfig: NextConfig = {
   },
   images: {
     formats: ['image/avif', 'image/webp'],
-    remotePatterns: [
-      {
-        protocol: "https",
-        hostname: "storage.googleapis.com",
-        pathname: "/groovy-ego-462522-v2.firebasestorage.app/**",
-      },
-      {
-        // Same bucket through the Firebase download API. The Lead with Ops
-        // flyer is served from here (moved from the Digital Canvas site, 2026-10).
-        protocol: "https",
-        hostname: "firebasestorage.googleapis.com",
-        pathname: "/v0/b/groovy-ego-462522-v2.firebasestorage.app/**",
-      },
-       {
-        protocol: 'https',
-        hostname: 'cdn.shopify.com',
-        pathname: '/s/files/**'
-      },
-      {
-        protocol: 'https',
-        hostname: 'placehold.co',
-        pathname: '/**'
-      },
-      {
-        protocol: 'https',
-        hostname: '*.public.blob.vercel-storage.com',
-        pathname: '/**'
-      },
-      {
-        protocol: 'https',
-        hostname: 'img.youtube.com',
-        pathname: '/**'
-      }
-    ],
+    // One list, shared with isOptimizableImage (lib/image-hosts.ts).
+    remotePatterns: REMOTE_IMAGE_PATTERNS.map((p) => ({ ...p })),
   },  
   
   // Explicit rewrites for the SDOH routes

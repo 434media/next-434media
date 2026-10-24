@@ -75,6 +75,21 @@ export type Role = (typeof ROLE_OPTIONS)[number]
 export type Industry = (typeof INDUSTRY_OPTIONS)[number]
 export type HeardAbout = (typeof HEARD_ABOUT_OPTIONS)[number]
 
+/**
+ * Length caps, enforced by the route and mirrored as maxLength on the form.
+ * Email follows RFC 5321's 254. The whole request body is capped too, well
+ * above what the caps allow, so an oversized payload is refused before parsing.
+ */
+export const MAX_LENGTH = {
+  email: 254,
+  name: 200,
+  company: 200,
+  industryOther: 200,
+  mostUseful: 2000,
+  biggestQuestion: 2000,
+} as const
+export const MAX_BODY_BYTES = 16 * 1024
+
 /** The free-text "Other" sentinel shared by the industry field. */
 export const OTHER_OPTION = "Other"
 

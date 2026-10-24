@@ -1,6 +1,10 @@
 import { NextResponse } from "next/server"
 import { getNamedDb, NAMED_DATABASES } from "@/lib/firebase-admin"
+import { requireHumanRequest } from "@/lib/botid-guard"
+import { isAllowedFormOrigin } from "@/lib/request-origin"
 import {
+  MAX_LENGTH,
+  MAX_BODY_BYTES,
   EVENT_ID,
   EVENT_NAME,
   EVENT_DATE,
@@ -17,6 +21,20 @@ import {
   OTHER_OPTION,
 } from "@/lib/lead-with-ops-feedback"
 
+type FeedbackBody = {
+  email?: string
+  name?: string
+  company?: string
+  sessionValue?: number | string
+  mostUseful?: string
+  talkFurther?: string
+  role?: string
+  industry?: string
+  industryOther?: string
+  biggestQuestion?: string
+  heardAbout?: string
+}
+
 const isDevelopment = process.env.NODE_ENV === "development"
 
 /**
@@ -29,17 +47,47 @@ const isDevelopment = process.env.NODE_ENV === "development"
  * the value the CRM already maps) and gain `site`, which records where the
  * form was served.
  *
- * Unlike registration, this endpoint is intentionally NOT behind Vercel BotID.
- * Feedback is a low-value target for bots, and the client-side BotID challenge
- * can silently hang for legitimate attendees (privacy extensions / ad blockers
- * return an empty body for the challenge script, so the wrapped fetch never
- * resolves). For a form we want every attendee to complete, reliable delivery
- * beats bot protection here. (Registration, when it ran on the Digital Canvas
- * site, was behind BotID.)
+ * Guards, in order (review of next-434media#225, 2026-10-24): JSON content
+ * type, an allowed Origin (lib/request-origin.ts), a body-size cap, Vercel
+ * BotID like every public form here, then a length cap on every string field.
+ *
+ * On Digital Canvas this route skipped BotID, because the client challenge can
+ * hang for an attendee whose blocker empties the challenge script. The form's
+ * 15-second abort now bounds that: the attendee sees a retryable error rather
+ * than a stuck button, and VIP@434MEDIA.COM is on the page.
  */
 export async function POST(request: Request) {
   try {
-    const body = await request.json()
+    const contentType = request.headers.get("content-type") || ""
+    if (!contentType.toLowerCase().startsWith("application/json")) {
+      return NextResponse.json({ error: "Content-Type must be application/json" }, { status: 415 })
+    }
+
+    if (!isAllowedFormOrigin(request)) {
+      return NextResponse.json({ error: "Request blocked" }, { status: 403 })
+    }
+
+    const declared = Number(request.headers.get("content-length") || 0)
+    if (declared > MAX_BODY_BYTES) {
+      return NextResponse.json({ error: "Request too large" }, { status: 413 })
+    }
+    const raw = await request.text()
+    if (new TextEncoder().encode(raw).length > MAX_BODY_BYTES) {
+      return NextResponse.json({ error: "Request too large" }, { status: 413 })
+    }
+
+    const human = await requireHumanRequest()
+    if (!human.ok) return human.response
+
+    let body: unknown
+    try {
+      body = JSON.parse(raw)
+    } catch {
+      return NextResponse.json({ error: "Invalid JSON" }, { status: 400 })
+    }
+    if (typeof body !== "object" || body === null || Array.isArray(body)) {
+      return NextResponse.json({ error: "Invalid request body" }, { status: 400 })
+    }
     const {
       email,
       name,
@@ -52,19 +100,18 @@ export async function POST(request: Request) {
       industryOther,
       biggestQuestion,
       heardAbout,
-    }: {
-      email?: string
-      name?: string
-      company?: string
-      sessionValue?: number | string
-      mostUseful?: string
-      talkFurther?: string
-      role?: string
-      industry?: string
-      industryOther?: string
-      biggestQuestion?: string
-      heardAbout?: string
-    } = body
+    } = body as FeedbackBody
+
+    // --- Length caps --------------------------------------------------------
+    const capped: Record<keyof typeof MAX_LENGTH, unknown> = { email, name, company, industryOther, mostUseful, biggestQuestion }
+    for (const [field, value] of Object.entries(capped) as [keyof typeof MAX_LENGTH, unknown][]) {
+      if (value !== undefined && typeof value !== "string") {
+        return NextResponse.json({ error: `${field} must be text` }, { status: 400 })
+      }
+      if (typeof value === "string" && value.trim().length > MAX_LENGTH[field]) {
+        return NextResponse.json({ error: `${field} must be ${MAX_LENGTH[field]} characters or fewer` }, { status: 400 })
+      }
+    }
 
     // --- Required free-text + identity fields -------------------------------
     const requiredText: Record<string, unknown> = { email, name, company, mostUseful, biggestQuestion }

@@ -29,6 +29,28 @@ const SANITIZE: sanitizeHtml.IOptions = {
   },
 }
 
+/** An authored link, kept only when it is http, https or mailto. */
+function safeHref(value: string | undefined): string | undefined {
+  if (!value) return undefined
+  try {
+    const url = new URL(value.trim())
+    return ["http:", "https:", "mailto:"].includes(url.protocol) ? url.toString() : undefined
+  } catch {
+    return undefined
+  }
+}
+
+/** An authored image URL, kept only when it is http or https. */
+function safeImage(value: string | undefined): string {
+  if (!value) return ""
+  try {
+    const url = new URL(value.trim())
+    return url.protocol === "https:" || url.protocol === "http:" ? url.toString() : ""
+  } catch {
+    return ""
+  }
+}
+
 function toHtml(text: string | undefined): string {
   if (!text) return ""
   const html = /<[a-z][\s\S]*>/i.test(text) ? text : (feedMarked.parse(text) as string)
@@ -43,13 +65,14 @@ export interface NewsletterContent {
   lastMonthGif: string
   theDropGif: string
   featuredPost: { title: string; image: string; content: string }
-  spotlights: { title: string; description: string; image: string; ctaText: string; ctaLink: string }[]
+  /** ctaLink is undefined when the authored link is missing or not http(s)/mailto; no CTA renders. */
+  spotlights: { title: string; description: string; image: string; ctaText: string; ctaLink?: string }[]
   upcomingEvent: {
     title: string
     description: string
     image: { desktop: string; mobile: string }
     ctaText: string
-    ctaLink: string
+    ctaLink?: string
   }
 }
 
@@ -76,18 +99,18 @@ function newsletterContent(item: FeedItem): NewsletterContent {
   const spotlights = ([1, 2, 3] as const).map((n) => ({
     title: item[`spotlight_${n}_title`] || "",
     description: toHtml(item[`spotlight_${n}_description`]),
-    image: item[`spotlight_${n}_image`] || "",
+    image: safeImage(item[`spotlight_${n}_image`]),
     ctaText: item[`spotlight_${n}_cta_text`] || "Learn More",
-    ctaLink: item[`spotlight_${n}_cta_link`] || "#",
+    ctaLink: safeHref(item[`spotlight_${n}_cta_link`]),
   }))
   return {
-    heroImage: { desktop: item.hero_image_desktop || "", mobile: item.hero_image_mobile || "" },
-    foundersNote: { text: toHtml(item.founders_note_text), image: item.founders_note_image || "" },
-    lastMonthGif: item.last_month_gif || "",
-    theDropGif: item.the_drop_gif || "",
+    heroImage: { desktop: safeImage(item.hero_image_desktop), mobile: safeImage(item.hero_image_mobile) },
+    foundersNote: { text: toHtml(item.founders_note_text), image: safeImage(item.founders_note_image) },
+    lastMonthGif: safeImage(item.last_month_gif),
+    theDropGif: safeImage(item.the_drop_gif),
     featuredPost: {
       title: item.featured_post_title || "",
-      image: item.featured_post_image || "",
+      image: safeImage(item.featured_post_image),
       content: toHtml(item.featured_post_content),
     },
     spotlights: spotlights.filter((s) => s.title),
@@ -95,11 +118,11 @@ function newsletterContent(item: FeedItem): NewsletterContent {
       title: item.upcoming_event_title || "",
       description: toHtml(item.upcoming_event_description),
       image: {
-        desktop: item.upcoming_event_image_desktop || "",
-        mobile: item.upcoming_event_image_mobile || "",
+        desktop: safeImage(item.upcoming_event_image_desktop),
+        mobile: safeImage(item.upcoming_event_image_mobile),
       },
       ctaText: item.upcoming_event_cta_text || "Learn More",
-      ctaLink: item.upcoming_event_cta_link || "#",
+      ctaLink: safeHref(item.upcoming_event_cta_link),
     },
   }
 }
@@ -122,7 +145,7 @@ function toPublic(item: FeedItem): PublicFeedItem {
       timeZone: "America/Chicago",
     }),
     published_date: item.published_date,
-    ogImage: item.og_image || "",
+    ogImage: safeImage(item.og_image),
     ogTitle: item.og_title,
     ogDescription: item.og_description,
     newsletterContent: item.type === "newsletter" ? newsletterContent(item) : undefined,
@@ -140,7 +163,7 @@ export async function getPublicFeedItems(): Promise<PublicFeedItem[]> {
 
 /** One published item, or null for a missing, draft, scheduled or archived slug. */
 export async function getPublicFeedItem(slug: string): Promise<PublicFeedItem | null> {
-  const item = await getFeedItemBySlug(slug, "THEFEED")
+  const item = await getFeedItemBySlug(slug, "THEFEED", { status: "published" })
   if (!item || item.status !== "published") return null
   return toPublic(item)
 }
