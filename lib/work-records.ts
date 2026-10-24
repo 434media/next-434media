@@ -156,7 +156,7 @@ export const WORK_RECORDS: WorkRecord[] = [
     model: "Original IP",
     categories: "Content",
     client: "Vulture Films, in association with Purghart Productions and Pink + White",
-    role: "Executive produced by 434 MEDIA; credited as a production company “In Association With”",
+    role: "Executive Producer",
     founderCredit: "Marcos Resendez — Executive Producer",
     collaboratorCredit: "A.J. Garces — Writer, Director; Erin Purghart — Producer; Kris Mish — Producer; Hira Vin — Executive Producer; Christian Lagasse — Executive Producer",
     years: "2025",
