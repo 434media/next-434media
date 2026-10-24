@@ -82,7 +82,7 @@ export function ContactPageClient() {
               initial={{ opacity: 0, y: 50 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.8 }}
-              className="space-y-5 lg:space-y-6 mt-16 sm:mt-20 lg:mt-0"
+              className="space-y-5 lg:space-y-6 mt-16 sm:mt-20 lg:mt-0 @container"
             >
               {/* Main Headline */}
               <motion.div
@@ -91,8 +91,14 @@ export function ContactPageClient() {
                 transition={{ duration: 0.8, delay: 0.2 }}
                 className="space-y-4 lg:space-y-5"
               >
+                {/* Display L is sized to the viewport, but from 1024px this headline sits
+                    in half the width, and "production." (8.62em in Menda) ran past its
+                    column. Sized to the column instead: 100 / 8.62 = 11.6cqi fits the word
+                    exactly, so 11.4cqi leaves ~2% for rendering. Never larger than Display L,
+                    so wherever the role already fits, it's unchanged. */}
                 <motion.h1
                   className="t-display-l text-neutral-900"
+                  style={{ fontSize: "clamp(28px, min(11.4cqi, var(--434-type-display-l-size)), 72px)" }}
                   initial={{ opacity: 0, x: -30 }}
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ duration: 0.8, delay: 0.3 }}
