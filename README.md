@@ -151,7 +151,7 @@ next-434media/
 ├── types/                        # Shared TypeScript types
 ├── fonts/                        # Local .otf fonts (brand display + OG image rendering)
 ├── scripts/                      # Operational CLI scripts (send-broadcast)
-├── public/                       # Static assets
+├── public/                       # Static assets (public/email/ is permanent — see its README)
 │
 ├── i18n-config.ts                # Internationalization config
 ├── proxy.ts                      # Middleware (locale routing) — Next 16 "proxy"

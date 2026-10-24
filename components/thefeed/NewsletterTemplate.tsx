@@ -109,7 +109,7 @@ export function NewsletterTemplate({ content }: { content: NewsletterContent }) 
           transition={{ duration: 0.6, delay: 0.2 }}
           className="border border-neutral-300 p-6 md:p-8 lg:p-12"
         >
-          <h2 className="font-ggx88 t-display-s text-neutral-900 mb-8 border-b border-neutral-300 pb-4">
+          <h2 className="t-display-s text-neutral-900 mb-8 border-b border-neutral-300 pb-4">
             Founder&apos;s Note
           </h2>
           <div className="grid md:grid-cols-2 gap-8 md:gap-12">

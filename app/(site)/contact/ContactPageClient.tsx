@@ -92,7 +92,7 @@ export function ContactPageClient() {
                 className="space-y-4 lg:space-y-5"
               >
                 <motion.h1
-                  className="font-ggx88 t-display-l text-neutral-900"
+                  className="t-display-l text-neutral-900"
                   initial={{ opacity: 0, x: -30 }}
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ duration: 0.8, delay: 0.3 }}

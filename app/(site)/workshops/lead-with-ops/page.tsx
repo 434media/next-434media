@@ -35,7 +35,7 @@ export default function LeadWithOpsPage() {
           <div className="lg:col-span-7 space-y-12">
             <div className="space-y-6">
               <p className="t-label text-neutral-500">Executive working lunch · Held June 18, 2026</p>
-              <h1 className="font-ggx88 t-display-l text-neutral-900">
+              <h1 className="t-display-l text-neutral-900">
                 Lead with Ops. <span className="block text-neutral-500">Layer in AI.</span>
               </h1>
               <p className="t-body-l text-neutral-700 max-w-2xl">

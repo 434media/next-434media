@@ -77,7 +77,7 @@ export function AdminTopBar({ user, onOpenMobileSidebar, onProfileUpdate }: Admi
         >
           <Menu className="w-5 h-5" />
         </button>
-        <h1 className="font-ggx88 text-[15px] sm:text-base text-neutral-900 tracking-wide truncate">
+        <h1 className="t-heading-xs text-neutral-900 truncate">
           {label}
         </h1>
       </div>

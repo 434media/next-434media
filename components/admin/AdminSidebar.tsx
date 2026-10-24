@@ -482,7 +482,7 @@ export function AdminSidebar({
       <div className="h-14 flex items-center justify-between px-3 border-b border-neutral-200 shrink-0">
         <Link
           href="/admin"
-          className="flex items-center gap-2 text-neutral-900 font-ggx88 text-sm tracking-wide"
+          className="flex items-center gap-2 text-neutral-900 text-sm tracking-wide"
           onClick={onNavigate}
         >
           <span className="w-7 h-7 rounded-md bg-neutral-900 text-white flex items-center justify-center shrink-0">
