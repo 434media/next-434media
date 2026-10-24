@@ -12,7 +12,7 @@ import RefreshWhenSignedIn from "./RefreshWhenSignedIn"
 // on the server, and the book is rendered only for staff. Interns are the
 // self-registered cohort, not staff.
 export const metadata: Metadata = {
-  title: "Brand book | 434 MEDIA",
+  title: "Brand book",
   robots: { index: false, follow: false },
 }
 
