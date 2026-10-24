@@ -179,7 +179,7 @@ export default function LeadWithOpsFeedbackPage() {
       <section className="pt-28 md:pt-32 pb-20 md:pb-28 px-4 sm:px-6">
         <div className="max-w-2xl mx-auto">
           <p className="t-label text-neutral-500 mb-6">Lunch &amp; Learn feedback</p>
-          <h1 className="font-ggx88 t-display-m text-neutral-900 mb-5">
+          <h1 className="t-display-m text-neutral-900 mb-5">
             Lead with Ops. <span className="block text-neutral-500">Layer in AI.</span>
           </h1>
           <p className="t-body-l text-neutral-700 mb-10">

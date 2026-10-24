@@ -15,8 +15,7 @@ export default async function DeckOgImage({ params }: { params: Promise<{ shareI
   const deck = await getDeckByShareId(shareId).catch(() => null)
   const title = deck && deck.status === "published" ? deck.name : "Sales Deck"
 
-  const [ggx88, menda, geist400] = await Promise.all([
-    readFile(fontPath("GGX88.otf")),
+  const [menda, geist400] = await Promise.all([
     readFile(fontPath("Menda-Black.otf")),
     readFile(fontPath("Geist-Regular.otf")),
   ])
@@ -60,7 +59,7 @@ export default async function DeckOgImage({ params }: { params: Promise<{ shareI
             style={{
               color: "#171717",
               fontSize: 84,
-              fontFamily: "GGX88",
+              fontFamily: "Menda",
               textTransform: "uppercase",
               letterSpacing: -2,
               lineHeight: 1,
@@ -82,7 +81,6 @@ export default async function DeckOgImage({ params }: { params: Promise<{ shareI
     {
       ...size,
       fonts: [
-        { name: "GGX88", data: ggx88, style: "normal", weight: 800 },
         { name: "Menda", data: menda, style: "normal", weight: 700 },
         { name: "Geist", data: geist400, style: "normal", weight: 400 },
       ],

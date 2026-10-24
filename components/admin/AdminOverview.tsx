@@ -216,7 +216,7 @@ export function AdminOverview() {
           <p className="font-geist-mono text-[11px] font-medium uppercase tracking-[0.22em] text-neutral-400">
             434 Admin · Overview
           </p>
-          <h1 className="mt-2 font-ggx88 text-2xl sm:text-3xl font-black tracking-tight text-neutral-900">
+          <h1 className="mt-2 t-display-s text-neutral-900">
             {firstName ? `Welcome back, ${firstName}.` : "Welcome back."}
           </h1>
           <p className="mt-2 max-w-2xl text-sm sm:text-[15px] leading-relaxed text-neutral-500">
@@ -454,12 +454,12 @@ function StageNode({
         </span>
         {accent && <span className="h-2 w-2 rounded-full bg-emerald-500" aria-hidden />}
       </div>
-      <h3 className="font-ggx88 text-base font-bold tracking-tight text-neutral-900">{title}</h3>
+      <h3 className="t-heading-xs text-neutral-900">{title}</h3>
       <div className="mt-1.5 flex items-baseline gap-2">
         {loading ? (
           <div className="h-7 w-14 animate-pulse rounded bg-neutral-100" />
         ) : (
-          <span className="font-ggx88 text-2xl font-black tabular-nums leading-none text-neutral-900">
+          <span className="text-2xl font-extrabold tabular-nums leading-none text-neutral-900">
             {stat.toLocaleString()}
           </span>
         )}
@@ -482,7 +482,7 @@ function EmptyStartBanner({ showImport }: { showImport: boolean }) {
     <div className="mb-5 rounded-xl border border-neutral-900 bg-neutral-900 p-4 text-white sm:p-5">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h2 className="font-ggx88 text-lg font-bold tracking-tight">Your funnel is empty — start here.</h2>
+          <h2 className="t-heading-s">Your funnel is empty — start here.</h2>
           <p className="mt-1 max-w-xl text-[13px] leading-relaxed text-neutral-300">
             Find companies that match your ICP, score them, and approve the best as leads. That&apos;s
             the front door of the sales funnel.
@@ -550,7 +550,7 @@ function FunnelScoreboard({ kpis }: { kpis: FunnelKpis }) {
 function ScoreStat({ label, value }: { label: string; value: string }) {
   return (
     <span className="flex items-baseline gap-1.5">
-      <span className="font-ggx88 text-lg font-black tabular-nums leading-none text-neutral-900">{value}</span>
+      <span className="text-lg font-extrabold tabular-nums leading-none text-neutral-900">{value}</span>
       <span className="text-[11px] text-neutral-500">{label}</span>
     </span>
   )

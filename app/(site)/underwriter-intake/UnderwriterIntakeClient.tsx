@@ -70,7 +70,7 @@ export function UnderwriterIntakeClient() {
   if (done) {
     return (
       <div className="rounded-2xl border border-gray-200 bg-white p-8 text-center">
-        <h2 className="font-ggx88 font-black text-2xl text-gray-900 mb-2">Thank you</h2>
+        <h2 className="t-display-s text-gray-900 mb-2">Thank you</h2>
         <p className="font-geist-sans text-sm text-gray-500 leading-relaxed max-w-md mx-auto">
           Your problem has been submitted to the Digital Canvas team. We review every intake and will reach out at{" "}
           <span className="text-gray-900 font-medium">{form.contactEmail}</span> if it's a fit for an upcoming cohort.

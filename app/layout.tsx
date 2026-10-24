@@ -12,18 +12,19 @@ const geistSans = Geist({
   display: "swap",
 })
 
-// Geist Mono and Menda Black are NOT preloaded.
+// Geist Mono is NOT preloaded.
 //
 // Measured on the Work page at both Lighthouse presets: the first screen renders
-// in Geist and GGX88 only, and those are the only two faces the browser reports
-// as loaded. next/font preloads every face by default, so all four were being
-// fetched in the critical window — about 105 KB competing with the LCP image on
-// a throttled link.
+// in Geist and the display face only (GGX88 when measured; Menda Black since it
+// replaced GGX88 on 2026-10-24), and those are the only two faces the browser
+// reports as loaded. next/font preloads every face by default, so all four were
+// being fetched in the critical window — about 105 KB competing with the LCP
+// image on a throttled link.
 //
 // web.dev's font best practices: preload "comes at the cost of taking away
 // browser resources from the loading of other resources", and preloading should
-// be selective. Both keep display: swap, so when a later screen needs them the
-// text renders immediately in the fallback and swaps.
+// be selective. Geist Mono keeps display: swap, so when a later screen needs it
+// the text renders immediately in the fallback and swaps.
 //
 // SITE-WIDE — these are declared in the root layout. No typeface, weight or
 // visual changes; only when the file is fetched.
@@ -34,16 +35,14 @@ const geistMono = Geist_Mono({
   preload: false,
 })
 
+// Menda Black is the display face (Display XL, L and M), so it is preloaded
+// like GGX88 was before it. weight: "900" matches the file's OS/2 weight class
+// and the tokens' font-weight, so the browser uses the face as drawn instead of
+// synthesizing bold.
 const mendaBlack = localFont({
   src: "../fonts/Menda-Black.otf",
   variable: "--font-menda-black",
-  display: "swap",
-  preload: false,
-})
-
-const ggx88Font = localFont({
-  src: "../fonts/GGX88.otf",
-  variable: "--font-ggx88",
+  weight: "900",
   display: "swap",
 })
 
@@ -158,7 +157,7 @@ export default function RootLayout({
         <link rel="alternate" hrefLang="x-default" href={`${siteUrl}/`} />
       </head>
       <body
-        className={`${geistSans.variable} ${geistMono.variable} ${mendaBlack.variable} ${ggx88Font.variable} antialiased min-h-screen flex flex-col`}
+        className={`${geistSans.variable} ${geistMono.variable} ${mendaBlack.variable} antialiased min-h-screen flex flex-col`}
       >
         {children}
       </body>

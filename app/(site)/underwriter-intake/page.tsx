@@ -24,7 +24,7 @@ export default function UnderwriterIntakePage() {
         <p className="font-geist-mono text-[11px] font-semibold uppercase tracking-[0.22em] text-gray-500 mb-3">
           Digital Canvas · Underwriter Intake
         </p>
-        <h1 className="font-ggx88 font-black text-4xl sm:text-5xl text-gray-900 leading-[0.95] tracking-tighter mb-4">
+        <h1 className="t-display-m text-gray-900 mb-4">
           Bring us a real problem.
         </h1>
         <p className="font-geist-sans text-base text-gray-500 leading-relaxed max-w-xl mb-8">

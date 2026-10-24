@@ -93,7 +93,6 @@
   --font-geist-sans: var(--font-geist-sans, sans-serif);
   --font-geist-mono: var(--font-geist-mono, monospace);
   --font-menda-black: var(--font-menda-black, sans-serif);
-  --font-ggx88: var(--font-ggx88, sans-serif);
 }
 
 @theme {
@@ -106,7 +105,6 @@
   --font-menda-black: "Menda Black", sans-serif;
   --font-geist-sans: "Geist Sans", sans-serif;
   --font-geist-mono: "Geist Mono", monospace;
-  --font-ggx88: "GGX88", sans-serif;
 }
 
 @layer base {
@@ -159,14 +157,6 @@
     text-wrap: balance;
   }
 
-  /* Display headings (font-ggx88) — tightest line-height.
-     A class rather than an element, but it competes with the display roles on
-     line height, so it belongs at the same level as the rest. */
-  .font-ggx88 {
-    line-height: 0.92;
-    letter-spacing: -0.02em;
-  }
-
   /* Body copy — comfortable reading line-height.
      This is the one with the widest reach: unlayered it overrode every body
      role's line height AND every font-weight utility on a paragraph, so a
@@ -179,11 +169,6 @@
   /* Small / auxiliary text — slightly tighter */
   small, .text-xs, .text-sm {
     line-height: 1.4;
-  }
-
-  /* Ensure brand font headings override generic heading line-height */
-  h1.font-ggx88, h2.font-ggx88, h3.font-ggx88 {
-    line-height: 0.92;
   }
 }
 

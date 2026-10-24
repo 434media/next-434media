@@ -44,7 +44,7 @@ export default async function TheFeedPage() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <header className="border-b border-neutral-200 pb-8 mb-10">
           <p className="t-label text-neutral-500 mb-4">Field notes</p>
-          <h1 className="font-ggx88 t-display-l text-neutral-900">
+          <h1 className="t-display-l text-neutral-900">
             The Feed <span className="t-metadata-l text-neutral-500 align-top">({items.length})</span>
           </h1>
           <p className="t-body-l text-neutral-600 mt-5 max-w-3xl">

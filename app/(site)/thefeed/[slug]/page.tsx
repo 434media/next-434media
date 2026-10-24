@@ -64,7 +64,7 @@ export default async function FeedPostPage({ params }: Props) {
             <span className="t-label text-neutral-600 border border-neutral-300 px-2 py-0.5">{item.type}</span>
           </div>
 
-          <h1 className="font-ggx88 t-display-m text-neutral-900 mb-6">{item.title}</h1>
+          <h1 className="t-display-m text-neutral-900 mb-6">{item.title}</h1>
 
           {item.summaryText && <p className="t-body-xl text-neutral-600 mb-8 max-w-3xl">{item.summaryText}</p>}
 

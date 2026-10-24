@@ -29,7 +29,7 @@ function headingFor(slide: DeckSlide): string {
 /* ================================================================== */
 
 export const HEAD =
-  "font-ggx88 font-black uppercase tracking-tighter leading-[0.85] text-neutral-900"
+  "font-menda-black font-black uppercase tracking-tighter leading-[0.85] text-neutral-900"
 
 // Fallback imagery per slide type — shown when a slide has no Asset image yet.
 export const defaultImages = {

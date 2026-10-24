@@ -57,8 +57,8 @@
 }
 
 .openingTitle {
-  font-family: var(--font-ggx88), sans-serif;
-  font-weight: 400;
+  font-family: var(--font-menda-black), sans-serif;
+  font-weight: 900;
   font-size: var(--434-type-display-l-size);   /* 44 compact, 72 wide */
   line-height: 0.92;                            /* the design's, not the role's 0.92 default */
   margin: 0;
