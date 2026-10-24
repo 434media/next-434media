@@ -108,6 +108,14 @@ test("Breaking freshness is a profile setting: an exact-time window that needs t
   assert.ok(validateProfile({ ...published.milcity, timeZone: "Central" }).some(x => /timeZone: an IANA time zone/.test(x)))
 })
 
+test("references: optional pointers to the brand's governing documents, {role, doc, renders?} and nothing else", () => {
+  const ref = { role: "design authority", doc: "invented-context/Brand/Visual_Standard.md", renders: "invented-context/Assets/reference/" }
+  assert.deepEqual(validateProfile({ ...published.milcity, references: [ref] }), [])
+  assert.deepEqual(validateProfile({ ...published.milcity, references: [{ role: ref.role, doc: ref.doc }] }), [])
+  for (const bad of [ref, [{ ...ref, colors: ["#000"] }], [{ role: ref.role }], [{ ...ref, doc: "" }], [{ ...ref, renders: 3 }]])
+    assert.ok(validateProfile({ ...published.milcity, references: bad }).includes("references: a list of {role, doc, renders?}"), JSON.stringify(bad))
+})
+
 test("originality: a headline or caption copied from the source is rewritten; quotes, names and ICYMI are not", () => {
   const story = { sourceTitle: "Northrop Grumman's YFQ-48A Talon Blue Completes First Autonomous Flight", sourceText: "The YFQ-48A Talon Blue completed its first fully autonomous flight from taxi to landing at Edwards Air Force Base on Oct. 5, the company said in a statement released on Monday." }
   assert.deepEqual(longestSharedRun(words("YFQ-48A TALON BLUE COMPLETES FIRST AUTONOMOUS FLIGHT"), words(story.sourceTitle)).length, 7)

@@ -68,7 +68,12 @@ export interface BrandProfile {
   photos: { card: string; searchSubject: string }
   posts: { match: string; tag: string; metaBrand: string; homeUrl: string; roundupExclude: string; roundupExcludeCaption: string }
   seeds: { orgKinds: string[]; outletKind: string; lookFirst: { label: string; kinds: string[]; sites: boolean }[]; backlog?: { kind: RequestKind; label: string } }
+  /** Documents that govern the brand outside the engine (its visual standard, …): where they are, never their values.
+   * A record for people and the version history; no prompt and no engine path reads it. */
+  references?: ProfileReference[]
 }
+/** role: what the document is to the brand ("design authority"); doc: where it is; renders: where its reference images are. */
+export interface ProfileReference { role: string; doc: string; renders?: string }
 
 type Obj = Record<string, unknown>
 const isObj = (v: unknown): v is Obj => !!v && typeof v === "object" && !Array.isArray(v)
@@ -85,13 +90,14 @@ function keys(o: unknown, where: string, required: string[], optional: string[],
 /** Problems with a profile (empty = publishable and runnable). Publish and every read run it. */
 export function validateProfile(v: unknown): string[] {
   const p: string[] = []
-  if (!keys(v, "profile", ["schema", "generatedBy", "profile", "profileVersion", "profileDate", "profileSha256", "id", "name", "shortName", "rulesVersion", "draftPrefix", "never", "editorial", "series", "requestKinds", "research", "photos", "posts", "seeds"], ["headlineRules", "checks", "timeZone"], p)) return p
+  if (!keys(v, "profile", ["schema", "generatedBy", "profile", "profileVersion", "profileDate", "profileSha256", "id", "name", "shortName", "rulesVersion", "draftPrefix", "never", "editorial", "series", "requestKinds", "research", "photos", "posts", "seeds"], ["headlineRules", "checks", "timeZone", "references"], p)) return p
   if (v.schema !== PROFILE_SCHEMA) p.push(`schema must be ${PROFILE_SCHEMA}`)
   if (!(typeof v.id === "string" && /^[a-z][a-z0-9-]{1,30}$/.test(v.id))) p.push("id: lowercase letters, digits and hyphens")
   for (const [k, n] of [["name", 60], ["shortName", 20], ["rulesVersion", 80], ["editorial", 40000]] as const) if (!str(v[k], n)) p.push(`${k}: 1–${n} characters`)
   if (!(typeof v.draftPrefix === "string" && /^[A-Z][A-Z0-9]{1,9}$/.test(v.draftPrefix))) p.push("draftPrefix: 2–10 uppercase letters or digits")
   if ("timeZone" in v && !(typeof v.timeZone === "string" && /^[A-Z][A-Za-z_]+(\/[A-Za-z_]+){1,2}$/.test(v.timeZone))) p.push("timeZone: an IANA time zone, e.g. America/Chicago")
   if ("headlineRules" in v && !str(v.headlineRules, 20000)) p.push("headlineRules: 1–20,000 characters")
+  if ("references" in v && !(Array.isArray(v.references) && v.references.length <= 20 && v.references.every(r => isObj(r) && ["doc,role", "doc,renders,role"].includes(Object.keys(r).sort().join()) && str(r.role, 80) && str(r.doc, 300) && (!("renders" in r) || str(r.renders, 300))))) p.push("references: a list of {role, doc, renders?}")
   if (!Array.isArray(v.never) || !v.never.every(n => isObj(n) && Object.keys(n).sort().join() === "id,what" && str(n.id, 80) && str(n.what, 400))) p.push("never: a list of {id, what}")
 
   if (v.checks !== undefined && keys(v.checks, "checks", [], ["headline", "originality"], p)) {
