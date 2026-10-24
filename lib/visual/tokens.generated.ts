@@ -52,7 +52,7 @@ export const TYPE_BREAKPOINT_PX = 680
 
 export const TYPE = {
   "display-xl": { compactPx: 56, widePx: 96, lineHeight: 0.9, weight: 900, family: ["Menda Black"] },
-  "display-l": { compactPx: 44, widePx: 72, lineHeight: 0.92, weight: 900, fluid: "clamp(28px, 5.5px + 7vw, 72px)", family: ["Menda Black"] },
+  "display-l": { compactPx: 44, widePx: 72, lineHeight: 0.92, weight: 900, fluid: "clamp(1.75rem, 0.34375rem + 7vw, 4.5rem)", family: ["Menda Black"] },
   "display-m": { compactPx: 36, widePx: 56, lineHeight: 0.95, weight: 900, family: ["Menda Black"] },
   "heading-xl": { compactPx: 32, widePx: 40, lineHeight: 1.05, weight: 600, family: ["Geist"] },
   "heading-l": { compactPx: 28, widePx: 32, lineHeight: 1.1, weight: 600, family: ["Geist"] },

@@ -36,7 +36,7 @@
 :root {
   --434-type-display-xl-size: 56px;
   --434-type-display-xl-line: 0.9;
-  --434-type-display-l-size: clamp(28px, 5.5px + 7vw, 72px);
+  --434-type-display-l-size: clamp(1.75rem, 0.34375rem + 7vw, 4.5rem);
   --434-type-display-l-line: 0.92;
   --434-type-display-m-size: 36px;
   --434-type-display-m-line: 0.95;
@@ -107,9 +107,9 @@
    the markup. In `components` the role sets the base and any utility on
    the same element still wins, which is the contract the roles are for. */
 @layer components {
-  .t-display-xl { font-size: var(--434-type-display-xl-size); line-height: var(--434-type-display-xl-line); font-family: var(--font-menda-black), sans-serif; font-weight: 900; }
-  .t-display-l { font-size: var(--434-type-display-l-size); line-height: var(--434-type-display-l-line); font-family: var(--font-menda-black), sans-serif; font-weight: 900; }
-  .t-display-m { font-size: var(--434-type-display-m-size); line-height: var(--434-type-display-m-line); font-family: var(--font-menda-black), sans-serif; font-weight: 900; }
+  .t-display-xl { font-size: var(--434-type-display-xl-size); line-height: var(--434-type-display-xl-line); font-family: var(--font-menda-black), sans-serif; font-weight: 900; overflow-wrap: anywhere; }
+  .t-display-l { font-size: var(--434-type-display-l-size); line-height: var(--434-type-display-l-line); font-family: var(--font-menda-black), sans-serif; font-weight: 900; overflow-wrap: anywhere; }
+  .t-display-m { font-size: var(--434-type-display-m-size); line-height: var(--434-type-display-m-line); font-family: var(--font-menda-black), sans-serif; font-weight: 900; overflow-wrap: anywhere; }
   .t-heading-xl { font-size: var(--434-type-heading-xl-size); line-height: var(--434-type-heading-xl-line); font-family: var(--font-geist-sans), sans-serif; font-weight: 600; }
   .t-heading-l { font-size: var(--434-type-heading-l-size); line-height: var(--434-type-heading-l-line); font-family: var(--font-geist-sans), sans-serif; font-weight: 600; }
   .t-heading-m { font-size: var(--434-type-heading-m-size); line-height: var(--434-type-heading-m-line); font-family: var(--font-geist-sans), sans-serif; font-weight: 600; }
@@ -125,5 +125,5 @@
   .t-heading-xs { font-size: var(--434-type-heading-xs-size); line-height: var(--434-type-heading-xs-line); font-family: var(--font-geist-sans), sans-serif; font-weight: 600; }
   .t-control { font-size: var(--434-type-control-size); line-height: var(--434-type-control-line); font-family: var(--font-geist-sans), sans-serif; font-weight: 400; }
   .t-control-emphasis { font-size: var(--434-type-control-size); line-height: var(--434-type-control-line); font-family: var(--font-geist-sans), sans-serif; font-weight: var(--434-type-control-emphasis-weight); }
-  .t-display-s { font-size: var(--434-type-display-s-size); line-height: var(--434-type-display-s-line); font-family: var(--font-geist-sans), sans-serif; font-weight: 800; }
+  .t-display-s { font-size: var(--434-type-display-s-size); line-height: var(--434-type-display-s-line); font-family: var(--font-geist-sans), sans-serif; font-weight: 800; overflow-wrap: anywhere; }
 }

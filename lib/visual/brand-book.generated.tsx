@@ -136,7 +136,7 @@ const BRAND_BOOK = {
       "family": "Menda Black",
       "tracking": null,
       "emphasisWeight": null,
-      "note": "Menda is wide: display headlines are kept to roughly three to five words. Fluid: clamp(28px, 5.5px + 7vw, 72px), so one word never clips its column; the specimens show its endpoints.",
+      "note": "Menda is wide: display headlines are kept to roughly three to five words. Fluid: clamp(1.75rem, 0.34375rem + 7vw, 4.5rem), so one word never clips its column; the specimens show its endpoints.",
       "sample": "Built in San Antonio"
     },
     {
