@@ -24,7 +24,7 @@ const LOGO_URL =
   "https://firebasestorage.googleapis.com/v0/b/groovy-ego-462522-v2.firebasestorage.app/o/digital-canvas-dark.svg?alt=media"
 const FLYER_URL =
   "https://firebasestorage.googleapis.com/v0/b/groovy-ego-462522-v2.firebasestorage.app/o/digitalcanvas%2FInvitation%20only%20Limited%20Executive%20Seating.PNG?alt=media"
-const FONT_URL = "https://www.digitalcanvas.community/fonts/GeistPixel-Square.ttf"
+const FONT_URL = "https://www.434media.com/fonts/GeistPixel-Square.ttf"
 
 const PIXEL_STACK = "'GeistPixelSquare', 'Courier New', monospace"
 const SANS_STACK =

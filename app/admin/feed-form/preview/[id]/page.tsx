@@ -415,7 +415,7 @@ export default function FeedPreviewPage() {
             <footer className="pt-8 border-t border-neutral-200 text-xs text-neutral-400 tabular-nums">
               <p>
                 Preview · This is an admin approximation of how this content will appear on{" "}
-                <span className="text-neutral-700">digitalcanvas.community/thefeed</span>. Final
+                <span className="text-neutral-700">434media.com/thefeed</span>. Final
                 rendering on the public site may differ.
               </p>
             </footer>

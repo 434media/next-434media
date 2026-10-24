@@ -1,6 +1,7 @@
 import type { MetadataRoute } from "next"
 import { getBlogPostsFromFirestore } from "@/lib/firestore-blog"
 import { getProducts } from "@/lib/shopify"
+import { getPublicFeedItems } from "@/lib/thefeed"
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://www.434media.com"
@@ -52,6 +53,21 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       priority: 0.7,
     },
     {
+      // The Feed and Lead with Ops moved here from the Digital Canvas site
+      // (founder, 2026-10-24). The Lead with Ops feedback form is noindex and
+      // stays out.
+      url: `${baseUrl}/thefeed`,
+      lastModified: new Date(),
+      changeFrequency: "weekly",
+      priority: 0.7,
+    },
+    {
+      url: `${baseUrl}/workshops/lead-with-ops`,
+      lastModified: new Date("2026-06-18"),
+      changeFrequency: "yearly",
+      priority: 0.5,
+    },
+    {
       url: `${baseUrl}/privacy-policy`,
       lastModified: new Date(),
       changeFrequency: "yearly",
@@ -90,9 +106,10 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   ]
 
   // Fetch dynamic content (in parallel)
-  const [posts, products] = await Promise.all([
+  const [posts, products, feedItems] = await Promise.all([
     getBlogPostsFromFirestore({ status: "published" }).catch(() => []),
     getProducts({}).catch(() => []),
+    getPublicFeedItems().catch(() => []),
   ])
 
   const blogEntries: MetadataRoute.Sitemap = Array.isArray(posts)
@@ -115,6 +132,13 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       }))
     : []
 
-  return [...staticEntries, ...blogEntries, ...productEntries]
+  const feedEntries: MetadataRoute.Sitemap = feedItems.map((item) => ({
+    url: `${baseUrl}/thefeed/${item.slug}`,
+    lastModified: new Date(item.published_date),
+    changeFrequency: "monthly",
+    priority: 0.6,
+  }))
+
+  return [...staticEntries, ...blogEntries, ...feedEntries, ...productEntries]
 }
 

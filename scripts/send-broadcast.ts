@@ -26,7 +26,7 @@ const CAMPAIGN = "lead-with-ops-invite"
 const FROM = `Digital Canvas | 434 Media <vip@${RESEND_DOMAIN}>`
 const REPLY_TO = "VIP@434media.com"
 const SUBJECT = "Limited Seating: Lead with Ops. Layer in AI. featuring Adam Carroll | June 18"
-const REGISTRATION_URL = "https://www.digitalcanvas.community/workshops/lead-with-ops"
+const REGISTRATION_URL = "https://www.434media.com/workshops/lead-with-ops"
 
 async function main() {
   const { recipients, stats } = await gatherBroadcastRecipients(SELECTED)

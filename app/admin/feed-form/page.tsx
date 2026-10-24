@@ -932,7 +932,7 @@ export default function FeedFormPage() {
             <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight text-neutral-900">The Feed</h1>
             <p className="text-sm text-neutral-500 mt-1">
               Content management for{" "}
-              <span className="font-medium text-neutral-700">digitalcanvas.community/thefeed</span>
+              <span className="font-medium text-neutral-700">434media.com/thefeed</span>
             </p>
           </div>
           <div className="flex items-center gap-2">

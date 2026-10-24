@@ -12,7 +12,7 @@ import { unsubscribeUrl } from "../lib/unsubscribe-token"
 const TO = "jesse@434media.com"
 const FROM = `Digital Canvas | 434 Media <vip@${RESEND_DOMAIN}>`
 const REPLY_TO = "VIP@434media.com"
-const REGISTRATION_URL = "https://www.digitalcanvas.community/workshops/lead-with-ops"
+const REGISTRATION_URL = "https://www.434media.com/workshops/lead-with-ops"
 const BASE = process.env.NEXT_PUBLIC_APP_URL || "https://www.434media.com"
 // Real signed unsubscribe URL (same as the live broadcast) so the test
 // validates the full click-through. NOTE: clicking it actually unsubscribes TO.

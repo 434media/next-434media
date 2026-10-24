@@ -27,6 +27,13 @@ const nextConfig: NextConfig = {
         hostname: "storage.googleapis.com",
         pathname: "/groovy-ego-462522-v2.firebasestorage.app/**",
       },
+      {
+        // Same bucket through the Firebase download API. The Lead with Ops
+        // flyer is served from here (moved from the Digital Canvas site, 2026-10).
+        protocol: "https",
+        hostname: "firebasestorage.googleapis.com",
+        pathname: "/v0/b/groovy-ego-462522-v2.firebasestorage.app/**",
+      },
        {
         protocol: 'https',
         hostname: 'cdn.shopify.com',

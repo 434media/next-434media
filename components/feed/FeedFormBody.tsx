@@ -647,7 +647,7 @@ export function FeedFormBody({
                       <>
                         <span className="font-medium">Available</span>
                         <span className="text-neutral-400">
-                          · digitalcanvas.community/thefeed/{formData.slug}
+                          · 434media.com/thefeed/{formData.slug}
                         </span>
                       </>
                     )}
@@ -773,7 +773,7 @@ export function FeedFormBody({
                         </div>
                       )}
                       <div className="p-3">
-                        <p className="text-xs text-neutral-400 uppercase tracking-wide mb-1">digitalcanvas.community</p>
+                        <p className="text-xs text-neutral-400 uppercase tracking-wide mb-1">434media.com</p>
                         <h5 className="text-sm font-semibold text-neutral-900 line-clamp-2 mb-1">
                           {formData.og_title || formData.title || "Your title here"}
                         </h5>
