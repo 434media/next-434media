@@ -1,7 +1,6 @@
 "use client"
 
 import { useState, type FormEvent } from "react"
-import { motion } from "motion/react"
 import {
   SESSION_VALUE_MIN,
   SESSION_VALUE_MAX,
@@ -14,9 +13,11 @@ import {
   OTHER_OPTION,
 } from "@/lib/lead-with-ops-feedback"
 
-// Carroll Strategy & Operations color system — matches the event page.
-const EMERALD = "#1AAD9B" // positive accent: selection, structural bullets
-const CORAL = "#FF5757" // sparingly: CTA, required markers, errors
+// The post-event feedback form, moved from the Digital Canvas site (founder,
+// 2026-10-24). Questions, options, required fields and client-side guards are
+// unchanged; the server route repeats every check. Styled in 434 palette tokens
+// and type roles. Selection is shown with the palette's color-03, and the error
+// state with the functional signal colour.
 
 const SESSION_SCALE = Array.from(
   { length: SESSION_VALUE_MAX - SESSION_VALUE_MIN + 1 },
@@ -25,22 +26,31 @@ const SESSION_SCALE = Array.from(
 
 type FormStatus = "idle" | "submitting" | "success" | "error"
 
-// Shared field-label styling (pixel font, uppercase, tracked) with a required mark.
+const Required = () => <span className="text-[var(--color-fn-error)]">*</span>
+
 function FieldLabel({ children, htmlFor }: { children: React.ReactNode; htmlFor?: string }) {
   return (
-    <label
-      htmlFor={htmlFor}
-      className="font-(family-name:--font-geist-pixel-square) text-[10px] uppercase tracking-[0.25em] text-[#6F7883] font-bold mb-2 block"
-    >
-      {children} <span style={{ color: CORAL }}>*</span>
+    <label htmlFor={htmlFor} className="t-label text-neutral-600 mb-2 block">
+      {children} <Required />
     </label>
   )
 }
 
 const inputClass =
-  "w-full bg-white border border-[#E1E4EA] text-[#041C32] text-sm px-3.5 py-3 focus:outline-none focus:border-[#041C32] transition-colors placeholder:text-[#6F7883]/60"
+  "t-control w-full bg-[var(--434-white)] border border-neutral-300 text-neutral-900 px-3.5 py-3 focus:outline-none focus:border-[var(--434-color-02-black)] transition-colors placeholder:text-neutral-500"
 
-// One styled single-choice list (radio group) with emerald selection accent.
+const SELECTED = "border-[var(--434-color-03)] bg-[var(--434-color-04)] text-neutral-900"
+const UNSELECTED = "border-neutral-300 bg-[var(--434-white)] text-neutral-800 hover:border-neutral-500"
+
+function SectionLabel({ children }: { children: React.ReactNode }) {
+  return (
+    <>
+      <div className="h-px bg-neutral-200" />
+      <p className="t-label text-neutral-900">{children}</p>
+    </>
+  )
+}
+
 function ChoiceGroup({
   legend,
   options,
@@ -54,8 +64,8 @@ function ChoiceGroup({
 }) {
   return (
     <fieldset>
-      <legend className="font-(family-name:--font-geist-pixel-square) text-[10px] uppercase tracking-[0.25em] text-[#6F7883] font-bold mb-2 block">
-        {legend} <span style={{ color: CORAL }}>*</span>
+      <legend className="t-label text-neutral-600 mb-2 block">
+        {legend} <Required />
       </legend>
       <div className="space-y-2" role="radiogroup" aria-label={legend}>
         {options.map((opt) => {
@@ -67,12 +77,7 @@ function ChoiceGroup({
               role="radio"
               aria-checked={isSelected}
               onClick={() => onChange(opt)}
-              className={`w-full text-left text-sm px-3.5 py-3 border-l-2 border transition-colors ${
-                isSelected
-                  ? "border-transparent text-[#041C32] font-medium"
-                  : "border-[#E1E4EA] bg-white text-[#041C32]/80 hover:border-[#041C32]/40"
-              }`}
-              style={isSelected ? { backgroundColor: `${EMERALD}1A`, borderLeftColor: EMERALD } : undefined}
+              className={`t-control w-full text-left px-3.5 py-3 border transition-colors ${isSelected ? `${SELECTED} font-semibold` : UNSELECTED}`}
             >
               {opt}
             </button>
@@ -88,7 +93,6 @@ export default function LeadWithOpsFeedbackPage() {
   const [errorMsg, setErrorMsg] = useState("")
   const [thanksName, setThanksName] = useState("")
 
-  // Single-choice selections held in state so the styled selection renders.
   const [sessionValue, setSessionValue] = useState<number | null>(null)
   const [talkFurther, setTalkFurther] = useState<string | null>(null)
   const [role, setRole] = useState<string | null>(null)
@@ -169,100 +173,47 @@ export default function LeadWithOpsFeedbackPage() {
   }
 
   return (
-    <main className="bg-white min-h-screen text-[#041C32]">
-      <section className="relative pt-28 md:pt-32 pb-20 md:pb-28 px-6">
-        <div
-          className="absolute top-0 left-0 right-0 h-px pointer-events-none"
-          style={{ backgroundImage: `linear-gradient(to right, transparent, ${CORAL}55, transparent)` }}
-        />
-
-        <div className="relative z-10 max-w-2xl mx-auto">
-          {/* Header */}
-          <motion.div
-            initial={{ opacity: 0, y: 16 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6 }}
-            className="flex items-center gap-3 flex-wrap mb-7"
-          >
-            <span className="inline-flex items-center gap-2">
-              <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: EMERALD }} />
-              <span className="font-(family-name:--font-geist-pixel-square) text-[10px] md:text-xs uppercase tracking-[0.4em] text-[#041C32] font-bold">
-                Lunch &amp; Learn Feedback
-              </span>
-            </span>
-          </motion.div>
-
-          <motion.h1
-            initial={{ opacity: 0, y: 24 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.7, delay: 0.1 }}
-            className="font-(family-name:--font-geist-pixel-square) text-3xl md:text-5xl text-[#041C32] uppercase tracking-wide leading-[1.1] font-black mb-5"
-          >
-            Lead with Ops.{" "}
-            <span className="text-[#6F7883] font-medium block">Layer in AI.</span>
-          </motion.h1>
-
-          <motion.p
-            initial={{ opacity: 0, y: 16 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.7, delay: 0.18 }}
-            className="text-[#6F7883] text-base md:text-lg leading-relaxed mb-10"
-          >
-            Thank you for spending your lunch with us. Ninety seconds of feedback shapes the next
-            session — and tells us who&apos;d like to keep the conversation going.
-          </motion.p>
+    <main className="bg-[var(--434-background)] text-[var(--434-text)] min-h-screen">
+      <section className="pt-28 md:pt-32 pb-20 md:pb-28 px-4 sm:px-6">
+        <div className="max-w-2xl mx-auto">
+          <p className="t-label text-neutral-500 mb-6">Lunch &amp; Learn feedback</p>
+          <h1 className="font-ggx88 t-display-m text-neutral-900 mb-5">
+            Lead with Ops. <span className="block text-neutral-500">Layer in AI.</span>
+          </h1>
+          <p className="t-body-l text-neutral-700 mb-10">
+            Thank you for spending your lunch with us. Ninety seconds of feedback shapes the next session — and tells
+            us who&apos;d like to keep the conversation going.
+          </p>
 
           {status === "success" ? (
-            <motion.div
-              initial={{ opacity: 0, y: 16 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6 }}
-              className="border border-[#E1E4EA] bg-white p-7 md:p-9 relative"
-            >
-              <div className="absolute top-0 left-0 right-0 h-1" style={{ backgroundColor: EMERALD }} aria-hidden="true" />
-              <span
-                className="inline-block font-(family-name:--font-geist-pixel-square) text-[10px] uppercase tracking-[0.3em] font-bold mb-4 px-2.5 py-1 text-[#041C32]"
-                style={{ backgroundColor: EMERALD }}
-              >
-                Received
-              </span>
-              <h2 className="font-(family-name:--font-geist-pixel-square) text-2xl md:text-3xl text-[#041C32] uppercase tracking-wide leading-tight mb-4">
-                Thank you{thanksName ? "," : "."}{" "}
-                {thanksName && <span className="text-[#6F7883] font-medium">{thanksName}.</span>}
+            <div className="border border-neutral-200 p-7 md:p-9" role="status">
+              <p className="t-label text-neutral-500 mb-4">Received</p>
+              <h2 className="t-heading-l text-neutral-900 mb-4">
+                Thank you{thanksName ? `, ${thanksName}.` : "."}
               </h2>
-              <p className="text-[#6F7883] text-sm md:text-base leading-relaxed">
-                Your feedback is in. If you asked to keep the conversation going, we&apos;ll be in touch.
-                Questions in the meantime?{" "}
-                <a href="mailto:VIP@434MEDIA.COM" className="text-[#041C32] hover:underline font-semibold">
+              <p className="t-body text-neutral-700">
+                Your feedback is in. If you asked to keep the conversation going, we&apos;ll be in touch. Questions in
+                the meantime?{" "}
+                <a href="mailto:VIP@434MEDIA.COM" className="text-neutral-900 font-semibold hover:underline">
                   VIP@434MEDIA.COM
                 </a>
                 .
               </p>
-            </motion.div>
+            </div>
           ) : (
-            <motion.form
-              initial={{ opacity: 0, y: 16 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.7, delay: 0.24 }}
-              onSubmit={handleSubmit}
-              className="border border-[#E1E4EA] bg-white p-6 md:p-8 space-y-7"
-            >
+            <form onSubmit={handleSubmit} className="border border-neutral-200 p-6 md:p-8 space-y-7">
               {/* Q1 — Email */}
               <div>
                 <FieldLabel htmlFor="email">Email</FieldLabel>
                 <input id="email" name="email" type="email" required autoComplete="email" className={inputClass} placeholder="you@company.com" />
               </div>
 
-              {/* Section: Today's session */}
-              <div className="h-px bg-[#E1E4EA]" />
-              <p className="font-(family-name:--font-geist-pixel-square) text-[10px] uppercase tracking-[0.3em] font-bold" style={{ color: CORAL }}>
-                Today&apos;s session
-              </p>
+              <SectionLabel>Today&apos;s session</SectionLabel>
 
               {/* Q2 — Session value 1–5 */}
               <fieldset>
-                <legend className="font-(family-name:--font-geist-pixel-square) text-[10px] uppercase tracking-[0.25em] text-[#6F7883] font-bold mb-2 block">
-                  How valuable was today&apos;s session? <span style={{ color: CORAL }}>*</span>
+                <legend className="t-label text-neutral-600 mb-2 block">
+                  How valuable was today&apos;s session? <Required />
                 </legend>
                 <div className="grid grid-cols-5 gap-1.5">
                   {SESSION_SCALE.map((n) => {
@@ -272,23 +223,18 @@ export default function LeadWithOpsFeedbackPage() {
                         key={n}
                         type="button"
                         onClick={() => setSessionValue(n)}
-                        className={`relative border p-3 transition-all duration-200 ${
-                          isSelected ? "border-transparent" : "border-[#E1E4EA] bg-white hover:border-[#041C32]/40"
-                        }`}
-                        style={isSelected ? { backgroundColor: EMERALD } : undefined}
+                        className={`t-heading-m border p-3 transition-colors ${isSelected ? SELECTED : UNSELECTED}`}
                         aria-pressed={isSelected}
                         aria-label={`${n}${n === SESSION_VALUE_MIN ? ` — ${SESSION_VALUE_LOW_LABEL}` : ""}${n === SESSION_VALUE_MAX ? ` — ${SESSION_VALUE_HIGH_LABEL}` : ""}`}
                       >
-                        <span className={`block font-(family-name:--font-geist-pixel-square) text-lg md:text-xl font-bold ${isSelected ? "text-[#041C32]" : "text-[#041C32]/70"}`}>
-                          {n}
-                        </span>
+                        {n}
                       </button>
                     )
                   })}
                 </div>
                 <div className="flex justify-between mt-2">
-                  <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-[#6F7883]">{SESSION_VALUE_LOW_LABEL}</span>
-                  <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-[#6F7883]">{SESSION_VALUE_HIGH_LABEL}</span>
+                  <span className="t-caption text-neutral-500">{SESSION_VALUE_LOW_LABEL}</span>
+                  <span className="t-caption text-neutral-500">{SESSION_VALUE_HIGH_LABEL}</span>
                 </div>
               </fieldset>
 
@@ -298,11 +244,7 @@ export default function LeadWithOpsFeedbackPage() {
                 <textarea id="mostUseful" name="mostUseful" required rows={4} className={`${inputClass} resize-y`} placeholder="A sentence or two is plenty." />
               </div>
 
-              {/* Section: Keep the conversation going */}
-              <div className="h-px bg-[#E1E4EA]" />
-              <p className="font-(family-name:--font-geist-pixel-square) text-[10px] uppercase tracking-[0.3em] font-bold" style={{ color: CORAL }}>
-                Keep the conversation going
-              </p>
+              <SectionLabel>Keep the conversation going</SectionLabel>
 
               {/* Q4 — Talk further */}
               <ChoiceGroup
@@ -312,11 +254,7 @@ export default function LeadWithOpsFeedbackPage() {
                 onChange={setTalkFurther}
               />
 
-              {/* Section: A bit about you */}
-              <div className="h-px bg-[#E1E4EA]" />
-              <p className="font-(family-name:--font-geist-pixel-square) text-[10px] uppercase tracking-[0.3em] font-bold" style={{ color: CORAL }}>
-                A bit about you
-              </p>
+              <SectionLabel>A bit about you</SectionLabel>
 
               {/* Q5 / Q6 — Name + Company */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -335,12 +273,7 @@ export default function LeadWithOpsFeedbackPage() {
 
               {/* Q8 — Industry (+ Other short answer) */}
               <div>
-                <ChoiceGroup
-                  legend="Your industry"
-                  options={INDUSTRY_OPTIONS}
-                  value={industry}
-                  onChange={(v) => setIndustry(v)}
-                />
+                <ChoiceGroup legend="Your industry" options={INDUSTRY_OPTIONS} value={industry} onChange={setIndustry} />
                 {industry === OTHER_OPTION && (
                   <input
                     name="industryOther"
@@ -358,11 +291,7 @@ export default function LeadWithOpsFeedbackPage() {
                 <textarea id="biggestQuestion" name="biggestQuestion" required rows={3} className={`${inputClass} resize-y`} placeholder="The one thing you'd most like answered." />
               </div>
 
-              {/* Section: Attribution */}
-              <div className="h-px bg-[#E1E4EA]" />
-              <p className="font-(family-name:--font-geist-pixel-square) text-[10px] uppercase tracking-[0.3em] font-bold" style={{ color: CORAL }}>
-                Attribution
-              </p>
+              <SectionLabel>Attribution</SectionLabel>
 
               {/* Q10 — Heard about */}
               <ChoiceGroup
@@ -373,7 +302,7 @@ export default function LeadWithOpsFeedbackPage() {
               />
 
               {status === "error" && errorMsg && (
-                <p className="text-xs font-(family-name:--font-geist-pixel-square)" style={{ color: CORAL }}>
+                <p className="t-body-s text-[var(--color-fn-error)]" role="alert">
                   {errorMsg}
                 </p>
               )}
@@ -381,16 +310,15 @@ export default function LeadWithOpsFeedbackPage() {
               <button
                 type="submit"
                 disabled={status === "submitting"}
-                className="w-full text-[#041C32] font-(family-name:--font-geist-pixel-square) font-bold text-xs uppercase tracking-widest py-4 px-6 transition-all hover:bg-[#041C32] hover:text-white disabled:opacity-50 disabled:cursor-not-allowed"
-                style={{ backgroundColor: CORAL }}
+                className="t-control-emphasis w-full py-4 px-6 bg-[var(--434-color-02-black)] text-[var(--434-white)] hover:bg-neutral-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {status === "submitting" ? "Sending..." : "Send feedback"}
               </button>
 
-              <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-[#6F7883] leading-relaxed">
-                Presented by Digital Canvas · 434 Media. Your responses are used to improve future sessions.
+              <p className="t-caption text-neutral-500">
+                Presented by Digital Canvas · 434 MEDIA. Your responses are used to improve future sessions.
               </p>
-            </motion.form>
+            </form>
           )}
         </div>
       </section>

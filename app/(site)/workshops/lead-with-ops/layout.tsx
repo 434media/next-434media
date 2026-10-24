@@ -8,7 +8,7 @@ const description =
   "An executive working lunch with Adam Carroll, Founder of Carroll Strategy & Operations, on how operators can lead with operations, layer in AI, and make technology decisions that support business outcomes. Held June 18, 2026 at VelocityTX."
 
 export const metadata: Metadata = {
-  title: "Lead with Ops. Layer in AI. | June 18, 2026 | Digital Canvas",
+  title: "Lead with Ops. Layer in AI. | June 18, 2026",
   description,
   alternates: { canonical: "/workshops/lead-with-ops" },
   openGraph: {

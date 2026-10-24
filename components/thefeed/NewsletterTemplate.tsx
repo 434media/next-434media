@@ -8,7 +8,9 @@ import type { NewsletterContent } from "@/lib/thefeed"
 
 const CHARACTER_LIMIT = 255
 
-// Every HTML string here was sanitized server side in lib/thefeed.ts.
+// Every HTML string here was sanitized server side in lib/thefeed.ts. Styled in
+// 434 palette tokens and type roles; the Digital Canvas version's look is not
+// carried over (coordinator, 2026-10-24).
 //
 // Two decorative stickers the Digital Canvas version hard-coded are left out:
 // an "Actions Speak Louder" sticker on the founder's note, which spells the
@@ -40,7 +42,7 @@ function truncateHtml(html: string): string {
     }
     if (char === ">") inTag = false
   }
-  return result + `<span class="text-neutral-500">... </span>`
+  return result + `<span>… </span>`
 }
 
 function TruncatedText({ html, className }: { html: string; className?: string }) {
@@ -53,7 +55,7 @@ function TruncatedText({ html, className }: { html: string; className?: string }
       <div dangerouslySetInnerHTML={{ __html: isExpanded ? html : truncateHtml(html) }} />
       <button
         onClick={() => setIsExpanded(!isExpanded)}
-        className="text-neutral-500 hover:text-black transition-colors underline"
+        className="t-body-s text-neutral-600 hover:text-neutral-900 transition-colors underline"
       >
         {isExpanded ? "less" : "more"}
       </button>
@@ -62,9 +64,9 @@ function TruncatedText({ html, className }: { html: string; className?: string }
 }
 
 const RICH =
-  "text-lg text-neutral-800 [&_p]:leading-relaxed [&_p]:mb-4 [&_strong]:font-bold [&_strong]:text-black [&_ul]:list-disc [&_ul]:ml-6 [&_ul]:space-y-2 [&_ol]:list-decimal [&_ol]:ml-6 [&_li]:leading-relaxed [&_a]:underline"
+  "t-body-l text-neutral-800 [&_p]:mb-4 [&_strong]:font-semibold [&_strong]:text-neutral-900 [&_ul]:list-disc [&_ul]:ml-6 [&_ul]:space-y-2 [&_ol]:list-decimal [&_ol]:ml-6 [&_li]:leading-relaxed [&_a]:underline"
 const RICH_INVERT =
-  "text-base leading-relaxed text-neutral-200 [&_p]:mb-4 [&_strong]:font-bold [&_strong]:text-white [&_a]:underline"
+  "t-body text-[var(--color-on-dark-text-secondary)] [&_p]:mb-4 [&_strong]:font-semibold [&_strong]:text-[var(--color-on-dark-text)] [&_a]:underline"
 
 function Cta({ href, children, invert }: { href: string; children: React.ReactNode; invert?: boolean }) {
   return (
@@ -72,8 +74,10 @@ function Cta({ href, children, invert }: { href: string; children: React.ReactNo
       href={href}
       target="_blank"
       rel="noopener noreferrer"
-      className={`inline-flex items-center gap-2 px-6 py-3 text-sm uppercase tracking-wider font-mono font-bold transition-colors w-fit border-2 group ${
-        invert ? "bg-white text-black hover:bg-neutral-200 border-white" : "bg-black text-white hover:bg-neutral-800 border-black"
+      className={`t-control-emphasis inline-flex items-center gap-2 px-6 py-3 transition-colors w-fit group ${
+        invert
+          ? "bg-[var(--434-white)] text-[var(--434-color-02-black)] hover:bg-neutral-100"
+          : "bg-[var(--434-color-02-black)] text-[var(--434-white)] hover:bg-neutral-800"
       }`}
     >
       {children}
@@ -103,15 +107,15 @@ export function NewsletterTemplate({ content }: { content: NewsletterContent }) 
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, delay: 0.2 }}
-          className="border-4 border-black p-6 md:p-8 lg:p-12 bg-white"
+          className="border border-neutral-300 p-6 md:p-8 lg:p-12"
         >
-          <h2 className="text-2xl md:text-3xl font-bold font-menda-black uppercase tracking-tight mb-8 border-b-4 border-black pb-4">
+          <h2 className="font-ggx88 t-display-s text-neutral-900 mb-8 border-b border-neutral-300 pb-4">
             Founder&apos;s Note
           </h2>
           <div className="grid md:grid-cols-2 gap-8 md:gap-12">
-            <div className={`${RICH} md:tracking-tighter`} dangerouslySetInnerHTML={{ __html: foundersNote.text }} />
+            <div className={RICH} dangerouslySetInnerHTML={{ __html: foundersNote.text }} />
             {foundersNote.image && (
-              <div className="relative aspect-4/5 border-4 border-black overflow-hidden bg-neutral-100">
+              <div className="relative aspect-4/5 overflow-hidden bg-neutral-100">
                 <Image src={foundersNote.image} alt="Founder's note" fill sizes="(min-width: 768px) 420px, 100vw" className="object-cover" />
               </div>
             )}
@@ -121,7 +125,7 @@ export function NewsletterTemplate({ content }: { content: NewsletterContent }) 
 
       <section className="space-y-8">
         {content.lastMonthGif && (
-          <div className="relative w-full aspect-3/1 border-4 border-black overflow-hidden bg-neutral-100">
+          <div className="relative w-full aspect-3/1 overflow-hidden bg-neutral-100">
             <Image src={content.lastMonthGif} alt="Last month in motion" fill className="object-cover" unoptimized />
           </div>
         )}
@@ -129,13 +133,13 @@ export function NewsletterTemplate({ content }: { content: NewsletterContent }) 
         {content.spotlights.map((spotlight, index) => (
           <div
             key={index}
-            className={`grid md:grid-cols-2 gap-6 md:gap-8 border-4 border-black p-6 md:p-8 bg-white hover:bg-neutral-50 transition-colors ${
+            className={`grid md:grid-cols-2 gap-6 md:gap-8 border border-neutral-300 p-6 md:p-8 ${
               index % 2 === 1 ? "md:grid-flow-dense" : ""
             }`}
           >
             {spotlight.image && (
               <div
-                className={`relative aspect-4/5 border-4 border-black overflow-hidden bg-neutral-100 ${
+                className={`relative aspect-4/5 overflow-hidden bg-neutral-100 ${
                   index % 2 === 1 ? "md:col-start-2" : ""
                 }`}
               >
@@ -143,8 +147,8 @@ export function NewsletterTemplate({ content }: { content: NewsletterContent }) 
               </div>
             )}
             <div className="flex flex-col justify-center space-y-4">
-              <h3 className="text-xl md:text-2xl font-bold font-menda-black uppercase tracking-tight">{spotlight.title}</h3>
-              <TruncatedText html={spotlight.description} className={`${RICH} md:tracking-tighter text-neutral-700`} />
+              <h3 className="t-heading-m text-neutral-900">{spotlight.title}</h3>
+              <TruncatedText html={spotlight.description} className={RICH} />
               <Cta href={spotlight.ctaLink}>{spotlight.ctaText}</Cta>
             </div>
           </div>
@@ -152,14 +156,14 @@ export function NewsletterTemplate({ content }: { content: NewsletterContent }) 
       </section>
 
       {featuredPost.title && (
-        <section className="border-4 border-black bg-white overflow-hidden">
+        <section className="border border-neutral-300 overflow-hidden">
           {featuredPost.image && (
             <div className="relative w-full aspect-2/1 bg-neutral-100">
               <Image src={featuredPost.image} alt={featuredPost.title} fill sizes="(min-width: 768px) 896px, 100vw" className="object-cover" />
             </div>
           )}
           <div className="p-6 md:p-8 lg:p-12 space-y-6">
-            <h2 className="text-2xl md:text-3xl lg:text-4xl font-bold font-menda-black uppercase tracking-tight border-b-4 border-black pb-4">
+            <h2 className="t-heading-xl text-neutral-900 border-b border-neutral-300 pb-4">
               {featuredPost.title}
             </h2>
             <div className={RICH} dangerouslySetInnerHTML={{ __html: featuredPost.content }} />
@@ -169,25 +173,25 @@ export function NewsletterTemplate({ content }: { content: NewsletterContent }) 
 
       <section className="space-y-8">
         {content.theDropGif && (
-          <div className="relative w-full aspect-3/1 border-4 border-black overflow-hidden bg-neutral-100">
+          <div className="relative w-full aspect-3/1 overflow-hidden bg-neutral-100">
             <Image src={content.theDropGif} alt="The Drop" fill className="object-cover" unoptimized />
           </div>
         )}
 
         {upcomingEvent.title && (
-          <div className="border-4 border-black bg-black text-white">
+          <div className="bg-[var(--color-chrome-bg)] text-[var(--color-on-dark-text)]">
             {upcomingEvent.image.mobile && (
-              <div className="relative aspect-4/5 bg-neutral-800 md:hidden">
+              <div className="relative aspect-4/5 bg-neutral-900 md:hidden">
                 <Image src={upcomingEvent.image.mobile} alt={upcomingEvent.title} fill sizes="100vw" className="object-cover" />
               </div>
             )}
             {upcomingEvent.image.desktop && (
-              <div className="relative aspect-video bg-neutral-800 hidden md:block">
+              <div className="relative aspect-video bg-neutral-900 hidden md:block">
                 <Image src={upcomingEvent.image.desktop} alt={upcomingEvent.title} fill sizes="896px" className="object-cover" />
               </div>
             )}
             <div className="p-6 md:p-8 lg:p-12 space-y-4 md:space-y-6">
-              <h3 className="text-xl md:text-3xl lg:text-4xl font-bold font-menda-black uppercase tracking-tight md:border-b-4 md:border-white md:pb-4">
+              <h3 className="t-heading-xl border-b border-[var(--color-chrome-divider)] pb-4">
                 {upcomingEvent.title}
               </h3>
               <div className={RICH_INVERT} dangerouslySetInnerHTML={{ __html: upcomingEvent.description }} />

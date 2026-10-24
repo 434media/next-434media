@@ -36,17 +36,17 @@ export function FeedSignup() {
   }
 
   return (
-    <footer className="mt-16 pt-10 border-t border-gray-200">
-      <div className="bg-gray-900 text-white p-8 md:p-10 rounded-sm">
+    <footer className="mt-16 pt-10 border-t border-neutral-200">
+      <div className="bg-[var(--color-chrome-bg)] text-[var(--color-on-dark-text)] p-8 md:p-10">
         {isSuccess ? (
           <div className="text-center py-4" role="status">
-            <h2 className="text-2xl font-bold mb-2">You&apos;re subscribed</h2>
-            <p className="text-gray-400 text-sm">Check your inbox for confirmation.</p>
+            <h2 className="t-heading-l mb-2">You&apos;re subscribed</h2>
+            <p className="t-body-s text-[var(--color-on-dark-text-secondary)]">Check your inbox for confirmation.</p>
           </div>
         ) : (
           <div className="max-w-md mx-auto text-center">
-            <h2 className="text-2xl md:text-3xl font-bold mb-3 tracking-tight">Stay Updated</h2>
-            <p className="mb-6 text-gray-400 text-sm md:text-base leading-relaxed">
+            <h2 className="t-heading-l mb-3">Stay updated</h2>
+            <p className="t-body mb-6 text-[var(--color-on-dark-text-secondary)]">
               New posts from The Feed, in your inbox when there&apos;s something worth saying.
             </p>
             <form onSubmit={handleSubmit} className="space-y-3">
@@ -60,13 +60,13 @@ export function FeedSignup() {
                 required
                 disabled={isLoading}
                 autoComplete="email"
-                className="w-full px-4 py-3 bg-white text-gray-900 rounded-sm focus:outline-none focus:ring-2 focus:ring-white/30 disabled:opacity-50 text-sm font-medium placeholder:text-gray-400"
+                className="t-control w-full px-4 py-3 bg-[var(--434-white)] text-[var(--434-color-02-black)] focus:outline-none focus:ring-2 focus:ring-[var(--434-color-05)] disabled:opacity-50 placeholder:text-neutral-500"
               />
-              {error && <p className="text-sm text-[#D0271D] text-left">{error}</p>}
+              {error && <p className="t-body-s text-[var(--color-fn-error)] text-left">{error}</p>}
               <button
                 type="submit"
                 disabled={isLoading}
-                className="w-full px-6 py-3 bg-white text-gray-900 text-sm font-semibold tracking-wide hover:bg-gray-100 transition-colors rounded-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                className="t-control-emphasis w-full px-6 py-3 bg-[var(--434-white)] text-[var(--434-color-02-black)] hover:bg-neutral-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isLoading ? "Subscribing..." : "Subscribe"}
               </button>

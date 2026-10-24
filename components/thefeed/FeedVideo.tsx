@@ -19,7 +19,7 @@ export function FeedVideo() {
     return () => query.removeEventListener("change", onChange)
   }, [])
 
-  if (reduced !== false) return <div className="w-full h-full bg-black" aria-hidden="true" />
+  if (reduced !== false) return <div className="w-full h-full bg-[var(--434-color-02-black)]" aria-hidden="true" />
 
   return (
     <video className="w-full h-full object-cover" muted loop playsInline controls preload="metadata" aria-label="Digital Canvas reel">

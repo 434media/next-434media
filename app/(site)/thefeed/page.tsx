@@ -7,69 +7,66 @@ import { FeedVideo } from "@/components/thefeed/FeedVideo"
 // appears at once. Same reason as the blog.
 export const dynamic = "force-dynamic"
 
+// Moved from the Digital Canvas site (founder, 2026-10-24). On 434media.com it
+// is 434's own surface: palette tokens and the visual system's type roles.
+
 const description =
-  "Field notes from the work — cohort builds, demo days, workshops, and the San Antonio builder ecosystem. Articles, videos, newsletters and podcasts from Digital Canvas."
+  "Field notes from the work — cohort builds, demo days, workshops, and the San Antonio builder ecosystem. Articles, videos, newsletters and podcasts from 434 MEDIA and Digital Canvas."
+
+const ogImage = `/api/og?${new URLSearchParams({ title: "The Feed", subtitle: "Field notes from the work", path: "/thefeed" })}`
 
 export const metadata: Metadata = {
-  title: "The Feed | Digital Canvas",
+  title: "The Feed",
   description,
   alternates: { canonical: "/thefeed" },
   openGraph: {
-    title: "The Feed | Digital Canvas",
+    title: "The Feed | 434 MEDIA",
     description,
     url: "/thefeed",
+    siteName: "434 MEDIA",
     type: "website",
-    images: [{ url: "/api/og/thefeed", width: 1200, height: 630, alt: "The Feed — field notes from Digital Canvas" }],
+    images: [{ url: ogImage, width: 1200, height: 630, alt: "The Feed — field notes from the work" }],
   },
   twitter: {
     card: "summary_large_image",
-    title: "The Feed | Digital Canvas",
+    title: "The Feed | 434 MEDIA",
     description,
-    images: ["/api/og/thefeed"],
+    images: [ogImage],
     creator: "@434media",
     site: "@434media",
   },
 }
 
-const LABEL =
-  "font-(family-name:--font-geist-pixel-square) text-[10px] uppercase tracking-[0.3em] text-white/40 font-normal"
-
 export default async function TheFeedPage() {
   const items = await getPublicFeedItems()
 
   return (
-    <div className="min-h-screen bg-[#0a0a0a] pt-28 pb-16">
+    <div className="min-h-screen bg-[var(--434-background)] text-[var(--434-text)] pt-28 pb-16">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <header className="border-b border-[#222] pb-8 mb-10">
-          <h1 className="font-(family-name:--font-geist-pixel-square) text-3xl md:text-4xl lg:text-5xl font-bold text-white uppercase tracking-wide leading-[1.15]">
-            The Feed
-            <sup className="text-base md:text-lg lg:text-xl ml-2 font-normal text-white/40">({items.length})</sup>
+        <header className="border-b border-neutral-200 pb-8 mb-10">
+          <p className="t-label text-neutral-500 mb-4">Field notes</p>
+          <h1 className="font-ggx88 t-display-l text-neutral-900">
+            The Feed <span className="t-metadata-l text-neutral-500 align-top">({items.length})</span>
           </h1>
-          <p className="mt-5 text-base md:text-lg text-white/50 max-w-3xl leading-[1.8] font-light">
-            Field notes from the work — workflows we shipped, loops we tuned, design choices we&apos;re still defending. New posts whenever there&apos;s something worth saying.
+          <p className="t-body-l text-neutral-600 mt-5 max-w-3xl">
+            Field notes from the work — workflows we shipped, loops we tuned, design choices we&apos;re still
+            defending. New posts whenever there&apos;s something worth saying.
           </p>
         </header>
 
         <div className="flex flex-col lg:flex-row gap-10">
           <aside className="lg:w-[380px] shrink-0">
             <div className="lg:sticky lg:top-24">
-              <div className="border-b border-[#222] pb-3 mb-6">
-                <span className={LABEL}>/ Info</span>
-              </div>
-              <div className="relative aspect-2/1 w-full overflow-hidden border border-[#222] bg-black rounded-sm">
+              <p className="t-label text-neutral-500 border-b border-neutral-200 pb-3 mb-6">Info</p>
+              <div className="relative aspect-2/1 w-full overflow-hidden bg-[var(--434-color-02-black)]">
                 <FeedVideo />
               </div>
-              <div className="mt-4 flex items-center justify-between">
-                <span className={`${LABEL} tracking-[0.25em] text-white/30`}>Digital Canvas</span>
-                <span className={`${LABEL} tracking-[0.25em] text-[#88FF00]/60`}>434 Media</span>
-              </div>
+              <p className="t-caption text-neutral-500 mt-3">Digital Canvas</p>
             </div>
           </aside>
 
           <main className="flex-1 min-w-0">
-            <div className="border-b border-[#222] pb-3 mb-6">
-              <span className={LABEL}>/ Topics</span>
-            </div>
+            <p className="t-label text-neutral-500 pb-3">Posts</p>
             <FeedList items={items} />
           </main>
         </div>
