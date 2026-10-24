@@ -1,5 +1,5 @@
 import { getDb, getNamedDb, COLLECTIONS, NAMED_DATABASES } from "./firebase-admin"
-import { getSaTechDay2026RoleTags } from "./event-roles/sa-tech-day-2026"
+import { getEventRoleOverlay, roleTagsFor, type EventRoleOverlay } from "./firestore-event-role-overlays"
 
 // Event Registration interface
 export interface EventRegistration {
@@ -128,7 +128,13 @@ function mapDefaultDoc(doc: FirebaseFirestore.DocumentSnapshot): EventRegistrati
 /**
  * Map a techday registration doc to the EventRegistration interface
  */
-function mapTechdayDoc(doc: FirebaseFirestore.DocumentSnapshot): EventRegistration {
+/** The techday registrations' role overlay (event_role_overlays/sa-tech-day-2026). */
+const TECHDAY_EVENT_SLUG = "sa-tech-day-2026"
+
+function mapTechdayDoc(
+  doc: FirebaseFirestore.DocumentSnapshot,
+  roleOverlay: EventRoleOverlay | null,
+): EventRegistration {
   const data = doc.data()!
   const registeredAt = data.createdAt?._seconds
     ? new Date(data.createdAt._seconds * 1000).toISOString()
@@ -156,13 +162,13 @@ function mapTechdayDoc(doc: FirebaseFirestore.DocumentSnapshot): EventRegistrati
   // Role tags. Tech Fuel attendance is auto-detected from the events array;
   // tech-day-attendee is the default for everyone in the techday `event-
   // registration` collection. Speakers / pitch companies / semi-final judges
-  // are joined in from the role overlay file (email match).
+  // are joined in from the event's role overlay in Firestore (email match).
   if (hasTechFuel) {
     tags.push("role:tech-fuel-attendee")
   } else {
     tags.push("role:tech-day-attendee")
   }
-  for (const roleTag of getSaTechDay2026RoleTags(data.email)) {
+  for (const roleTag of roleTagsFor(roleOverlay, data.email)) {
     if (!tags.includes(roleTag)) tags.push(roleTag)
   }
 
@@ -204,8 +210,11 @@ async function getTechdayRegistrations(filters?: { event?: string }): Promise<Ev
     if (filters?.event && filters.event !== "SATechDay2026") return []
 
     const tdDb = getNamedDb(NAMED_DATABASES.TECHDAY)
-    const snapshot = await tdDb.collection("registrations").get()
-    return snapshot.docs.map(mapTechdayDoc)
+    const [snapshot, roleOverlay] = await Promise.all([
+      tdDb.collection("registrations").get(),
+      getEventRoleOverlay(TECHDAY_EVENT_SLUG),
+    ])
+    return snapshot.docs.map((doc) => mapTechdayDoc(doc, roleOverlay))
   } catch (error) {
     console.error("Error fetching techday registrations:", error)
     return []
@@ -686,7 +695,7 @@ export async function getEventRegistrationById(
     const tdDb = getNamedDb(NAMED_DATABASES.TECHDAY)
     const doc = await tdDb.collection("registrations").doc(realId).get()
     if (!doc.exists) return null
-    return mapTechdayDoc(doc)
+    return mapTechdayDoc(doc, await getEventRoleOverlay(TECHDAY_EVENT_SLUG))
   }
   if (id.startsWith("dcw:")) {
     const realId = id.replace("dcw:", "")

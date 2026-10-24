@@ -61,7 +61,7 @@ function dayParts(date: string) {
 
 /**
  * The hotel names the guest in full; the itinerary calls him what he goes by.
- * Initials would read "AG" for Augusto Garces, which is nobody — so the roster's
+ * Initials of a full name can read as nobody the guest would recognise — so the roster's
  * display name wins when the names match, and an unrecognised guest is shown as
  * the hotel wrote them rather than quietly renamed.
  */

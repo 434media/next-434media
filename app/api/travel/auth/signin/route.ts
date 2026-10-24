@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server"
 import { verifyFirebaseToken } from "@/lib/firebase-admin"
 import { authorizeTravelViewer, setTravelSession } from "@/lib/travel/auth"
-import { getTravelProject } from "@/lib/travel/projects"
+import { getTravelProject } from "@/lib/firestore-travel-projects"
 
 export async function POST(request: NextRequest) {
   try {
@@ -10,7 +10,7 @@ export async function POST(request: NextRequest) {
       projectSlug?: string
       travelerSlug?: string
     }
-    if (!idToken || !projectSlug || !travelerSlug || !getTravelProject(projectSlug, travelerSlug)) {
+    if (!idToken || !projectSlug || !travelerSlug || !(await getTravelProject(projectSlug, travelerSlug))) {
       return NextResponse.json({ error: "invalid_request" }, { status: 400 })
     }
     const identity = await verifyFirebaseToken(idToken)

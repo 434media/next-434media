@@ -78,4 +78,10 @@ Without the flag the script creates the user and prints a one-time setup link, w
 
 ## Project configuration
 
-Non-sensitive route identity, dates, and route-stop labels live in `lib/travel/projects.ts`. Add a project there instead of hand-keying route strings in page components.
+A project's dates, Airtable base, and each traveller's name and route stops live in Firestore, one document per project in `travel_projects/<project-slug>` ([lib/firestore-travel-projects.ts](../lib/firestore-travel-projects.ts)). They used to be in `lib/travel/projects.ts`; a named person's route is personal data and does not belong in this public repository, and the `verify` workflow's personal-data check keeps it out.
+
+- The itinerary page and its API read the whole record behind the travel gate (an admin session, or a `travel_access` record for that page).
+- The sign-in page and route only check that the page exists.
+- The public link card reads client, purpose and year, never the traveller or dates.
+
+Add a project by writing its document (the shape is `TravelProjectInput` in that module) through `createTravelProjectIfAbsent`, from a private file outside this repository, never by committing it here. `scripts/personal-data/import.ts` is the one-time import of the record that used to be committed.

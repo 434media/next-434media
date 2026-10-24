@@ -1,14 +1,14 @@
 import { NextResponse, type NextRequest } from "next/server"
 import { createEditorNote } from "@/lib/travel/airtable"
 import { canReadEditorNotes, getTravelAccess } from "@/lib/travel/auth"
-import { getTravelProject } from "@/lib/travel/projects"
+import { getTravelProject } from "@/lib/firestore-travel-projects"
 
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ project: string; traveler: string }> },
 ) {
   const { project: projectSlug, traveler: travelerSlug } = await params
-  const config = getTravelProject(projectSlug, travelerSlug)
+  const config = await getTravelProject(projectSlug, travelerSlug)
   if (!config) return NextResponse.json({ error: "not_found" }, { status: 404 })
   const viewer = await getTravelAccess(projectSlug, travelerSlug)
   if (!viewer) return NextResponse.json({ error: "unauthorized" }, { status: 401 })

@@ -2,7 +2,7 @@ import type { Metadata } from "next"
 import { notFound, redirect } from "next/navigation"
 import { getTravelItinerary } from "@/lib/travel/airtable"
 import { canReadEditorNotes, getTravelAccess } from "@/lib/travel/auth"
-import { getTravelProject } from "@/lib/travel/projects"
+import { getTravelProject } from "@/lib/firestore-travel-projects"
 import TravelItinerary from "@/components/travel/TravelItinerary"
 
 export const dynamic = "force-dynamic"
@@ -31,7 +31,7 @@ export default async function TravelPage({
   params: Promise<{ project: string; traveler: string }>
 }) {
   const { project: projectSlug, traveler: travelerSlug } = await params
-  const config = getTravelProject(projectSlug, travelerSlug)
+  const config = await getTravelProject(projectSlug, travelerSlug)
   if (!config) notFound()
   const viewer = await getTravelAccess(projectSlug, travelerSlug)
   if (!viewer) {

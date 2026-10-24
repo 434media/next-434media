@@ -1,7 +1,7 @@
 import { ImageResponse } from "next/og"
 import { readFile } from "node:fs/promises"
 import path from "node:path"
-import { TRAVEL_PROJECTS, type TravelProjectSlug } from "@/lib/travel/projects"
+import { getTravelProjectRecord } from "@/lib/firestore-travel-projects"
 
 /**
  * The link card for every /travel/<project> page.
@@ -44,8 +44,8 @@ export default async function TravelOpengraphImage({
   params: Promise<{ project: string }>
 }) {
   const { project } = await params
-  const known = Object.prototype.hasOwnProperty.call(TRAVEL_PROJECTS, project)
-  const record = known ? TRAVEL_PROJECTS[project as TravelProjectSlug] : null
+  // The record holds the traveller and their route too; only client, purpose and year leave this function.
+  const record = await getTravelProjectRecord(project).catch(() => null)
   const projectLine = record ? `${record.client} \u00b7 ${record.purpose} ${record.year}` : ""
 
   const [geist600, geist800] = await Promise.all([

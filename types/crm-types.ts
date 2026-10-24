@@ -582,6 +582,13 @@ export const CRM_COLLECTIONS = {
   // Brand profiles (lib/firestore-brand-profiles.ts): one document per brand, draft and published, with every
   // published version kept in its versions subcollection. The content pipeline reads the published one per request.
   BRAND_PROFILES: "brand_profiles",
+  // Personal data that used to be hard-coded in this public repository. Server-side reads only.
+  // One document per event slug: role tag → registrant emails, joined onto named-DB registrations at read time
+  // (lib/firestore-event-role-overlays.ts).
+  EVENT_ROLE_OVERLAYS: "event_role_overlays",
+  // One document per travel project slug: dates, Airtable base, travellers and their routes
+  // (lib/firestore-travel-projects.ts). Read behind the travel viewer gate; access records are in travel_access.
+  TRAVEL_PROJECTS: "travel_projects",
 } as const
 
 // ============================================
