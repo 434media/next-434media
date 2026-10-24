@@ -1,13 +1,13 @@
 // GENERATED FILE - DO NOT EDIT BY HAND.
 // Written by 434media/434-context: 04 Build/emit_work_media.py from
 // 04 Build/records-media-manifest.json, the manifest published alongside the
-// objects themselves at "records/manifest-2.0.30-20261005-103703.json".
+// objects themselves at "records/manifest-2.0.32-20261024-132035.json".
 //
 // Display and Design Standard section 5: the site resolves delivered media from
 // the stamped manifest rather than by path convention, which is what makes an
 // asset addressable by version. Every URL below carries one.
 //
-// Master 2.0.30, asset version v1, published 2026-10-05T15:37:03+00:00.
+// Master 2.0.32, asset version v1, published 2026-10-24T18:20:35+00:00.
 //
 // Every published record is here. There is no path convention to fall back to:
 // a record this map does not name has no media.
@@ -82,6 +82,9 @@ export const RECORD_MEDIA: Record<string, RecordMedia> = {
       loop: { mp4: "https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/records/gradiant/v1/loop.mp4", webm: "https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/records/gradiant/v1/loop.webm" },
       detail: { mp4: "https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/records/gradiant/v1/detail.mp4", webm: "https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/records/gradiant/v1/detail.webm" },
       tile: { compact: "https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/records/gradiant/v1/tile-4x5.jpg", compactWebp: "https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/records/gradiant/v1/tile-4x5.webp", wide: "https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/records/gradiant/v1/tile-16x9.jpg", wideWebp: "https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/records/gradiant/v1/tile-16x9.webp" },
+  },
+  "me-and-michael": {
+      tile: { compact: "https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/records/me-and-michael/v1/tile-4x5.jpg", compactWebp: "https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/records/me-and-michael/v1/tile-4x5.webp", wide: "https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/records/me-and-michael/v1/tile-16x9.jpg", wideWebp: "https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/records/me-and-michael/v1/tile-16x9.webp" },
   },
   "milcityusa": {
       tile: { compact: "https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/records/milcityusa/v1/tile-4x5.jpg", compactWebp: "https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/records/milcityusa/v1/tile-4x5.webp", wide: "https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/records/milcityusa/v1/tile-16x9.jpg" },
