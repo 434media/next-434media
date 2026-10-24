@@ -15,7 +15,7 @@ export async function generateMetadata(props: { params: Promise<{ lang: Locale }
     ? 'Aprende sobre los determinantes sociales de la salud (SDOH) y cómo impactan el bienestar comunitario. Recursos, eventos y oportunidades.'
     : 'Learn about Social Determinants of Health (SDOH) and how they impact community well-being. Resources, events, and opportunities.'
   return {
-    title: `${title} | 434 MEDIA`,
+    title,
     description,
     alternates: {
       canonical: `${baseUrl}/${lang}/sdoh`,

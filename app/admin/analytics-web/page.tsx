@@ -2,7 +2,7 @@ import { Suspense } from "react"
 import AnalyticsClientPage from "./AnalyticsClientPage"
 
 export const metadata = {
-  title: "Google Analytics 4 Dashboard | 434 MEDIA",
+  title: "Google Analytics 4 Dashboard",
   description: "Google Analytics dashboard for 434 Media website performance and insights",
 }
 

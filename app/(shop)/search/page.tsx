@@ -7,7 +7,8 @@ import { CollectionNavbar } from "@/components/shopify/collection-navbar"
 import { Skeleton } from "@/components/shopify/skeleton"
 
 export const metadata = {
-  title: "Search | 434 MEDIA Store",
+  // absolute: the root template would append "| 434 MEDIA" a second time.
+  title: { absolute: "Search | 434 MEDIA Store" },
   description: "Search for products in the store.",
   robots: {
     index: false,

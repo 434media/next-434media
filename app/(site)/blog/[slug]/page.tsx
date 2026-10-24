@@ -18,7 +18,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
   if (!post) {
     return {
-      title: "Blog Post Not Found | 434 MEDIA",
+      title: "Blog Post Not Found",
       description: "The requested blog post could not be found.",
     }
   }
@@ -44,7 +44,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const keywordsArray = tagsArray.length > 0 ? tagsArray : ["434 Media", "Blog", "Technology"]
 
   return {
-    title: `${post.title} | 434 MEDIA Blog`,
+    // absolute: the root template would append "| 434 MEDIA" a second time.
+    title: { absolute: `${post.title} | 434 MEDIA Blog` },
     description: post.excerpt || "Read this article on the 434 MEDIA blog",
     keywords: keywordsArray,
     authors: [{ name: post.author || "434 Media" }],

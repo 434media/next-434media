@@ -2,7 +2,7 @@ import { Suspense } from "react"
 import PortfolioAnalyticsClientPage from "./PortfolioAnalyticsClientPage"
 
 export const metadata = {
-  title: "Portfolio Analytics | 434 MEDIA",
+  title: "Portfolio Analytics",
   description: "Cross-property GA4 rollup across the 434 Media portfolio.",
 }
 
