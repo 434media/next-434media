@@ -288,15 +288,23 @@ instead is that the page still renders every published record
 ([scripts/verify-work-page.ts](scripts/verify-work-page.ts)) — the failure a
 hash cannot catch.
 
-**After any Section 1 or Section 4 change, regenerate:**
+**After any Section 1, Section 4.3 or portfolio-record change, regenerate:**
 
 ```
 python3 docs/context/"04 Build"/master_extract.py \
-  --emit-web lib/work-records.ts \
+  --emit-models lib/commercial-models.ts \
   --emit-brand lib/brand-records.ts
+python3 docs/context/"05 System of Record"/scripts/emit_work_records.py \
+  docs/context/"05 System of Record"/seed lib/work-records.ts
 ```
 
-The generator finds the master via `--master`, then `MASTER_CONTEXT_PATH`, then
+The work records are canonical in the system-of-record seed, not the master, so
+`lib/work-records.ts` comes from `emit_work_records.py`. `master_extract.py
+--emit-web` is retired and refuses to run. `--emit-models` writes the 4.3
+commercial-model definitions the Work page renders; `--emit-brand` writes the
+Section 1 strings. All three update `lib/master-manifest.json`.
+
+`master_extract.py` finds the master via `--master`, then `MASTER_CONTEXT_PATH`, then
 the repo's own `docs/context` symlink, then `~/434/docs/context`. Either of the
 first two may name the document itself or the directory holding it — so a clone
 without the symlink can still regenerate by pointing at a local copy.
@@ -305,10 +313,12 @@ without the symlink can still regenerate by pointing at a local copy.
 change that is not regenerated leaves the site rendering the previous version
 of the record, and nothing in the page will look wrong.
 
-The generator is strict: a field key outside the Section 4.5 vocabulary stops
-the run, as does a repeated field, so a record that invents a field breaks the
-build rather than silently not rendering. Records marked `Work page: Not
-published` are parsed and reported but excluded from the emitted file.
+The seed is strict: `validate.py` in `05 System of Record` checks every record
+against `portfolio_record.schema.json`, which admits no field outside it, so a
+record that invents a field fails validation rather than silently not
+rendering. `emit_work_records.py` emits an allowlist of public fields, refuses to
+run if an internal one (Internal context, Ownership, proof assets, restrictions)
+is named, and leaves out records whose `work_page.published` is not true.
 
 The manifest records both the master's version and a sha256 of the master file,
 so an in-place edit with no version bump is caught too — that has happened more
