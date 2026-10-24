@@ -250,6 +250,7 @@ SOP through `docs/context`, but does not run the skill from here.
 
 | Skill | SOP |
 |---|---|
+| add-work-record | `06 Standards/Work_Record_SOP.md` |
 | meta-account-governance | `06 Standards/Meta_Account_Governance_SOP.md` |
 
 The skills in `.claude/skills/` here are code conventions only — how to edit
