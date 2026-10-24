@@ -36,7 +36,7 @@
 :root {
   --434-type-display-xl-size: 56px;
   --434-type-display-xl-line: 0.9;
-  --434-type-display-l-size: 44px;
+  --434-type-display-l-size: clamp(28px, 5.5px + 7vw, 72px);
   --434-type-display-l-line: 0.92;
   --434-type-display-m-size: 36px;
   --434-type-display-m-line: 0.95;
@@ -85,7 +85,6 @@
 @media (min-width: 680px) {
   :root {
     --434-type-display-xl-size: 96px;
-    --434-type-display-l-size: 72px;
     --434-type-display-m-size: 56px;
     --434-type-heading-xl-size: 40px;
     --434-type-heading-l-size: 32px;

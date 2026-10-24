@@ -3,8 +3,9 @@
   "source": "434-context 07 Visual System/source",
   "sourceVersion": "1.2",
   "files": {
-    "lib/visual/tokens.generated.css": "8c61f225b14da3d4",
-    "lib/visual/tokens.generated.ts": "ea565ae5a45c7536",
+    "lib/visual/tokens.generated.css": "3a02c1cb83f57b82",
+    "lib/visual/tokens.generated.ts": "299f8ee86abd0aef",
+    "lib/visual/brand-book.generated.tsx": "15ffe4361c54654a",
     "public/brand/434-mark-dark.svg": "706b95e9997ec489",
     "public/brand/434-mark-light.svg": "8ba7844a1cf026bb",
     "public/brand/434-primary-dark.svg": "5fea00243dd3eb83",
