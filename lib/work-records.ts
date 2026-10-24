@@ -166,7 +166,7 @@ export const WORK_RECORDS: WorkRecord[] = [
     rightsDefaults: "Creator A.J. Garces · Copyright notice © 2025 A.J. Garces · Credit line A.J. Garces · Rights usage terms All rights reserved",
     registeredIdentifier: null,
     video: null,
-    displayException: "tile-4x5-upscale; factor 1.50× from an 801×1001 crop, the widest 4:5 the supplied still gives (2000×1125 with letterbox bars, 2000×1001 of picture); beyond the 15% allowance in Display and Design Standard 3.1; founder approval pending; interim until a master-resolution export is supplied. The 16:9 tile is upscaled 1.08× from a centred 1780×1001 crop, within the allowance. Left edge of the 4:5 window in the 2000×1001 frame: 780 px, centred on the two players. Source: the founder-supplied production still 1.jpg, 2026-10-24.",
+    displayException: "tile-4x5-upscale; factor 1.50× from an 801×1001 crop, the widest 4:5 the supplied still gives (2000×1125 with letterbox bars, 2000×1001 of picture); beyond the 15% allowance in Display and Design Standard 3.1; founder approved interim, 2026-10-24; replace with a master-resolution export from A.J. Garces. The 16:9 tile is upscaled 1.08× from a centred 1780×1001 crop, within the allowance. Left edge of the 4:5 window in the 2000×1001 frame: 780 px, centred on the two players. Source: the founder-supplied production still 1.jpg, 2026-10-24.",
     description: "A young tennis prodigy's perfect world begins to fracture as the lines between love, loyalty, and ambition blur.",
   },
   {
