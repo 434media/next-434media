@@ -120,6 +120,20 @@ test("public scope keeps the approved description and drops internal context", (
   assert.equal(out?.updated_by, undefined)
 })
 
+test("public scope drops ownership, the master 4.5 internal field", () => {
+  const owned = {
+    ...record,
+    ownership: { basis: "equity in lieu of fee", owners: ["434 MEDIA", "A partner"], ip_holder: "A partner", stake_434: "25%" },
+  }
+  const out = project("portfolio_records", owned, "public")
+  assert.equal(out?.title, record.title)
+  assert.equal(out?.ownership, undefined)
+  assert.ok(!JSON.stringify(out).includes("25%"))
+  // Outside portfolio_records the denylist applies, and it names the field too.
+  assert.equal(project("work_page_sections", { key: "x", ownership: owned.ownership }, "public")?.ownership, undefined)
+  assert.deepEqual(project("portfolio_records", owned, "internal")?.ownership, owned.ownership)
+})
+
 test("every field the Work page renders survives the public projection", () => {
   // The page maps these out of the row. Stripping one would blank a card field
   // in production while every test about "internal data" still passed.
