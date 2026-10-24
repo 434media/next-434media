@@ -51,9 +51,9 @@ export const PROHIBITIONS = [
 export const TYPE_BREAKPOINT_PX = 680
 
 export const TYPE = {
-  "display-xl": { compactPx: 56, widePx: 96, lineHeight: 0.9, weight: 400, family: ["GGX88", "Menda Black"] },
-  "display-l": { compactPx: 44, widePx: 72, lineHeight: 0.92, weight: 400, family: ["GGX88", "Menda Black"] },
-  "display-m": { compactPx: 36, widePx: 56, lineHeight: 0.95, weight: 400, family: ["GGX88", "Menda Black"] },
+  "display-xl": { compactPx: 56, widePx: 96, lineHeight: 0.9, weight: 900, family: ["Menda Black"] },
+  "display-l": { compactPx: 44, widePx: 72, lineHeight: 0.92, weight: 900, fluid: "clamp(1.75rem, 0.34375rem + 7vw, 4.5rem)", family: ["Menda Black"] },
+  "display-m": { compactPx: 36, widePx: 56, lineHeight: 0.95, weight: 900, family: ["Menda Black"] },
   "heading-xl": { compactPx: 32, widePx: 40, lineHeight: 1.05, weight: 600, family: ["Geist"] },
   "heading-l": { compactPx: 28, widePx: 32, lineHeight: 1.1, weight: 600, family: ["Geist"] },
   "heading-m": { compactPx: 22, widePx: 24, lineHeight: 1.15, weight: 600, family: ["Geist"] },
@@ -68,7 +68,7 @@ export const TYPE = {
   "body-xl": { compactPx: 20, widePx: 24, lineHeight: 1.5, weight: 400, family: ["Geist"] },
   "heading-xs": { compactPx: 16, widePx: 16, lineHeight: 1.25, weight: 600, family: ["Geist"] },
   "control": { compactPx: 16, widePx: 16, lineHeight: 1.25, weight: 400, family: ["Geist"] },
-  "display-s": { compactPx: 24, widePx: 30, lineHeight: 1.1, weight: 400, family: ["GGX88"] },
+  "display-s": { compactPx: 24, widePx: 30, lineHeight: 1.1, weight: 800, family: ["Geist"] },
 } as const
 
 export const LOGO = {
