@@ -73,13 +73,10 @@
 /* ── Opening ─────────────────────────────────────────────────────────── */
 .hero { padding-top: 32px; }
 
-/* GGX88 is the page's one expressive face (cinematic/editorial expression). */
-.display { font-family: var(--font-ggx88), sans-serif; margin: 0; }
+/* The face comes from the display role each heading carries. */
+.display { margin: 0; }
 
 .statement { margin-top: 24px; }
-
-/* GGX88 has no ≠ glyph; Geist does. */
-.ne { font-family: var(--font-geist-sans), sans-serif; font-weight: 600; }
 
 .lede { margin: 16px 0 0; max-width: 34ch; color: var(--pm-muted); }
 .lede strong { display: block; margin-top: 8px; font-weight: 600; color: var(--pm-ink); }

@@ -2,6 +2,7 @@ import { ImageResponse } from "next/og"
 import { readFile } from "node:fs/promises"
 import path from "node:path"
 import { getDeckByShareId } from "@/lib/firestore-deck"
+import { fitTitleSize } from "@/lib/og/fit-title"
 
 export const runtime = "nodejs"
 export const alt = "434 Media sales deck"
@@ -10,16 +11,25 @@ export const contentType = "image/png"
 
 const fontPath = (file: string) => path.join(process.cwd(), "fonts", file)
 
+/** Smallest the deck name is set: 60 characters of Menda's widest letters (W, M) fit in three lines at 36px. */
+const TITLE_MIN_SIZE = 36
+
 export default async function DeckOgImage({ params }: { params: Promise<{ shareId: string }> }) {
   const { shareId } = await params
   const deck = await getDeckByShareId(shareId).catch(() => null)
   const title = deck && deck.status === "published" ? deck.name : "Sales Deck"
 
-  const [ggx88, menda, geist400] = await Promise.all([
-    readFile(fontPath("GGX88.otf")),
+  const [menda, geist400] = await Promise.all([
     readFile(fontPath("Menda-Black.otf")),
     readFile(fontPath("Geist-Regular.otf")),
   ])
+
+  // Menda is wide: at a fixed 84px a 60-character name ran to six lines and
+  // into the footer. Size it so the whole name fits in three lines instead.
+  const displayTitle = title.length > 60 ? `${title.slice(0, 60)}…` : title
+  const titleSize = fitTitleSize(menda, displayTitle.toUpperCase(), {
+    maxSize: 84, minSize: TITLE_MIN_SIZE, maxWidth: 1200 - 72 * 2, maxLines: 3, letterSpacing: -2,
+  })
 
   return new ImageResponse(
     (
@@ -59,15 +69,17 @@ export default async function DeckOgImage({ params }: { params: Promise<{ shareI
           <div
             style={{
               color: "#171717",
-              fontSize: 84,
-              fontFamily: "GGX88",
+              fontSize: titleSize,
+              fontFamily: "Menda",
               textTransform: "uppercase",
               letterSpacing: -2,
               lineHeight: 1,
+              // Only a single word wider than the image reaches this.
+              wordBreak: "break-word",
               display: "flex",
             }}
           >
-            {title.length > 60 ? `${title.slice(0, 60)}…` : title}
+            {displayTitle}
           </div>
         </div>
 
@@ -82,7 +94,6 @@ export default async function DeckOgImage({ params }: { params: Promise<{ shareI
     {
       ...size,
       fonts: [
-        { name: "GGX88", data: ggx88, style: "normal", weight: 800 },
         { name: "Menda", data: menda, style: "normal", weight: 700 },
         { name: "Geist", data: geist400, style: "normal", weight: 400 },
       ],

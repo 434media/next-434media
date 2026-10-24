@@ -215,7 +215,7 @@ export function ContactForm({ className = "", isVisible = true }: ContactFormPro
             aria-live="polite"
           >
             <div className="mb-4 lg:mb-5">
-              {/* Geist, not the ggx88 display face. This is a card heading at
+              {/* Geist, not the Menda display face. This is a card heading at
                   20px; the display face only carries its personality at page-
                   headline sizes (48px+) and below that just reads as an odd
                   sans. Display type is reserved for page-level headlines. */}

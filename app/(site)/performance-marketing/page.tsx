@@ -105,7 +105,7 @@ export default function PerformanceMarketingPage() {
         <p className={`t-display-s ${styles.display} ${styles.statement}`}>
           Performance Marketing{" "}
           <span className={styles.nowrap}>
-            <span className={styles.ne}>≠</span> PPC.
+            ≠ PPC.
           </span>
         </p>
         <p className={`t-body-xl ${styles.lede}`}>
