@@ -68,7 +68,7 @@ export const TYPE = {
   "body-xl": { compactPx: 20, widePx: 24, lineHeight: 1.5, weight: 400, family: ["Geist"] },
   "heading-xs": { compactPx: 16, widePx: 16, lineHeight: 1.25, weight: 600, family: ["Geist"] },
   "control": { compactPx: 16, widePx: 16, lineHeight: 1.25, weight: 400, family: ["Geist"] },
-  "display-s": { compactPx: 24, widePx: 30, lineHeight: 1.1, weight: 900, family: ["Menda Black"] },
+  "display-s": { compactPx: 24, widePx: 30, lineHeight: 1.1, weight: 800, family: ["Geist"] },
 } as const
 
 export const LOGO = {

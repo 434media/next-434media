@@ -126,5 +126,5 @@
   .t-heading-xs { font-size: var(--434-type-heading-xs-size); line-height: var(--434-type-heading-xs-line); font-family: var(--font-geist-sans), sans-serif; font-weight: 600; }
   .t-control { font-size: var(--434-type-control-size); line-height: var(--434-type-control-line); font-family: var(--font-geist-sans), sans-serif; font-weight: 400; }
   .t-control-emphasis { font-size: var(--434-type-control-size); line-height: var(--434-type-control-line); font-family: var(--font-geist-sans), sans-serif; font-weight: var(--434-type-control-emphasis-weight); }
-  .t-display-s { font-size: var(--434-type-display-s-size); line-height: var(--434-type-display-s-line); font-family: var(--font-menda-black), sans-serif; font-weight: 900; }
+  .t-display-s { font-size: var(--434-type-display-s-size); line-height: var(--434-type-display-s-line); font-family: var(--font-geist-sans), sans-serif; font-weight: 800; }
 }
