@@ -237,6 +237,23 @@ alone drops a translation from ~$0.019 to ~$0.0052 on the cached path.
   source, qualification — are not readable from this repository at all, because
   it is public. See [docs/standards/README.md](docs/standards/README.md).
 
+## Business skills live in 434-context, not here
+
+This repository is public, so it carries no business procedure. Every business
+skill is an SOP in `docs/context/"06 Standards/"`, its scripts in 434-context,
+and a thin adapter in 434-context's `.claude/skills/`. The Skill Building
+Standard is `docs/context/"06 Standards/Skill_Building_Standard.md"`. On this
+Mac, `python3 docs/context/"04 Build/link_skills.py"` links the adapters into
+`~/.claude/skills/` so they load here; without the link, read the SOP directly.
+
+| Skill | SOP |
+|---|---|
+| meta-account-governance | `06 Standards/Meta_Account_Governance_SOP.md` |
+
+The skills in `.claude/skills/` here are code conventions only — how to edit
+this repository's code. Never add a business procedure, an account identifier,
+a recovery detail or an internal process to this repository.
+
 ## Environment
 
 This machine is a MacBook Air (Apple Silicon) on macOS 13.4, with bash as the
