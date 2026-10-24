@@ -160,7 +160,7 @@ export const WORK_RECORDS: WorkRecord[] = [
     founderCredit: "Marcos Resendez — Executive Producer",
     collaboratorCredit: "A.J. Garces — Writer, Director; Erin Purghart — Producer; Kris Mish — Producer; Hira Vin — Executive Producer; Christian Lagasse — Executive Producer",
     years: "2025",
-    status: "In post-production",
+    status: "Completed",
     publicUrl: "https://www.instagram.com/meandmichaelfilm/",
     recordKey: "me-and-michael",
     rightsDefaults: "Creator A.J. Garces · Copyright notice © 2025 A.J. Garces · Credit line A.J. Garces · Rights usage terms All rights reserved",
