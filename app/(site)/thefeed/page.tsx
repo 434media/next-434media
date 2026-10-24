@@ -1,7 +1,6 @@
 import type { Metadata } from "next"
 import { getPublicFeedItems } from "@/lib/thefeed"
 import { FeedList } from "@/components/thefeed/FeedList"
-import { FeedVideo } from "@/components/thefeed/FeedVideo"
 
 // Read from Firestore on every request, so a post published in /admin/feed-form
 // appears at once. Same reason as the blog.
@@ -54,22 +53,10 @@ export default async function TheFeedPage() {
           </p>
         </header>
 
-        <div className="flex flex-col lg:flex-row gap-10">
-          <aside className="lg:w-[380px] shrink-0">
-            <div className="lg:sticky lg:top-24">
-              <p className="t-label text-neutral-500 border-b border-neutral-200 pb-3 mb-6">Info</p>
-              <div className="relative aspect-2/1 w-full overflow-hidden bg-[var(--434-color-02-black)]">
-                <FeedVideo />
-              </div>
-              <p className="t-caption text-neutral-500 mt-3">Digital Canvas</p>
-            </div>
-          </aside>
-
-          <main className="flex-1 min-w-0">
-            <p className="t-label text-neutral-500 pb-3">Posts</p>
-            <FeedList items={items} />
-          </main>
-        </div>
+        <main>
+          <p className="t-label text-neutral-500 pb-3">Posts</p>
+          <FeedList items={items} />
+        </main>
       </div>
     </div>
   )
