@@ -6,8 +6,9 @@ import { EVENT_NAME, OTHER_OPTION } from "@/lib/lead-with-ops-feedback"
  *
  * Adam Carroll (Carroll Strategy & Operations) runs the workshop and takes the
  * call; the founder is copied. Founder decision, 2026-10-24: "Email future call
- * requests to Adam Carroll, cc me." Override either list without a redeploy
- * via the env vars (comma-separated), as lib/contact-form-notification.ts does.
+ * requests to Adam Carroll, cc me." Either list can be overridden by the env
+ * vars (comma-separated), as lib/contact-form-notification.ts does. They are
+ * read at module load, so a change on Vercel takes effect at the next deployment.
  */
 export const CALL_REQUEST_RECIPIENTS = {
   to: listFromEnv(process.env.LEAD_WITH_OPS_CALL_REQUEST_TO, ["adam@carrollstrategyoperations.com"]),

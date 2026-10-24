@@ -40,6 +40,8 @@ export interface FeedbackDeps {
   saveRow: (row: Record<string, unknown>) => Promise<void>
   /** Sends the call-request email; throws on failure. */
   sendCallRequest: (message: CallRequestMessage) => Promise<void>
+  /** Runs a task after the response is sent: `after()` from next/server in the route. */
+  afterResponse: (task: () => Promise<void>) => void
   now?: () => Date
 }
 
@@ -50,7 +52,8 @@ export interface FeedbackDeps {
  * "Yes, let's set up a call" answer sends one email to Carroll Strategy &
  * Operations with the founder copied (lib/lead-with-ops-call-request.ts); the
  * other two answers send nothing. A failed send is logged and the submission
- * still succeeds, because the row is already saved.
+ * still succeeds, because the row is already saved. The send runs after the
+ * response, so it never delays or fails the submission.
  *
  * Moved from the Digital Canvas site in 2026-10 with its validation unchanged.
  * Rows keep `source: "web-digitalcanvas"` (the brand the form belongs to, and
@@ -223,28 +226,31 @@ export async function handleFeedbackPost(request: Request, deps: FeedbackDeps): 
     }
 
     // --- Call request: tell Carroll, after the row is safely saved ----------
+    // Sent after the response, so a slow Resend can never outlast the form's
+    // 15-second abort and turn a saved row into an error and a resubmission.
     if (talkFurther === TALK_FURTHER_OPTIONS[0]) {
-      try {
-        await deps.sendCallRequest(
-          callRequestMessage({
-            name: (name as string).trim(),
-            email: normalizedEmail,
-            company: (company as string).trim(),
-            role: role as string,
-            industry: industry as string,
-            ...(industry === OTHER_OPTION ? { industryOther: trimmedIndustryOther } : {}),
-            mostUseful: (mostUseful as string).trim(),
-            biggestQuestion: (biggestQuestion as string).trim(),
-            submittedAt,
-          }),
-        )
-        console.log(`Lead with Ops call request emailed for ${normalizedEmail}`)
-      } catch (emailError) {
-        // The row is saved and tagged feedback-wants-call; the submitter still
-        // gets their success state. Someone forwards it by hand from the log.
-        const message = emailError instanceof Error ? emailError.message : String(emailError)
-        console.error(`Lead with Ops call request email failed for ${normalizedEmail}:`, message)
-      }
+      const message = callRequestMessage({
+        name: (name as string).trim(),
+        email: normalizedEmail,
+        company: (company as string).trim(),
+        role: role as string,
+        industry: industry as string,
+        ...(industry === OTHER_OPTION ? { industryOther: trimmedIndustryOther } : {}),
+        mostUseful: (mostUseful as string).trim(),
+        biggestQuestion: (biggestQuestion as string).trim(),
+        submittedAt,
+      })
+      deps.afterResponse(async () => {
+        try {
+          await deps.sendCallRequest(message)
+          console.log(`Lead with Ops call request emailed for ${normalizedEmail}`)
+        } catch (emailError) {
+          // The row is saved and tagged feedback-wants-call, and the submitter
+          // already has their success state. Someone forwards it by hand from the log.
+          const detail = emailError instanceof Error ? emailError.message : String(emailError)
+          console.error(`Lead with Ops call request email failed for ${normalizedEmail}:`, detail)
+        }
+      })
     }
 
     return NextResponse.json(

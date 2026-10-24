@@ -1,3 +1,4 @@
+import { after } from "next/server"
 import { getNamedDb, NAMED_DATABASES } from "@/lib/firebase-admin"
 import { requireHumanRequest } from "@/lib/botid-guard"
 import { assertVerifiedSender, getResend } from "@/lib/resend"
@@ -30,5 +31,6 @@ export async function POST(request: Request) {
       const { error } = await getResend().emails.send(message)
       if (error) throw new Error(error.message ?? JSON.stringify(error))
     },
+    afterResponse: (task) => after(task),
   })
 }
