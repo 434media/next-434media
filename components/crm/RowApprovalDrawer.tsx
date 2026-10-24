@@ -9,7 +9,7 @@ import { CanvaChoice } from "./CreateTable"
 import { isCanvaLink, mediaFromCanva, mediaFromFile, type MediaResult } from "./row-media"
 import { CONTENT_POST_STATUS_OPTIONS, SOCIAL_PLATFORM_OPTIONS, type ContentPost, type CreateText, type SocialPlatform } from "./types"
 import { CREATE_ROWS_STORE_KEY, FORMAT_LABEL, ddmmmyy, isHandPosted, type CreateFormat, type CreateRow, type RowMedia } from "@/lib/content-pipeline/create-table"
-import { approvalCovers, awaitingApproval, formatOf, frozen, futureDated, goesOut, handPlatforms, isApproved, parsePages, platformsFor, publisherPlatforms, readiness, shownOf } from "@/lib/content-pipeline/row-approval"
+import { allowedPlatforms, approvalCovers, awaitingApproval, formatOf, frozen, futureDated, goesOut, handPlatforms, isApproved, parsePages, platformConflicts, publisherPlatforms, readiness, shownOf } from "@/lib/content-pipeline/row-approval"
 
 /**
  * The approval drawer (plan v11.1 Step 3 item 2): a Create row's format variations side by side. The designs come from
@@ -114,7 +114,13 @@ export function RowApprovalDrawer({ rowId, open, onClose, onChanged, onOpenDetai
   const captionsDiffer = new Set(variations.filter(v => !frozen(v.post)).map(v => v.post.social_copy ?? "")).size > 1
   const pending = variations.filter(v => awaitingApproval(v.post))
   const aiVideo = pending.some(v => publisherPlatforms(v.post).length && v.post.assets.some(a => a.kind === "video"))
+  // One size per platform per row (Step 3 part 5): the ticks as they stand, saved or not; the server refuses the same.
+  const conflicts = platformConflicts(variations.map(v => v.post), platforms)
+  const savedConflicts = platformConflicts(variations.map(v => v.post))
+  /** Which size each platform is ticked on, so another size can't take it too. */
+  const takenBy = (postId: string) => Object.fromEntries(variations.filter(v => v.post.id !== postId).flatMap(v => (platforms[v.post.id] ?? []).map(p => [p, FORMAT_LABEL[formatOf(v.post)]])))
   const blockers = [
+    ...conflicts,
     ...(dirty ? ["Save your edits first"] : []),
     ...(!pending.length && variations.length ? ["Nothing in this row is waiting for approval"] : []),
     ...pending.flatMap(v => { const why = readiness(v.post); return why ? [`${FORMAT_LABEL[formatOf(v.post)]}: ${why}`] : [] }),
@@ -174,12 +180,13 @@ export function RowApprovalDrawer({ rowId, open, onClose, onChanged, onOpenDetai
       subtitle={variations.length ? `${variations.length} variation${variations.length > 1 ? "s" : ""} from one Create row` : undefined}
       footer={view && <div className="flex flex-col gap-2">
         {blockers.length > 0 && pending.length > 0 && <ul className="text-xs text-amber-700 list-disc pl-4">{blockers.map(b => <li key={b}>{b}</li>)}</ul>}
+        {conflicts.length > 0 && !pending.length && <ul role="status" className="text-xs text-red-700 list-disc pl-4">{conflicts.map(b => <li key={b}>{b}</li>)}</ul>}
         {pending.length > 0 && <label className="flex items-start gap-2 text-xs text-neutral-700"><input type="checkbox" className="mt-0.5" checked={reviewed} onChange={e => setReviewed(e.target.checked)} />I checked every design, the caption, platforms and date. Approving lets these exact files go out from their public links.</label>}
         <div className="flex flex-wrap items-center gap-2">
           {pending.length > 0 && <button type="button" onClick={approve} disabled={!!busy || blockers.length > 0 || !reviewed} className="inline-flex items-center gap-2 h-9 px-4 bg-neutral-900 text-white rounded-md disabled:opacity-40 text-sm font-medium">
             {busy === "approve" ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />} Approve &amp; Schedule
           </button>}
-          {publishable.length > 0 && view.publisher && <button type="button" onClick={publishAll} disabled={!!busy} className="inline-flex items-center gap-2 h-9 px-4 border border-neutral-300 rounded-md disabled:opacity-40 text-sm font-medium">
+          {publishable.length > 0 && view.publisher && <button type="button" onClick={publishAll} disabled={!!busy || savedConflicts.length > 0} title={savedConflicts[0] ?? ""} className="inline-flex items-center gap-2 h-9 px-4 border border-neutral-300 rounded-md disabled:opacity-40 text-sm font-medium">
             {busy?.startsWith("publish") ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />} {early.length ? "Publish now, before its date" : "Publish now to Instagram and Facebook"}
           </button>}
           {refreshable.length > 1 && <button type="button" onClick={refreshAll} disabled={!!busy || dirty} title={dirty ? "Save your edits first" : "Re-export every design from Canva"} className="inline-flex items-center gap-2 h-9 px-3 border border-neutral-300 rounded-md disabled:opacity-40 text-sm">
@@ -193,7 +200,7 @@ export function RowApprovalDrawer({ rowId, open, onClose, onChanged, onOpenDetai
       {problems.length > 0 && <ul role="status" className="mt-1 text-xs text-red-700 list-disc pl-4">{problems.map(p => <li key={p}>{p}</li>)}</ul>}
       {view && <div className="space-y-5">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          {variations.map(v => <VariationCard key={v.post.id} v={v} busy={busy} dirty={dirty} showCaption={captionsDiffer} picked={platforms[v.post.id] ?? []}
+          {variations.map(v => <VariationCard key={v.post.id} v={v} busy={busy} dirty={dirty} showCaption={captionsDiffer} picked={platforms[v.post.id] ?? []} taken={takenBy(v.post.id)}
             onPick={next => setPlatforms(s => ({ ...s, [v.post.id]: next }))}
             onRefresh={() => call(`refresh-${v.post.id}`, "POST", { action: "refresh", postId: v.post.id })}
             onSendBack={() => sendBack(v.post.id)}
@@ -272,8 +279,8 @@ export function RowApprovalDrawer({ rowId, open, onClose, onChanged, onOpenDetai
   )
 }
 
-function VariationCard({ v, busy, dirty, showCaption, picked, onPick, onRefresh, onSendBack, onDetails, handLink, setHandLink, onHandPost }: {
-  v: Variation; busy: string | null; dirty: boolean; showCaption: boolean; picked: SocialPlatform[]; onPick(next: SocialPlatform[]): void; onRefresh(): void; onSendBack(): void; onDetails(): void
+function VariationCard({ v, busy, dirty, showCaption, picked, taken, onPick, onRefresh, onSendBack, onDetails, handLink, setHandLink, onHandPost }: {
+  v: Variation; busy: string | null; dirty: boolean; showCaption: boolean; picked: SocialPlatform[]; taken: Record<string, string>; onPick(next: SocialPlatform[]): void; onRefresh(): void; onSendBack(): void; onDetails(): void
   handLink(p: string): string; setHandLink(p: string, url: string): void; onHandPost(p: string): void
 }) {
   const { post, batch } = v
@@ -285,7 +292,7 @@ function VariationCard({ v, busy, dirty, showCaption, picked, onPick, onRefresh,
   return (
     <div className="rounded-md ring-1 ring-neutral-200 bg-white p-3 space-y-2">
       <div className="flex items-center justify-between gap-2">
-        <p className="text-sm font-medium inline-flex items-center gap-1.5">{FORMAT_LABEL[format]}<HelpTip label={FORMAT_LABEL[format]}>{format === "feed" ? "The 4:5 design, for the Instagram and Facebook feeds and LinkedIn." : "The 9:16 design, for Reels, TikTok and YouTube Shorts."}{fromTemplate(post) ? "" : " This one was attached by link (One-off)."}</HelpTip></p>
+        <p className="text-sm font-medium inline-flex items-center gap-1.5">{FORMAT_LABEL[format]}<HelpTip label={FORMAT_LABEL[format]}>{format === "feed" ? "The 4:5 design: a photo post, or a 4:5 Reel for a video, on Instagram and Facebook; and LinkedIn." : "The 9:16 design: a full-screen Reel on Instagram and Facebook (a video only), TikTok and YouTube Shorts."}{fromTemplate(post) ? "" : " This one was attached by link (One-off)."}</HelpTip></p>
         {status && <span className="text-[11px] px-1.5 py-0.5 rounded" style={{ color: status.color }}>{status.label}</span>}
       </div>
       <div className={`grid gap-1 ${post.assets.length > 1 ? "grid-cols-2" : "grid-cols-1"}`}>
@@ -313,11 +320,12 @@ function VariationCard({ v, busy, dirty, showCaption, picked, onPick, onRefresh,
         <button type="button" onClick={onDetails} className="underline text-neutral-500">All details</button>
       </div>
       <fieldset className="space-y-0.5">
-        <legend className="text-xs font-medium text-neutral-700 inline-flex items-center gap-1.5">Platforms<HelpTip label="Platforms">Where this size goes. Untick all and it stays in Review. Save changes to keep them.</HelpTip></legend>
-        {platformsFor(format).map(p => (
-          <label key={p} className="flex items-center gap-1.5 text-xs">
-            <input type="checkbox" disabled={out} checked={picked.includes(p)} onChange={e => onPick(e.target.checked ? [...picked, p] : picked.filter(x => x !== p))} />
+        <legend className="text-xs font-medium text-neutral-700 inline-flex items-center gap-1.5">Platforms<HelpTip label="Platforms">Where this size goes. A platform gets one size per row: untick it on the other size to move it here. Untick all and it stays in Review. Save changes to keep them.</HelpTip></legend>
+        {allowedPlatforms(post).map(p => (
+          <label key={p} className={`flex items-center gap-1.5 text-xs ${taken[p] && !picked.includes(p) ? "text-neutral-400" : ""}`}>
+            <input type="checkbox" disabled={out || (!!taken[p] && !picked.includes(p))} checked={picked.includes(p)} onChange={e => onPick(e.target.checked ? [...picked, p] : picked.filter(x => x !== p))} />
             {platformLabel(p)}{isHandPosted(p) && <span className="text-neutral-400">· posted by hand</span>}
+            {taken[p] && !picked.includes(p) && <span className="text-neutral-400">· on {taken[p]}</span>}
           </label>
         ))}
         {!goesOut(post) && <p className="text-xs text-neutral-500">No platforms ticked: this variation stays in Review and isn&apos;t approved with the row.</p>}

@@ -397,6 +397,9 @@ export interface ContentPost {
   // templates with this text and new media. Optional; posts made before it have none (the drawer then sends the row
   // kept in the browser's Create table).
   create_text?: CreateText
+  // What the row's media was when the design was filled (Step 3 part 5): a photo goes to Instagram and Facebook at 4:5
+  // only. Optional; posts made before it have none, and then nothing is ruled out by it.
+  create_media?: "photo" | "video"
   // The design's pages this post was attached from, when one design fills several formats by page (the drawer's attach
   // by link); Refresh from Canva exports the same pages. Optional; absent means every page.
   canva_pages?: number[]

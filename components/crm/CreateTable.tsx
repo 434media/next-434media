@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react"
 import { Check, Loader2, PenLine, Play, Plus, Trash2, Upload, X, ArrowUpRight } from "lucide-react"
-import { CREATE_ROWS_STORE_KEY, FORMAT_LABEL, formatsOf, rowProblems, templateGap, type CellField, type CreatePlatform, type CreateRow, type CreateTemplate } from "@/lib/content-pipeline/create-table"
+import { CREATE_ROWS_STORE_KEY, CREATE_SOCIALS, FORMAT_LABEL, SOCIAL_LABEL, choiceLabel, formatChoices, formatsOf, mediaShapeOf, normalizePlatforms, pickedFormat, platformIdOf, rowProblems, templateGap, type CellField, type CreateFormat, type CreatePlatform, type CreateRow, type CreateSocial, type CreateTemplate, type MediaShape } from "@/lib/content-pipeline/create-table"
 import { HelpTip } from "@/components/admin/HelpTip"
 import { isCanvaLink, mediaFromCanva, mediaFromFile, mediaFromLink, type MediaResult } from "./row-media"
 
@@ -18,6 +18,9 @@ import { isCanvaLink, mediaFromCanva, mediaFromFile, mediaFromLink, type MediaRe
  *
  * Step 3 part 4: the Media cell also takes a Canva design link, which the app exports (MP4 or JPG); (?) tips explain
  * the columns.
+ *
+ * Step 3 part 5: one size per platform per row. Each platform is ticked once; its size follows the row's media (a photo
+ * goes to Instagram and Facebook at 4:5; a video as a 9:16 Reel, or a 4:5 Reel), and a (?) tip explains each choice.
  */
 interface BrandConfig { id: string; label: string; active: boolean; reason: string | null; versionId: string | null; templates: CreateTemplate[] }
 interface Config { brands: BrandConfig[]; platforms: CreatePlatform[] }
@@ -39,9 +42,19 @@ const COLUMN_HELP: Record<string, string> = {
   Template: "The card design. Tick a second template to add a row for it; each row is its own post.",
   "Reference link": "The story this post is about. Human+ reads it and drafts the Headline, Sub-headline and Caption.",
   Media: "The photo or video for the card's frame. Drop a file, paste a link to the file, or paste a Canva design link and the app exports it.",
-  "Target platforms": "Where the post goes. Feed platforms get the 4:5 design, Reels, TikTok and Shorts the 9:16 one.",
+  "Target platforms": "Where the post goes, one size per platform. The size follows the media: a photo or a video.",
   Caption: "The text under the post. It never changes the design.",
   Date: "The day the post goes out. The card's own printed date comes from the story, when Human+ finds one.",
+}
+
+/** The (?) tip beside a platform's size: why it gets that size, and the alternative when there is one. */
+function choiceHelp(platform: CreateSocial, format: CreateFormat, shape: MediaShape): string {
+  if (platform === "tiktok" || platform === "youtube") return `${SOCIAL_LABEL[platform]} takes the 9:16 design only. It is posted by hand for now.`
+  if (platform === "linkedin") return "LinkedIn gets the 4:5 design. It is posted by hand for now."
+  if (shape === "photo") return `A photo goes to ${SOCIAL_LABEL[platform]} as a 4:5 post, the size the feed shows in full.`
+  return format === "reels"
+    ? `A video goes to ${SOCIAL_LABEL[platform]} as a full-screen 9:16 Reel. Pick 4:5 Reel for a Reel that also fits the feed.`
+    : `The video goes to ${SOCIAL_LABEL[platform]} at 4:5, so it also fits the feed and grid. Pick 9:16 Reel for full screen.`
 }
 
 /** "12 / 15" per line for a field with limits, red when over. */
@@ -81,14 +94,22 @@ export function CreateTable({ onPostsReady }: { onPostsReady?: () => void }) {
     loaded.current = true
     loadConfig().then(c => {
       const first = c?.brands.find(b => b.active), kind = first?.templates[0]?.kind ?? ""
-      setRows(loadRows() ?? Array.from({ length: 5 }, () => blankRow(first?.id ?? "", kind)))
+      // A row kept from before part 5 may tick a platform at two sizes; it keeps one, at a size its media allows.
+      const kept = loadRows()?.map(r => ({ ...r, platforms: normalizePlatforms(r.platforms, mediaShapeOf(r.media)) }))
+      setRows(kept ?? Array.from({ length: 5 }, () => blankRow(first?.id ?? "", kind)))
     })
   }, [open, loadConfig])
   useEffect(() => { if (loaded.current && rows.length) saveRows(rows) }, [rows])
 
   const brandOf = (r: CreateRow) => config?.brands.find(b => b.id === r.brand)
   const templateOf = (r: CreateRow) => brandOf(r)?.templates.find(t => t.kind === r.kind)
-  const patch = (id: string, p: Partial<CreateRow>) => setRows(rs => rs.map(r => r.id === id ? { ...r, ...p } : r))
+  // A new Brand or Template refits the platforms to the sizes its template has.
+  const patch = (id: string, p: Partial<CreateRow>) => setRows(rs => rs.map(r => r.id === id ? ("kind" in p || "brand" in p ? fit({ ...r, ...p }) : { ...r, ...p }) : r))
+  /** The row's platforms fitted to its media and template; `fresh` when the media changed between photo and video. */
+  const fit = (r: CreateRow, fresh = false): CreateRow => {
+    const t = templateOf(r)
+    return { ...r, platforms: normalizePlatforms(r.platforms, mediaShapeOf(r.media), f => !t || !!t.templates[f], fresh) }
+  }
   const patchState = (id: string, s: RowState | ((cur: RowState) => RowState)) => setState(cur => ({ ...cur, [id]: typeof s === "function" ? s(cur[id] ?? {}) : s }))
 
   /** Ticking a template: an empty row takes it; a row that has one gets a copy below it for the new template. */
@@ -96,8 +117,9 @@ export function CreateTable({ onPostsReady }: { onPostsReady?: () => void }) {
     if (!r.kind) { patch(r.id, { kind }); return }
     const next = brandOf(r)?.templates.find(x => x.kind === kind)
     const fields = Object.fromEntries(Object.entries(r.fields).filter(([k]) => k === "date" || next?.fields.some(f => f.name === k)))
-    const platforms = r.platforms.filter(id => { const p = config?.platforms.find(x => x.id === id); return !!p && !!next?.templates[p.format] })
-    const copy: CreateRow = { ...r, id: newId(), kind, fields, platforms: platforms.length ? platforms : DEFAULT_PLATFORMS.filter(id => { const p = config?.platforms.find(x => x.id === id); return !!p && !!next?.templates[p.format] }) }
+    const has = (f: CreateFormat) => !!next?.templates[f], shape = mediaShapeOf(r.media)
+    const platforms = normalizePlatforms(r.platforms, shape, has)
+    const copy: CreateRow = { ...r, id: newId(), kind, fields, platforms: platforms.length ? platforms : normalizePlatforms(DEFAULT_PLATFORMS, shape, has) }
     setRows(rs => { const i = rs.findIndex(x => x.id === r.id); return [...rs.slice(0, i + 1), copy, ...rs.slice(i + 1)] })
   }
 
@@ -118,11 +140,13 @@ export function CreateTable({ onPostsReady }: { onPostsReady?: () => void }) {
 
   /** Media for a row: a dropped file, a pasted file link, or a Canva design the app exports (row-media.ts). */
   async function takeMedia(r: CreateRow, message: string, get: () => Promise<MediaResult>, failed: string) {
+    const before = mediaShapeOf(r.media)
     patch(r.id, { media: null })
     patchState(r.id, { busy: "media", message })
     try {
       const { media, message: done } = await get()
-      patch(r.id, { media })
+      // A video ticks Instagram and Facebook as a 9:16 Reel by default; a photo at 4:5.
+      setRows(rs => rs.map(x => x.id === r.id ? fit({ ...x, media }, mediaShapeOf(media) !== before) : x))
       patchState(r.id, s => ({ ...s, busy: undefined, message: done }))
     } catch (e) { patchState(r.id, { error: e instanceof Error ? e.message : failed }) }
   }
@@ -231,16 +255,29 @@ export function CreateTable({ onPostsReady }: { onPostsReady?: () => void }) {
                           </button>
                         </td>
                         <td className="px-2 py-2 w-44">
-                          <MediaCell row={r} disabled={locked} onFile={f => dropFile(r, f)} onUrl={u => pasteMedia(r, u)} onCanva={(u, as) => canvaMedia(r, u, as)} onClear={() => patch(r.id, { media: null })} />
+                          <MediaCell row={r} disabled={locked} onFile={f => dropFile(r, f)} onUrl={u => pasteMedia(r, u)} onCanva={(u, as) => canvaMedia(r, u, as)} onClear={() => setRows(rs => rs.map(x => x.id === r.id ? fit({ ...x, media: null }, mediaShapeOf(x.media) !== "photo") : x))} />
                         </td>
                         <td className="px-2 py-2 w-40">
-                          {config.platforms.map(p => {
-                            const available = !!t?.templates[p.format]
+                          {/* One size per platform per row (Step 3 part 5): the size follows the media. */}
+                          {CREATE_SOCIALS.map(platform => {
+                            const shape = mediaShapeOf(r.media)
+                            const choices = formatChoices(platform, shape).filter(f => !!t?.templates[f])
+                            const picked = pickedFormat(r.platforms, platform), on = !!picked && choices.includes(picked)
+                            const format = on ? picked : choices[0]
+                            const hand = config.platforms.find(p => p.platform === platform)?.posting === "hand"
+                            const set = (f: CreateFormat | null) => patch(r.id, { platforms: [...r.platforms.filter(id => config.platforms.find(p => p.id === id)?.platform !== platform), ...(f ? [platformIdOf(platform, f)!] : [])] })
                             return (
-                              <label key={p.id} className={`flex items-center gap-1.5 text-xs py-0.5 ${available ? "" : "text-neutral-400"}`}>
-                                <input type="checkbox" disabled={locked || !available} checked={available && r.platforms.includes(p.id)} onChange={e => patch(r.id, { platforms: e.target.checked ? [...r.platforms, p.id] : r.platforms.filter(x => x !== p.id) })} /> {p.label}
-                                {p.posting === "hand" && <span className="text-neutral-400">· by hand</span>}
-                              </label>
+                              <div key={platform} className={`flex items-center gap-1.5 text-xs py-0.5 ${choices.length ? "" : "text-neutral-400"}`}>
+                                <label className="inline-flex items-center gap-1.5">
+                                  <input type="checkbox" disabled={locked || !choices.length} checked={on} onChange={e => set(e.target.checked ? format! : null)} /> {SOCIAL_LABEL[platform]}
+                                </label>
+                                {format && (choices.length > 1
+                                  ? <select aria-label={`${SOCIAL_LABEL[platform]} size`} disabled={locked || !on} value={format} onChange={e => set(e.target.value as CreateFormat)} className="h-6 rounded border border-neutral-300 px-0.5 bg-white text-[11px]">
+                                      {choices.map(f => <option key={f} value={f}>{choiceLabel(platform, f, shape)}</option>)}
+                                    </select>
+                                  : <span className="text-neutral-400">· {choiceLabel(platform, format, shape)}{hand ? " · by hand" : ""}</span>)}
+                                {format && <HelpTip label={`${SOCIAL_LABEL[platform]} size`}>{choiceHelp(platform, format, shape)}</HelpTip>}
+                              </div>
                             )
                           })}
                           {/* A missing template is a gap with a note, never a fallback (plan v11.1 Step 3 item 3). */}

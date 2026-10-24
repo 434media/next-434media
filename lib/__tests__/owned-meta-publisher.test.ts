@@ -1,7 +1,8 @@
 /** Offline only. Run with tsx --test; all transport/persistence is injected. */
 import { test } from "node:test"
 import assert from "node:assert/strict"
-import { beginFacebookRecovery, guardFacebookRetryDispatch, draftBatch, manifestHash, dryRun, resetUnpublishedPreparation, assertOperatorSettlement, confirmStoppedRun, runtimePublishingEnabled, validateMetaMutationBoundary, runOwnedMeta, guardedContentUpdate, sendBackPlan, type MetaManifest, type MetaRecord, type MetaStore, type MetaProvider, type MetaDestination } from "../owned-meta-publisher"
+import { beginFacebookRecovery, guardFacebookRetryDispatch, draftBatch, manifestHash, dryRun, resetUnpublishedPreparation, assertOperatorSettlement, confirmStoppedRun, runtimePublishingEnabled, FB_REELS_FLOW, META_PROCESSING_WINDOW_MS, validateMetaMutationBoundary, runOwnedMeta, guardedContentUpdate, sendBackPlan, type MetaManifest, type MetaRecord, type MetaStore, type MetaProvider, type MetaDestination } from "../owned-meta-publisher"
+import { needsContinuation } from "../owned-meta-tool"
 import { createMetaProvider, checkMetaCapability, type MetaPublishingEvidence } from "../instagram-publishing"
 import { assetDigest, assertApprovedBlobUrl, verifyAssetBytes, readTrustedAsset, measureExport } from "../owned-meta-assets"
 
@@ -375,4 +376,81 @@ test("Send back to Review withdraws an approval before anything goes out, and is
   assert.throws(() => sendBackPlan({ status: "approved", hand_posts: [{ platform: "tiktok" }] }, undefined, actor, at, "n"), /already out/)
   assert.throws(() => sendBackPlan({ status: "posted" }, undefined, actor, at, "n"), /already out/)
   assert.throws(() => sendBackPlan({ status: "needs_approval" }, undefined, actor, at, "n"), /Only an approved/)
+})
+
+// ── Facebook Reels (Step 3 part 5): finish first, then wait; the earlier flow's stuck job is never resumed ──
+/** A fake Graph API for one Page Reel (video 555). `meta` is what Meta reports; every request is logged. */
+function fakeReelsMeta(meta:{uploading:string;processing:string;publishing:string;published:boolean}) {
+  const log:string[]=[]
+  const fetcher=(async(input:URL|string,init?:RequestInit)=>{
+    const url=new URL(String(input)),method=init?.method||"GET",body=new URLSearchParams(init?.body as URLSearchParams)
+    const what=url.hostname==="rupload.facebook.com"?"upload":url.pathname.endsWith("/video_reels")?`video_reels:${body.get("upload_phase")}`:url.pathname.endsWith("/published_posts")?"published_posts":url.pathname.endsWith("/555")?`video:${url.searchParams.get("fields")}`:url.pathname
+    log.push(`${method} ${what}`)
+    if(what==="video_reels:start")return Response.json({video_id:"555",upload_url:"https://rupload.facebook.com/video-upload/v26.0/555"})
+    if(what==="upload"||what==="video_reels:finish")return Response.json({success:true})
+    if(what==="video:status")return Response.json({status:{video_status:meta.publishing==="complete"?"ready":"processing",uploading_phase:{status:meta.uploading},processing_phase:{status:meta.processing},publishing_phase:{status:meta.publishing}}})
+    if(what==="published_posts")return Response.json({data:meta.published?[{id:"2_9",permalink_url:"https://www.facebook.com/reel/555",attachments:{data:[{target:{id:"555"}}]}}]:[]})
+    return Response.json({error:{code:1}},{status:400})
+  }) as typeof fetch
+  return {log,fetcher}
+}
+/** An approved video batch whose Instagram Reel is already out, so only Facebook runs. */
+function reelsStore(at="2026-10-09T00:00:00Z") {
+  const s=new Store(record(manifest("video")))
+  s.value.batch.jobs.instagram={status:"verified",preparation:{},remoteId:"101",permalink:"https://www.instagram.com/reel/x",verifiedAt:at}
+  return s
+}
+const reelsProvider=(m:MetaManifest,fetcher:typeof fetch)=>createMetaProvider({accessToken:"fake",evidence:evidence(m),fetcher,beforeMutation:async()=>{}})
+
+test("FB Reel: finish is sent once the upload is complete, never after waiting on processing; the job is then re-checked, never re-sent",async()=>{
+  const s=reelsStore(),meta={uploading:"complete",processing:"not_started",publishing:"not_started",published:false},fake=fakeReelsMeta(meta)
+  const p=reelsProvider(s.value.batch.manifest,fake.fetcher)
+  await run(s,p)
+  assert.deepEqual(fake.log.filter(x=>x.startsWith("POST")),["POST video_reels:start","POST upload","POST video_reels:finish"],"finish follows the upload, with processing not yet started")
+  const fb=s.value.batch.jobs.facebook
+  assert.equal(fb.preparation.reels_flow,FB_REELS_FLOW)
+  assert.deepEqual([fb.status,fb.awaitingMeta,fb.remoteId],["final_started",true,"555"])
+  assert.match(fb.blocker!,/still processing/)
+  assert.deepEqual(needsContinuation(s.value),["facebook"],"the continuation re-checks it")
+  // Meta finishes: the continuation verifies it and sends nothing.
+  Object.assign(meta,{processing:"complete",publishing:"complete",published:true})
+  await runOwnedMeta({id:"p",runId:"cron",store:s,provider:p,enabled:async()=>true,resolveAssets:async b=>b.manifest.assets.map(a=>a.url),now:()=>"2026-10-09T00:10:00Z",only:needsContinuation(s.value)})
+  assert.deepEqual([s.value.batch.jobs.facebook.status,s.value.batch.jobs.facebook.permalink,s.value.batch.jobs.facebook.awaitingMeta],["verified","https://www.facebook.com/reel/555",undefined])
+  assert.equal(fake.log.filter(x=>x==="POST video_reels:finish").length,1,"exactly one final publication")
+  assert.deepEqual(needsContinuation(s.value),[])
+})
+
+test("FB Reel: an upload Meta hasn't finished receiving waits for the next run, with no finish",async()=>{
+  const s=reelsStore(),fake=fakeReelsMeta({uploading:"in_progress",processing:"not_started",publishing:"not_started",published:false})
+  await run(s,reelsProvider(s.value.batch.manifest,fake.fetcher))
+  assert.ok(!fake.log.includes("POST video_reels:finish"))
+  assert.equal(s.value.batch.jobs.facebook.status,"processing")
+  assert.deepEqual(needsContinuation(s.value),["facebook"])
+})
+
+test("FB Reel: Meta still processing after a day goes to a person, never a second finish",async()=>{
+  const s=reelsStore(),fake=fakeReelsMeta({uploading:"complete",processing:"in_progress",publishing:"not_started",published:false}),p=reelsProvider(s.value.batch.manifest,fake.fetcher)
+  await run(s,p)
+  const later=new Date(Date.parse("2026-10-09T00:00:00Z")+META_PROCESSING_WINDOW_MS+1).toISOString()
+  await runOwnedMeta({id:"p",runId:"cron",store:s,provider:p,enabled:async()=>true,resolveAssets:async b=>b.manifest.assets.map(a=>a.url),now:()=>later,only:["facebook"]})
+  assert.equal(s.value.batch.jobs.facebook.status,"needs_reconciliation")
+  assert.match(s.value.batch.jobs.facebook.blocker!,/within a day/)
+  assert.deepEqual(needsContinuation(s.value),[])
+  assert.equal(fake.log.filter(x=>x==="POST video_reels:finish").length,1)
+})
+
+test("FB Reel: the stuck job from the earlier flow (Xtv0HJeyPoJU2KLQA8gX) is never resumed: the cron skips it, a click closes it with no Meta call",async()=>{
+  // Its saved state on 2026-10-22: uploaded under the old flow, waiting on processing that never starts.
+  const s=reelsStore()
+  s.value.batch.jobs.facebook={status:"processing",preparation:{video:"1463737685855692",upload_url:"https://rupload.facebook.com/video-upload/v26.0/1463737685855692",uploaded:"true"}}
+  assert.deepEqual(needsContinuation(s.value),[],"the continuation cron leaves it alone")
+  const fake=fakeReelsMeta({uploading:"complete",processing:"not_started",publishing:"not_started",published:false})
+  await run(s,reelsProvider(s.value.batch.manifest,fake.fetcher))
+  assert.deepEqual(fake.log,[],"no request reaches Meta")
+  const fb=s.value.batch.jobs.facebook
+  assert.equal(fb.status,"manual_required"); assert.ok(fb.closed); assert.match(fb.blocker!,/closed without posting/)
+  assert.equal(fb.finalIntent,undefined)
+  assert.throws(()=>resetUnpublishedPreparation(s.value,"facebook"),/closed/,"an operator reset can't reopen it")
+  await run(s,reelsProvider(s.value.batch.manifest,fake.fetcher),"again")
+  assert.deepEqual(fake.log,[],"a closed job is skipped")
 })

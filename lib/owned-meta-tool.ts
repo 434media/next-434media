@@ -1,6 +1,6 @@
 import { aiDisclosureRequired, apiLabelSupported, checkReviewedFormat, META_AI_DISCLOSURE_RULE } from "./owned-meta-formats"
 import type { MetaConnectionReport } from "./owned-meta-connection"
-import { assertApproved, MetaBlocked, type MetaBatch, type MetaDestination, type MetaManifest, type MetaRecord } from "./owned-meta-publisher"
+import { assertApproved, legacyReelsPreparation, MetaBlocked, type MetaBatch, type MetaDestination, type MetaManifest, type MetaRecord } from "./owned-meta-publisher"
 
 /**
  * Narrow machine surface over the existing publisher (Slack executor, crons).
@@ -57,13 +57,18 @@ export function permalinkFor(destination: MetaDestination, raw: string): string 
 }
 
 /**
- * A continuation only resumes preparation that Meta is still processing.
- * Any recorded final intent is excluded, so a continuation can never repeat a final publish.
+ * A continuation resumes preparation that Meta is still processing, and re-checks a final publication Meta is still
+ * processing (a Facebook Reel after finish). The publisher never sends a second final publication for a job with a
+ * recorded final intent; it only verifies it. A closed job, or a Facebook Reel prepared by the earlier flow, is never touched.
  */
 export function needsContinuation(record: MetaRecord): MetaDestination[] {
   try { assertApproved(record) } catch { return [] }
   if (record.batch.claim) return []
-  return (["instagram", "facebook"] as const).filter(d => { const j = record.batch.jobs[d]; return j.status === "processing" && !j.finalIntent && !j.retry })
+  return (["instagram", "facebook"] as const).filter(d => {
+    const j = record.batch.jobs[d]
+    if (j.retry || j.closed || d === "facebook" && legacyReelsPreparation(j.preparation)) return false
+    return j.status === "processing" && !j.finalIntent || j.status === "final_started" && !!j.awaitingMeta && !!j.finalIntent && !!j.remoteId
+  })
 }
 
 export interface OwnedMetaResult { destination: MetaDestination; status: string; evidence: "api_verified" | "owner_reported" | "none"; remoteId?: string; permalink?: string; verifiedAt?: string; blocker?: string; doNotRepeat: boolean }

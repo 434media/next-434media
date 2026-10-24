@@ -1,7 +1,7 @@
 import type { ContentPost, SocialPlatform } from "@/components/crm/types"
 import type { MetaBatch, MetaDestination, MetaFormat } from "@/lib/owned-meta-publisher"
 import type { PrepareChoices } from "@/lib/owned-meta-execution"
-import { CREATE_PLATFORMS, FORMAT_LABEL, isHandPosted, type CreateFormat } from "./create-table"
+import { CREATE_PLATFORMS, FORMAT_LABEL, SOCIAL_LABEL, formatChoices, isHandPosted, type CreateFormat, type CreateSocial } from "./create-table"
 
 /**
  * The approval drawer (plan v11.1 Step 3 item 2): a Create row's format variations, approved together. Each variation
@@ -17,6 +17,27 @@ export const isApproved = (p: Pick<ContentPost, "status">) => (APPROVED_STATUSES
 export const formatOf = (p: Pick<ContentPost, "create_format">): CreateFormat => p.create_format === "reels" ? "reels" : "feed"
 /** The social platforms a format's design can go to (TikTok and Shorts take 9:16; LinkedIn takes 4:5). */
 export const platformsFor = (format: CreateFormat): SocialPlatform[] => [...new Set(CREATE_PLATFORMS.filter(p => p.format === format).map(p => p.platform))]
+
+/**
+ * The platforms this variation's design can go to: its format's platforms, less Instagram and Facebook on a 9:16 design
+ * made from a photo (a photo goes to them at 4:5 only; Step 3 part 5). A post that doesn't record its media allows all.
+ */
+export const allowedPlatforms = (p: Pick<ContentPost, "create_format" | "create_media">): SocialPlatform[] =>
+  platformsFor(formatOf(p)).filter(x => !p.create_media || formatChoices(x as CreateSocial, p.create_media).includes(formatOf(p)))
+
+/**
+ * One size per platform per row (Step 3 part 5): each platform two or more of the row's variations go to, in the person's
+ * words; empty when none. `picked` overrides a variation's saved platforms (the drawer's unsaved ticks, or an edit being
+ * checked). A variation already out counts with the platforms it went to, so nothing can follow it to the same place.
+ */
+export function platformConflicts(posts: Pick<ContentPost, "id" | "create_format" | "social_platforms" | "archived">[], picked: Record<string, readonly string[]> = {}): string[] {
+  const live = posts.filter(p => !p.archived)
+  return (Object.keys(SOCIAL_LABEL) as CreateSocial[]).flatMap(platform => {
+    const on = live.filter(p => (picked[p.id] ?? p.social_platforms ?? []).includes(platform))
+    const sizes = [...new Set(on.map(p => FORMAT_LABEL[formatOf(p)]))]
+    return on.length > 1 ? [`${SOCIAL_LABEL[platform]} is ticked on ${sizes.length > 1 ? sizes.join(" and ") : `${on.length} ${sizes[0]} designs`}; a platform gets one size per row, so untick it on one`] : []
+  })
+}
 
 /** A variation with no platforms ticked stays in Review and is left out of the row's approval. */
 export const goesOut = (p: Pick<ContentPost, "social_platforms">) => (p.social_platforms ?? []).length > 0
@@ -115,6 +136,7 @@ export async function approveRow(deps: ApproveRowDeps, rowId: string, shown: Rec
   let problems = shownProblems(posts, shown)
   if (problems.length) throw new RowApprovalError(problems)
   const waiting = posts.filter(awaitingApproval)
+  problems.push(...platformConflicts(posts))
   for (const p of waiting) { const why = readiness(p); if (why) problems.push(`${FORMAT_LABEL[formatOf(p)]}: ${why}`) }
   if (problems.length) throw new RowApprovalError(problems)
 
@@ -129,7 +151,8 @@ export async function approveRow(deps: ApproveRowDeps, rowId: string, shown: Rec
   }
   if (problems.length) throw new RowApprovalError(problems)
   // Read again just before approving: an edit made meanwhile (another person, the post drawer) stops the row.
-  problems = shownProblems(await deps.listRow(rowId), shown)
+  const again = await deps.listRow(rowId)
+  problems = [...shownProblems(again, shown), ...platformConflicts(again)]
   if (problems.length) throw new RowApprovalError(problems)
 
   const out: ApprovedVariation[] = []

@@ -6,12 +6,12 @@
 import { test } from "node:test"
 import assert from "node:assert/strict"
 import { published, loadPublishedProfileFirst } from "./published-profile"
-import { CREATE_PLATFORMS, cellRoles, isHandPosted, platformIdsOf, templateGap, createTemplates, ddmmmyy, designText, exportFileBase, formatsOf, rowProblems, type CreateRow } from "../content-pipeline/create-table"
+import { CREATE_PLATFORMS, choiceLabel, formatChoices, mediaShapeOf, normalizePlatforms, platformProblems, cellRoles, isHandPosted, platformIdsOf, templateGap, createTemplates, ddmmmyy, designText, exportFileBase, formatsOf, rowProblems, type CreateRow } from "../content-pipeline/create-table"
 import { PAGE_LINK_MESSAGE, blobStoreHost, dvidsImagePage, isCreateUpload, isPageLink, isPageType, mediaKind, transcodeArgs, videoContainer, videoPlan } from "../content-pipeline/create-media"
 import { cardSubject } from "../content-pipeline/series"
 import { humanPlus, HumanPlusError, withoutMediaLines, type HumanPlusDeps } from "../content-pipeline/human-plus"
 import { DOD_NOTICE } from "../content-pipeline/worker"
-import { CreateRowError, createRequestId, replaceRowMedia, runCreateRow, serverRowProblems, type CreateRunDeps } from "../content-pipeline/create-run"
+import { CreateRowError, createRequestId, shortExportHolds, replaceRowMedia, runCreateRow, serverRowProblems, type CreateRunDeps } from "../content-pipeline/create-run"
 import type { McuAi } from "../content-pipeline/model"
 import { guardedContentUpdate, sendBackPlan } from "../owned-meta-publisher"
 import { approvalCovers, isApproved } from "../content-pipeline/row-approval"
@@ -179,7 +179,7 @@ function runDeps() {
 
 test("Run job: one design and one Review post per format, stamped, keyed by the row, with video exported as MP4", async () => {
   const s = runDeps()
-  const r = await runCreateRow(s.deps, row({ platforms: ["instagram_feed", "facebook_feed", "instagram_reels"] }), { email: "audrey@x.co", name: "Audrey" })
+  const r = await runCreateRow(s.deps, row({ platforms: ["instagram_feed", "facebook_feed", "tiktok"] }), { email: "audrey@x.co", name: "Audrey" })
   assert.deepEqual(r.posts.map(p => p.format), news().templates.reels ? ["feed", "reels"] : ["feed"])
   const feed = [...s.posts.values()].find(p => p.create_format === "feed")!
   assert.equal(feed.status, "needs_approval")
@@ -193,7 +193,7 @@ test("Run job: one design and one Review post per format, stamped, keyed by the 
   assert.deepEqual(s.made[0].image, { field: news().media.feed, url: row().media!.url, name: "p.jpg" })
   if (news().templates.reels) assert.ok(s.exports.some(e => e.endsWith(":mp4")), "a Reels design is exported as video")
   // A retry reuses the posts it made: no second design.
-  const again = await runCreateRow(s.deps, row({ platforms: ["instagram_feed", "facebook_feed", "instagram_reels"] }), { email: "audrey@x.co", name: "Audrey" })
+  const again = await runCreateRow(s.deps, row({ platforms: ["instagram_feed", "facebook_feed", "tiktok"] }), { email: "audrey@x.co", name: "Audrey" })
   assert.ok(again.posts.every(p => p.reused))
   assert.equal(s.made.length, r.posts.length)
 })
@@ -201,7 +201,7 @@ test("Run job: one design and one Review post per format, stamped, keyed by the 
 test("Run job: TikTok and Shorts ride the 9:16 design, LinkedIn the 4:5 one, each post carrying its hand-posted platforms", async (t) => {
   if (!news().templates.reels) return t.skip("the profile under test has no 9:16 News template")
   const s = runDeps()
-  const r = await runCreateRow(s.deps, row({ platforms: ["linkedin", "tiktok", "youtube_shorts", "instagram_reels", "facebook_reels"] }), { email: "a@x.co", name: "A" })
+  const r = await runCreateRow(s.deps, row({ media: { url: "https://abc.public.blob.vercel-storage.com/content-create/c.mp4", kind: "video", name: "c.mp4", bytes: 1e7, optimized: "done" }, platforms: ["linkedin", "tiktok", "youtube_shorts", "instagram_reels", "facebook_reels"] }), { email: "a@x.co", name: "A" })
   assert.deepEqual(r.posts.map(p => p.format), ["feed", "reels"])
   const posts = [...s.posts.values()]
   assert.deepEqual(posts.find(p => p.create_format === "feed")!.social_platforms, ["linkedin"])
@@ -322,7 +322,7 @@ test("Run job: a post made before designs were hashed that is already out is reu
 // ── Replace media (Step 3 part 4) ──
 test("Replace media: every size is filled again with the same text and the new media, on the same posts, still in Review", async () => {
   const s = runDeps()
-  const platforms = ["instagram_feed", "facebook_feed", "instagram_reels"]
+  const platforms = ["instagram_feed", "facebook_feed", "tiktok"]
   const first = await runCreateRow(s.deps, row({ platforms }), { email: "a@x.co", name: "A" })
   const feed = s.posts.get(first.posts[0].postId)!
   assert.deepEqual(feed.create_text, { brand: "milcity", kind: "news", headline: "ARMY FIELDS NEW KIT", subHeadline: "Soldiers test it this week.", fields: { source: "U.S. Army", date: "21OCT26" } })
@@ -402,4 +402,70 @@ test("Replace media: the card keeps its printed date when the post date was chan
   await replaceRowMedia(s.deps, "row-0001-abcd", post.create_text!, photo, { email: "a@x.co", name: "A" })
   assert.equal(s.made.at(-1)!.text.date, "21OCT26")
   await assert.rejects(replaceRowMedia(s.deps, "row-0001-abcd", { ...post.create_text!, fields: {} }, photo, { email: "a@x.co", name: "A" }), /printed date/)
+})
+
+// ── One size per platform per row (Step 3 part 5) ──
+const VIDEO = { url: "https://abc.public.blob.vercel-storage.com/content-create/c.mp4", kind: "video" as const, name: "c.mp4", bytes: 1e7, optimized: "done" }
+
+test("each platform's sizes follow the media: a photo is 4:5 on Instagram and Facebook; a video a 9:16 Reel, or a 4:5 Reel", () => {
+  assert.deepEqual(formatChoices("instagram", "photo"), ["feed"])
+  assert.deepEqual(formatChoices("facebook", "photo"), ["feed"])
+  assert.deepEqual(formatChoices("instagram", "video"), ["reels", "feed"], "9:16 Reel first: the default")
+  assert.deepEqual(formatChoices("facebook", "video"), ["reels", "feed"])
+  for (const shape of ["photo", "video"] as const) {
+    assert.deepEqual(formatChoices("tiktok", shape), ["reels"])
+    assert.deepEqual(formatChoices("youtube", shape), ["reels"])
+    assert.deepEqual(formatChoices("linkedin", shape), ["feed"])
+  }
+  assert.equal(choiceLabel("instagram", "reels", "video"), "9:16 Reel")
+  assert.equal(choiceLabel("facebook", "feed", "video"), "4:5 Reel")
+  assert.equal(choiceLabel("instagram", "feed", "photo"), "4:5")
+  assert.equal(mediaShapeOf(null), "photo")
+  assert.equal(mediaShapeOf(VIDEO), "video")
+})
+
+test("ticks are fitted to one size per platform: kept when allowed, the default when not, reset when photo and video swap", () => {
+  const all = CREATE_PLATFORMS.map(p => p.id)
+  assert.deepEqual(normalizePlatforms(all, "photo"), ["instagram_feed", "facebook_feed", "tiktok", "youtube_shorts", "linkedin"])
+  assert.deepEqual(normalizePlatforms(["instagram_feed", "facebook_reels"], "video"), ["instagram_feed", "facebook_reels"], "a 4:5 Reel choice is kept")
+  assert.deepEqual(normalizePlatforms(["instagram_feed", "facebook_feed"], "video", undefined, true), ["instagram_reels", "facebook_reels"], "a new video defaults to 9:16 Reels")
+  assert.deepEqual(normalizePlatforms(["instagram_reels", "tiktok"], "photo"), ["instagram_feed", "tiktok"])
+  assert.deepEqual(normalizePlatforms(["instagram_reels"], "video", f => f === "feed"), ["instagram_feed"], "no 9:16 template: the 4:5 Reel")
+  assert.deepEqual(normalizePlatforms(["tiktok"], "video", f => f === "feed"), [], "TikTok with no 9:16 template is dropped")
+})
+
+test("a row with a platform at two sizes, or at a size its media doesn't take, can't run", () => {
+  const t = news()
+  assert.deepEqual(platformProblems(["instagram_feed", "instagram_reels"], "video"), ["Instagram is ticked at two sizes; a platform gets one size per row"])
+  assert.deepEqual(platformProblems(["facebook_reels"], "photo"), ["Facebook takes a photo at 4:5 only"])
+  assert.deepEqual(platformProblems(["instagram_reels", "facebook_feed", "tiktok", "linkedin"], "video"), [])
+  assert.ok(rowProblems(row({ platforms: ["instagram_feed", "instagram_reels"] }), t).some(p => /two sizes/.test(p)))
+  assert.ok(rowProblems(row({ platforms: ["instagram_reels"] }), t).some(p => /takes a photo at 4:5 only/.test(p)))
+  assert.ok(!rowProblems(row({ media: VIDEO, platforms: ["instagram_reels", "facebook_feed"] }), t).some(p => /size|takes a/.test(p)))
+})
+
+test("Run job: the server refuses two sizes for one platform before anything is made, and stamps the media on each post", async () => {
+  const s = runDeps()
+  await assert.rejects(runCreateRow(s.deps, row({ media: VIDEO, platforms: ["instagram_feed", "instagram_reels"] }), { email: "a@x.co", name: "A" }), (e: unknown) => e instanceof CreateRowError && e.problems.some(p => /two sizes/.test(p)))
+  assert.equal(s.made.length, 0)
+  await runCreateRow(s.deps, row({ platforms: ["instagram_feed", "facebook_feed"] }), { email: "a@x.co", name: "A" })
+  assert.equal([...s.posts.values()][0].create_media, "photo")
+})
+
+test("Replace media: a photo can't replace the video of a 9:16 size that goes to Instagram or Facebook", async (t) => {
+  if (!news().templates.reels) return t.skip("the profile under test has no 9:16 News template")
+  const s = runDeps()
+  const first = await runCreateRow(s.deps, row({ media: VIDEO, platforms: ["instagram_reels", "facebook_reels", "linkedin"] }), { email: "a@x.co", name: "A" })
+  const text = s.posts.get(first.posts[0].postId)!.create_text!
+  const made = s.made.length
+  const photo = { url: "https://abc.public.blob.vercel-storage.com/content-create/p2.jpg", kind: "image" as const, name: "p2.jpg", optimized: "done" }
+  await assert.rejects(replaceRowMedia(s.deps, "row-0001-abcd", text, photo, { email: "a@x.co", name: "A" }), /Reels 9:16 size goes to Instagram and Facebook, which take a photo at 4:5 only/)
+  assert.equal(s.made.length, made, "nothing is made")
+})
+
+test("a video export at Canva's default 5 s page timing is flagged in Review; a full-length one or a photo isn't", () => {
+  assert.match(shortExportHolds("feed", VIDEO, [{ duration: 5 }])[0], /Feed 4:5 video is only 0:05 long: the template's page timing/)
+  assert.deepEqual(shortExportHolds("feed", VIDEO, [{ duration: 42.4 }]), [])
+  assert.deepEqual(shortExportHolds("feed", { kind: "image" }, [{ duration: 5 }]), [], "a photo card exported as MP4 is meant to be short")
+  assert.deepEqual(shortExportHolds("reels", VIDEO, []), [], "a reused export isn't measured again")
 })

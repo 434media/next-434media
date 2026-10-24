@@ -2,8 +2,8 @@ import { BRAND, activeProfile } from "./brand"
 import { SERIES, checkFields, normalizeFields } from "./series"
 import { contentPropertyOf } from "./properties"
 import { pipelineMarked, adoptablePost, PIPELINE_KEY_PREFIX } from "./ownership"
-import { FORMAT_LABEL, createTemplates, ddmmmyy, designText, exportFileBase, formatsOf, rowProblems, type CreateFormat, type CreateRow, type CreateTemplate } from "./create-table"
-import { frozen, isApproved } from "./row-approval"
+import { FORMAT_LABEL, createTemplates, ddmmmyy, designText, exportFileBase, formatsOf, mediaShapeOf, rowProblems, SOCIAL_LABEL, type CreateSocial, type CreateFormat, type CreateRow, type CreateTemplate } from "./create-table"
+import { allowedPlatforms, frozen, isApproved } from "./row-approval"
 import { createHash } from "node:crypto"
 import type { ContentPost, CreateText } from "@/components/crm/types"
 import { canvaEditUrl, type CreateInput, type CreatedDesign } from "../canva-create"
@@ -27,7 +27,7 @@ export interface CreateRunDeps {
   /** The guarded update: a changed caption, date or platforms sends an approved post back for approval. */
   updatePost(id: string, updates: Partial<ContentPost>): Promise<ContentPost>
   /** `rebind`: the post takes a new design in place of its old one (a re-run after the row changed). */
-  attachExports(input: { postId: string; items: { url: string; label: string }[]; canva: { designId: string }; fileBase: string; rebind?: boolean }): Promise<{ holds: string[] }>
+  attachExports(input: { postId: string; items: { url: string; label: string }[]; canva: { designId: string }; fileBase: string; rebind?: boolean }): Promise<{ holds: string[]; assets?: { duration?: number }[] }>
   /**
    * Claims the row for one run, atomically (a Firestore transaction): false while another run of it holds an unexpired
    * lease. Two tabs or a double click can't then fill two designs and stage two Review posts, since the Canva ledger
@@ -42,6 +42,19 @@ export interface CreateRunDeps {
 export interface CreatedPost { format: CreateFormat; postId: string; designId: string; editUrl: string; previewUrl?: string; holds: string[]; reused: boolean }
 export class CreateRowError extends Error {
   constructor(readonly problems: string[], readonly status: 400 | 409 | 502 = 400) { super(problems.join("; ")) }
+}
+
+/**
+ * A video design exported at Canva's default page timing (5 s) most likely cut the clip: the MCU MASTER video templates'
+ * pages were timed at 5 s, not to the video (Step 3 part 5). Our export asks only for MP4 at 1080p; Canva takes the
+ * length from the design's page timing. The Review card says so, so nobody approves a cut clip by mistake.
+ */
+export const SHORT_EXPORT_SEC = 5.05
+export function shortExportHolds(format: CreateFormat, media: Pick<NonNullable<CreateRow["media"]>, "kind"> | null, assets: { duration?: number }[] = []): string[] {
+  const d = assets.find(a => a.duration !== undefined)?.duration
+  return media?.kind === "video" && d !== undefined && d <= SHORT_EXPORT_SEC
+    ? [`The ${FORMAT_LABEL[format]} video is only 0:0${Math.round(d)} long: the template's page timing may have cut the clip. Check it before approving; if it's cut, fix the template's timing in Canva, then Replace media.`]
+    : []
 }
 
 export const createRequestId = (rowId: string, format: CreateFormat) => `${PIPELINE_KEY_PREFIX}create:${rowId}:${format}`
@@ -113,8 +126,8 @@ async function runClaimedRow(deps: CreateRunDeps, row: CreateRow, template: Crea
       } as Omit<ContentPost, "id" | "created_at" | "updated_at">))
     const items = asVideo ? [{ url: urls[0], label: `${format}-video` }] : urls.map((url, n) => ({ url, label: `${format}-page-${n + 1}` }))
     const attached = await deps.attachExports({ postId: post.id, items, canva: { designId: design.designId }, fileBase: exportFileBase(BRAND.id, row.date, row.headline), ...(existing ? { rebind: true } : {}) })
-    await deps.updatePost(post.id, { create_input_hash: inputHash, create_text: createTextOf(row) })
-    posts.push({ format, postId: post.id, designId: design.designId, editUrl: canvaEditUrl(design.designId), previewUrl: design.previewUrls[0], holds: [...attached.holds, ...(design.folderProblem ? [design.folderProblem] : [])], reused: false })
+    await deps.updatePost(post.id, { create_input_hash: inputHash, create_text: createTextOf(row), create_media: mediaShapeOf(row.media) })
+    posts.push({ format, postId: post.id, designId: design.designId, editUrl: canvaEditUrl(design.designId), previewUrl: design.previewUrls[0], holds: [...attached.holds, ...shortExportHolds(format, row.media, attached.assets), ...(design.folderProblem ? [design.folderProblem] : [])], reused: false })
   }
   return posts
 }
@@ -178,6 +191,12 @@ export async function replaceRowMedia(deps: CreateRunDeps, rowId: string, text: 
   if (!made.length) throw new CreateRowError(["Nothing in this row was made from a template; use One-off to attach a finished design"], 409)
   for (const { format, post } of made) if (frozen(post)) throw new CreateRowError([`The ${FORMAT_LABEL[format]} post is already out or publishing; its media can't change`], 409)
   for (const { format, post } of made) if (post.intake?.metaBrand && post.intake.metaBrand !== BRAND.posts.metaBrand) throw new CreateRowError([`The ${FORMAT_LABEL[format]} post belongs to another brand`], 409)
+  // A photo goes to Instagram and Facebook at 4:5 only (Step 3 part 5): a 9:16 size that goes there needs a video.
+  const shape = mediaShapeOf(media)
+  for (const { format, post } of made) {
+    const off = (post.social_platforms ?? []).filter(x => !allowedPlatforms({ ...post, create_media: shape }).includes(x))
+    if (off.length) throw new CreateRowError([`The ${FORMAT_LABEL[format]} size goes to ${off.map(x => SOCIAL_LABEL[x as CreateSocial]).join(" and ")}, which take a ${shape} at 4:5 only. Untick ${off.length > 1 ? "them" : "it"} on that size first, or replace with a video.`])
+  }
   if (!await deps.claimRow(rowId, actor.email)) throw new CreateRowError(["This row is already running (another tab or click); wait for it to finish"], 409)
   try {
     // Every format is checked against its template before anything is made.
@@ -201,8 +220,8 @@ export async function replaceRowMedia(deps: CreateRunDeps, rowId: string, text: 
     for (const { format, post, filled, design, urls, asVideo } of ready) {
       const items = asVideo ? [{ url: urls[0], label: `${format}-video` }] : urls.map((url, n) => ({ url, label: `${format}-page-${n + 1}` }))
       const attached = await deps.attachExports({ postId: post.id, items, canva: { designId: design.designId }, fileBase: exportFileBase(BRAND.id, post.date_to_post ?? "", text.headline), rebind: true })
-      await deps.updatePost(post.id, { create_input_hash: filled.inputHash, create_text: { ...text, fields: { ...text.fields } }, canva_pages: [], profile_version_id: versionId })
-      posts.push({ format, postId: post.id, designId: design.designId, reused: false, holds: [...attached.holds, ...(design.folderProblem ? [design.folderProblem] : [])] })
+      await deps.updatePost(post.id, { create_input_hash: filled.inputHash, create_text: { ...text, fields: { ...text.fields } }, create_media: shape, canva_pages: [], profile_version_id: versionId })
+      posts.push({ format, postId: post.id, designId: design.designId, reused: false, holds: [...attached.holds, ...shortExportHolds(format, media, attached.assets), ...(design.folderProblem ? [design.folderProblem] : [])] })
     }
     return { posts, profileVersionId: versionId }
   } finally { await deps.releaseRow(rowId).catch(err => console.error("[create-run] release failed:", rowId, err)) }

@@ -5,7 +5,7 @@
  */
 import { test } from "node:test"
 import assert from "node:assert/strict"
-import { approvalCovers, approveRow, awaitingApproval, canvaDesignIdFromLink, futureDated, parsePages, resolveCanvaDesignLink, todayIn, exportAs, frozen, platformsFor, prepareChoices, readiness, RowApprovalError, shownOf, type ApproveRowDeps } from "../content-pipeline/row-approval"
+import { allowedPlatforms, platformConflicts, approvalCovers, approveRow, awaitingApproval, canvaDesignIdFromLink, futureDated, parsePages, resolveCanvaDesignLink, todayIn, exportAs, frozen, platformsFor, prepareChoices, readiness, RowApprovalError, shownOf, type ApproveRowDeps } from "../content-pipeline/row-approval"
 import type { ContentPost } from "../../components/crm/types"
 import type { MetaBatch } from "../owned-meta-publisher"
 
@@ -20,6 +20,8 @@ const post = (over: Partial<ContentPost>): ContentPost => ({
 const feed = post({ id: "feed" })
 const reels = post({ id: "reels", create_format: "reels", export_fingerprint: FP_REELS, social_platforms: ["instagram", "facebook", "tiktok"], assets: [{ url: "https://x.public.blob.vercel-storage.com/content-posts/2.mp4", kind: "video", sha256: "s2" }] })
 const linkedin = post({ id: "li", export_fingerprint: FP_LINKEDIN, social_platforms: ["linkedin"], canva_design_id: "DAGli0001" })
+// One size per platform per row (Step 3 part 5): beside a 4:5 that goes to Instagram and Facebook, the 9:16 goes by hand.
+const reelsHand = post({ ...reels, social_platforms: ["tiktok", "youtube"] })
 
 function fakes(rows: ContentPost[], opts: { holds?: Record<string, string>; filesFp?: Record<string, string>; secondRead?: ContentPost[]; failDecide?: string } = {}) {
   const calls: string[] = []
@@ -29,7 +31,7 @@ function fakes(rows: ContentPost[], opts: { holds?: Record<string, string>; file
     prepare: async (id, c) => { calls.push(`prepare:${id}:${c.format}:${c.placements.instagram}/${c.placements.facebook}`); return { id: `b-${id}`, hash: `h-${id}`, manifest: { revision: 1, assets: [{ sha256: id }], captions: c.captions } } as unknown as MetaBatch },
     preflight: b => ({ instagram: opts.holds?.[b.id] ?? null, facebook: null }),
     decide: async (id, rev, hash) => { if (opts.failDecide === id) throw new Error("Review changed"); calls.push(`decide:${id}:${rev}:${hash}`); return {} as MetaBatch },
-    approveHand: async (id, shown) => { calls.push(`hand:${id}:${shown.fingerprint.slice(0, 1)}`) },
+    approveHand: async (id, shown) => { if (opts.failDecide === id) throw new Error("Review changed"); calls.push(`hand:${id}:${shown.fingerprint.slice(0, 1)}`) },
     fingerprintOf: s => opts.filesFp?.[s[0]] ?? rows.find(r => r.id === s[0])!.export_fingerprint!,
   }
   return { deps, calls }
@@ -38,10 +40,13 @@ const shown = (...ps: ContentPost[]) => Object.fromEntries(ps.map(p => [p.id, sh
 const NO_AI = { aiGenerated: false }
 
 test("a row's variations are approved together: publisher manifests prepared, then each approval bound to its hash", async () => {
-  const f = fakes([feed, reels, linkedin])
-  const out = await approveRow(f.deps, "row-0001-abcd", shown(feed, reels, linkedin), NO_AI)
-  assert.deepEqual(f.calls, ["prepare:feed:still:feed/feed", "prepare:reels:video:reels/reels", "decide:feed:1:h-feed", "decide:reels:1:h-reels", "hand:li:c"])
-  assert.deepEqual(out.map(o => `${o.postId}:${o.via}`), ["feed:publisher", "reels:publisher", "li:hand"])
+  const f = fakes([feed, reelsHand, linkedin])
+  const out = await approveRow(f.deps, "row-0001-abcd", shown(feed, reelsHand, linkedin), NO_AI)
+  assert.deepEqual(f.calls, ["prepare:feed:still:feed/feed", "decide:feed:1:h-feed", "hand:reels:b", "hand:li:c"])
+  assert.deepEqual(out.map(o => `${o.postId}:${o.via}`), ["feed:publisher", "reels:publisher", "li:hand"].map(x => x === "reels:publisher" ? "reels:hand" : x))
+  const g = fakes([reels, linkedin])
+  await approveRow(g.deps, "row-0001-abcd", shown(reels, linkedin), NO_AI)
+  assert.deepEqual(g.calls, ["prepare:reels:video:reels/reels", "decide:reels:1:h-reels", "hand:li:c"])
 })
 
 test("nothing is approved unless every variation is ready, and the reasons are named", async () => {
@@ -55,24 +60,24 @@ test("nothing is approved unless every variation is ready, and the reasons are n
 })
 
 test("approval binds what was shown: a changed design, a changed row, or different files read stop it before any approval", async () => {
-  const f = fakes([feed, reels])
-  await assert.rejects(approveRow(f.deps, "r", { ...shown(feed, reels), feed: { ...shownOf(feed), fingerprint: "f".repeat(64) } }, NO_AI), /changed since it was shown/)
-  await assert.rejects(approveRow(f.deps, "r", { ...shown(feed, reels), feed: { ...shownOf(feed), caption: "Old caption." } }, NO_AI), /changed since it was shown/)
-  await assert.rejects(approveRow(f.deps, "r", { ...shown(feed, reels), reels: { ...shownOf(reels), platforms: ["instagram", "facebook"] } }, NO_AI), /changed since it was shown/)
+  const f = fakes([feed, reelsHand])
+  await assert.rejects(approveRow(f.deps, "r", { ...shown(feed, reelsHand), feed: { ...shownOf(feed), fingerprint: "f".repeat(64) } }, NO_AI), /changed since it was shown/)
+  await assert.rejects(approveRow(f.deps, "r", { ...shown(feed, reelsHand), feed: { ...shownOf(feed), caption: "Old caption." } }, NO_AI), /changed since it was shown/)
+  await assert.rejects(approveRow(f.deps, "r", { ...shown(feed, reelsHand), reels: { ...shownOf(reelsHand), platforms: ["tiktok"] } }, NO_AI), /changed since it was shown/)
   await assert.rejects(approveRow(f.deps, "r", shown(feed), NO_AI), /row changed/)
-  const g = fakes([feed, reels], { filesFp: { feed: "0".repeat(64) } })
-  await assert.rejects(approveRow(g.deps, "r", shown(feed, reels), NO_AI), /files read for approval differ/)
+  const g = fakes([feed, reelsHand], { filesFp: { feed: "0".repeat(64) } })
+  await assert.rejects(approveRow(g.deps, "r", shown(feed, reelsHand), NO_AI), /files read for approval differ/)
   assert.ok(!g.calls.some(c => c.startsWith("decide")))
 })
 
 test("a format hold from the publisher's preflight stops the whole row before any approval", async () => {
-  const f = fakes([feed, reels], { holds: { "b-reels": "Instagram Reel export is outside the reviewed limits" } })
-  await assert.rejects(approveRow(f.deps, "r", shown(feed, reels), NO_AI), (e: unknown) => e instanceof RowApprovalError && /Reels 9:16, Instagram/.test(e.problems[0]))
+  const f = fakes([reels, linkedin], { holds: { "b-reels": "Instagram Reel export is outside the reviewed limits" } })
+  await assert.rejects(approveRow(f.deps, "r", shown(reels, linkedin), NO_AI), (e: unknown) => e instanceof RowApprovalError && /Reels 9:16, Instagram/.test(e.problems[0]))
   assert.ok(!f.calls.some(c => c.startsWith("decide")))
 })
 
 test("a variation with no platforms stays out; approved ones aren't approved twice", async () => {
-  const off = post({ id: "off", social_platforms: [] }), done = post({ id: "done", status: "approved", owned_meta: { batchId: "b", hash: "h", started: false } })
+  const off = post({ id: "off", social_platforms: [] }), done = post({ id: "done", status: "approved", social_platforms: ["linkedin"], approvals: [{ decision: "approved", by_name: "A", by_email: "a@x.co", at: "t", export_fingerprint: FP_FEED }] })
   const f = fakes([feed, off, done])
   await approveRow(f.deps, "r", shown(feed), NO_AI)
   assert.deepEqual(f.calls, ["prepare:feed:still:feed/feed", "decide:feed:1:h-feed"])
@@ -81,14 +86,14 @@ test("a variation with no platforms stays out; approved ones aren't approved twi
 
 test("an edit made after the manifests were prepared stops the row before any approval", async () => {
   const edited = post({ id: "feed", social_copy: "Edited by someone else." })
-  const f = fakes([feed, reels], { secondRead: [edited, reels] })
-  await assert.rejects(approveRow(f.deps, "r", shown(feed, reels), NO_AI), /changed since it was shown/)
+  const f = fakes([feed, reelsHand], { secondRead: [edited, reelsHand] })
+  await assert.rejects(approveRow(f.deps, "r", shown(feed, reelsHand), NO_AI), /changed since it was shown/)
   assert.ok(!f.calls.some(c => c.startsWith("decide")))
 })
 
 test("a failure while approving says what was approved", async () => {
-  const f = fakes([feed, reels], { failDecide: "reels" })
-  await assert.rejects(approveRow(f.deps, "r", shown(feed, reels), NO_AI), /Approved before it stopped: Feed 4:5/)
+  const f = fakes([feed, reelsHand], { failDecide: "reels" })
+  await assert.rejects(approveRow(f.deps, "r", shown(feed, reelsHand), NO_AI), /Approved before it stopped: Feed 4:5/)
 })
 
 test("an approval covers the current files: a hand approval must name them; anything already out is frozen", () => {
@@ -154,4 +159,27 @@ test("pages for a format, and a post dated after today", () => {
   assert.equal(futureDated({ date_to_post: "2026-10-22" }, "2026-10-21"), true)
   assert.equal(futureDated({ date_to_post: "2026-10-21" }, "2026-10-21"), false)
   assert.equal(futureDated({ date_to_post: undefined }, "2026-10-21"), false)
+})
+
+// ── One size per platform per row (Step 3 part 5) ──
+test("approval refuses a row that would send two sizes to one platform, before any manifest, and on the second read", async () => {
+  const f = fakes([feed, reels])
+  await assert.rejects(approveRow(f.deps, "r", shown(feed, reels), NO_AI), (e: unknown) => e instanceof RowApprovalError && e.problems.some(p => /Instagram is ticked on Feed 4:5 and Reels 9:16/.test(p)) && e.problems.some(p => /^Facebook/.test(p)))
+  assert.deepEqual(f.calls, [], "nothing is prepared or approved")
+  // Someone ticks Instagram on the 9:16 while the row is being approved.
+  const g = fakes([feed, reelsHand], { secondRead: [feed, { ...reelsHand, social_platforms: ["tiktok", "youtube"] }, post({ id: "one-off", social_platforms: ["instagram"], status: "posted" })] })
+  await assert.rejects(approveRow(g.deps, "r", shown(feed, reelsHand), NO_AI), /Instagram is ticked on 2 Feed 4:5 designs/)
+  assert.ok(!g.calls.some(c => c.startsWith("decide")))
+})
+
+test("platform conflicts count what is already out and the drawer's unsaved ticks; a photo's 9:16 never offers Instagram or Facebook", () => {
+  const out = post({ id: "out", status: "posted", social_platforms: ["instagram", "facebook"] })
+  assert.equal(platformConflicts([out, reelsHand]).length, 0)
+  assert.equal(platformConflicts([out, reels]).length, 2, "a size already out still holds its platforms")
+  assert.deepEqual(platformConflicts([feed, reelsHand], { reels: ["instagram", "tiktok"] }), ["Instagram is ticked on Feed 4:5 and Reels 9:16; a platform gets one size per row, so untick it on one"])
+  assert.deepEqual(platformConflicts([feed, { ...reels, archived: true }]), [], "an archived size doesn't count")
+  assert.deepEqual(allowedPlatforms({ create_format: "reels", create_media: "photo" }), ["tiktok", "youtube"])
+  assert.deepEqual(allowedPlatforms({ create_format: "reels", create_media: "video" }), ["instagram", "facebook", "tiktok", "youtube"])
+  assert.deepEqual(allowedPlatforms({ create_format: "feed", create_media: "photo" }), ["instagram", "facebook", "linkedin"])
+  assert.deepEqual(allowedPlatforms({ create_format: "reels" }), ["instagram", "facebook", "tiktok", "youtube"], "an older post allows all")
 })

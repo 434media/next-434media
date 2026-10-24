@@ -4,7 +4,7 @@ import { requireContentRunner } from "../../../content-pipeline/auth"
 import { getContentPostsByCreateRow, updateContentPost, ownedMetaStore, decideOwnedMeta, approveHandPost, recordHandPost } from "@/lib/firestore-crm"
 import { MetaBlocked } from "@/lib/owned-meta-publisher"
 import { exportFileBase, isHandPosted, FORMAT_LABEL, type CreateFormat } from "@/lib/content-pipeline/create-table"
-import { approveRow, exportAs, formatOf, frozen, futureDated, isApproved, platformsFor, resolveCanvaDesignLink, RowApprovalError } from "@/lib/content-pipeline/row-approval"
+import { allowedPlatforms, approveRow, exportAs, formatOf, frozen, futureDated, isApproved, platformConflicts, platformsFor, resolveCanvaDesignLink, RowApprovalError } from "@/lib/content-pipeline/row-approval"
 import { CreateRowError, createRequestId } from "@/lib/content-pipeline/create-run"
 import { isCreateUpload } from "@/lib/content-pipeline/create-media"
 import { createProfile } from "../../profile"
@@ -110,7 +110,7 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ rowId: st
     const updates: Partial<ContentPost> = {}
     const platforms = edit.platforms?.[p.id]
     if (platforms && [...new Set(platforms)].sort().join() !== [...(p.social_platforms ?? [])].sort().join()) {
-      const bad = platforms.filter(x => !platformsFor(formatOf(p)).includes(x))
+      const bad = platforms.filter(x => !allowedPlatforms(p).includes(x))
       if (bad.length) return refuse(`${FORMAT_LABEL[formatOf(p)]} can't go to ${bad.join(", ")}`, 400)
       if (frozen(p)) return refuse(`${FORMAT_LABEL[formatOf(p)]} is already out or publishing; its platforms can't change`, 409)
       updates.social_platforms = [...new Set(platforms)] as SocialPlatform[]
@@ -125,6 +125,9 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ rowId: st
     if (Object.keys(updates).length && isApproved(p) && !p.owned_meta) updates.status = "needs_approval"
     if (Object.keys(updates).length) plan.push({ post: p, updates })
   }
+  // One size per platform per row (Step 3 part 5): an edit that would put a platform on two sizes is refused whole.
+  const conflicts = platformConflicts(posts, Object.fromEntries(plan.filter(x => x.updates.social_platforms).map(x => [x.post.id, x.updates.social_platforms!])))
+  if (conflicts.length) return NextResponse.json({ error: conflicts.join("; "), problems: conflicts }, { status: 409 })
   try {
     for (const { post, updates } of plan) await updateContentPost(post.id, updates)
     return NextResponse.json(await rowView(rowId))
@@ -197,14 +200,16 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ rowId: str
         if (!post) {
           // A new variation in this row, from the row's own values: its title is the row's (the board shows the format).
           const base = posts[0], now = new Date().toISOString()
-          const allowed = platformsFor(format)
-          const platforms = (base.social_platforms ?? []).filter(x => allowed.includes(x))
+          // It takes only the row's platforms no other size goes to (one size per platform per row); with none, it
+          // stays in Review until a platform is moved to it.
+          const allowed = platformsFor(format).filter(x => !posts.some(p => (p.social_platforms ?? []).includes(x)))
+          const platforms = [...new Set(posts.flatMap(p => p.social_platforms ?? []))].filter(x => allowed.includes(x))
           post = await crm.createContentPost(pipelineMarked({
             user: base.user, date_created: now.slice(0, 10), platform: base.platform ?? "", status: "needs_approval",
             title: base.title.replace(/ · (Feed 4:5|Reels 9:16)/, "").slice(0, 200),
             notes: `Attached by link in the approval drawer (Canva design ${designId}${target.pages ? `, page ${target.pages.join(", ")}` : ""}).`,
             social_copy: base.social_copy ?? "", links: base.links ?? [], assets: [], tags: base.tags,
-            social_platforms: platforms.length ? platforms : ["instagram", "facebook"], date_to_post: base.date_to_post,
+            social_platforms: platforms, date_to_post: base.date_to_post,
             ...(base.profile_version_id ? { profile_version_id: base.profile_version_id } : {}),
             create_row_id: rowId, create_format: format, ...(target.pages ? { canva_pages: target.pages } : {}),
             intake: { requestId: `${createRequestId(rowId, format)}:link:${designId}${target.pages ? `:p${target.pages.join("-")}` : ""}`, metaBrand: base.intake?.metaBrand ?? "", requestedBy: email, at: now },
@@ -266,6 +271,9 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ rowId: str
     if (body.action === "publish") {
       const post = inRow(body.postId)
       if (!post?.owned_meta) return refuse("This variation has no approved publisher manifest", 409)
+      // One size per platform per row: never a second variation of the row to the same platform.
+      const conflicts = platformConflicts(posts)
+      if (conflicts.length) return NextResponse.json({ ...(await rowView(rowId)), error: conflicts.join("; "), problems: conflicts }, { status: 409 })
       const { executeOwnedMeta, recordOwnedMetaFailure } = await import("@/lib/owned-meta-execution")
       const store = ownedMetaStore(), record = await store.read(post.id)
       if (record.batch.hash !== body.hash || !record.batch.approval) return refuse("The approved version changed; reload", 409)
