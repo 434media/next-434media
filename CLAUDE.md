@@ -41,8 +41,9 @@ specifies. For an owned property such as MilCityUSA, TXMX Boxing or VemosVamos,
 or for a client brand, that brand's own identity governs (MilCityUSA's is
 `docs/context/06 Standards/Brand Profiles/MilCityUSA_Visual_Standard.md`), and
 the 434 system applies only where the 434 mark itself appears. Where no
-surface-specific subsection exists, use the simplest provisional treatment and do
-not represent it as a standard. This is a pointer: the rules and values live in
+surface-specific subsection exists, build the simplest provisional treatment and,
+in the same task, write that surface's subsection marked Provisional, as §1.1
+sets out; where one exists, start from it. This is a pointer: the rules and values live in
 those documents and are deliberately not restated here.
 
 **After any merge that touches CSS, verify the served stylesheet.** Fetch the
