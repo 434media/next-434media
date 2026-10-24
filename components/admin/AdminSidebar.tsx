@@ -26,6 +26,7 @@ import {
   Settings,
   Globe,
   LayoutDashboard,
+  Palette,
 } from "lucide-react"
 import type { LucideIcon } from "lucide-react"
 import type { SquadKey } from "@/components/crm/types"
@@ -292,6 +293,14 @@ const SIDEBAR_SECTIONS: SidebarSection[] = [
         href: "/admin/sops",
         matchPrefix: "/admin/sops",
         roles: ["full_admin", "intern"],
+      },
+      {
+        id: "brand-book",
+        label: "Brand book",
+        icon: Palette,
+        href: "/admin/brand",
+        matchPrefix: "/admin/brand",
+        roles: ["full_admin", "crm_only"],
       },
     ],
   },
