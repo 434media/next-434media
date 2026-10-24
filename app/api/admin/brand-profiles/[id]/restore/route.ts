@@ -1,4 +1,4 @@
-import { NextResponse, after, type NextRequest } from "next/server"
+import { NextResponse, type NextRequest } from "next/server"
 import { z } from "zod4"
 import { requireSuperAdmin } from "../../../content-pipeline/auth"
 import { BRAND_ID } from "@/lib/content-pipeline/profile-store"
@@ -21,12 +21,11 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
   const parsed = input.safeParse(await req.json().catch(() => null))
   if (!parsed.success) return NextResponse.json({ error: "Send {versionId}, e.g. milcity@v1" }, { status: 400 })
   try {
-    const [{ firestoreBrandProfiles }, { backupPublished }] = await Promise.all([import("@/lib/firestore-brand-profiles"), import("@/lib/content-pipeline/profile-backup")])
+    const { firestoreBrandProfiles } = await import("@/lib/firestore-brand-profiles")
     const store = firestoreBrandProfiles()
     const result = await store.restore(id, parsed.data.versionId, auth.session.email.toLowerCase(), new Date().toISOString(), parsed.data.force)
     if (!result.ok) return NextResponse.json({ error: "That version cannot be restored", problems: result.problems }, { status: result.problems[0]?.startsWith("no ") ? 404 : 400 })
     const v = result.version
-    after(async () => { await backupPublished(v, b => store.markBackup(id, v.n, b)) })
     return NextResponse.json({ ok: true, versionId: v.version_id, restoredFrom: v.restored_from, publishedAt: v.published_at })
   } catch (err) {
     console.error("[POST /api/admin/brand-profiles/[id]/restore]", err)

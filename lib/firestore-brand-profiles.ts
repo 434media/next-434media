@@ -1,7 +1,7 @@
 import { getDb } from "./firebase-admin"
 import { CRM_COLLECTIONS } from "../types/crm-types"
 import { profileProblems, type BrandProfile } from "./content-pipeline/profile"
-import { preparePublish, versionDocId, BRAND_ID, MAX_PROFILE_BYTES, type BackupState, type BrandProfileDoc, type ProfileExamples, type ProfileVersion, type PublishResult } from "./content-pipeline/profile-store"
+import { preparePublish, versionDocId, BRAND_ID, MAX_PROFILE_BYTES, type BrandProfileDoc, type ProfileExamples, type ProfileVersion, type PublishResult } from "./content-pipeline/profile-store"
 import type { ActiveProfile } from "./content-pipeline/brand"
 
 /**
@@ -51,7 +51,8 @@ export interface BrandProfileStore {
   restore(id: string, versionId: string, actor: string, at: string, force?: boolean): Promise<PublishResult>
   /** Every published version, newest first. */
   versions(id: string): Promise<ProfileVersion[]>
-  markBackup(id: string, n: number, backup: BackupState): Promise<void>
+  /** The published versions numbered above `n`, oldest first: what the 434-context backup does not hold yet. */
+  versionsAfter(id: string, n: number): Promise<ProfileVersion[]>
 }
 
 export function firestoreBrandProfiles(db: FirebaseFirestore.Firestore = getDb()): BrandProfileStore {
@@ -106,14 +107,7 @@ export function firestoreBrandProfiles(db: FirebaseFirestore.Firestore = getDb()
       return result
     }),
     versions: async id => (await col.doc(id).collection(VERSIONS).orderBy("n", "desc").get()).docs.map(d => d.data() as ProfileVersion),
-    markBackup: async (id, n, backup) => {
-      await col.doc(id).collection(VERSIONS).doc(versionDocId(n)).update({ backup: clean(backup) })
-      // The document's copy of the published version carries the same state while it is the published one.
-      await db.runTransaction(async tx => {
-        const ref = col.doc(id), cur = (await tx.get(ref)).data()
-        if (cur?.published?.n === n) tx.update(ref, { "published.backup": clean(backup) })
-      })
-    },
+    versionsAfter: async (id, n) => (await col.doc(id).collection(VERSIONS).where("n", ">", n).orderBy("n", "asc").get()).docs.map(d => d.data() as ProfileVersion),
   }
 }
 

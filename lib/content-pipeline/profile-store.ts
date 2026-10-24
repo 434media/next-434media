@@ -31,7 +31,6 @@ export interface ProfileIdentity {
 export interface ProfileDraft { profile: unknown; examples: ProfileExamples; updated_by: string; updated_at: string }
 /** platform → format (feed | reels) → series → Canva brand template id. Derived from the profile's series on Publish. */
 export type TemplateMap = Record<ProfilePlatform, Record<"feed" | "reels", Partial<Record<SeriesKey, string>>>>
-export interface BackupState { status: "pending" | "done" | "failed"; path?: string; commit?: string; at?: string; error?: string }
 export interface ProfileVersion {
   /** "<brand>@v<n>": stamped on every post written under this version (crm_content_posts.profile_version_id). */
   version_id: string
@@ -45,7 +44,6 @@ export interface ProfileVersion {
   published_by: string
   published_at: string
   restored_from: string | null
-  backup: BackupState
 }
 export interface BrandProfileDoc {
   id: string
@@ -142,7 +140,7 @@ export function preparePublish(doc: BrandProfileDoc, actor: string, at: string, 
   const profile = draft.profile as BrandProfile, n = (doc.last_version || 0) + 1
   const version: ProfileVersion = {
     version_id: versionIdOf(doc.id, n), brand_id: doc.id, n, profile, examples: draft.examples, template_map: templateMap(profile),
-    profile_sha256: profileSha256(profile), published_by: actor, published_at: at, restored_from: opts.restoredFrom ?? null, backup: { status: "pending" },
+    profile_sha256: profileSha256(profile), published_by: actor, published_at: at, restored_from: opts.restoredFrom ?? null,
   }
   // A restore also becomes the draft, so the next edit starts from what is live.
   const nextDraft = opts.restoredFrom ? { profile, examples: draft.examples, updated_by: actor, updated_at: at } : doc.draft

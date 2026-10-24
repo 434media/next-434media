@@ -1,63 +1,93 @@
-import { versionDocId, type BackupState, type ProfileVersion } from "./profile-store"
+import { createHash, timingSafeEqual } from "node:crypto"
+import { versionDocId, BRAND_ID, type ProfileVersion } from "./profile-store"
 
 /**
- * The record of each published profile version in 434-context (plan v11, Step 1, item 6). 434-context is no longer
- * where profiles are edited; it keeps a copy of every version as published, for the record.
+ * The record of each published profile version in 434-context (plan v11.1, Step 2b). 434-context is no longer where
+ * profiles are edited; it keeps a copy of every version as published, for the record.
  *
- * The copy is committed to a records branch (BACKUP_BRANCH) of the private 434-context repository through the GitHub
- * contents API, with a token in BACKUP_TOKEN_ENV that may write to that repository's contents. Commits land on the
- * branch, never on main: they reach main through a pull request the founder merges, as every 434-context record does.
- * Without the token the version keeps backup.status "pending", and `scripts/brand-profiles/profile.ts backup-pending`
- * writes the pending versions to a local 434-context worktree for a working session to commit by pull request.
+ * The site holds no token that can write to 434-context (founder, 2026-10-19: "No backup token on the site"). 434-context
+ * pulls instead: a daily workflow there finds the highest v<n>.json it already has for each brand, asks the read-only
+ * endpoint GET /api/brand-profiles/backups for the newer versions, writes each record to backupPath and opens a pull
+ * request, so the founder's merge stays the approval. Nothing is written back: what is backed up is what 434-context
+ * holds. The endpoint is gated by its own read-only credential (BACKUP_READ_TOKEN_ENV), separate from the admin session.
  */
-export const BACKUP_TOKEN_ENV = "BRAND_PROFILE_BACKUP_GITHUB_TOKEN"
-export const BACKUP_REPO = "434media/434-context"
-export const BACKUP_BRANCH = "records/brand-profile-backups"
+export const BACKUP_READ_TOKEN_ENV = "BRAND_PROFILE_BACKUP_READ_TOKEN"
+/** A configured credential shorter than this is treated as unset: the endpoint refuses rather than accept a weak one. */
+export const MIN_READ_TOKEN_LENGTH = 32
 export const backupPath = (v: Pick<ProfileVersion, "brand_id" | "n">) => `06 Standards/Brand Profiles/Published/${v.brand_id}/${versionDocId(v.n)}.json`
 
-/** The backed-up record: the version as published, newline-terminated, keys in a stable order. */
+/** The backed-up record: the version as published, newline-terminated, keys in a stable order. Versions published
+ * before Step 2b still carry a stored `backup` status field; it is not part of the record. */
 export function backupRecord(v: ProfileVersion): string {
-  const rest: Partial<ProfileVersion> = { ...v }
+  const rest: Partial<ProfileVersion> & { backup?: unknown } = { ...v }
   delete rest.backup
   return `${JSON.stringify({ record: "434 brand profile, published version (backup; the database is the source)", ...rest }, null, 2)}\n`
 }
 
-type Fetch = typeof fetch
-export async function backupToGitHub(v: ProfileVersion, token: string, f: Fetch = fetch, now = () => new Date().toISOString()): Promise<BackupState> {
-  const api = `https://api.github.com/repos/${BACKUP_REPO}`
-  const headers = { authorization: `Bearer ${token}`, accept: "application/vnd.github+json", "x-github-api-version": "2022-11-28", "content-type": "application/json" }
-  const call = async (method: string, url: string, body?: unknown) => {
-    const r = await f(url, { method, headers, ...(body ? { body: JSON.stringify(body) } : {}) })
-    return { status: r.status, json: (await r.json().catch(() => ({}))) as Record<string, unknown> }
+/** One version as the endpoint lists it: where it goes in 434-context and the exact bytes to write there. */
+export interface BackupEntry { brand_id: string; n: number; version_id: string; path: string; record: string }
+export const backupEntry = (v: ProfileVersion): BackupEntry => ({ brand_id: v.brand_id, n: v.n, version_id: v.version_id, path: backupPath(v), record: backupRecord(v) })
+
+/**
+ * `after=milcity:4,txmx:0` → { milcity: 4, txmx: 0 }: the highest version 434-context holds per brand. A brand not
+ * named starts from 0, so a new brand's versions are all listed. Anything malformed returns null (400).
+ */
+export function parseAfter(raw: string | null): Record<string, number> | null {
+  const after: Record<string, number> = {}
+  if (!raw) return after
+  for (const part of raw.split(",")) {
+    const m = /^([a-z][a-z0-9-]{1,30}):(\d{1,6})$/.exec(part.trim())
+    if (!m || !BRAND_ID.test(m[1]) || m[1] in after) return null
+    after[m[1]] = Number(m[2])
   }
-  const path = backupPath(v)
-  try {
-    // The records branch, created from main the first time.
-    const branch = await call("GET", `${api}/git/ref/heads/${BACKUP_BRANCH}`)
-    if (branch.status === 404) {
-      const main = await call("GET", `${api}/git/ref/heads/main`)
-      const sha = (main.json.object as { sha?: string } | undefined)?.sha
-      if (!sha) throw new Error(`could not read main (${main.status})`)
-      const made = await call("POST", `${api}/git/refs`, { ref: `refs/heads/${BACKUP_BRANCH}`, sha })
-      if (made.status !== 201) throw new Error(`could not create ${BACKUP_BRANCH} (${made.status})`)
-    } else if (branch.status !== 200) throw new Error(`could not read ${BACKUP_BRANCH} (${branch.status})`)
-    const url = `${api}/contents/${path.split("/").map(encodeURIComponent).join("/")}`
-    const content = Buffer.from(backupRecord(v)).toString("base64")
-    const existing = await call("GET", `${url}?ref=${encodeURIComponent(BACKUP_BRANCH)}`)
-    if (existing.status === 200 && typeof existing.json.content === "string" && existing.json.content.replace(/\n/g, "") === content) return { status: "done", path, at: now() }
-    const put = await call("PUT", url, { message: `Brand profile backup: ${v.version_id} (published by ${v.published_by}, ${v.published_at})`, content, branch: BACKUP_BRANCH, ...(existing.status === 200 ? { sha: existing.json.sha } : {}) })
-    if (put.status !== 200 && put.status !== 201) throw new Error(`commit failed (${put.status})`)
-    return { status: "done", path, commit: String((put.json.commit as { sha?: string } | undefined)?.sha ?? ""), at: now() }
-  } catch (err) {
-    return { status: "failed", path, at: now(), error: (err instanceof Error ? err.message : String(err)).slice(0, 300) }
-  }
+  return after
 }
 
-/** Backs up a just-published version when the token is set; otherwise it stays pending. Never throws. */
-export async function backupPublished(v: ProfileVersion, mark: (backup: BackupState) => Promise<void>, env: Record<string, string | undefined> = process.env): Promise<BackupState> {
-  const token = env[BACKUP_TOKEN_ENV]
-  if (!token) return v.backup
-  const state = await backupToGitHub(v, token)
-  await mark(state).catch(err => console.error("[brand-profiles] backup state not saved", v.version_id, err))
-  return state
+/**
+ * Whether the request carries the read credential. Both sides are hashed first, so the comparison is constant-time
+ * and equal-length whatever the caller sends, and neither the length nor a prefix of the secret leaks. "unset" when
+ * the credential is missing or too short: the endpoint then refuses everyone.
+ */
+export function readTokenCheck(authorization: string | null, env: Record<string, string | undefined> = process.env): "ok" | "denied" | "unset" {
+  const expected = env[BACKUP_READ_TOKEN_ENV]
+  if (!expected || expected.length < MIN_READ_TOKEN_LENGTH) return "unset"
+  const bearer = /^Bearer (\S+)$/.exec(authorization ?? "")?.[1]
+  if (!bearer) return "denied"
+  const digest = (s: string) => createHash("sha256").update(s).digest()
+  return timingSafeEqual(digest(bearer), digest(expected)) ? "ok" : "denied"
+}
+
+/** What the endpoint reads: the brands, and each brand's versions above a number. Reads only. */
+export interface BackupSource {
+  list(): Promise<{ id: string }[]>
+  versionsAfter(id: string, n: number): Promise<ProfileVersion[]>
+}
+
+const json = (body: unknown, status: number) => Response.json(body, { status, headers: { "cache-control": "no-store" } })
+
+/**
+ * GET /api/brand-profiles/backups?after=milcity:4 with `Authorization: Bearer <BRAND_PROFILE_BACKUP_READ_TOKEN>`:
+ * every published version above the given numbers, all brands, oldest first per brand, each as its backup record.
+ * 503 when the credential is not configured (refused for everyone), 401 for a wrong or missing one, 400 for a
+ * malformed `after`, 500 when the database read fails. It writes nothing and sends no CORS headers.
+ */
+export async function serveBackups(req: Request, source: () => Promise<BackupSource>, env: Record<string, string | undefined> = process.env): Promise<Response> {
+  const check = readTokenCheck(req.headers.get("authorization"), env)
+  if (check === "unset") {
+    console.error(`[GET /api/brand-profiles/backups] ${BACKUP_READ_TOKEN_ENV} is not set (or shorter than ${MIN_READ_TOKEN_LENGTH}); refusing`)
+    return json({ error: "Backup endpoint not configured" }, 503)
+  }
+  if (check === "denied") return json({ error: "Unauthorized" }, 401)
+  const after = parseAfter(new URL(req.url).searchParams.get("after"))
+  if (!after) return json({ error: "after must look like milcity:4,txmx:0" }, 400)
+  try {
+    const store = await source()
+    const brands = (await store.list()).map(d => d.id).filter(id => BRAND_ID.test(id)).sort()
+    const versions: BackupEntry[] = []
+    for (const id of brands) for (const v of await store.versionsAfter(id, after[id] ?? 0)) versions.push(backupEntry(v))
+    return json({ versions }, 200)
+  } catch (err) {
+    console.error("[GET /api/brand-profiles/backups]", err)
+    return json({ error: "Could not read brand profiles" }, 500)
+  }
 }

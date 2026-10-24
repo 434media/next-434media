@@ -169,10 +169,16 @@ history is not rewritten.
   skill's 30-second cache.
 - **Stamped.** Every post the pipeline writes carries `profile_version_id`
   (`milcity@v1`) on `crm_content_posts`.
-- **Backed up as a record.** Each published version is committed to the
-  `records/brand-profile-backups` branch of 434-context when
-  `BRAND_PROFILE_BACKUP_GITHUB_TOKEN` is set; otherwise its backup stays
-  `pending` and `profile.ts backup-pending` writes it out for a pull request.
+- **Backed up as a record, pulled by 434-context.** The site holds no token
+  that can write to 434-context (founder, 2026-10-19: "No backup token on the
+  site"; plan v11.1 Step 2b). A daily workflow in 434-context finds the highest
+  `06 Standards/Brand Profiles/Published/<id>/v<n>.json` it holds, calls the
+  read-only `GET /api/brand-profiles/backups?after=<id>:<n>` (gated by its own
+  credential, `BRAND_PROFILE_BACKUP_READ_TOKEN`, not the admin session), writes
+  each newer record and opens a pull request; the founder's merge is the
+  approval. Nothing is written back, so versions carry no backup status (older
+  ones still have a stored `backup` field; it is ignored). Don't reintroduce a
+  write path from the site to 434-context.
   434-context is no longer where profiles are edited, and its
   `brand_profile_extract.py` is no longer the way in.
 - **Tests run on an invented fixture.** By default the content-pipeline and

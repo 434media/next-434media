@@ -15,7 +15,7 @@ export async function GET(_req: NextRequest, ctx: { params: Promise<{ id: string
     const { firestoreBrandProfiles } = await import("@/lib/firestore-brand-profiles")
     const store = firestoreBrandProfiles(), doc = await store.get(id)
     if (!doc) return NextResponse.json({ error: "No profile for that brand" }, { status: 404 })
-    const versions = (await store.versions(id)).map(v => ({ versionId: v.version_id, n: v.n, profileVersion: v.profile.profileVersion, sha256: v.profile_sha256, publishedBy: v.published_by, publishedAt: v.published_at, restoredFrom: v.restored_from, backup: v.backup }))
+    const versions = (await store.versions(id)).map(v => ({ versionId: v.version_id, n: v.n, profileVersion: v.profile.profileVersion, sha256: v.profile_sha256, publishedBy: v.published_by, publishedAt: v.published_at, restoredFrom: v.restored_from }))
     return NextResponse.json({ doc, versions }, { headers: { "cache-control": "private, no-store" } })
   } catch (err) {
     console.error("[GET /api/admin/brand-profiles/[id]]", err)
