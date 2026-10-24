@@ -32,11 +32,6 @@
   ],
   "pending": [
     {
-      "path": ".claude/skills/meta-account-governance/SKILL.md",
-      "sha256": "e2af8ab1de068939a3fa7c399ae84613b6b176be16ce6b05d6e594acd99e28ce",
-      "reason": "The company's account-recovery mailbox in an example ownership record. Not a person's address, but not public either; the skill is moving out of this repository (next-434media #242)."
-    },
-    {
       "path": "lib/__tests__/lead-with-ops-feedback.test.ts",
       "sha256": "fb66f19a6999c0ef9015857ec190473121a2d69ae0fa0add98b8bba696ba8f4c",
       "reason": "A partner's business address that call requests are routed to. Functional; should move to an environment variable or Firestore setting. Founder decision."

@@ -41,7 +41,7 @@ import {
 const argv = process.argv.slice(2)
 const flag = (name: string) => { const i = argv.indexOf(name); return i >= 0 ? argv[i + 1] : undefined }
 const APPLY = argv.includes("--apply")
-/** origin/main when the files were removed (next-434media #241's merge). */
+/** The last main commit that still has both files: #241's merge, which this branch was cut from. */
 const FROM_COMMIT = flag("--from-commit") ?? "49edb0c"
 
 const EVENT_SLUG = "sa-tech-day-2026"
