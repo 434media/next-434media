@@ -32,6 +32,19 @@ pull request; a direct commit to `main` needs explicit founder approval (master 
 register IMP-31). Present the diff and wait for a call. One designated writer per task: if another
 agent already holds a task or branch, report the conflict rather than writing alongside it.
 
+**Before building or materially revising anything anyone will look at, run the
+artifact preflight** in §1.1 of the Display and Design Standard
+(`docs/context/00 Governing/434_Display_and_Design_Standard.md`). It applies to
+every surface, not only the Work page. For a 434-branded surface, the visual
+authority is `docs/context/07 Visual System/` — do not derive a value it already
+specifies. For an owned property such as MilCityUSA, TXMX Boxing or VemosVamos,
+or for a client brand, that brand's own identity governs (MilCityUSA's is
+`docs/context/06 Standards/Brand Profiles/MilCityUSA_Visual_Standard.md`), and
+the 434 system applies only where the 434 mark itself appears. Where no
+surface-specific subsection exists, use the simplest provisional treatment and do
+not represent it as a standard. This is a pointer: the rules and values live in
+those documents and are deliberately not restated here.
+
 **After any merge that touches CSS, verify the served stylesheet.** Fetch the
 deployed HTML, read the stylesheet path out of it — on this project
 `/_next/static/immutable/chunks/*.css`, *not* `/_next/static/css/` — and grep
@@ -314,6 +327,7 @@ than once.
 | Pricing Architecture | `docs/context/00 Governing/434_Pricing_Architecture.md` |
 | Process Log & SOP | `docs/context/00 Governing/434_Process_Log_and_SOP.md` |
 | Display and Design Standard | `docs/context/00 Governing/434_Display_and_Design_Standard.md` — the only source; not copied into this repo. See [docs/standards/README.md](docs/standards/README.md) |
+| Visual System (434's own brand) | `docs/context/07 Visual System/` — read `source/434-visual-system-final-spec.md` first |
 | Engagement Handoff (historical) | `docs/context/00 Governing/HANDOFF.md` |
 | Voice router | `docs/context/01 Voice System/00-VOICE-ROUTER.md` |
 | Brand voice | `docs/context/01 Voice System/01-434-MEDIA-BRAND-VOICE.md` |
