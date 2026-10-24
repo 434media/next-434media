@@ -506,7 +506,7 @@ function Detail({ record, onClose }: { record: WorkRecord; onClose: () => void }
           ) : null}
           {record.role ? (
             <div className={styles.dialogRow}>
-              <p className="t-label">434 MEDIA role</p>
+              <p className="t-label">434 MEDIA</p>
               <p className="t-body">{record.role}</p>
             </div>
           ) : null}
