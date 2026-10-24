@@ -43,6 +43,67 @@ export function formatsOf(platformIds: readonly string[]): { format: CreateForma
   return (["feed", "reels"] as const).map(format => ({ format, platforms: picked.filter(p => p.format === format).map(p => p.platform) })).filter(f => f.platforms.length)
 }
 
+export type CreateSocial = CreatePlatform["platform"]
+/** The social platforms in the order the table lists them, each once. */
+export const CREATE_SOCIALS: readonly CreateSocial[] = [...new Set(CREATE_PLATFORMS.map(p => p.platform))]
+export const SOCIAL_LABEL: Record<CreateSocial, string> = { instagram: "Instagram", facebook: "Facebook", tiktok: "TikTok", youtube: "YouTube Shorts", linkedin: "LinkedIn" }
+/** What the row's media is: a video, or a photo (a template with no media field makes a still card, like a photo). */
+export type MediaShape = "photo" | "video"
+export const mediaShapeOf = (media: Pick<RowMedia, "kind"> | null | undefined): MediaShape => media?.kind === "video" ? "video" : "photo"
+
+/**
+ * One format per platform per row (Step 3 part 5): the sizes a platform takes for the row's media, the default first.
+ * Instagram and Facebook take a photo at 4:5, and a video as a 9:16 Reel or, as the alternative, at 4:5; TikTok and
+ * YouTube Shorts take 9:16 only; LinkedIn takes 4:5.
+ */
+export function formatChoices(platform: CreateSocial, shape: MediaShape): CreateFormat[] {
+  if (platform === "instagram" || platform === "facebook") return shape === "video" ? ["reels", "feed"] : ["feed"]
+  return CREATE_PLATFORMS.filter(p => p.platform === platform).map(p => p.format)
+}
+/**
+ * A choice's name in the table. On Instagram a video is a Reel at either size (the 4:5 one is shared to the feed); on
+ * Facebook the 9:16 is a Reel and the 4:5 goes out as a regular Page video (row-approval prepareChoices).
+ */
+export function choiceLabel(platform: CreateSocial, format: CreateFormat, shape: MediaShape): string {
+  if (platform === "instagram" && shape === "video") return format === "reels" ? "9:16 Reel" : "4:5 Reel"
+  if (platform === "facebook" && shape === "video") return format === "reels" ? "9:16 Reel" : "4:5 video"
+  return FORMAT_ASPECT[format]
+}
+export const platformIdOf = (platform: CreateSocial, format: CreateFormat) => CREATE_PLATFORMS.find(p => p.platform === platform && p.format === format)?.id
+/** The size a platform is ticked at, or undefined when it isn't ticked (the first, if a stored row has two). */
+export const pickedFormat = (platformIds: readonly string[], platform: CreateSocial): CreateFormat | undefined =>
+  CREATE_PLATFORMS.find(p => p.platform === platform && platformIds.includes(p.id))?.format
+
+/**
+ * Every ticked platform once, at a size its media allows: the size ticked when it is allowed and has a template, else the
+ * first allowed size with one; a platform with none is dropped. `has` says whether the template has a design at a size.
+ * `fresh`: the media just changed between photo and video, so each platform takes its default size again.
+ */
+export function normalizePlatforms(platformIds: readonly string[], shape: MediaShape, has: (f: CreateFormat) => boolean = () => true, fresh = false): string[] {
+  const out: string[] = []
+  for (const platform of CREATE_SOCIALS) {
+    const ticked = CREATE_PLATFORMS.filter(p => p.platform === platform && platformIds.includes(p.id)).map(p => p.format)
+    if (!ticked.length) continue
+    const allowed = formatChoices(platform, shape).filter(has)
+    const format = (fresh ? undefined : ticked.find(f => allowed.includes(f))) ?? allowed[0]
+    const id = format && platformIdOf(platform, format)
+    if (id) out.push(id)
+  }
+  return out
+}
+
+/** Why the ticked platforms break "one size per platform" for this media, in the person's words; empty when they don't. */
+export function platformProblems(platformIds: readonly string[], shape: MediaShape): string[] {
+  const p: string[] = []
+  for (const platform of CREATE_SOCIALS) {
+    const ticked = CREATE_PLATFORMS.filter(x => x.platform === platform && platformIds.includes(x.id)).map(x => x.format)
+    if (ticked.length > 1) p.push(`${SOCIAL_LABEL[platform]} is ticked at two sizes; a platform gets one size per row`)
+    const allowed = formatChoices(platform, shape)
+    for (const f of ticked) if (!allowed.includes(f)) p.push(`${SOCIAL_LABEL[platform]} takes a ${shape} at ${allowed.map(a => FORMAT_ASPECT[a]).join(" or ")} only`)
+  }
+  return p
+}
+
 /** The table's ids for a variation's social platforms (the drawer edits them in the table's terms). */
 export function platformIdsOf(format: CreateFormat, socialPlatforms: readonly string[]): string[] {
   return CREATE_PLATFORMS.filter(p => p.format === format && socialPlatforms.includes(p.platform)).map(p => p.id)
@@ -155,6 +216,7 @@ export function rowProblems(row: CreateRow, t: CreateTemplate | undefined): stri
   if (!t) { p.push("Choose a Template"); return p }
   const formats = formatsOf(row.platforms)
   if (!formats.length) p.push("Tick at least one platform")
+  p.push(...platformProblems(row.platforms, mediaShapeOf(row.media)))
   for (const f of formats) if (!t.templates[f.format]) p.push(`${t.label} has no ${FORMAT_ASPECT[f.format]} template yet`)
   if (formats.some(f => t.media[f.format]) && !row.media) p.push("Add media (a photo or a video)")
   if (row.media && row.media.optimized !== "done") p.push("Wait for the media to finish optimizing")

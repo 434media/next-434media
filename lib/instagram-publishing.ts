@@ -1,6 +1,6 @@
 import { safeMetaError, type MetaOperation } from "./owned-meta-errors"
 import { aiDisclosureRequired, checkReviewedFormat, META_AI_DISCLOSURE_RULE, OWNED_META_GRAPH_VERSION, sendsAiLabel } from "./owned-meta-formats"
-import { MetaBlocked, MetaPermissionError, type MetaDestination, type MetaManifest, type MetaProvider, type FacebookRetryRead } from "./owned-meta-publisher"
+import { FB_REELS_FLOW, legacyReelsPreparation, MetaBlocked, MetaClosed, MetaPermissionError, type MetaDestination, type MetaManifest, type MetaProvider, type FacebookRetryRead } from "./owned-meta-publisher"
 
 export interface MetaPublishingEvidence {
   verifiedAt: string
@@ -16,10 +16,13 @@ export function checkMetaCapability(m: MetaManifest, d: MetaDestination, e: Meta
 interface PublishedItem { id: string; message?: string; created_time?: string; permalink?: string; permalink_url?: string; attachments?: { data?: { target?: { id?: string } }[] } }
 interface GraphResponse {
   id?: string; post_id?: string; video_id?: string; upload_url?: string; success?: boolean
-  error?: { code?: number }; status_code?: string; status?: { processing_phase?: { status?: string } }
+  error?: { code?: number }; status_code?: string
+  status?: { video_status?: string; uploading_phase?: { status?: string }; processing_phase?: { status?: string }; publishing_phase?: { status?: string } }
   data?: PublishedItem[]; is_ai_generated?: boolean
   paging?: { next?: string; cursors?: { after?: string } }
 }
+const reelState = (s: GraphResponse["status"]) => [s?.video_status, s?.uploading_phase?.status, s?.processing_phase?.status, s?.publishing_phase?.status]
+
 export function createMetaProvider(args: { accessToken: string; evidence: MetaPublishingEvidence; fetcher?: typeof fetch; beforeMutation: (urls?: string[]) => Promise<void>; beforeFinalDispatch?: (manifest: MetaManifest, destination: MetaDestination) => Promise<void> }): MetaProvider & { checkFacebookRetry: (m: MetaManifest, intentAt: string) => Promise<FacebookRetryRead> } {
   const fetcher = args.fetcher ?? fetch
   const graphFor = (destination: MetaDestination, operation: MetaOperation, finalGuard?: () => Promise<void>) => async (path: string, values: Record<string, unknown> = {}, method: "GET" | "POST" = "GET") => {
@@ -69,7 +72,9 @@ export function createMetaProvider(args: { accessToken: string; evidence: MetaPu
       if (m.format === "carousel") {
         for (let i=0;i<urls.length;i++) if (!p[`photo_${i}`]) { const r = await graph(`${m.destinations.pageId}/photos`, { url: urls[i], published: false }, "POST"); await keep(`photo_${i}`,id(r.id)) }
       } else if (m.format === "video" && m.placements.facebook === "reels") {
+        if (legacyReelsPreparation(p)) throw new MetaClosed("Facebook Reel was uploaded by the earlier flow; closed without posting. Never resume or reset it: the row may already have this Reel")
         if (!p.video || !p.upload_url) {
+          await keep("reels_flow",FB_REELS_FLOW)
           const r = await graph(`${m.destinations.pageId}/video_reels`, { upload_phase: "start" }, "POST")
           if (!r.upload_url) throw new MetaBlocked("Facebook returned no upload URL")
           const upload = new URL(r.upload_url)
@@ -83,8 +88,10 @@ export function createMetaProvider(args: { accessToken: string; evidence: MetaPu
           if (!response.ok) { const detail=safeMetaError(response.status, await response.json().catch(()=>({})), d, "prepare", args.accessToken); if ([401,403].includes(response.status) || [10,190,200].includes(detail.code || 0)) throw new MetaPermissionError(detail); throw new MetaBlocked("Facebook unpublished video upload failed",detail) }
           await keep("uploaded","true")
         }
+        // Ready once Meta has the file. Processing starts only after finish (publish), so it is never waited on here.
         const state = await graph(p.video, { fields: "status" })
-        if (state.status?.processing_phase?.status !== "complete") return { ready:false, preparation:p }
+        if (reelState(state.status).includes("error")) throw new MetaBlocked("Facebook Reel upload failed; operator review required")
+        if (state.status?.uploading_phase?.status !== "complete") return { ready:false, preparation:p }
       }
       return { ready:true, preparation:p }
     },
@@ -139,7 +146,14 @@ export function createMetaProvider(args: { accessToken: string; evidence: MetaPu
       // A direct media lookup/permalink alone can describe an unpublished upload.
       const listing = await graph(`${d === "instagram" ? m.destinations.instagramId : m.destinations.pageId}/${d === "instagram" ? "media" : "published_posts"}`, { fields: d === "instagram" ? "id,permalink" : "id,permalink_url,attachments{target{id}}", limit: 100 })
       const published = (listing.data || []).find((item) => item.id === remoteId || d === "facebook" && item.attachments?.data?.some((a) => a.target?.id === remoteId))
-      if (!published) return { verified:false,blocker:"Exact remote ID not found in the account's published collection; use operator evidence if needed" }
+      if (!published) {
+        // A Reel is processed and published after finish: while Meta is still working on it, the publisher checks again.
+        if (d === "facebook" && m.format === "video" && m.placements.facebook === "reels") {
+          const s = (await graph(remoteId,{ fields:"status" })).status, phases = reelState(s)
+          if (s && !phases.includes("error") && s.publishing_phase?.status !== "complete") return { verified:false,pending:true,blocker:"Meta is still processing the Reel; it is checked again every 5 minutes" }
+        }
+        return { verified:false,blocker:"Exact remote ID not found in the account's published collection; use operator evidence if needed" }
+      }
       // Read the label back only where it was sent: IG media creation and FB Reels finish.
       const labelSent = sendsAiLabel(m,d)
       const r: GraphResponse = labelSent ? await graph(remoteId,{fields:"id,is_ai_generated"}) : {}

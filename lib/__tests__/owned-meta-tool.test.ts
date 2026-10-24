@@ -8,6 +8,9 @@ import { credentialState, needsContinuation, noticesFor, parseApprovers, recordE
 import { continueOwnedMeta, runOwnedMetaTool, type ToolDeps, type ToolName } from "../owned-meta-tool-handler"
 import type { IntakeDeps } from "../owned-meta-intake"
 import { postSlackNotice, readSlackMessage } from "../owned-meta-slack"
+import { readFileSync, readdirSync, statSync } from "node:fs"
+import { join } from "node:path"
+import { assertRowDispatch, executeOwnedMeta, type RowReads } from "../owned-meta-execution"
 
 const FOUNDER = "U08LKLE5H3M", NOW = "2026-10-16T12:00:00.000Z"
 const jpeg = Buffer.from([0xff, 0xd8, 0xff, 0xd9])
@@ -676,4 +679,39 @@ test("finding 4: a no-content card's status never changes through the generic up
   assert.equal(outcomeStatusRefusal(notice, undefined), null)
   assert.equal(outcomeStatusRefusal(post({ status: "approved" }), "posted"), null)
   assert.equal(outcomeStatusRefusal(null, "approved"), null)
+})
+
+// ── One size per platform per row on every publish path (Step 3 part 5) ──
+
+const rowPost = (id: string, format: "feed" | "reels", platforms: string[]) => ({ id, create_row_id: "row-1", create_format: format, social_platforms: platforms }) as unknown as ContentPost
+/** A Create row whose 4:5 and 9:16 both go to Instagram and Facebook (a row made before the rule). */
+const conflicted: RowReads = { getPost: async id => rowPost(id, "feed", ["instagram", "facebook"]), listRow: async () => [rowPost("p", "feed", ["instagram", "facebook"]), rowPost("q", "reels", ["instagram", "facebook", "tiktok"])] }
+
+test("the connector/Slack execute path refuses a row that would send two sizes to one platform, before any claim or Meta call", async () => {
+  const s = new Store(), p = provider()
+  const d = deps(s, p, { execute: a => executeOwnedMeta({ ...a, rowReads: conflicted }) })
+  const r = await call(d, exec(s))
+  assert.equal(r.status, 409)
+  assert.match((await r.json()).error, /Instagram is ticked on Feed 4:5 and Reels 9:16/)
+  assert.deepEqual(p.calls, [])
+  assert.equal(s.value.batch.claim, undefined, "nothing was claimed")
+})
+
+test("the per-post route's executeOwnedMeta refuses the same row; a started publication, a non-Create post or another platform's conflict isn't held", async () => {
+  const s = new Store()
+  await assert.rejects(executeOwnedMeta({ id: "p", runId: "r", record: s.value, store: s, trigger: "admin", rowReads: conflicted }), (e: unknown) => e instanceof MetaBlocked && /Facebook is ticked on Feed 4:5 and Reels 9:16/.test(e.message))
+  const started = record(); started.batch.jobs.instagram.finalIntent = { id: "r:instagram", at: NOW }
+  await assertRowDispatch("p", started, conflicted)
+  await assertRowDispatch("p", record(), { getPost: async () => ({ id: "p", social_platforms: ["instagram"] }) as ContentPost, listRow: async () => { throw new Error("not read") } })
+  const tiktokOnly: RowReads = { getPost: async id => rowPost(id, "feed", ["instagram", "facebook"]), listRow: async () => [rowPost("p", "feed", ["instagram", "facebook"]), rowPost("q", "reels", ["tiktok"]), rowPost("r", "reels", ["tiktok"])] }
+  await assertRowDispatch("p", record(), tiktokOnly)
+})
+
+test("every publish path goes through executeOwnedMeta: nothing outside the publisher and its wiring calls runOwnedMeta", () => {
+  const root = join(__dirname, "..", "..")
+  const files = (dir: string): string[] => readdirSync(dir).flatMap(f => { const p = join(dir, f); return statSync(p).isDirectory() ? (f === "node_modules" || f === "__tests__" || f.startsWith(".") ? [] : files(p)) : /\.tsx?$/.test(f) ? [p] : [] })
+  const callers = [...files(join(root, "app")), ...files(join(root, "lib"))].filter(f => /runOwnedMeta\(/.test(readFileSync(f, "utf8"))).map(f => f.slice(root.length + 1)).sort()
+  assert.deepEqual(callers, ["lib/owned-meta-execution.ts", "lib/owned-meta-publisher.ts"])
+  for (const f of ["app/api/admin/crm/content-posts/[id]/owned-meta/route.ts", "app/api/admin/content/rows/[rowId]/route.ts", "app/api/cron/owned-meta-continue/route.ts"]) assert.match(readFileSync(join(root, f), "utf8"), /executeOwnedMeta/, f)
+  assert.match(readFileSync(join(root, "lib/owned-meta-execution.ts"), "utf8"), /execute: executeOwnedMeta/, "the connector/Slack tool is wired to executeOwnedMeta")
 })

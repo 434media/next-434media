@@ -45,6 +45,10 @@ export interface MetaJob {
   retry?: { id: string; priorIntentId: string; by: string; at: string; evidence: string; approvedHash: string; duplicateRiskAccepted: true }
   retryRead?: FacebookRetryRead
   manualEvidence?: { by: string; at: string; approvedHash: string; confirmation: string }
+  /** Final publication sent; Meta is still processing it, so the continuation re-checks it (never re-sends). */
+  awaitingMeta?: boolean
+  /** Closed without posting: never resumed, reset or retried. */
+  closed?: { at: string; reason: string }
 }
 export interface FacebookRetryRead { checkedAt: string; since: string; until: string; pages: number; items: number; outcome: "no_candidate_observed" }
 export interface FacebookRecovery { expectedAttemptId: string; actor: string; evidence: string; acceptDuplicateRisk: boolean }
@@ -70,7 +74,18 @@ export interface MetaProvider {
   preflight(manifest: MetaManifest, destination: MetaDestination): string | null
   prepare(manifest: MetaManifest, destination: MetaDestination, urls: string[], saved: Record<string, string>, checkpoint: (key: string, value: string) => Promise<void>): Promise<{ ready: boolean; preparation: Record<string, string> }>
   publish(manifest: MetaManifest, destination: MetaDestination, urls: string[], preparation: Record<string, string>): Promise<string>
-  verify(manifest: MetaManifest, destination: MetaDestination, remoteId: string): Promise<{ verified: boolean; permalink?: string; blocker?: string; notice?: string }>
+  /** pending: published, and Meta is still processing it; check again later. */
+  verify(manifest: MetaManifest, destination: MetaDestination, remoteId: string): Promise<{ verified: boolean; pending?: boolean; permalink?: string; blocker?: string; notice?: string }>
+}
+/** A verify result on the job: verified, still with Meta (re-checked within the processing window), or for a person. */
+function applyVerify(j: MetaJob, v: Awaited<ReturnType<MetaProvider["verify"]>>, at: string): void {
+  if (v.notice) j.notice = v.notice
+  if (v.verified && v.permalink) { j.status = "verified"; j.permalink = v.permalink; j.verifiedAt = at; delete j.blocker; delete j.awaitingMeta; return }
+  const since = Date.parse(j.finalIntent?.at ?? "")
+  if (v.pending && Number.isFinite(since) && Date.parse(at) - since < META_PROCESSING_WINDOW_MS) { j.status = "final_started"; j.awaitingMeta = true; j.blocker = v.blocker || "Meta is still processing; checked again later"; return }
+  delete j.awaitingMeta
+  j.status = "needs_reconciliation"
+  j.blocker = v.pending ? "Meta has not finished processing within a day; check the Page before anything else" : v.blocker || "Published result needs review"
 }
 /**
  * Posts published outside the publisher and verified by the owner. Holding them in code
@@ -83,6 +98,19 @@ export interface MetaProvider {
 export const OWNED_META_EXCLUDED_POST_IDS: readonly string[] = ["Opb3LOHpfZPFoxdQ720F"]
 export function isExcludedPostId(id: string): boolean { return OWNED_META_EXCLUDED_POST_IDS.includes(id) }
 export class MetaBlocked extends Error { constructor(message: string, public readonly detail?: SafeMetaError) { super(message); this.name = "MetaBlocked" } }
+/** A preparation that must never be resumed or reset: the job is closed without posting, with this message as its blocker. */
+export class MetaClosed extends MetaBlocked { constructor(message: string) { super(message); this.name = "MetaClosed" } }
+/**
+ * The Facebook Reels flow a job's preparation was made under. Meta processes a Reel only after `upload_phase=finish`, so
+ * prepare stops once the upload is complete and the finish call is the final publication; the publisher then re-checks
+ * until Meta has processed and published it. A preparation without this mark was made by the earlier flow, which waited
+ * for processing before finish and never completed (job Xtv0HJeyPoJU2KLQA8gX, 2026-10-22): it is never resumed, since
+ * resuming it could post a Reel the row already has. The continuation leaves it alone; a person closes it.
+ */
+export const FB_REELS_FLOW = "finish-then-wait"
+export const legacyReelsPreparation = (p: Record<string, string>) => !!(p.video || p.upload_url || p.uploaded) && p.reels_flow !== FB_REELS_FLOW
+/** How long a final publication may wait on Meta's processing before a person looks (a Facebook Reel, Step 3 part 5). */
+export const META_PROCESSING_WINDOW_MS = 24 * 60 * 60 * 1000
 export class MetaPermissionError extends Error { constructor(public readonly detail?: SafeMetaError) { super("Publishing permission failed; this brand needs a new permission check"); this.name = "MetaPermissionError" } }
 export function canonicalJson(value: unknown): string {
   if (Array.isArray(value)) return `[${value.map(canonicalJson).join(",")}]`
@@ -203,7 +231,7 @@ export async function runOwnedMeta(args: {
       if (r.batch.claim !== runId || r.batch.id !== initial.batch.id) throw new MetaBlocked("Stopped run cannot dispatch another destination")
       let job = r.batch.jobs[destination]
       if (job.retry && !args.facebookRecovery) continue
-      if (job.status === "verified" || job.status === "operator_confirmed") continue
+      if (job.status === "verified" || job.status === "operator_confirmed" || job.closed) continue
       if (blockers[destination]) {
         await mutate(current => { current.batch.jobs[destination].status = "manual_required"; current.batch.jobs[destination].blocker = blockers[destination]! })
         continue
@@ -212,7 +240,7 @@ export async function runOwnedMeta(args: {
         if (job.remoteId) {
           try {
             const v = await provider.verify(r.batch.manifest, destination, job.remoteId)
-            await mutate(current => { const j = current.batch.jobs[destination]; if (v.notice) j.notice = v.notice; if (v.verified && v.permalink) { j.status = "verified"; j.permalink = v.permalink; j.verifiedAt = now(); delete j.blocker } else { j.status = "needs_reconciliation"; j.blocker = v.blocker || "Remote outcome unverified" } }, true)
+            await mutate(current => applyVerify(current.batch.jobs[destination], { ...v, blocker: v.blocker || "Remote outcome unverified" }, now()), true)
           } catch (error) {
             if ((error instanceof MetaPermissionError || error instanceof MetaBlocked) && error.detail) await mutate(current => { current.batch.jobs[destination].lastError = error.detail }, true).catch(() => {})
             throw error
@@ -230,6 +258,7 @@ export async function runOwnedMeta(args: {
       } catch (error) {
         if ((error instanceof MetaPermissionError || error instanceof MetaBlocked) && error.detail) await mutate(current => { current.batch.jobs[destination].lastError = error.detail }, true).catch(() => {})
         if (error instanceof MetaPermissionError) throw error
+        if (error instanceof MetaClosed) { await mutate(current => { const j = current.batch.jobs[destination]; j.status = "manual_required"; j.blocker = error.message; j.closed = { at: now(), reason: error.message } }); continue }
         await mutate(current => { current.batch.jobs[destination].status = "manual_required"; current.batch.jobs[destination].blocker = "Preparation failed; operator may reset unpublished preparation and retry" })
         continue
       }
@@ -273,12 +302,7 @@ export async function runOwnedMeta(args: {
         if(observed.batch.claim!==runId)return observed.batch // stopped run may record evidence, never dispatch again
 
         const result = await provider.verify(r.batch.manifest, destination, remoteId)
-        await mutate(current => {
-          job = current.batch.jobs[destination]
-          if (result.notice) job.notice = result.notice
-          if (result.verified && result.permalink) { job.status = "verified"; job.permalink = result.permalink; job.verifiedAt = now(); delete job.blocker }
-          else { job.status = "needs_reconciliation"; job.blocker = result.blocker || "Published result needs review" }
-        }, true)
+        await mutate(current => { job = current.batch.jobs[destination]; applyVerify(job, result, now()) }, true)
       } catch (error) {
         await mutate(current => { const j = current.batch.jobs[destination]; j.status = "needs_reconciliation"; j.blocker = "Final publication may have happened; do not repeat"; if ((error instanceof MetaPermissionError || error instanceof MetaBlocked) && error.detail) j.lastError = error.detail }, true)
         if (error instanceof MetaPermissionError) throw error
@@ -294,7 +318,9 @@ export async function runOwnedMeta(args: {
 /** Operator reset can abandon unused containers only, never a recorded public outcome. */
 export function resetUnpublishedPreparation(record: MetaRecord, destination: MetaDestination): void {
   const j=record.batch.jobs[destination]
-  if(record.batch.claim || j.retry || j.finalIntent || j.remoteId || j.manualEvidence || ["verified","operator_confirmed"].includes(j.status)) throw new MetaBlocked("Cannot reset active, uncertain or completed publication")
+  if(record.batch.claim || j.retry || j.finalIntent || j.remoteId || j.manualEvidence || j.closed || ["verified","operator_confirmed"].includes(j.status)) throw new MetaBlocked("Cannot reset active, uncertain, closed or completed publication")
+  // A Facebook Reel from the earlier flow is closed, never reset: a reset would upload and post a new Reel.
+  if(destination==="facebook" && legacyReelsPreparation(j.preparation)) throw new MetaBlocked("Cannot reset a Facebook Reel from the earlier upload flow; close it without posting")
   record.batch.jobs[destination]={status:"ready",preparation:{}}
 }
 export function assertOperatorSettlement(record: MetaRecord, expectedBatchId: string): void {
