@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server"
 import { getTravelAccess } from "@/lib/travel/auth"
 import { getTravelItinerary } from "@/lib/travel/airtable"
-import { getTravelProject } from "@/lib/travel/projects"
+import { getTravelProject } from "@/lib/firestore-travel-projects"
 
 export const dynamic = "force-dynamic"
 
@@ -10,7 +10,7 @@ export async function GET(
   { params }: { params: Promise<{ project: string; traveler: string }> },
 ) {
   const { project: projectSlug, traveler: travelerSlug } = await params
-  const config = getTravelProject(projectSlug, travelerSlug)
+  const config = await getTravelProject(projectSlug, travelerSlug)
   if (!config) return NextResponse.json({ error: "not_found" }, { status: 404 })
   const viewer = await getTravelAccess(projectSlug, travelerSlug)
   if (!viewer) return NextResponse.json({ error: "unauthorized" }, { status: 401 })

@@ -1,0 +1,120 @@
+{
+  "domains": [
+    "434media.com",
+    "example.com",
+    "example.org",
+    "example.net"
+  ],
+  "addresses": [
+    "a@b.co",
+    "a@x.co",
+    "audrey@x.co",
+    "r@x.co",
+    "x@gmail.com",
+    "x@y.com",
+    "foo@bar.com",
+    "jane@acme.com",
+    "name@organization.com",
+    "noreply+xyz@vendor.com",
+    "email@company.com",
+    "you@company.com",
+    "tu@email.com",
+    "you@email.com",
+    "speaker@mail.com",
+    "project_id@iam.gserviceaccount.com"
+  ],
+  "skipPaths": [
+    "pnpm-lock.yaml"
+  ],
+  "forbiddenPaths": [
+    "lib/event-roles/",
+    "lib/travel/projects.ts"
+  ],
+  "pending": [
+    {
+      "path": ".claude/skills/meta-account-governance/SKILL.md",
+      "sha256": "e2af8ab1de068939a3fa7c399ae84613b6b176be16ce6b05d6e594acd99e28ce",
+      "reason": "The company's account-recovery mailbox in an example ownership record. Not a person's address, but not public either; the skill is moving out of this repository (next-434media #242)."
+    },
+    {
+      "path": "lib/__tests__/lead-with-ops-feedback.test.ts",
+      "sha256": "fb66f19a6999c0ef9015857ec190473121a2d69ae0fa0add98b8bba696ba8f4c",
+      "reason": "A partner's business address that call requests are routed to. Functional; should move to an environment variable or Firestore setting. Founder decision."
+    },
+    {
+      "path": "lib/lead-with-ops-call-request.ts",
+      "sha256": "fb66f19a6999c0ef9015857ec190473121a2d69ae0fa0add98b8bba696ba8f4c",
+      "reason": "A partner's business address that call requests are routed to. Functional; should move to an environment variable or Firestore setting. Founder decision."
+    },
+    {
+      "path": "scripts/content-replay/pages/l3harris-navy-vampire.json",
+      "sha256": "3c723de80452a8da58884a1517255ea0f79c44cf606c5036375dbc45d1232a86",
+      "reason": "Press-release media contact (address or phone) inside a captured public news page used as replay input. Published by the issuer; trim the capture or keep it. Founder decision."
+    },
+    {
+      "path": "scripts/content-replay/pages/l3harris-navy-vampire.json",
+      "sha256": "0c152bd2e17b66bd0d84c63ef5b8aad823449d985a57870281dbc68361252498",
+      "reason": "Press-release media contact (address or phone) inside a captured public news page used as replay input. Published by the issuer; trim the capture or keep it. Founder decision."
+    },
+    {
+      "path": "scripts/content-replay/pages/l3harris-navy-vampire.json",
+      "sha256": "368a742177ed02e9a0d17200e1accdb82bef6a47b58d40f1d3406532825ec9f7",
+      "reason": "Press-release media contact (address or phone) inside a captured public news page used as replay input. Published by the issuer; trim the capture or keep it. Founder decision."
+    },
+    {
+      "path": "scripts/content-replay/pages/l3harris-navy-vampire.json",
+      "sha256": "ec9801af51bff0040c1925fea3b617ef8f0c06db3c9c57f74e956c1f786be113",
+      "reason": "Press-release media contact (address or phone) inside a captured public news page used as replay input. Published by the issuer; trim the capture or keep it. Founder decision."
+    },
+    {
+      "path": "scripts/content-replay/pages/morfius-release.json",
+      "sha256": "21873131c89339431779c43c447fc9215100cbb381f7ae5ba16458b9145c0e8c",
+      "reason": "Press-release media contact (address or phone) inside a captured public news page used as replay input. Published by the issuer; trim the capture or keep it. Founder decision."
+    },
+    {
+      "path": "scripts/content-replay/pages/morfius-release.json",
+      "sha256": "efcbf62b7758fb6245b0818e3770286f4ec0513f57311e64e40c1bbdb0b3a686",
+      "reason": "Press-release media contact (address or phone) inside a captured public news page used as replay input. Published by the issuer; trim the capture or keep it. Founder decision."
+    },
+    {
+      "path": "scripts/content-replay/pages/pac3-edge.json",
+      "sha256": "21873131c89339431779c43c447fc9215100cbb381f7ae5ba16458b9145c0e8c",
+      "reason": "Press-release media contact (address or phone) inside a captured public news page used as replay input. Published by the issuer; trim the capture or keep it. Founder decision."
+    },
+    {
+      "path": "scripts/content-replay/pages/pac3-edge.json",
+      "sha256": "4be624d432817de625930018705d5357ee53ce2eb57ca5aa880aad96b49e8893",
+      "reason": "Press-release media contact (address or phone) inside a captured public news page used as replay input. Published by the issuer; trim the capture or keep it. Founder decision."
+    },
+    {
+      "path": "scripts/content-replay/pages/raid-hunter.json",
+      "sha256": "883d119044532ee602020f3cb251d3fbb73fc9009be85a58a57fbb803f121a46",
+      "reason": "Press-release media contact (address or phone) inside a captured public news page used as replay input. Published by the issuer; trim the capture or keep it. Founder decision."
+    },
+    {
+      "path": "scripts/content-replay/pages/raid-hunter.json",
+      "sha256": "b3337f94bce095b53c24dac48e7c990e0f60f347b9be2d70bb7b6436b12b0975",
+      "reason": "Press-release media contact (address or phone) inside a captured public news page used as replay input. Published by the issuer; trim the capture or keep it. Founder decision."
+    },
+    {
+      "path": "scripts/content-replay/pages/raid-hunter.json",
+      "sha256": "5c113532034d5c9ff713d3cc79ac73c462494b0c862e0f676b19d29add1739ff",
+      "reason": "Press-release media contact (address or phone) inside a captured public news page used as replay input. Published by the issuer; trim the capture or keep it. Founder decision."
+    },
+    {
+      "path": "scripts/content-replay/pages/xtend-striker.json",
+      "sha256": "9c13f331cedb34cd4338cc4a98b308aa98a339b62065f265e7e7de0925dab1d1",
+      "reason": "Press-release media contact (address or phone) inside a captured public news page used as replay input. Published by the issuer; trim the capture or keep it. Founder decision."
+    },
+    {
+      "path": "scripts/content-replay/pages/xtend-striker.json",
+      "sha256": "a9ee574cf9d54a70c7de0348e3a4929d383af053f3a7ddb89db7e075d675259c",
+      "reason": "Press-release media contact (address or phone) inside a captured public news page used as replay input. Published by the issuer; trim the capture or keep it. Founder decision."
+    },
+    {
+      "path": "scripts/offboard-interns.ts",
+      "sha256": "b4005539aea7082826b327d6bf732df00629f44f143720aa416c8d46b308ef1c",
+      "reason": "A staff member's personal address kept as an offboarding skip-list entry. Should move to Firestore (a flag on the team member). Founder decision."
+    }
+  ]
+}

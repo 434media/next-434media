@@ -48,6 +48,12 @@ jobs:
       - run: pnpm add -g tsx
       - run: tsx scripts/verify-work-page.ts
 
+      # This repository is public, so people's email addresses, phone numbers and movements stay out of it: they
+      # live in Firestore behind a server-side gate (event_role_overlays, travel_projects). Fails on any address or
+      # phone number in a tracked file that is not on the small allowlist in scripts/personal-data/allowlist.json,
+      # and on the two paths that used to hold such data. Node built-ins and git only.
+      - run: tsx scripts/personal-data/check.ts
+
       # The system-of-record JSON Schemas are canonical in the private context
       # repository and are deliberately not copied here: they carry no figures,
       # but they describe the shape of qualification and rate-card data, and this
@@ -115,6 +121,8 @@ jobs:
       - run: tsx --test lib/__tests__/create-table.test.ts
       # The approval drawer (plan v11.1 Step 3): a row's variations approved together, bound to the files shown.
       - run: tsx --test lib/__tests__/row-approval.test.ts
+      # Event roles and travel routes from Firestore, the create-or-skip import, and the personal-data check itself.
+      - run: tsx --test lib/__tests__/personal-data.test.ts
 
       # Optional: the same suites again on MilCityUSA's real published profile, when the BRAND_PROFILE_FIXTURE Actions
       # secret holds a published version's 434-context backup record. Secrets are not given to pull requests from
