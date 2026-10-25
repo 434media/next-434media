@@ -110,10 +110,13 @@ applies to proposing the change as well as making it. It mirrors 434-context's
 Put the evidence in the proposal and the run log. **If any consumer is
 unverified, the proposal says so, and nothing changes until it is resolved.**
 
-**Jurisdiction policy is one constant.** 434 Media does not cold-outreach the
-EU/UK/EEA/Switzerland/Canada (GDPR/CASL). The single source of truth is
+**Jurisdiction policy is one constant.** Which jurisdictions 434 Media does not
+cold-outreach is master 5.3; in code the single source of truth is
 `EXCLUDED_COUNTRIES` in [lib/prospecting/scorer.ts](lib/prospecting/scorer.ts).
-Any new outbound surface must gate on it rather than re-listing countries.
+Any new outbound surface must gate on it rather than re-listing countries, and
+documentation points here instead of listing them. The only lists are inputs the
+code runs on: the constant itself, the translator's prompt and
+`lib/prospecting/icp-base.md`, which the model reads.
 
 **Mailchimp tags are code-owned.** Exactly one live audience (`434 Media`,
 `7fa6fbcb82`) segmented by the taxonomy in

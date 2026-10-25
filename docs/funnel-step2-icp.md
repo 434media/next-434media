@@ -70,7 +70,7 @@ Canonical maxes are authoritative. Sub-criteria below are **proposed** — recon
 | **Company Size (15)** | Apollo `estimated_num_employees` | `scorer.ts` size@10 | Rescale 10→15; align ranges to ICP (10–50 best); **unknown = 0** per the rubric. |
 | **Location (10)** | Apollo city/state/country / lead `location` | Both geo@**25** | Rescale 25→10 — **but this de-emphasizes geography, which 434 weights heavily** → Decision 2. |
 
-**Hard exclusion stays:** `EXCLUDED_COUNTRIES` (EU/UK/EEA/CH/CA) remains a pre-score gate returning the excluded sentinel, independent of the rubric ([scorer.ts:75](../lib/prospecting/scorer.ts#L75), `isExcludedJurisdiction`). Compliance is not a scored dimension.
+**Hard exclusion stays:** `EXCLUDED_COUNTRIES` (the jurisdictions master 5.3 excludes) remains a pre-score gate returning the excluded sentinel, independent of the rubric ([scorer.ts:75](../lib/prospecting/scorer.ts#L75), `isExcludedJurisdiction`). Compliance is not a scored dimension.
 
 ---
 

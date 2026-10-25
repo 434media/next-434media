@@ -5,13 +5,17 @@ description: Required checks before any surface sends email or adds contacts to 
 
 # Outbound compliance
 
-434 Media does cold outbound in the US only. Every one of these checks already
-exists as a module — the failure mode is a new surface that forgets to call one,
-not a missing primitive. Wire them all before the first send.
+This is a code convention: which module enforces each check, and how to wire
+it. The policy behind the checks is not restated here. Outbound eligibility
+and jurisdiction are master 5.3, read through `docs/context`, and that is the
+only place they are written down. Every check already exists as a module — the
+failure mode is a new surface that forgets to call one, not a missing
+primitive. Wire them all before the first send.
 
 ## 1. Jurisdiction
 
-No cold outreach to the EU, UK, EEA, Switzerland, or Canada (GDPR / CASL).
+Which jurisdictions cold outreach excludes is master 5.3. In code, its single
+source is `EXCLUDED_COUNTRIES`:
 
 ```ts
 import { EXCLUDED_COUNTRIES } from "@/lib/prospecting/scorer"
