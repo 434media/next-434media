@@ -63,3 +63,7 @@ docs/context-backup-*/
 
 # content pipeline replay: photos and pages the photo step fetched (not ours to publish)
 /.replay-cache
+
+# Licensed font fetched at build time from the private 434media/brand-fonts
+# (scripts/fonts/fetch-private-fonts.mjs). Never commit it: this repository is public.
+/fonts/Menda-Black.otf

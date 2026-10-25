@@ -149,7 +149,7 @@ next-434media/
 │   ├── prospecting/              # Apollo + ICP scoring + NL translator
 │   └── seo/                      # Structured data (services, FAQ, brand)
 ├── types/                        # Shared TypeScript types
-├── fonts/                        # Local .otf fonts (brand display + OG image rendering)
+├── fonts/                        # Menda WOFF2 subset + Geist OTFs; the Menda OTF is fetched at build (scripts/fonts/)
 ├── scripts/                      # Operational CLI scripts (send-broadcast)
 ├── public/                       # Static assets (public/email/ is permanent — see its README)
 │
