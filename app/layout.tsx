@@ -39,8 +39,12 @@ const geistMono = Geist_Mono({
 // like GGX88 was before it. weight: "900" matches the file's OS/2 weight class
 // and the tokens' font-weight, so the browser uses the face as drawn instead of
 // synthesizing bold.
+//
+// The browser gets only a WOFF2 subset (scripts/fonts/build-menda-subset.mjs),
+// which is what Menda's licence covers for self-hosting. The full OTF stays out
+// of this public repository.
 const mendaBlack = localFont({
-  src: "../fonts/Menda-Black.otf",
+  src: "../fonts/Menda-Black-subset.woff2",
   variable: "--font-menda-black",
   weight: "900",
   display: "swap",

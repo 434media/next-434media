@@ -87,6 +87,9 @@ jobs:
         run: pnpm run build
         env:
           NEXT_TELEMETRY_DISABLED: "1"
+          # Read-only access to 434media/brand-fonts for the licensed Menda OTF
+          # (scripts/fonts/fetch-private-fonts.mjs). The build fails without it.
+          BRAND_FONTS_TOKEN: ${{ secrets.BRAND_FONTS_TOKEN }}
 
       # lhci starts the server itself via startServerCommand, runs Lighthouse
       # three times, and asserts on the median of the three.

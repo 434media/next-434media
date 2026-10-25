@@ -103,6 +103,8 @@ jobs:
       # Brand profiles live in Firestore, not in this public repository (plan v11 Step 1): the generated copies
       # under lib/brand-profiles/ must not come back.
       - run: test ! -e lib/brand-profiles
+      # Licensed fonts never go in this public repository; only the allowlisted files may be committed.
+      - run: node scripts/fonts/verify-font-files.mjs
       # The email-signature logo is referenced by every signature already sent, so it never moves, changes or goes
       # away (public/email/README.md).
       - run: echo "253dd42c44cec18f23a461fc3a9e0358320a05413506d457420bf05e1da990a8  public/email/434-email-signature-330x132.png" | sha256sum -c -

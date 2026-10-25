@@ -14,6 +14,11 @@ const nextConfig: NextConfig = {
     // The binary's real path under pnpm's store: node_modules/ffmpeg-static is a symlink, and a traced path through a
     // symlinked directory makes Vercel refuse the function ("files in symlinked directories").
     '/api/admin/content/media-optimize': ['./node_modules/.pnpm/ffmpeg-static@*/node_modules/ffmpeg-static/ffmpeg'],
+    // The social-image routes read Menda's OTF at runtime. It's fetched at build time and gitignored
+    // (scripts/fonts/fetch-private-fonts.mjs), so name it rather than rely on the tracer finding it.
+    '/opengraph-image': ['./fonts/Menda-Black.otf'],
+    '/api/og': ['./fonts/Menda-Black.otf'],
+    '/deck/[shareId]/opengraph-image': ['./fonts/Menda-Black.otf'],
   },
   experimental: {
     serverActions: {
