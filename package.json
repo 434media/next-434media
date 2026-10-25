@@ -45,8 +45,8 @@
     "sharp": "^0.35.5",
     "svix": "^1.92.2",
     "undici": ">=6.28.1 <7",
-    "zod": "^3.25.76",
-    "zod4": "npm:zod@4"
+    "zod": "^4.6.6",
+    "zod4": "npm:zod@^4.6.6"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",
@@ -88,6 +88,7 @@
       "node-forge": ">=1.4.0 <2",
       "picomatch@2": ">=2.3.2 <3",
       "picomatch@4": ">=4.0.4 <5",
+      "zod": ">=4.6.6 <5",
       "postcss": ">=8.5.23 <9",
       "protobufjs": ">=7.6.3 <8",
       "qs": ">=6.16.0 <7",

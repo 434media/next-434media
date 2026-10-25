@@ -17,7 +17,7 @@ import {
   HEARD_ABOUT_OPTIONS,
   OTHER_OPTION,
 } from "@/lib/lead-with-ops-feedback"
-import { callRequestMessage, type CallRequestMessage } from "@/lib/lead-with-ops-call-request"
+import { callRequestMessage, type CallRequestMessage, type CallRequestRecipients } from "@/lib/lead-with-ops-call-request"
 
 type FeedbackBody = {
   email?: string
@@ -38,6 +38,8 @@ const isDevelopment = process.env.NODE_ENV === "development"
 export interface FeedbackDeps {
   requireHuman: () => Promise<{ ok: true } | { ok: false; response: Response }>
   saveRow: (row: Record<string, unknown>) => Promise<void>
+  /** Who the call-request email goes to (env, then Firestore); throws when nobody is set. */
+  callRequestRecipients: () => Promise<CallRequestRecipients>
   /** Sends the call-request email; throws on failure. */
   sendCallRequest: (message: CallRequestMessage) => Promise<void>
   /** Runs a task after the response is sent: `after()` from next/server in the route. */
@@ -229,7 +231,7 @@ export async function handleFeedbackPost(request: Request, deps: FeedbackDeps): 
     // Sent after the response, so a slow Resend can never outlast the form's
     // 15-second abort and turn a saved row into an error and a resubmission.
     if (talkFurther === TALK_FURTHER_OPTIONS[0]) {
-      const message = callRequestMessage({
+      const callRequest = {
         name: (name as string).trim(),
         email: normalizedEmail,
         company: (company as string).trim(),
@@ -239,9 +241,10 @@ export async function handleFeedbackPost(request: Request, deps: FeedbackDeps): 
         mostUseful: (mostUseful as string).trim(),
         biggestQuestion: (biggestQuestion as string).trim(),
         submittedAt,
-      })
+      }
       deps.afterResponse(async () => {
         try {
+          const message = callRequestMessage(callRequest, await deps.callRequestRecipients())
           await deps.sendCallRequest(message)
           console.log(`Lead with Ops call request emailed for ${normalizedEmail}`)
         } catch (emailError) {
