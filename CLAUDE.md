@@ -114,7 +114,9 @@ unverified, the proposal says so, and nothing changes until it is resolved.**
 cold-outreach is master 5.3; in code the single source of truth is
 `EXCLUDED_COUNTRIES` in [lib/prospecting/scorer.ts](lib/prospecting/scorer.ts).
 Any new outbound surface must gate on it rather than re-listing countries, and
-no document here lists them either.
+documentation points here instead of listing them. The only lists are inputs the
+code runs on: the constant itself, the translator's prompt and
+`lib/prospecting/icp-base.md`, which the model reads.
 
 **Mailchimp tags are code-owned.** Exactly one live audience (`434 Media`,
 `7fa6fbcb82`) segmented by the taxonomy in

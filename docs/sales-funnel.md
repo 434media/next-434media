@@ -122,8 +122,8 @@ else `low`. So an engaged or event-sourced lead rides high even at mediocre fit.
 1. **Unknown = 0, by design.** Missing industry/location/size counts *against*
    fit — not benefit-of-the-doubt. Leads with no firmographics score blind/low
    until enrichment (AI research → apply-country, Apollo revenue) fills them in.
-2. **Pre-score jurisdiction gate.** EU/UK/EEA/Switzerland/Canada are excluded
-   *before* scoring via `EXCLUDED_COUNTRIES` in
+2. **Pre-score jurisdiction gate.** The jurisdictions master 5.3 excludes are
+   excluded *before* scoring via `EXCLUDED_COUNTRIES` in
    [`lib/prospecting/scorer.ts`](../lib/prospecting/scorer.ts) (GDPR/CASL) —
    a compliance gate, not a scoring dimension.
 
@@ -201,8 +201,8 @@ shown under `reply_received` events.
 **Deploys:** pushing to `main` auto-deploys to production via the Vercel↔GitHub
 integration — no manual `vercel --prod`.
 
-**Compliance:** 434media does **not** cold-outreach EU/UK/EEA/Switzerland/Canada
-(GDPR/CASL). Single source of truth: `EXCLUDED_COUNTRIES` in
+**Compliance:** which jurisdictions 434media does **not** cold-outreach is
+master 5.3. Single source of truth in code: `EXCLUDED_COUNTRIES` in
 [`lib/prospecting/scorer.ts`](../lib/prospecting/scorer.ts).
 
 **QA period toggles to revert when testing ends:** ~~remove `intern` from

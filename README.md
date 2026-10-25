@@ -238,12 +238,12 @@ timeline (`lib/firestore-leads.ts` `appendLeadActivity`).
   search model to produce a cited company summary + ICP-fit rationale. Stored as
   a **review-only** `lead.research` field; nothing is auto-applied to canonical
   fields, and a suggested HQ country is applied only on explicit click
-  (the EU/UK/CA outreach-compliance gate is never driven by model output).
+  (the outreach-compliance jurisdiction gate is never driven by model output).
 - **Prospecting translator** — `lib/prospecting/translator.ts` turns a free-form
   query into Apollo filters via forced tool-use.
 
-> **Compliance:** 434media does not cold-outreach EU/UK/EEA/Switzerland/Canada
-> (GDPR/CASL). The single source of truth is `EXCLUDED_COUNTRIES` in
+> **Compliance:** which jurisdictions 434media does not cold-outreach is master
+> 5.3. The single source of truth in code is `EXCLUDED_COUNTRIES` in
 > `lib/prospecting/scorer.ts`, enforced in the translator, scorer, and approval
 > boundary.
 
