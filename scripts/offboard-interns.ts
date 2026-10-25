@@ -54,10 +54,12 @@ loadEnv()
 
 const COLLECTION = "crm_team_members"
 
-// Emails carrying role="intern" that are NOT cohort interns and must survive an
-// offboarding run. jesseovr@ is an owner test account — disabling its Firebase
-// user would break every other 434 property it signs into.
-const SKIP_EMAILS = ["jesseovr@gmail.com"].map((e) => e.toLowerCase())
+// Records carrying role="intern" that are NOT cohort interns and must survive an
+// offboarding run carry `offboard_skip: true` on their crm_team_members document:
+// an owner test account, whose Firebase user every other 434 property signs into.
+// The flag replaced a hard-coded address list (personal data in a public repo;
+// set by scripts/personal-data/import-pending.ts).
+const isSkipped = (d: FirebaseFirestore.DocumentData) => d.offboard_skip === true
 
 const APPLY = process.argv.includes("--apply")
 const BACKUP_PATH = resolve("backups/offboard-interns-snapshot.json")
@@ -74,9 +76,7 @@ async function main() {
   }
 
   const allInterns = snap.docs.filter((d) => (d.data() as { role?: string }).role === "intern")
-  const skipped = allInterns.filter((d) =>
-    SKIP_EMAILS.includes(((d.data() as { email?: string }).email || "").toLowerCase()),
-  )
+  const skipped = allInterns.filter((d) => isSkipped(d.data()))
   const interns = allInterns.filter((d) => !skipped.includes(d))
   const kept = snap.docs.length - interns.length
 
@@ -96,7 +96,7 @@ async function main() {
   }
   console.log(`\n${interns.length} intern record(s) to remove · ${kept} record(s) untouched`)
   if (skipped.length) {
-    console.log("\nSkipped (on SKIP_EMAILS — kept as-is):")
+    console.log("\nSkipped (offboard_skip — kept as-is):")
     skipped.forEach((d) => console.log(`   ${(d.data() as { email?: string }).email}`))
   }
   console.log("")

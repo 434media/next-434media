@@ -10,11 +10,13 @@
 import { test } from "node:test"
 import assert from "node:assert/strict"
 import { handleFeedbackPost, type FeedbackDeps } from "../lead-with-ops-feedback-handler"
-import { CALL_REQUEST_FROM, type CallRequestMessage } from "../lead-with-ops-call-request"
+import { CALL_REQUEST_FROM, resolveCallRequestRecipients, type CallRequestMessage } from "../lead-with-ops-call-request"
 import { assertVerifiedSender } from "../resend"
 import { TALK_FURTHER_OPTIONS } from "../lead-with-ops-feedback"
 
 const NOW = new Date("2026-10-24T15:30:00.000Z")
+/** Stands in for notification_routes/lead-with-ops-call-request; the real mailbox is in Firestore. */
+const PARTNER_ROUTE = { to: ["partner@example.com"], cc: [] }
 
 const body = (over: Record<string, unknown> = {}) => ({
   email: "Pat.Jones@Example.com ",
@@ -44,6 +46,7 @@ function fakes(opts: { sendFails?: boolean; sendHangs?: boolean; saveFails?: boo
   const deferred: (() => Promise<void>)[] = []
   const deps: FeedbackDeps = {
     requireHuman: async () => ({ ok: true }),
+    callRequestRecipients: async () => resolveCallRequestRecipients(PARTNER_ROUTE, {}),
     saveRow: async (row) => {
       if (opts.saveFails) throw new Error("firestore down")
       rows.push(row)
@@ -75,7 +78,7 @@ test("yes: saves the row, then sends one email to Adam, cc the founder, Reply-To
   assert.deepEqual(rows[0].tags, ["event-feedback", "lead-with-ops-2026-06-18", "feedback-wants-call"])
   assert.equal(sent.length, 1)
   const m = sent[0]
-  assert.deepEqual(m.to, ["adam@carrollstrategyoperations.com"])
+  assert.deepEqual(m.to, ["partner@example.com"])
   assert.deepEqual(m.cc, ["marcos@434media.com"])
   assert.equal(m.replyTo, "pat.jones@example.com")
   assert.equal(m.from, CALL_REQUEST_FROM)
@@ -149,4 +152,24 @@ test("a newline in name or company stays out of the subject line", async () => {
   await runAfter()
   assert.equal(sent.length, 1)
   assert.ok(!/[\r\n]/.test(sent[0].subject))
+})
+
+test("recipients: env overrides the stored route; cc falls back to the founder; no to throws", () => {
+  assert.deepEqual(resolveCallRequestRecipients(PARTNER_ROUTE, {}), { to: ["partner@example.com"], cc: ["marcos@434media.com"] })
+  assert.deepEqual(
+    resolveCallRequestRecipients(PARTNER_ROUTE, { to: "a@example.com, b@example.com", cc: "c@example.com" }),
+    { to: ["a@example.com", "b@example.com"], cc: ["c@example.com"] },
+  )
+  assert.deepEqual(resolveCallRequestRecipients({ to: ["p@example.com"], cc: ["q@example.com"] }, {}).cc, ["q@example.com"])
+  assert.throws(() => resolveCallRequestRecipients(null, {}), /No call-request recipient/)
+})
+
+test("yes with no recipient set: the row is saved, 200, and the send is never attempted", async () => {
+  const { deps, rows, sent, runAfter } = fakes()
+  deps.callRequestRecipients = async () => resolveCallRequestRecipients(null, {})
+  const res = await handleFeedbackPost(request(body()), deps)
+  assert.equal(res.status, 200)
+  await runAfter()
+  assert.equal(rows.length, 1)
+  assert.equal(sent.length, 0)
 })

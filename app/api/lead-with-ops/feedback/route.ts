@@ -4,6 +4,8 @@ import { requireHumanRequest } from "@/lib/botid-guard"
 import { assertVerifiedSender, getResend } from "@/lib/resend"
 import { FEEDBACK_COLLECTION } from "@/lib/lead-with-ops-feedback"
 import { handleFeedbackPost } from "@/lib/lead-with-ops-feedback-handler"
+import { CALL_REQUEST_ROUTE_ID, resolveCallRequestRecipients } from "@/lib/lead-with-ops-call-request"
+import { getNotificationRoute } from "@/lib/firestore-notification-routes"
 
 /**
  * Post-event feedback intake for the Lead with Ops. Layer in AI. lunch. The
@@ -20,6 +22,7 @@ export async function POST(request: Request) {
     saveRow: async (row) => {
       await getNamedDb(NAMED_DATABASES.DIGITALCANVAS).collection(FEEDBACK_COLLECTION).add(row)
     },
+    callRequestRecipients: async () => resolveCallRequestRecipients(await getNotificationRoute(CALL_REQUEST_ROUTE_ID)),
     sendCallRequest: async (message) => {
       if (process.env.VERCEL_ENV !== "production") {
         console.log(

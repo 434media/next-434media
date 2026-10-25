@@ -6,21 +6,48 @@ import { EVENT_NAME, OTHER_OPTION } from "@/lib/lead-with-ops-feedback"
  *
  * Adam Carroll (Carroll Strategy & Operations) runs the workshop and takes the
  * call; the founder is copied. Founder decision, 2026-10-24: "Email future call
- * requests to Adam Carroll, cc me." Either list can be overridden by the env
- * vars (comma-separated), as lib/contact-form-notification.ts does. They are
- * read at module load, so a change on Vercel takes effect at the next deployment.
+ * requests to Adam Carroll, cc me." The partner's mailbox is personal data, so
+ * it is not in this public repository: it is the Firestore route
+ * `notification_routes/lead-with-ops-call-request`
+ * (lib/firestore-notification-routes.ts). Either list can be overridden by the
+ * env vars (comma-separated), as lib/contact-form-notification.ts does.
  */
-export const CALL_REQUEST_RECIPIENTS = {
-  to: listFromEnv(process.env.LEAD_WITH_OPS_CALL_REQUEST_TO, ["adam@carrollstrategyoperations.com"]),
-  cc: listFromEnv(process.env.LEAD_WITH_OPS_CALL_REQUEST_CC, ["marcos@434media.com"]),
-} as const
+export const CALL_REQUEST_ROUTE_ID = "lead-with-ops-call-request"
+export const CALL_REQUEST_DEFAULT_CC = ["marcos@434media.com"]
+
+export interface CallRequestRecipients {
+  to: string[]
+  cc: string[]
+}
+
+/**
+ * Env vars first, then the stored route, then the founder for cc only. No `to`
+ * anywhere throws, so the send fails and is logged rather than going nowhere.
+ */
+export function resolveCallRequestRecipients(
+  stored: { to: string[]; cc: string[] } | null,
+  env: { to?: string; cc?: string } = {
+    to: process.env.LEAD_WITH_OPS_CALL_REQUEST_TO,
+    cc: process.env.LEAD_WITH_OPS_CALL_REQUEST_CC,
+  },
+): CallRequestRecipients {
+  const to = firstNonEmpty(listFromEnv(env.to), stored?.to ?? [])
+  const cc = firstNonEmpty(listFromEnv(env.cc), stored?.cc ?? [], CALL_REQUEST_DEFAULT_CC)
+  if (to.length === 0) {
+    throw new Error(`No call-request recipient: set notification_routes/${CALL_REQUEST_ROUTE_ID} or LEAD_WITH_OPS_CALL_REQUEST_TO`)
+  }
+  return { to, cc }
+}
 
 /** Same mailbox as DEFAULT_FROM, under a name that says what the email is. */
 export const CALL_REQUEST_FROM = `Lead with Ops feedback <crm@${RESEND_DOMAIN}>`
 
-function listFromEnv(value: string | undefined, fallback: string[]): string[] {
-  const list = (value ?? "").split(",").map((s) => s.trim()).filter(Boolean)
-  return list.length > 0 ? list : fallback
+function listFromEnv(value: string | undefined): string[] {
+  return (value ?? "").split(",").map((s) => s.trim()).filter(Boolean)
+}
+
+function firstNonEmpty(...lists: string[][]): string[] {
+  return lists.find((l) => l.length > 0) ?? []
 }
 
 /** The saved row's fields the email needs. */
@@ -64,7 +91,7 @@ function oneLine(s: string): string {
  * a partner, not outbound to the submitter: it goes to Carroll, and Reply-To is
  * the submitter so Adam answers them directly.
  */
-export function callRequestMessage(req: CallRequest): CallRequestMessage {
+export function callRequestMessage(req: CallRequest, recipients: CallRequestRecipients): CallRequestMessage {
   const submitted = new Date(req.submittedAt).toLocaleString("en-US", {
     timeZone: "America/Chicago",
     dateStyle: "medium",
@@ -125,8 +152,8 @@ export function callRequestMessage(req: CallRequest): CallRequestMessage {
 
   return {
     from: CALL_REQUEST_FROM,
-    to: [...CALL_REQUEST_RECIPIENTS.to],
-    cc: [...CALL_REQUEST_RECIPIENTS.cc],
+    to: [...recipients.to],
+    cc: [...recipients.cc],
     replyTo: req.email,
     subject,
     text,

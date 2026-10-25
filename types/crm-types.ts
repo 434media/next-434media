@@ -589,6 +589,9 @@ export const CRM_COLLECTIONS = {
   // One document per travel project slug: dates, Airtable base, travellers and their routes
   // (lib/firestore-travel-projects.ts). Read behind the travel viewer gate; access records are in travel_access.
   TRAVEL_PROJECTS: "travel_projects",
+  // One document per notification route id: {to, cc} mailboxes for an internal notification email
+  // (lib/firestore-notification-routes.ts). The Lead with Ops call request reads "lead-with-ops-call-request".
+  NOTIFICATION_ROUTES: "notification_routes",
 } as const
 
 // ============================================
