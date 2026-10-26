@@ -163,7 +163,7 @@ function runDeps(live: RoundupStory[] = []) {
   const bases: string[] = [], attachCalls: { items: string[]; canvaItems?: number }[] = []
   const posts = new Map<string, ContentPost>(), made: { requestId: string; templateId: string; text: Record<string, string>; video?: unknown; image?: unknown }[] = [], exports: string[] = []
   const deps: CreateRunDeps = {
-    templateFields: async () => ({ headline: "text", deck: "text", date: "text", source: "text", media: "image", ...ICYMI_COVER }),
+    templateFields: async () => ({ ...ICYMI_COVER, headline: "text", deck: "text", date: "text", source: "text", media: "image" }),
     createDesign: async i => { made.push(i); return { designId: `D${made.length}abcdefgh`, title: i.title, editUrl: "https://canva/e", viewUrl: "https://canva/v", templateId: i.templateId, fields: Object.keys(i.text), previewUrls: [`https://export/${made.length}.jpg`], createdAt: "t" } },
     exportDesign: async (id, as) => { exports.push(`${id}:${as}`); return [`https://export/${id}.${as}`] },
     findByRequestId: async id => [...posts.values()].find(p => p.intake?.requestId === id) ?? null,
@@ -564,4 +564,15 @@ test("ICYMI Human+: the writer drafts the story rows and caption from the ticked
   assert.equal(r.fields.story_04, undefined)
   assert.equal(r.fields.headline, undefined, "the fixed headline is never the writer's")
   assert.match(r.caption, /^Three stories from last week\./)
+})
+
+test("ICYMI Run job: a re-run resumes with the slides its post already holds, even after the window moved", async () => {
+  const s = runDeps(STORIES)
+  await runCreateRow(s.deps, icymiRow(), { email: "audrey@x.co", name: "Audrey" })
+  // Monday: the window has moved on and none of the ticked stories is listed any more.
+  s.deps.roundupStories = async () => []
+  const again = await runCreateRow(s.deps, icymiRow(), { email: "audrey@x.co", name: "Audrey" })
+  assert.ok(again.posts.every(p => p.reused), "the same design and post, no 409")
+  // Changed ticks are new choices, checked against the window as it is now.
+  await assert.rejects(runCreateRow(s.deps, icymiRow({ roundup: ["a1", "b2", "d4"], fields: { story_01: "a", story_02: "b", story_03: "d" } }), { email: "audrey@x.co", name: "Audrey" }), /no longer a live post/)
 })

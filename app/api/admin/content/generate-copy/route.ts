@@ -36,6 +36,10 @@ export async function POST(req: NextRequest) {
   const template = createTemplates(p.active.profile).find(t => t.kind === a.kind)
   if (!template) return NextResponse.json({ error: "That brand has no such template in its published profile" }, { status: 400 })
   if (!!template.roundup !== !!a.roundup) return NextResponse.json({ error: template.roundup ? `Tick ${template.roundup.min}–${template.roundup.max} published stories first` : "Paste an https reference link first" }, { status: 400 })
+  // The roundup's size is the profile's, and each story is ticked once (the Run job checks the same).
+  if (template.roundup && a.roundup && (a.roundup.length < template.roundup.min || a.roundup.length > template.roundup.max || new Set(a.roundup).size !== a.roundup.length)) {
+    return NextResponse.json({ error: `Tick ${template.roundup.min}–${template.roundup.max} published stories, each once` }, { status: 400 })
+  }
   const requestedBy = { actorEmail: auth.session.email.toLowerCase(), actorName: auth.session.name || "" }
   try {
     const copy = await withProfile(p.active, async () => {

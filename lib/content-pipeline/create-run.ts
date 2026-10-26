@@ -80,6 +80,17 @@ export async function roundupSlides(deps: Pick<CreateRunDeps, "roundupStories">,
   if (missing.length) throw new CreateRowError([`${missing.length === 1 ? "A ticked story is" : `${missing.length} ticked stories are`} no longer a live post from the window (${missing.join(", ")}); choose the stories again`], 409)
   return ids.map(id => { const s = live.find(x => x.postId === id)!; return { postId: s.postId, url: s.card, title: s.title } })
 }
+/**
+ * A roundup run's slides. A re-run of a row whose post already holds its slides, for the same ticks in the same order,
+ * resumes with those (a run that failed on Sunday and is retried on Monday must not find its stories "gone" because
+ * the window moved); only new or changed ticks are checked against what may be recapped now.
+ */
+async function slidesForRun(deps: Pick<CreateRunDeps, "roundupStories" | "findByRequestId">, row: Pick<CreateRow, "id" | "roundup">): Promise<RoundupSlide[]> {
+  const ids = row.roundup ?? []
+  const prior = adoptablePost(await deps.findByRequestId(createRequestId(row.id, "feed")))?.roundup_slides
+  if (prior?.length && prior.length === ids.length && prior.every((s, i) => s.postId === ids[i])) return prior
+  return roundupSlides(deps, ids)
+}
 /** The export items for a design's pages, then a roundup's published cards as they are. */
 function exportItems(format: CreateFormat, urls: string[], asVideo: boolean, slides: readonly RoundupSlide[] = []) {
   const pages = asVideo ? [{ url: urls[0], label: `${format}-video` }] : urls.map((url, n) => ({ url, label: `${format}-page-${n + 1}` }))
@@ -116,7 +127,7 @@ export async function runCreateRow(deps: CreateRunDeps, row: CreateRow, actor: {
 
 async function runClaimedRow(deps: CreateRunDeps, row: CreateRow, template: CreateTemplate, actor: { email: string; name: string }, versionId: string): Promise<CreatedPost[]> {
   const posts: CreatedPost[] = []
-  const slides = template.roundup ? await roundupSlides(deps, row.roundup ?? []) : []
+  const slides = template.roundup ? await slidesForRun(deps, row) : []
   for (const { format, platforms } of formatsOf(row.platforms)) {
     const postKey = createRequestId(row.id, format)
     const existing = adoptablePost(await deps.findByRequestId(postKey))
