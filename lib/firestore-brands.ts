@@ -21,7 +21,7 @@ export function seedsDocId(pointer: string | null | undefined): string | null {
 
 async function postsMade(id: string): Promise<number> {
   // Every published version is "<id>@v<n>"; the range is that prefix.
-  const snap = await getDb().collection(CRM_COLLECTIONS.CONTENT_POSTS).where("profile_version_id", ">=", `${id}@`).where("profile_version_id", "<", `${id}@`).count().get()
+  const snap = await getDb().collection(CRM_COLLECTIONS.CONTENT_POSTS).where("profile_version_id", ">=", `${id}@`).where("profile_version_id", "<", `${id}@\uf8ff`).count().get()
   return snap.data().count
 }
 
