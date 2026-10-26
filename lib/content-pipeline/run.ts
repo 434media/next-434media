@@ -4,9 +4,10 @@ import { DEFAULT_PROPERTY } from "./properties"
 import { createMcuAi } from "./model"
 import { PIPELINE_MODELS } from "./models"
 import { fetchImage, fetchSourcePage, searchCommons, searchDvids, searchNasa, searchOpenverse } from "./sources"
-import { runDue, label, type ChoiceTasks, type PostRow, type WorkerDeps } from "./worker"
+import { runDue, label, type ChoiceTasks, type WorkerDeps } from "./worker"
 import type { McuDraft, McuJob } from "./store"
 import { adoptablePost, pipelineMarked } from "./ownership"
+import { brandPostRows } from "./roundup"
 
 /** Every post the pipeline writes carries the published profile version it ran under (crm_content_posts). */
 export const profileStamp = () => ({ profile_version_id: activeProfile().versionId })
@@ -48,15 +49,7 @@ export async function pipelineDeps(): Promise<WorkerDeps> {
     content: {
       // The brand's posts under any of the names they carry (older MCU records are not all tagged "milcity"), as
       // findPosts matches them (title, caption or tags), with when each went out for the ICYMI window. Newest first.
-      recentPosts: async () => {
-        const ours = new RegExp(BRAND.posts.match, "i")
-        const mcu = (await tools.intake.listPosts()).filter(p => !p.archived && [p.title, p.social_copy, p.tags, p.platform].some(v => typeof v === "string" && ours.test(v)))
-        const when = (p: (typeof mcu)[number]) => p.posted_at || (p.status === "posted" || p.published_url ? p.date_to_post : undefined)
-        // card: the post's first staged image, the card as posted, which ICYMI reuses as the story's slide.
-        const card = (p: (typeof mcu)[number]) => (Array.isArray(p.assets) ? p.assets : []).find(a => a.kind === "image" && /^https:\/\//.test(a.url))
-        return mcu.map((p): PostRow => ({ id: p.id, title: p.title, status: p.status, ...(p.published_url ? { publishedUrl: p.published_url } : {}), ...(p.social_copy ? { caption: p.social_copy.slice(0, 2200) } : {}), ...(when(p) ? { publishedAt: when(p) } : {}), ...(Array.isArray(p.pipeline_media) && p.pipeline_media.length ? { media: p.pipeline_media.slice(0, 6) } : {}), ...(card(p) ? { card: { url: card(p)!.url, ...(card(p)!.sha256 ? { sha256: card(p)!.sha256 } : {}) } } : {}) }))
-          .sort((a, b) => (b.publishedAt ?? "").localeCompare(a.publishedAt ?? "")).slice(0, 75)
-      },
+      recentPosts: async () => brandPostRows(await tools.intake.listPosts()),
       templateFields: templateId => tools.canvaFields(templateId),
       createDesign: async input => {
         const { design } = await tools.canvaCreate(input)

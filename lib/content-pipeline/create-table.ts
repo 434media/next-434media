@@ -116,7 +116,7 @@ export function templateGap(t: Pick<CreateTemplate, "label" | "templates"> | und
 }
 
 /** A card field as the table shows it. role: which column holds it; "extra" fields show under the row's More fields. */
-export interface CellField { name: string; label: string; role: "headline" | "subHeadline" | "extra"; perLine?: number; maxLines?: number; maxChars?: number; exactLines?: number; uppercase?: boolean; allowed?: readonly string[] }
+export interface CellField { name: string; label: string; role: "headline" | "subHeadline" | "extra" | "story"; perLine?: number; maxLines?: number; maxChars?: number; exactLines?: number; uppercase?: boolean; allowed?: readonly string[] }
 export interface CreateTemplate {
   kind: RequestKind
   label: string
@@ -127,7 +127,14 @@ export interface CreateTemplate {
   templates: Partial<Record<CreateFormat, string>>
   /** The template's image field per format (a video goes into it too), or none. */
   media: Partial<Record<CreateFormat, string>>
+  /**
+   * A roundup (MCU's ICYMI, Step 4 item 1): the cover is filled from min–max chosen published posts, one story row each,
+   * under a fixed headline; each story's published card follows the cover as it is. Feed only: it is a carousel.
+   */
+  roundup?: { min: number; max: number; headline: string; storyCard?: StoryCardTemplate }
 }
+/** The ICYMI story template (the profile's icymi_story series, 4:5): a video story's card is made with it. */
+export interface StoryCardTemplate { series: SeriesKey; template: string; media: string; fields: CellField[] }
 
 /** Written fields only: the server fills dates, counters and labels, and fixed values are the same on every card. */
 const written = (f: FieldSpec) => !f.serverFilled && !f.fixed && !f.date
@@ -137,14 +144,19 @@ export function cellRoles(series: Pick<ProfileSeries, "fields">): { headline?: s
   return { headline: names[0], subHeadline: names[1], extra: names.slice(2) }
 }
 
+/** A roundup cover's story rows (story_01 … story_05): one per story chosen, in order. */
+export const STORY_SLOT = /^story_0([1-9])$/
+export const storySlotUsed = (name: string, stories: number) => { const m = STORY_SLOT.exec(name); return !m || Number(m[1]) <= stories }
+
 /**
- * The templates a brand's Create row offers: its request kinds (one card each) with a template for at least one format.
- * A roundup (a kind with minStories, MCU's ICYMI) is built from published posts and is offered in Step 4, not here.
+ * The templates a brand's Create row offers: its request kinds (one card each) with a template for at least one format,
+ * and a roundup (a kind with minStories, MCU's ICYMI: Step 4 item 1), whose cover is a 4:5 carousel's first card.
  */
 export function createTemplates(profile: BrandProfile): CreateTemplate[] {
-  return profile.requestKinds.filter(k => !k.minStories && k.series.length === 1).flatMap(k => {
+  return profile.requestKinds.filter(k => k.series.length === 1).flatMap(k => {
     const series = profile.series[k.series[0]]
     if (!series) return []
+    if (k.minStories) return roundupTemplate(k, series, profile)
     const templates: CreateTemplate["templates"] = {}, media: CreateTemplate["media"] = {}
     for (const f of ["feed", "reels"] as const) {
       if (series.templates[f]) templates[f] = series.templates[f]
@@ -161,6 +173,33 @@ export function createTemplates(profile: BrandProfile): CreateTemplate[] {
     return [{ kind: k.kind, label: k.label, detail: k.detail, series: k.series[0], fields, templates, media }]
   })
 }
+
+function roundupTemplate(k: BrandProfile["requestKinds"][number], series: ProfileSeries, profile: BrandProfile): CreateTemplate[] {
+  const headline = series.fields.find(f => f.fixed)?.fixed
+  if (!series.templates.feed || !headline) return []
+  const fields: CellField[] = series.fields.filter(f => STORY_SLOT.test(f.name) && written(f)).map(f => ({
+    name: f.name, label: f.label, role: "story", ...(f.perLine ? { perLine: f.perLine } : {}), ...(f.maxLines ? { maxLines: f.maxLines } : {}), ...(f.maxChars ? { maxChars: f.maxChars } : {}),
+  }))
+  const max = Math.min(k.maxStories ?? fields.length, fields.length), min = Math.min(k.minStories ?? 1, max)
+  if (!max) return []
+  // A video story's card: the ICYMI story series, when the profile binds it with a 4:5 template and a photo frame. Its
+  // counter is the server's ("01 / 03"); the person edits the headline and deck.
+  const story = profile.series.icymi_story
+  const storyCard: StoryCardTemplate | undefined = story?.templates.feed && story.media?.feed ? {
+    series: "icymi_story", template: story.templates.feed, media: story.media.feed,
+    fields: story.fields.filter(f => written(f) && f.name !== "counter").map(f => ({ name: f.name, label: f.label, role: "extra" as const, ...(f.perLine ? { perLine: f.perLine } : {}), ...(f.maxLines ? { maxLines: f.maxLines } : {}), ...(f.maxChars ? { maxChars: f.maxChars } : {}), ...(f.uppercase ? { uppercase: true } : {}) })),
+  } : undefined
+  return [{ kind: k.kind, label: k.label, detail: k.detail, series: k.series[0], fields, templates: { feed: series.templates.feed }, media: series.media?.feed ? { feed: series.media.feed } : {}, roundup: { min, max, headline, ...(storyCard ? { storyCard } : {}) } }]
+}
+
+/**
+ * A published post a roundup can recap (Step 4 item 1): last week's live News or Breaking post. `card`: its published
+ * still card, reused as it is. `needsCard`: it has none (a video post), so the row makes it an ICYMI story card from its
+ * headline and deck with a photo the person adds (coordinator's call, 2026-10-26).
+ */
+export interface RoundupStory { postId: string; title: string; publishedAt?: string; publishedUrl?: string; card?: string; needsCard?: true; /** Its headline and deck as they were set (a Create row's), for the story row and a made card. */ headline?: string; deck?: string; /** The photo it used, with the page it came from, for the cover. */ photo?: { url: string; pageUrl: string } }
+/** A made ICYMI story card's text and photo (a video story), by the story's post id. */
+export interface StoryCard { headline: string; deck: string; media: RowMedia | null }
 
 export interface RowMedia { url: string; kind: "image" | "video"; name: string; bytes?: number; width?: number; height?: number; durationSec?: number; optimized?: string; /** The link it was pasted from (a dropped file has none): a DVIDS photo keeps its credit. */ source?: string }
 export interface CreateRow {
@@ -181,12 +220,26 @@ export interface CreateRow {
   fields: Record<string, string>
   /** The profile version Human+ wrote under, carried to the posts with the one the Run job fills under. */
   copyVersionId?: string
+  /** A roundup's chosen published posts, by id, in the order the cover lists them. */
+  roundup?: string[]
+  /** A roundup's made story cards (its video stories), by post id: the card's headline, deck and photo. */
+  storyCards?: Record<string, StoryCard>
 }
 
 /** The card text a template gets: the row's fields under the names the template has. */
-export function designText(t: Pick<CreateTemplate, "fields">, row: Pick<CreateRow, "headline" | "subHeadline" | "fields" | "date">, dataset: Record<string, string>): { text: Record<string, string>; unfilled: string[] } {
+export function designText(t: Pick<CreateTemplate, "fields" | "roundup">, row: Pick<CreateRow, "headline" | "subHeadline" | "fields" | "date" | "roundup">, dataset: Record<string, string>): { text: Record<string, string>; unfilled: string[] } {
   const text: Record<string, string> = {}, unfilled: string[] = []
   const put = (names: string[], value: string) => { const n = names.find(x => dataset[x] === "text"); if (n && value.trim()) { text[n] = value.trim(); return true } return false }
+  if (t.roundup) {
+    // The cover: its fixed headline, one row per chosen story and their numbers ("01\n02\n03"); the rows past the last
+    // story are left unfilled, as the pipeline's roundup left them.
+    const n = row.roundup?.length ?? 0
+    if (!put(["headline"], t.roundup.headline)) unfilled.push("Cover headline")
+    put(["story_numbers"], Array.from({ length: n }, (_, i) => String(i + 1).padStart(2, "0")).join("\n"))
+    for (const f of t.fields.filter(f => storySlotUsed(f.name, n))) if (!put([f.name], row.fields[f.name] ?? "")) unfilled.push(f.label)
+    put(["date"], row.fields.date?.trim() || (row.date ? ddmmmyy(row.date) : ""))
+    return { text, unfilled }
+  }
   for (const f of t.fields) {
     const raw = f.role === "headline" ? row.headline : f.role === "subHeadline" ? row.subHeadline : row.fields[f.name] ?? ""
     // A template that names the column differently (a generic master: headline, deck) still gets it.
@@ -214,6 +267,7 @@ export function rowProblems(row: CreateRow, t: CreateTemplate | undefined): stri
   const p: string[] = []
   if (!row.brand) p.push("Choose a Brand")
   if (!t) { p.push("Choose a Template"); return p }
+  if (t.roundup) return [...p, ...roundupProblems(row, t, t.roundup)]
   const formats = formatsOf(row.platforms)
   if (!formats.length) p.push("Tick at least one platform")
   p.push(...platformProblems(row.platforms, mediaShapeOf(row.media)))
@@ -223,6 +277,33 @@ export function rowProblems(row: CreateRow, t: CreateTemplate | undefined): stri
   if (!row.headline.trim()) p.push("Write the Headline")
   if (t.fields.some(f => f.role === "subHeadline") && !row.subHeadline.trim()) p.push("Write the Sub-headline")
   for (const f of t.fields.filter(f => f.role === "extra" && f.name !== "source")) if (!(row.fields[f.name] ?? "").trim()) p.push(`Write ${f.label}`)
+  if (!row.caption.trim()) p.push("Write the Caption")
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(row.date)) p.push("Pick a Date")
+  return p
+}
+
+/** What keeps a roundup row from running: min–max stories, a row for each, the cover's media, a caption and a date. */
+function roundupProblems(row: CreateRow, t: CreateTemplate, r: NonNullable<CreateTemplate["roundup"]>): string[] {
+  const p: string[] = [], n = row.roundup?.length ?? 0
+  if (n < r.min || n > r.max) p.push(`Tick ${r.min}–${r.max} published stories`)
+  else if (new Set(row.roundup).size !== n) p.push("Tick each story once")
+  const formats = formatsOf(row.platforms)
+  if (!formats.length) p.push("Tick at least one platform")
+  if (formats.some(f => f.format !== "feed")) p.push(`${t.label} is a 4:5 carousel; it has no 9:16 size`)
+  if (t.media.feed && !row.media) p.push("Add the cover's photo")
+  if (row.media?.kind === "video") p.push(`${t.label} is a carousel of photos; its cover takes a photo, not a video`)
+  if (row.media && row.media.optimized !== "done") p.push("Wait for the media to finish optimizing")
+  for (const f of t.fields.filter(f => storySlotUsed(f.name, n) && n)) if (!(row.fields[f.name] ?? "").trim()) p.push(`Write ${f.label}`)
+  // A ticked video story's card: its headline and a photo (the deck may be empty).
+  for (const [i, id] of (row.roundup ?? []).entries()) {
+    const c = row.storyCards?.[id]
+    if (!c) continue
+    if (!r.storyCard) { p.push(`Story ${i + 1} is a video post and ${t.label} has no story-card template to make its card`); continue }
+    if (!c.headline.trim()) p.push(`Write story ${i + 1}'s card headline`)
+    if (!c.media) p.push(`Add a photo for story ${i + 1}'s card`)
+    else if (c.media.kind !== "image") p.push(`Story ${i + 1}'s card takes a photo, not a video`)
+    else if (c.media.optimized !== "done") p.push(`Wait for story ${i + 1}'s photo to finish optimizing`)
+  }
   if (!row.caption.trim()) p.push("Write the Caption")
   if (!/^\d{4}-\d{2}-\d{2}$/.test(row.date)) p.push("Pick a Date")
   return p

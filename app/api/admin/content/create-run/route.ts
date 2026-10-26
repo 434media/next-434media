@@ -9,6 +9,7 @@ export const runtime = "nodejs"
 export const maxDuration = 800
 
 const text = (max: number) => z.string().max(max)
+const MEDIA = z.object({ url: z.string().url().max(2000), kind: z.enum(["image", "video"]), name: text(120), bytes: z.number().int().nonnegative().optional(), width: z.number().optional(), height: z.number().optional(), durationSec: z.number().optional(), optimized: z.string().max(20).optional(), source: z.string().max(2000).optional() })
 const row = z.object({
   id: z.string().regex(/^[A-Za-z0-9_-]{8,64}$/),
   brand: z.string().regex(/^[a-z0-9-]{2,40}$/),
@@ -21,6 +22,10 @@ const row = z.object({
   date: z.string().max(10),
   fields: z.record(z.string().regex(/^[a-z][a-z0-9_]{0,63}$/), text(400)),
   copyVersionId: z.string().max(80).optional(),
+  /** An ICYMI roundup row's ticked published posts, in order (the Run job checks them again). */
+  roundup: z.array(z.string().regex(/^[A-Za-z0-9_-]{1,64}$/)).max(10).optional(),
+  /** A roundup's video stories' cards (made by the Run job), by post id: headline, deck and photo. */
+  storyCards: z.record(z.string().regex(/^[A-Za-z0-9_-]{1,64}$/), z.object({ headline: text(200), deck: text(400), media: MEDIA.nullable() }).strict()).optional(),
 }).strict()
 
 /**
@@ -35,6 +40,8 @@ export async function POST(req: NextRequest) {
   if (!parsed.success) return NextResponse.json({ error: "The row is incomplete or malformed" }, { status: 400 })
   const r = parsed.data
   if (r.media && !isCreateUpload(r.media.url)) return NextResponse.json({ error: "Media must be added through the table" }, { status: 400 })
+  // A story card's photo is the table's own upload too (it goes into Canva as it is).
+  for (const c of Object.values(r.storyCards ?? {})) if (c.media && (!isCreateUpload(c.media.url) || c.media.kind !== "image")) return NextResponse.json({ error: "A story card's photo must be added through the table" }, { status: 400 })
   // The size picks Canva's video upload path; it is read from the store, never taken from the browser.
   if (r.media) {
     const stored = await (await import("@vercel/blob")).head(r.media.url).catch(() => null)

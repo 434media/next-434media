@@ -341,18 +341,20 @@ const MAX_CHOICES = 20
  * TODO(analytics): the founder's rule is the five best-performing stories; rank by performance once analytics are
  * mapped to this workflow. Until then, recency, and the requester's choice when more qualify.
  */
-export function icymiStory(posts: PostRow[], window: { startMs: number; endMs: number; label: string }, size = { min: 1, max: ICYMI_MAX }): Story[] | { hold: string } {
+export function icymiStory(posts: PostRow[], window: { startMs: number; endMs: number; label: string }, size = { min: 1, max: ICYMI_MAX }, opts: { cardless?: boolean } = {}): Story[] | { hold: string } {
   const at = (p: PostRow) => p.publishedAt ? Date.parse(p.publishedAt) : NaN
   // DT101 posts are told by their mission-brief caption too: older manual ones aren't titled DT101 (gate round 1, ULTRA).
   const exclude = new RegExp(BRAND.posts.roundupExclude, "i"), excludeCaption = new RegExp(BRAND.posts.roundupExcludeCaption, "i")
   const eligible = posts.filter(p => publishedPost(p) && !exclude.test(p.title) && p.caption && !excludeCaption.test(p.caption) && at(p) >= window.startMs && at(p) < window.endMs)
     .sort((a, b) => at(b) - at(a))
     .filter((p, i, all) => all.findIndex(x => x.title.trim().toLowerCase() === p.title.trim().toLowerCase()) === i)
-  const withCard = eligible.filter(p => p.card && /^https:\/\//.test(p.card.url)).slice(0, MAX_CHOICES)
+  // cardless (the Create table, Step 4): a story with no still card (a video post) qualifies too; the table makes it an
+  // ICYMI story card from its headline. The parked pipeline keeps the rule that a story brings its own card.
+  const withCard = eligible.filter(p => opts.cardless || (p.card && /^https:\/\//.test(p.card.url))).slice(0, MAX_CHOICES)
   if (!eligible.length) return { hold: `no ${BRAND.shortName} News or Breaking story was published in ${window.label}, so there is no ICYMI` }
-  if (withCard.length < size.min) return { hold: `only ${withCard.length} ${BRAND.shortName} News or Breaking ${withCard.length === 1 ? "story" : "stories"} with a published card ${withCard.length === 1 ? "was" : "were"} published in ${window.label}${eligible.length > withCard.length ? ` (${eligible.length - withCard.length} more without a staged card)` : ""}, and an ICYMI takes at least ${size.min}, so there is no ICYMI` }
+  if (withCard.length < size.min) return { hold: `only ${withCard.length} ${BRAND.shortName} News or Breaking ${withCard.length === 1 ? "story" : "stories"}${opts.cardless ? "" : " with a published card"} ${withCard.length === 1 ? "was" : "were"} published in ${window.label}${eligible.length > withCard.length ? ` (${eligible.length - withCard.length} more without a staged card)` : ""}, and an ICYMI takes at least ${size.min}, so there is no ICYMI` }
   return [roundupStory(withCard.map(p => ({
-    postId: p.id, title: p.title, caption: (p.caption || "").split("\n").filter(l => !/^Image: /.test(l) && l !== DOD_NOTICE).join("\n").trim().slice(0, 800), ...(p.publishedUrl ? { publishedUrl: p.publishedUrl } : {}), ...(p.publishedAt ? { publishedAt: p.publishedAt } : {}), ...(p.media?.[0] ? { media: p.media[0] } : {}), card: p.card!,
+    postId: p.id, title: p.title, caption: (p.caption || "").split("\n").filter(l => !/^Image: /.test(l) && l !== DOD_NOTICE).join("\n").trim().slice(0, 800), ...(p.publishedUrl ? { publishedUrl: p.publishedUrl } : {}), ...(p.publishedAt ? { publishedAt: p.publishedAt } : {}), ...(p.media?.[0] ? { media: p.media[0] } : {}), ...(p.card && /^https:\/\//.test(p.card.url) ? { card: p.card } : {}),
   })), window.label)]
 }
 /**
@@ -370,7 +372,7 @@ export function publishedPost(p: Pick<PostRow, "status" | "title">): boolean {
   return p.status === "posted" && !REVIEW_DRAFT_TITLE.test(p.title)
 }
 /** The roundup's story: its source is the stories' own titles and captions, in order. */
-function roundupStory(items: RoundupItem[], label: string): Story {
+export function roundupStory(items: RoundupItem[], label: string): Story {
   return { title: "ICYMI roundup", primaryUrl: items[0]?.publishedUrl || BRAND.posts.homeUrl, publisher: BRAND.name, sourceTitle: `${items.length} published ${BRAND.shortName} ${items.length === 1 ? "story" : "stories"} from ${label}`, sourceText: items.map((p, i) => `${i + 1}. ${p.title}\n${p.caption}`).join("\n\n"), roundup: items }
 }
 /**
