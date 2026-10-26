@@ -561,12 +561,13 @@ test("ICYMI Replace media: the new cover photo, and the same published cards aft
 
 test("ICYMI Human+: the writer drafts the story rows and caption from the ticked posts; nothing is read from the web", async () => {
   let fetched = 0
-  const ai = stubAi({ write: async () => ({ frames: [{ series: "icymi_cover", fields: { story_01: "Army fields new kit", story_02: "Navy tests drone", story_03: "Air Force picks jet" } }], caption: "Three stories from last week.\n\nSource: the brand's posts, 12–18 Oct 2026" }) })
+  const ai = stubAi({ write: async () => ({ frames: [{ series: "icymi_cover", fields: { story_01: "01 Army fields new kit", story_02: "5 drones join Navy", story_03: "3. Air Force picks jet" } }], caption: "Three stories from last week.\n\nSource: the brand's posts, 12–18 Oct 2026" }) })
   const items = STORIES.slice(0, 3).map(x => ({ postId: x.postId, title: x.title, caption: `${x.title} caption.`, card: { url: x.card! } }))
   const r = await humanPlusRoundup({ ai: () => ai, fetchPage: async () => { fetched++; return page }, seeds: async () => null, nowMs: () => Date.parse("2026-10-19T15:00:00Z") }, { kind: "icymi", items, window: "the week of 2026-10-12", requestedBy: { actorEmail: "a@b.co", actorName: "A" } })
   assert.equal(fetched, 0)
   assert.equal(r.hold, undefined, r.hold)
-  assert.equal(r.fields.story_02, "Navy tests drone")
+  assert.equal(r.fields.story_02, "5 drones join Navy", "a number that is the story's own stays")
+  assert.deepEqual([r.fields.story_01, r.fields.story_03], ["Army fields new kit", "Air Force picks jet"], "the cover prints its own numbers")
   assert.equal(r.fields.story_04, undefined)
   assert.equal(r.fields.headline, undefined, "the fixed headline is never the writer's")
   assert.match(r.caption, /^Three stories from last week\./)

@@ -140,7 +140,10 @@ export async function humanPlusRoundup(deps: HumanPlusDeps, input: { kind: Reque
     console.error("[human-plus] roundup write failed:", err instanceof Error ? err.message : err)
     throw new HumanPlusError("The writer could not answer just now; try Human+ again", 502)
   }
-  const fields = Object.fromEntries(Object.entries(written.frames[0]?.fields ?? {}).filter(([k]) => /^story_0\d$/.test(k) || k === "date"))
+  // The cover prints its own numbers (story_numbers): a row the writer numbered ("01 Microchip buys …", seen on the
+  // live preview, 2026-10-26) loses its number. Only a "01" or "1." style marker: "5 drones arrive" keeps its 5.
+  const fields = Object.fromEntries(Object.entries(written.frames[0]?.fields ?? {}).filter(([k]) => /^story_0\d$/.test(k) || k === "date")
+    .map(([k, v]) => [k, k === "date" ? v : v.replace(/^\s*(?:0\d|\d{1,2}[.):\-–—|])\s+/, "")]))
   // The cover's photo is the row's: a DVIDS photo gets its credit and the notice, as a one-card row's does.
   const credited = await mediaCredit(deps, written.caption, input.mediaFrom)
   return { fields, headline: "", subHeadline: "", caption: credited.caption, notes: credited.note ? [...written.notes, credited.note] : written.notes, facts: 0, ...(written.hold ? { hold: written.hold } : {}), source: { url: story.primaryUrl, title: story.sourceTitle }, calls }
