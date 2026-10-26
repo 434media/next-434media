@@ -96,7 +96,7 @@ export default function BrandPage() {
     <AdminRoleGuard allowedRoles={[]}>
       <div className="min-h-full bg-neutral-50 px-4 sm:px-6 py-6">
         <div className="max-w-5xl mx-auto space-y-6">
-          <Link href="/admin/brands" className="inline-flex items-center gap-1 text-xs text-neutral-500 hover:text-neutral-900"><ArrowLeft className="w-3.5 h-3.5" /> Brands</Link>
+          <Link href="/admin/brands" className="flex w-fit items-center gap-1 text-xs text-neutral-500 hover:text-neutral-900"><ArrowLeft className="w-3.5 h-3.5" /> Brands</Link>
           {error && <p className="text-sm text-red-600">{error}</p>}
           {!view && !error && <p className="text-sm text-neutral-500 inline-flex items-center gap-2"><Loader2 className="w-4 h-4 animate-spin" /> Reading the brand…</p>}
           {view && b && <>
@@ -199,7 +199,8 @@ export default function BrandPage() {
 
 function Section({ title, note, children }: { title: string; note?: string; children: React.ReactNode }) {
   return (
-    <section className="rounded-lg border border-neutral-200 bg-white p-4">
+    // min-w-0 and overflow-wrap: anywhere keep a long unbroken value (a sheet id, an email) inside the card on a phone.
+    <section className="min-w-0 rounded-lg border border-neutral-200 bg-white p-4 [overflow-wrap:anywhere]">
       <h2 className="text-sm font-semibold text-neutral-900">{title}</h2>
       {note && <p className="mt-0.5 text-xs text-neutral-500">{note}</p>}
       <div className="mt-3">{children}</div>
