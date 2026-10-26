@@ -64,8 +64,13 @@ export function ContactPageClient() {
   }, [drawDots])
 
   return (
-    <div className="min-h-dvh bg-white text-neutral-900 overflow-hidden pt-10">
-      <div className="relative min-h-dvh flex items-center py-4 lg:py-6">
+    // Clears the fixed header by its one height (--site-header-h), and uses the
+    // site gutter, so the headline starts on the same edge as the logo. The
+    // page used to centre itself in a full-height box under a 40px offset with
+    // its own 1280px container, which put the form's last third below the
+    // fold on a 13-inch laptop.
+    <div className="min-h-dvh bg-white text-neutral-900 overflow-hidden pt-(--site-header-h)">
+      <div className="relative">
         {/* Dot Distortion Background */}
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
           <div className="absolute inset-0 bg-linear-to-br from-neutral-50 via-white to-neutral-50" />
@@ -76,13 +81,13 @@ export function ContactPageClient() {
           aria-hidden="true"
         />
 
-        <div className="relative w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 lg:py-6">
+        <div className="relative w-full px-(--site-gutter) py-8 lg:py-6">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-10 xl:gap-16 items-start">
             <motion.div
               initial={{ opacity: 0, y: 50 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.8 }}
-              className="space-y-5 lg:space-y-6 mt-16 sm:mt-20 lg:mt-0 @container"
+              className="space-y-5 lg:space-y-6 lg:pt-2 @container"
             >
               {/* Main Headline */}
               <motion.div

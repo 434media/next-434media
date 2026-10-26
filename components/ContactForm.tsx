@@ -4,8 +4,7 @@ import type React from "react"
 import { useState, useRef, useEffect } from "react"
 import { motion, AnimatePresence } from "motion/react"
 import { Check, Loader2 } from "lucide-react"
-import { Button } from "@/components/ui/Button"
-import { Eyebrow } from "@/components/ui/Eyebrow"
+import { Select } from "@/components/ui/Select"
 import { BUDGET_RANGES, ORGANIZATION_TYPES, REQUEST_OPTIONS } from "@/lib/start-a-production"
 
 interface ContactFormProps {
@@ -37,12 +36,16 @@ type ControlProps = {
   className: string
 }
 
+// The form treatment in Display and Design Standard 3.7, as the Lead with Ops
+// feedback form has it: square-cornered white fields, a neutral border that
+// darkens to the palette black on focus, and the one functional error colour
+// (the palette's signal) in place of Tailwind's reds.
 const fieldClass = (hasError: boolean) =>
-  `mt-1.5 block w-full rounded-lg bg-neutral-50 border ${
+  `mt-1.5 block w-full bg-(--434-white) border ${
     hasError
-      ? "border-red-400 focus:ring-red-500 focus:border-red-500"
-      : "border-neutral-200 focus:ring-neutral-900 focus:border-neutral-900"
-  } text-neutral-900 placeholder-neutral-400 t-control px-3 py-2 lg:px-3.5 lg:py-2.5 transition-colors`
+      ? "border-(--color-fn-error)"
+      : "border-neutral-300 hover:border-neutral-500 focus:border-(--434-color-02-black)"
+  } text-neutral-900 placeholder:text-neutral-500 t-control px-3.5 py-2.5 transition-colors focus:outline-none`
 
 export function ContactForm({ className = "", isVisible = true }: ContactFormProps) {
   const [isLoading, setIsLoading] = useState(false)
@@ -145,9 +148,14 @@ export function ContactForm({ className = "", isVisible = true }: ContactFormPro
     { required = true, span = true }: { required?: boolean; span?: boolean } = {},
   ) => (
     <div className={span ? "sm:col-span-2" : undefined}>
-      <Eyebrow as="label" htmlFor={name} className="block">
-        {label} {required && <span aria-hidden="true">*</span>}
-      </Eyebrow>
+      <label htmlFor={name} className="t-label block text-neutral-600">
+        {label}{" "}
+        {required && (
+          <span className="text-(--color-fn-error)" aria-hidden="true">
+            *
+          </span>
+        )}
+      </label>
       {control({
         name,
         id: name,
@@ -156,33 +164,29 @@ export function ContactForm({ className = "", isVisible = true }: ContactFormPro
         className: fieldClass(!!fieldErrors[name]),
       })}
       {fieldErrors[name] && (
-        <p className="mt-1 t-body-s text-red-600" id={`${name}-error`}>
+        <p className="mt-1 t-body-s text-(--color-fn-error)" id={`${name}-error`}>
           {fieldErrors[name]}
         </p>
       )}
     </div>
   )
 
+  // The branded dropdown (components/ui/Select.tsx), not a native <select>.
   const select = (options: readonly string[]) =>
     function SelectControl(props: ControlProps) {
       return (
-        <select {...props} required aria-required="true" defaultValue="">
-          <option value="" disabled>
-            Select one
-          </option>
-          {options.map((o) => (
-            <option key={o} value={o}>
-              {o}
-            </option>
-          ))}
-        </select>
+        <Select
+          name={props.name}
+          id={props.id}
+          options={options}
+          invalid={props["aria-invalid"]}
+          describedBy={props["aria-describedby"]}
+        />
       )
     }
 
   return (
-    <div
-      className={`bg-white rounded-2xl lg:rounded-3xl p-5 lg:p-6 overflow-hidden border border-neutral-200 shadow-sm ${className}`}
-    >
+    <div className={`bg-(--434-white) border border-neutral-200 p-5 lg:p-6 ${className}`}>
       <AnimatePresence mode="wait">
         {hasSubmitted ? (
           <motion.div
@@ -196,10 +200,10 @@ export function ContactForm({ className = "", isVisible = true }: ContactFormPro
             role="status"
           >
             <div className="text-center">
-              <div className="mx-auto h-12 w-12 text-neutral-900 flex items-center justify-center rounded-full bg-neutral-100">
+              <div className="mx-auto h-12 w-12 text-neutral-900 flex items-center justify-center bg-(--434-color-04)">
                 <Check className="h-6 w-6" />
               </div>
-              <h3 className="mt-4 t-heading-s text-neutral-900 tracking-tight">Thank you. We have your request.</h3>
+              <h3 className="mt-4 t-heading-s text-neutral-900">Thank you. We have your request.</h3>
               <p className="mt-1.5 t-body-s text-neutral-500">
                 We review every request before confirming the right next step.
               </p>
@@ -214,41 +218,42 @@ export function ContactForm({ className = "", isVisible = true }: ContactFormPro
             exit="exit"
             aria-live="polite"
           >
-            <div className="mb-4 lg:mb-5">
-              {/* Geist, not the Menda display face. This is a card heading at
-                  20px; the display face only carries its personality at page-
-                  headline sizes (48px+) and below that just reads as an odd
-                  sans. Display type is reserved for page-level headlines. */}
-              <h2 className="font-geist-sans t-heading-s text-neutral-900 tracking-tight">Production details</h2>
-              <p className="mt-1.5 t-caption text-neutral-400">Fields marked with * are required</p>
-            </div>
-            <form className="space-y-3.5" onSubmit={handleSubmit} ref={formRef} id="contact-form" noValidate>
-              <div className="grid grid-cols-1 gap-x-4 lg:gap-x-5 gap-y-3.5 sm:grid-cols-2">
+            {/* No card heading: "Production details" repeated what the page
+                headline already says, and its two lines were part of why the
+                page could not fit a laptop screen. The required note moves to
+                the line above the submit button. */}
+            <form className="space-y-4" onSubmit={handleSubmit} ref={formRef} id="contact-form" noValidate>
+              <div className="grid grid-cols-1 gap-x-4 lg:gap-x-5 gap-y-3 sm:grid-cols-2">
                 {field("firstName", "First name", (p) => <input type="text" ref={firstNameRef} required aria-required="true" {...p} />, { span: false })}
                 {field("lastName", "Last name", (p) => <input type="text" required aria-required="true" {...p} />, { span: false })}
                 {field("role", "Role", (p) => <input type="text" required aria-required="true" placeholder="Your title or role" {...p} />, { span: false })}
                 {field("company", "Organization", (p) => <input type="text" required aria-required="true" placeholder="Organization name" {...p} />, { span: false })}
-                {field("organizationType", "Organization type", select(ORGANIZATION_TYPES))}
                 {field("email", "Work email", (p) => <input type="email" required aria-required="true" placeholder="name@organization.com" {...p} />, { span: false })}
                 {field("phoneNumber", "Phone", (p) => <input type="tel" placeholder="(123) 456-7890" {...p} />, { required: false, span: false })}
-                {field("requestType", "Request", select(REQUEST_OPTIONS))}
-                {field("message", "What do you want to produce or accomplish?", (p) => <textarea rows={3} required aria-required="true" {...p} />)}
+                {field("organizationType", "Organization type", select(ORGANIZATION_TYPES), { span: false })}
+                {field("requestType", "Request", select(REQUEST_OPTIONS), { span: false })}
+                {field("message", "What do you want to produce or accomplish?", (p) => <textarea rows={2} required aria-required="true" {...p} className={`${p.className} resize-y`} />)}
                 {field("timeline", "Timeline", (p) => <input type="text" required aria-required="true" placeholder="Target date or window" {...p} />, { span: false })}
                 {field("budgetRange", "Budget range", select(BUDGET_RANGES), { span: false })}
                 {field("referralSource", "How did you hear about 434?", (p) => <input type="text" required aria-required="true" {...p} />)}
               </div>
 
               {error && (
-                <div
-                  className="p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 t-body-s"
-                  role="alert"
-                >
+                <p className="t-body-s text-(--color-fn-error)" role="alert">
                   {error}
-                </div>
+                </p>
               )}
 
-              <div className="pt-1">
-                <Button type="submit" size="lg" fullWidth disabled={isLoading}>
+              {/* 3.7's submit: full width, square, white on the palette black. */}
+              <div>
+                <p className="mb-2 t-caption text-neutral-500">
+                  <span className="text-(--color-fn-error)" aria-hidden="true">*</span> Required
+                </p>
+                <button
+                  type="submit"
+                  disabled={isLoading}
+                  className="t-control-emphasis flex w-full items-center justify-center gap-2 bg-(--434-color-02-black) px-6 py-3.5 text-(--434-white) transition-colors hover:bg-neutral-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-(--434-color-02-black) focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                >
                   {isLoading ? (
                     <>
                       <Loader2 className="animate-spin h-4 w-4" aria-hidden="true" />
@@ -257,7 +262,7 @@ export function ContactForm({ className = "", isVisible = true }: ContactFormPro
                   ) : (
                     "Start a production"
                   )}
-                </Button>
+                </button>
               </div>
             </form>
           </motion.div>
