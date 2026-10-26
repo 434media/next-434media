@@ -93,7 +93,7 @@ export interface AttachResult { post: PostSummary; assets: { url: string; mime: 
  * <uuid>-milcity-2026-10-21-headline-01-feed-page-1.jpg; the UUID stays first, as the publisher checks) and replaces the
  * post's assets in the given order. Nothing is stored for the post if any item fails.
  */
-export async function attachExports(deps: IntakeDeps, input: { postId: string; items: ExportItem[]; randomId: () => string; canva?: { designId: string; pages?: number[] }; fileBase?: string; rebind?: boolean }): Promise<AttachResult> {
+export async function attachExports(deps: IntakeDeps, input: { postId: string; items: ExportItem[]; randomId: () => string; canva?: { designId: string; pages?: number[] }; canvaItems?: number; fileBase?: string; rebind?: boolean }): Promise<AttachResult> {
   if (!input.items.length || input.items.length > META_FORMAT_RULES.instagramCarousel.maxItems) throw new MetaBlocked("Attach 1–10 exports in carousel order")
   const post = await assertAttachable(deps, input.postId)
   // rebind: the Create table's re-run after the row changed puts its new design on the same post (the caller checks
@@ -117,8 +117,10 @@ export async function attachExports(deps: IntakeDeps, input: { postId: string; i
   const stored: Asset[] = []
   for (const [i, m] of measured.entries()) {
     const url = await deps.storeExport(m.bytes, `content-posts/${input.randomId()}-${m.name}`, m.mime)
-    stored.push({ url, kind: m.mime === "video/mp4" ? "video" : "image", source: input.canva ? "canva" : "upload", width: m.width, height: m.height, sha256: m.sha256, bytes: m.bytes.byteLength,
-      ...(input.canva ? { canvaDesignId: input.canva.designId, page: input.canva.pages?.[i] ?? i + 1 } : {}) })
+    // canvaItems: only the first items are the design's pages; a roundup's published cards after them are not.
+    const fromCanva = !!input.canva && i < (input.canvaItems ?? Infinity)
+    stored.push({ url, kind: m.mime === "video/mp4" ? "video" : "image", source: fromCanva ? "canva" : "upload", width: m.width, height: m.height, sha256: m.sha256, bytes: m.bytes.byteLength,
+      ...(fromCanva ? { canvaDesignId: input.canva!.designId, page: input.canva!.pages?.[i] ?? i + 1 } : {}) })
   }
   const updated = await deps.setAssets(post.id, stored, { export_fingerprint: fingerprint, export_staged_at: deps.now(), ...(input.canva ? { canva_design_id: input.canva.designId } : {}) })
   return { post: summarizePost(updated), assets: stored.map((a, i) => ({ url: a.url, mime: measured[i].mime, width: measured[i].width, height: measured[i].height, ...(measured[i].duration ? { duration: measured[i].duration } : {}), bytes: measured[i].bytes.byteLength })), holds: holdsFor(measured), fingerprint, reused: false }

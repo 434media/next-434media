@@ -3,9 +3,9 @@ import { createMcuAi, framesFor, type McuAi, type ModelCall } from "./model"
 import { PIPELINE_MODELS } from "./models"
 import { fetchSourcePage, pageImageCandidate, type SourcePage } from "./sources"
 import { SERIES, type RequestKind } from "./series"
-import { DOD_NOTICE, normalizeDate, withCredits, writeCopy, type WrittenCopy } from "./worker"
+import { DOD_NOTICE, normalizeDate, roundupStory, withCredits, writeCopy, type WrittenCopy } from "./worker"
 import type { McuSeeds } from "./seeds"
-import type { RequestRef, Story } from "./store"
+import type { RequestRef, RoundupItem, Story } from "./store"
 import { cellRoles } from "./create-table"
 import { dvidsImagePage } from "./create-media"
 
@@ -123,6 +123,25 @@ export async function humanPlus(deps: HumanPlusDeps, input: HumanPlusInput): Pro
     source: { url: story.primaryUrl, title: story.sourceTitle, ...(story.publishedAt ? { publishedAt: story.publishedAt } : {}), ...(viaSearch ? { readViaSearch: true } : {}) },
     calls,
   }
+}
+
+/**
+ * Human+ for an ICYMI roundup row (Step 4 item 1): the pipeline's writer drafts the cover's story rows and the caption
+ * from the chosen published posts' own titles and captions, as the pipeline's roundup did. Nothing is read from the web:
+ * the stories are the brand's own posts. The cover's headline is fixed and its date and numbers are the server's.
+ */
+export async function humanPlusRoundup(deps: Omit<HumanPlusDeps, "fetchPage">, input: { kind: RequestKind; items: RoundupItem[]; window: string; notes?: string; requestedBy: RequestRef }): Promise<HumanPlusCopy> {
+  const calls: ModelCall[] = []
+  const ai = deps.ai(c => { calls.push(c) })
+  const story = roundupStory(input.items, input.window)
+  let written: WrittenCopy
+  try { written = await writeCopy(deps, ai, { kind: input.kind, story, ...(input.notes?.trim() ? { direction: input.notes.trim() } : {}), requestedBy: input.requestedBy }) }
+  catch (err) {
+    console.error("[human-plus] roundup write failed:", err instanceof Error ? err.message : err)
+    throw new HumanPlusError("The writer could not answer just now; try Human+ again", 502)
+  }
+  const fields = Object.fromEntries(Object.entries(written.frames[0]?.fields ?? {}).filter(([k]) => /^story_0\d$/.test(k) || k === "date"))
+  return { fields, headline: "", subHeadline: "", caption: written.caption, notes: written.notes, facts: 0, ...(written.hold ? { hold: written.hold } : {}), source: { url: story.primaryUrl, title: story.sourceTitle }, calls }
 }
 
 /** Production wiring: the pipeline's models and search tool (run.ts pipelineDeps), without the board or Canva. */

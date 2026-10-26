@@ -21,6 +21,8 @@ const row = z.object({
   date: z.string().max(10),
   fields: z.record(z.string().regex(/^[a-z][a-z0-9_]{0,63}$/), text(400)),
   copyVersionId: z.string().max(80).optional(),
+  /** An ICYMI roundup row's ticked published posts, in order (the Run job checks them again). */
+  roundup: z.array(z.string().regex(/^[A-Za-z0-9_-]{1,64}$/)).max(10).optional(),
 }).strict()
 
 /**

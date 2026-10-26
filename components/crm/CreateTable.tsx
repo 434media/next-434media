@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react"
 import { Check, Loader2, PenLine, Play, Plus, Trash2, Upload, X, ArrowUpRight } from "lucide-react"
-import { CREATE_ROWS_STORE_KEY, CREATE_SOCIALS, FORMAT_LABEL, SOCIAL_LABEL, choiceLabel, formatChoices, formatsOf, mediaShapeOf, normalizePlatforms, pickedFormat, platformIdOf, rowProblems, templateGap, type CellField, type CreateFormat, type CreatePlatform, type CreateRow, type CreateSocial, type CreateTemplate, type MediaShape } from "@/lib/content-pipeline/create-table"
+import { CREATE_ROWS_STORE_KEY, CREATE_SOCIALS, FORMAT_LABEL, SOCIAL_LABEL, choiceLabel, formatChoices, formatsOf, mediaShapeOf, normalizePlatforms, pickedFormat, platformIdOf, rowProblems, templateGap, type CellField, type CreateFormat, type CreatePlatform, type CreateRow, type CreateSocial, type CreateTemplate, type MediaShape, type RoundupStory } from "@/lib/content-pipeline/create-table"
 import { HelpTip } from "@/components/admin/HelpTip"
 import { isCanvaLink, mediaFromCanva, mediaFromFile, mediaFromLink, type MediaResult } from "./row-media"
 
@@ -21,10 +21,16 @@ import { isCanvaLink, mediaFromCanva, mediaFromFile, mediaFromLink, type MediaRe
  *
  * Step 3 part 5: one size per platform per row. Each platform is ticked once; its size follows the row's media (a photo
  * goes to Instagram and Facebook at 4:5; a video as a 9:16 Reel, or at 4:5), and a (?) tip explains each choice.
+ *
+ * Step 4 item 1: ICYMI. A roundup template lists last week's live News and Breaking posts in place of the reference
+ * link; the person ticks min–max, writes (or asks Human+ for) one row per story under the cover's fixed headline, and
+ * Run job fills the cover and puts each story's published card after it.
  */
 interface BrandConfig { id: string; label: string; active: boolean; reason: string | null; versionId: string | null; templates: CreateTemplate[] }
 interface Config { brands: BrandConfig[]; platforms: CreatePlatform[] }
 interface RunPost { format: "feed" | "reels"; postId: string; designId: string; editUrl: string; previewUrl?: string; holds: string[] }
+interface Roundup { window: string; min: number; max: number; stories: RoundupStory[]; hold?: string }
+interface RoundupLoad { data?: Roundup; error?: string }
 interface RowState { busy?: "human" | "media" | "run"; message?: string; error?: string; notes?: string[]; hold?: string; posts?: RunPost[]; done?: boolean }
 
 const STORE_KEY = CREATE_ROWS_STORE_KEY
@@ -79,6 +85,9 @@ export function CreateTable({ onPostsReady }: { onPostsReady?: () => void }) {
   const [rows, setRows] = useState<CreateRow[]>([])
   const [state, setState] = useState<Record<string, RowState>>({})
   const [running, setRunning] = useState(false)
+  // A roundup template's published stories, per brand and template, read once per opening of the table.
+  const [roundups, setRoundups] = useState<Record<string, RoundupLoad>>({})
+  const asked = useRef(new Set<string>())
   const loaded = useRef(false)
 
   const loadConfig = useCallback(async () => {
@@ -103,6 +112,23 @@ export function CreateTable({ onPostsReady }: { onPostsReady?: () => void }) {
     })
   }, [open, loadConfig])
   useEffect(() => { if (loaded.current && rows.length) saveRows(rows) }, [rows])
+  const loadRoundup = useCallback(async (brand: string, kind: string) => {
+    const key = `${brand}:${kind}`
+    asked.current.add(key)
+    setRoundups(cur => ({ ...cur, [key]: {} }))
+    try {
+      const res = await fetch(`/api/admin/content/roundup-stories?brand=${encodeURIComponent(brand)}&kind=${encodeURIComponent(kind)}`, { cache: "no-store" })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || "Could not list the published stories")
+      setRoundups(cur => ({ ...cur, [key]: { data: data as Roundup } }))
+    } catch (e) { setRoundups(cur => ({ ...cur, [key]: { error: e instanceof Error ? e.message : "Could not list the published stories" } })) }
+  }, [])
+  useEffect(() => {
+    for (const r of rows) {
+      const t = config?.brands.find(b => b.id === r.brand)?.templates.find(x => x.kind === r.kind)
+      if (t?.roundup && !asked.current.has(`${r.brand}:${r.kind}`)) loadRoundup(r.brand, r.kind)
+    }
+  }, [rows, config, loadRoundup])
 
   const brandOf = (r: CreateRow) => config?.brands.find(b => b.id === r.brand)
   const templateOf = (r: CreateRow) => brandOf(r)?.templates.find(t => t.kind === r.kind)
@@ -126,18 +152,37 @@ export function CreateTable({ onPostsReady }: { onPostsReady?: () => void }) {
     setRows(rs => { const i = rs.findIndex(x => x.id === r.id); return [...rs.slice(0, i + 1), copy, ...rs.slice(i + 1)] })
   }
 
+  /**
+   * Ticking a roundup's story: the ticks stay in the list's order (newest first, as the cover lists them), and each
+   * story keeps the row text written for it; a newly ticked story starts from its headline.
+   */
+  function tickStory(r: CreateRow, t: CreateTemplate, stories: RoundupStory[], postId: string, on: boolean) {
+    const before = r.roundup ?? [], slots = t.fields.map(f => f.name)
+    const picked = new Set(before); if (on) picked.add(postId); else picked.delete(postId)
+    const ids = stories.map(x => x.postId).filter(id => picked.has(id))
+    const written = Object.fromEntries(before.map((id, i) => [id, r.fields[slots[i]] ?? ""]))
+    const fields = Object.fromEntries(Object.entries(r.fields).filter(([k]) => !slots.includes(k)))
+    ids.forEach((id, i) => { if (slots[i]) fields[slots[i]] = written[id] ?? stories.find(x => x.postId === id)?.headline ?? "" })
+    patch(r.id, { roundup: ids, fields })
+  }
+  /** The cover's photo from a ticked story's own photo, through the same optimize step as a pasted link. */
+  const storyPhoto = (r: CreateRow, photo: NonNullable<RoundupStory["photo"]>) =>
+    takeMedia(r, "Optimizing…", async () => { const got = await mediaFromLink(photo.url); return { ...got, media: { ...got.media, source: photo.pageUrl } } }, "That photo could not be used")
+
   async function humanPlus(r: CreateRow) {
-    if (!r.referenceLink.startsWith("https://")) { patchState(r.id, { error: "Paste an https reference link first" }); return }
-    patchState(r.id, { busy: "human", message: "Reading the link and drafting…" })
+    const roundup = !!templateOf(r)?.roundup
+    if (!roundup && !r.referenceLink.startsWith("https://")) { patchState(r.id, { error: "Paste an https reference link first" }); return }
+    patchState(r.id, { busy: "human", message: roundup ? "Drafting the story rows and caption…" : "Reading the link and drafting…" })
     try {
-      const res = await fetch("/api/admin/content/generate-copy", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ brand: r.brand, kind: r.kind, referenceLink: r.referenceLink, ...(r.notes.trim() ? { notes: r.notes.trim() } : {}), ...(r.media?.source ? { mediaFrom: r.media.source } : {}) }) })
+      const source = roundup ? { roundup: r.roundup ?? [] } : { referenceLink: r.referenceLink, ...(r.media?.source ? { mediaFrom: r.media.source } : {}) }
+      const res = await fetch("/api/admin/content/generate-copy", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ brand: r.brand, kind: r.kind, ...source, ...(r.notes.trim() ? { notes: r.notes.trim() } : {}) }) })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || "Human+ failed")
       if (data.hold) { patchState(r.id, { hold: data.hold, message: undefined }); return }
       const t = templateOf(r)
-      const extras = Object.fromEntries(Object.entries(data.fields as Record<string, string>).filter(([k]) => t?.fields.some(f => f.role === "extra" && f.name === k) || k === "date"))
+      const extras = Object.fromEntries(Object.entries(data.fields as Record<string, string>).filter(([k]) => t?.fields.some(f => (f.role === "extra" || f.role === "story") && f.name === k) || k === "date"))
       patch(r.id, { headline: data.headline, subHeadline: data.subHeadline, caption: data.caption, fields: { ...r.fields, ...extras }, copyVersionId: data.profileVersionId })
-      patchState(r.id, { notes: data.notes, message: `Drafted from ${data.facts} sourced facts (${data.profileVersionId}). Check every cell before Run job.` })
+      patchState(r.id, { notes: data.notes, message: roundup ? `Drafted from the ${r.roundup?.length ?? 0} ticked posts (${data.profileVersionId}). Check every cell before Run job.` : `Drafted from ${data.facts} sourced facts (${data.profileVersionId}). Check every cell before Run job.` })
     } catch (e) { patchState(r.id, { error: e instanceof Error ? e.message : "Human+ failed" }) }
   }
 
@@ -173,7 +218,7 @@ export function CreateTable({ onPostsReady }: { onPostsReady?: () => void }) {
     for (const r of rows) {
       if (state[r.id]?.done) continue
       const problems = rowProblems(r, templateOf(r))
-      if (!r.headline.trim() && !r.caption.trim() && !r.referenceLink.trim()) continue // an empty row is skipped quietly
+      if (!r.headline.trim() && !r.caption.trim() && !r.referenceLink.trim() && !r.roundup?.length) continue // an empty row is skipped quietly
       if (problems.length) { patchState(r.id, s => ({ ...s, error: problems.join(" · ") })); continue }
       if (await runRow(r)) made++
     }
@@ -251,9 +296,14 @@ export function CreateTable({ onPostsReady }: { onPostsReady?: () => void }) {
                           {brand && brand.templates.length > 1 && <p className="mt-1 text-[11px] text-neutral-400">Tick another template to add a row for it.</p>}
                         </td>
                         <td className="px-2 py-2 w-64">
+                          {t?.roundup ? (
+                            <RoundupCell row={r} roundup={t.roundup} load={roundups[`${r.brand}:${r.kind}`]} disabled={locked}
+                              onTick={(stories, id, on) => tickStory(r, t, stories, id, on)} onPhoto={photo => storyPhoto(r, photo)} onReload={() => loadRoundup(r.brand, r.kind)} />
+                          ) : <>
                           <input disabled={locked} value={r.referenceLink} onChange={e => patch(r.id, { referenceLink: e.target.value.trim() })} placeholder="https://…" className="w-full h-8 rounded border border-neutral-300 px-2" />
+                          </>}
                           <textarea disabled={locked} value={r.notes} onChange={e => patch(r.id, { notes: e.target.value })} placeholder="Starter notes (optional): angle, emphasis" rows={2} className="mt-1 w-full rounded border border-neutral-200 px-2 py-1 text-xs" />
-                          <button disabled={locked || !t || !r.referenceLink} onClick={() => humanPlus(r)} className="mt-1 inline-flex items-center gap-1.5 h-7 px-2.5 rounded border border-neutral-300 text-xs font-medium hover:bg-neutral-50 disabled:opacity-40">
+                          <button disabled={locked || !t || (t.roundup ? (r.roundup?.length ?? 0) < t.roundup.min || (r.roundup?.length ?? 0) > t.roundup.max : !r.referenceLink)} onClick={() => humanPlus(r)} className="mt-1 inline-flex items-center gap-1.5 h-7 px-2.5 rounded border border-neutral-300 text-xs font-medium hover:bg-neutral-50 disabled:opacity-40">
                             {s.busy === "human" ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <PenLine className="w-3.5 h-3.5" />} Human+
                           </button>
                         </td>
@@ -287,7 +337,15 @@ export function CreateTable({ onPostsReady }: { onPostsReady?: () => void }) {
                           {(["feed", "reels"] as const).map(f => templateGap(t, brand?.label ?? "this Brand", f)).filter(Boolean).map(note => <p key={note} className="mt-1 text-[11px] text-amber-700">{note}</p>)}
                           {formats.length > 0 && <p className="mt-1 text-[11px] text-neutral-400">{formats.map(f => FORMAT_LABEL[f.format]).join(" + ")}</p>}
                         </td>
-                        <td className="px-2 py-2 w-52"><Cell field={head} value={r.headline} disabled={locked} rows={3} onChange={v => patch(r.id, { headline: v })} /></td>
+                        {t?.roundup ? (
+                          <td className="px-2 py-2 w-52">
+                            {/* The cover's headline is the profile's fixed one; each ticked story gets one row under it. */}
+                            <p className="text-xs font-medium text-neutral-700 uppercase">{t.roundup.headline}</p>
+                            <p className="text-[11px] text-neutral-400">Cover headline (fixed)</p>
+                            {t.fields.slice(0, r.roundup?.length ?? 0).map(f => <div key={f.name} className="mt-1"><Cell field={f} value={r.fields[f.name] ?? ""} disabled={locked} rows={1} onChange={v => patch(r.id, { fields: { ...r.fields, [f.name]: v } })} /></div>)}
+                            {!r.roundup?.length && <p className="mt-1 text-[11px] text-neutral-400">Tick stories to write a row for each.</p>}
+                          </td>
+                        ) : <td className="px-2 py-2 w-52"><Cell field={head} value={r.headline} disabled={locked} rows={3} onChange={v => patch(r.id, { headline: v })} /></td>}
                         <td className="px-2 py-2 w-52">
                           <Cell field={sub} value={r.subHeadline} disabled={locked || !sub} rows={3} onChange={v => patch(r.id, { subHeadline: v })} />
                           {extras.map(f => <div key={f.name} className="mt-1"><Cell field={f} value={r.fields[f.name] ?? ""} disabled={locked} rows={1} onChange={v => patch(r.id, { fields: { ...r.fields, [f.name]: v } })} /></div>)}
@@ -331,6 +389,38 @@ export function CreateTable({ onPostsReady }: { onPostsReady?: () => void }) {
         </div>
       )}
     </>
+  )
+}
+
+/** A roundup's published stories to tick (Step 4 item 1): each with its card, its date and, when it has one, its photo for the cover. */
+function RoundupCell({ row, roundup, load, disabled, onTick, onPhoto, onReload }: { row: CreateRow; roundup: NonNullable<CreateTemplate["roundup"]>; load?: RoundupLoad; disabled?: boolean; onTick(stories: RoundupStory[], id: string, on: boolean): void; onPhoto(photo: NonNullable<RoundupStory["photo"]>): void; onReload(): void }) {
+  if (!load || (!load.data && !load.error)) return <p className="text-xs text-neutral-500 inline-flex items-center gap-1"><Loader2 className="w-3.5 h-3.5 animate-spin" /> Listing published stories…</p>
+  if (load.error) return <p className="text-xs text-red-600">{load.error} <button className="underline" onClick={onReload}>Try again</button></p>
+  const d = load.data!, picked = row.roundup ?? []
+  const gone = picked.filter(id => !d.stories.some(x => x.postId === id))
+  return (
+    <div className="text-xs">
+      <p className="text-neutral-600">Tick {roundup.min}–{roundup.max} from {d.window} <span className="text-neutral-400">({picked.length} ticked)</span></p>
+      {d.hold && <p className="mt-1 text-amber-700">{d.hold}</p>}
+      {gone.length > 0 && <p className="mt-1 text-amber-700">{gone.length} ticked {gone.length === 1 ? "story is" : "stories are"} no longer in the list; untick and choose again.</p>}
+      <div className="mt-1 max-h-56 overflow-auto space-y-1 pr-1">
+        {d.stories.map(x => {
+          const on = picked.includes(x.postId)
+          return (
+            <div key={x.postId} className={`flex items-start gap-1.5 rounded border px-1.5 py-1 ${on ? "border-neutral-400 bg-neutral-50" : "border-neutral-200"}`}>
+              <input type="checkbox" className="mt-1" aria-label={x.title} disabled={disabled || (!on && picked.length >= roundup.max)} checked={on} onChange={e => onTick(d.stories, x.postId, e.target.checked)} />
+              {/* eslint-disable-next-line @next/next/no-img-element -- a staged card thumbnail in an admin table, not page content */}
+              <img src={x.card} alt="" className="w-9 h-11 object-cover rounded-sm border border-neutral-200 shrink-0" />
+              <div className="min-w-0">
+                <p className="leading-snug line-clamp-2" title={x.title}>{x.headline || x.title}</p>
+                <p className="text-[11px] text-neutral-400">{x.publishedAt?.slice(0, 10)}{x.publishedUrl && <> · <a href={x.publishedUrl} target="_blank" rel="noreferrer" className="hover:underline">live</a></>}</p>
+                {x.photo && !row.media && !disabled && <button type="button" onClick={() => onPhoto(x.photo!)} className="text-[11px] text-neutral-500 underline hover:text-neutral-900">Use its photo on the cover</button>}
+              </div>
+            </div>
+          )
+        })}
+      </div>
+    </div>
   )
 }
 

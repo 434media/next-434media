@@ -47,7 +47,7 @@ const patchBody = z.object({
 }).strict()
 const TEXT = (max: number) => z.string().max(max)
 const MEDIA = z.object({ url: z.string().url().max(2000), kind: z.enum(["image", "video"]), name: TEXT(120), bytes: z.number().int().nonnegative().optional(), width: z.number().optional(), height: z.number().optional(), durationSec: z.number().optional(), optimized: z.string().max(20).optional() }).strict()
-const CARD_TEXT = z.object({ brand: z.string().regex(/^[a-z0-9-]{2,40}$/), kind: z.string().regex(/^[a-z0-9_]{2,30}$/), headline: TEXT(400), subHeadline: TEXT(400), fields: z.record(z.string().regex(/^[a-z][a-z0-9_]{0,63}$/), TEXT(400)) }).strict()
+const CARD_TEXT = z.object({ brand: z.string().regex(/^[a-z0-9-]{2,40}$/), kind: z.string().regex(/^[a-z0-9_]{2,30}$/), headline: TEXT(400), subHeadline: TEXT(400), fields: z.record(z.string().regex(/^[a-z][a-z0-9_]{0,63}$/), TEXT(400)), roundup: z.array(z.string().regex(/^[A-Za-z0-9_-]{1,64}$/)).max(10).optional() }).strict()
 const postBody = z.discriminatedUnion("action", [
   z.object({ action: z.literal("refresh"), postId: z.string().max(64) }),
   z.object({ action: z.literal("attach"), designLink: z.string().max(2000), format: z.enum(["feed", "reels"]), postId: z.string().max(64).optional(),
@@ -216,13 +216,15 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ rowId: str
           } as Omit<ContentPost, "id" | "created_at" | "updated_at">))
           posts.push(post)
         }
-        const items = as === "mp4" ? [{ url: urls[0], label: `${format}-video` }] : urls.map((url, n) => ({ url, label: `${format}-page-${target.pages?.[n] ?? n + 1}` }))
+        const pages = as === "mp4" ? [{ url: urls[0], label: `${format}-video` }] : urls.map((url, n) => ({ url, label: `${format}-page-${target.pages?.[n] ?? n + 1}` }))
+        // An ICYMI roundup's published cards follow its cover again, as the Run job put them (never re-chosen here).
+        const slides = post.roundup_slides ?? [], items = [...pages, ...slides.map((x, n) => ({ url: x.url, label: `story-${n + 1}` }))]
         // New files void an approval: the publisher's guarded update resets its own; a hand-post approval is reset in
         // the same write as the files, so the post is never "approved" with files nobody saw.
         const resetHand = isApproved(post) && !post.owned_meta
         const pagesChange = body.action === "attach" ? { canva_pages: target.pages ?? [] } : {}
         const intake = { ...tools.intake, setAssets: (id: string, assets: ContentPost["assets"], record: { export_fingerprint: string; export_staged_at: string; canva_design_id?: string }) => updateContentPost(id, { assets, ...record, ...pagesChange, ...(resetHand ? { status: "needs_approval" as const } : {}) }) }
-        const attached = await attachExports(intake, { postId: post.id, items, randomId: tools.randomId, canva: { designId, ...(target.pages ? { pages: target.pages } : {}) }, fileBase: fileBaseOf(post), ...(body.action === "attach" && post.canva_design_id !== designId ? { rebind: true } : {}) })
+        const attached = await attachExports(intake, { postId: post.id, items, randomId: tools.randomId, canva: { designId, ...(target.pages ? { pages: target.pages } : {}) }, ...(slides.length ? { canvaItems: pages.length } : {}), fileBase: fileBaseOf(post), ...(body.action === "attach" && post.canva_design_id !== designId ? { rebind: true } : {}) })
         holds.push(...attached.holds)
         unchanged &&= attached.reused
         console.info("[content/rows]", JSON.stringify({ by: email, row: rowId, action: body.action, post: post.id, design: designId, pages: target.pages ?? null, reused: attached.reused }))

@@ -370,7 +370,7 @@ export function publishedPost(p: Pick<PostRow, "status" | "title">): boolean {
   return p.status === "posted" && !REVIEW_DRAFT_TITLE.test(p.title)
 }
 /** The roundup's story: its source is the stories' own titles and captions, in order. */
-function roundupStory(items: RoundupItem[], label: string): Story {
+export function roundupStory(items: RoundupItem[], label: string): Story {
   return { title: "ICYMI roundup", primaryUrl: items[0]?.publishedUrl || BRAND.posts.homeUrl, publisher: BRAND.name, sourceTitle: `${items.length} published ${BRAND.shortName} ${items.length === 1 ? "story" : "stories"} from ${label}`, sourceText: items.map((p, i) => `${i + 1}. ${p.title}\n${p.caption}`).join("\n\n"), roundup: items }
 }
 /**
