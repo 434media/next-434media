@@ -9,8 +9,8 @@ import type { BrandState } from "@/lib/content-pipeline/brand-status"
 
 /**
  * The Brands area (plan v11.2.1 Step 4 item 2): every brand the content engine serves, 434-owned or client, with its
- * status, published profile version, onboarding progress and missing templates. Each opens its own page. Super-admins
- * only, as the brand-profiles routes are.
+ * status, published profile version, onboarding progress and missing templates. Each opens its own page. 434 staff
+ * (interns excluded) read the brand books there; super-admins also edit and publish.
  */
 interface BrandRow { id: string; label: string; brandType: "owned" | "client" | null; state: BrandState; versionId: string | null; publishedAt: string | null; draftDiffers: boolean; problem: string | null; stepsDone: number; steps: number; missing: number; postsMade: number }
 
@@ -26,7 +26,7 @@ export default function BrandsPage() {
   }, [])
 
   return (
-    <AdminRoleGuard allowedRoles={[]}>
+    <AdminRoleGuard allowedRoles={["full_admin", "crm_only"]}>
       <div className="min-h-full bg-neutral-50 px-4 sm:px-6 py-6">
         <div className="max-w-5xl mx-auto">
           <h1 className="text-lg font-semibold text-neutral-900">Brands</h1>

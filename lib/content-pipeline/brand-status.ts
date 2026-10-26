@@ -35,8 +35,9 @@ export interface BrandFacts {
   postsMade: number
   /** The publisher knows the brand's Meta id (META_BRANDS). */
   publisherBrands: readonly string[]
-  /** A generated brand book exists for the brand (Step 4 item 3). */
+  /** A generated brand book exists for the brand (Step 4 item 3); when not, why (brand-book-check.ts). */
   brandBook: boolean
+  brandBookProblem?: string | null
 }
 
 export type BrandState = "live" | "draft" | "not_started"
@@ -50,7 +51,7 @@ const FORMAT_ASPECT = { feed: "4:5", reels: "9:16" } as const
  * The templates a brand doesn't have yet, in the table's words ("No 9:16 News template for MilCityUSA yet"): every
  * request kind's series in each format, except a roundup's 9:16 (it is a 4:5 carousel). Then a missing brand book.
  */
-export function missingTemplates(profile: BrandProfile | null, label: string, brandBook: boolean): string[] {
+export function missingTemplates(profile: BrandProfile | null, label: string, brandBook: boolean, bookProblem?: string | null): string[] {
   const out: string[] = []
   if (!profile) out.push(`No published profile for ${label} yet, so no templates are connected`)
   for (const k of profile?.requestKinds ?? []) {
@@ -61,7 +62,8 @@ export function missingTemplates(profile: BrandProfile | null, label: string, br
       }
     }
   }
-  if (!brandBook) out.push(`No brand book yet for ${label}`)
+  // Step 4 item 3: a brand with no visual standard has no book, and it cannot be shared.
+  if (!brandBook) out.push(`No brand book yet for ${label}${bookProblem ? `: ${bookProblem}` : ""}`)
   return out
 }
 

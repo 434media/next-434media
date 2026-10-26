@@ -23,3 +23,15 @@ export async function requireContentRunner() {
   if (!await canRunContent(session.email)) return { error: "Forbidden: the content permission is required", status: 403 as const }
   return { session }
 }
+
+/**
+ * The admin gate for 434 staff: any admin except an intern (interns are the self-registered cohort, not staff), as the
+ * brand book at /admin/brand is gated. `superAdmin` says whether the caller may also edit and publish (the Brands area
+ * shows staff the brand book, and super-admins the rest).
+ */
+export async function requireStaff() {
+  const session = await getSession()
+  if (!session) return { error: "Unauthorized", status: 401 as const }
+  if (!isAuthorizedAdmin(session.email) || session.role === "intern") return { error: "Forbidden: 434 staff only", status: 403 as const }
+  return { session, superAdmin: await isCrmSuperAdmin(session.email) }
+}

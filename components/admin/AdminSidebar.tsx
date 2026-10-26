@@ -270,8 +270,8 @@ const SIDEBAR_SECTIONS: SidebarSection[] = [
         href: "/admin/brands",
         matchPrefix: "/admin/brands",
         description: "Brand profiles, onboarding and templates",
-        // Profiles are edited and published by super-admins (the brand-profiles routes).
-        roles: ["crm_super_admin"],
+        // Staff read the brand books here (interns excluded, as the brand book); super-admins also edit and publish.
+        roles: ["full_admin", "crm_only"],
       },
       {
         id: "feed",

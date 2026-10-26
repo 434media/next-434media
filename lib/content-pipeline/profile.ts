@@ -1,3 +1,4 @@
+import type { BrandBook } from "./brand-book"
 import type { Series } from "./series"
 
 /**
@@ -71,6 +72,8 @@ export interface BrandProfile {
   /** Documents that govern the brand outside the engine (its visual standard, …): where they are, never their values.
    * A record for people and the version history; no prompt and no engine path reads it. */
   references?: ProfileReference[]
+  /** The brand book, generated from the brand's visual standard (brand-book.ts). Optional: a brand without one has no book yet. */
+  visual?: BrandBook
 }
 /** role: what the document is to the brand ("design authority"); doc: where it is; renders: where its reference images are. */
 export interface ProfileReference { role: string; doc: string; renders?: string }
@@ -90,7 +93,9 @@ function keys(o: unknown, where: string, required: string[], optional: string[],
 /** Problems with a profile (empty = publishable and runnable). Publish and every read run it. */
 export function validateProfile(v: unknown): string[] {
   const p: string[] = []
-  if (!keys(v, "profile", ["schema", "generatedBy", "profile", "profileVersion", "profileDate", "profileSha256", "id", "name", "shortName", "rulesVersion", "draftPrefix", "never", "editorial", "series", "requestKinds", "research", "photos", "posts", "seeds"], ["headlineRules", "checks", "timeZone", "references"], p)) return p
+  if (!keys(v, "profile", ["schema", "generatedBy", "profile", "profileVersion", "profileDate", "profileSha256", "id", "name", "shortName", "rulesVersion", "draftPrefix", "never", "editorial", "series", "requestKinds", "research", "photos", "posts", "seeds"], ["headlineRules", "checks", "timeZone", "references", "visual"], p)) return p
+  // `visual`, the brand book, is checked on its own (brand-book-check.ts): a bad book is not shown, and never stops the
+  // profile publishing or running (plan v11.2.1 Step 4 item 3).
   if (v.schema !== PROFILE_SCHEMA) p.push(`schema must be ${PROFILE_SCHEMA}`)
   if (!(typeof v.id === "string" && /^[a-z][a-z0-9-]{1,30}$/.test(v.id))) p.push("id: lowercase letters, digits and hyphens")
   for (const [k, n] of [["name", 60], ["shortName", 20], ["rulesVersion", 80], ["editorial", 40000]] as const) if (!str(v[k], n)) p.push(`${k}: 1–${n} characters`)

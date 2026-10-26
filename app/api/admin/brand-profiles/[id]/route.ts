@@ -44,8 +44,14 @@ export async function PUT(req: NextRequest, ctx: { params: Promise<{ id: string 
   try {
     const { firestoreBrandProfiles } = await import("@/lib/firestore-brand-profiles")
     const store = firestoreBrandProfiles()
-    if (!await store.get(id)) return NextResponse.json({ error: "No profile for that brand" }, { status: 404 })
+    const current = await store.get(id)
+    if (!current) return NextResponse.json({ error: "No profile for that brand" }, { status: 404 })
     const { expectedDraft, ...draft } = parsed.data
+    // The brand book is generated, never edited by hand: whatever `visual` was sent is dropped, and the stored draft's
+    // (or, with no draft yet, the published version's) is kept (plan v11.2.1 Step 4 item 3).
+    const kept = ((current.draft ?? current.published)?.profile as { visual?: unknown } | undefined)?.visual
+    const profile = Object.fromEntries(Object.entries(draft.profile).filter(([k]) => k !== "visual"))
+    draft.profile = kept === undefined ? profile : { ...profile, visual: kept }
     const doc = await store.saveDraft(id, draft as { profile: unknown; examples: { approved: never[]; rejected: never[] } }, auth.session.email.toLowerCase(), new Date().toISOString(), expectedDraft)
     // The problems Publish would raise, so the editor sees them before publishing (saving is still allowed).
     const { publishProblems, draftToken } = await import("@/lib/content-pipeline/profile-store")
