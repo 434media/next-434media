@@ -15,7 +15,7 @@ loadPublishedProfileFirst()
 const live = (over: Partial<BrandFacts> = {}): BrandFacts => ({
   id: "milcity", label: "MilCityUSA", onRoster: true, brandType: "owned", hasDocument: true,
   identity: { source: "lib/work-records.ts", record: "milcityusa" }, sources: { seeds: "content_pipeline_config/mcu_seeds" },
-  published: { versionId: "milcity@v3", profile: published.milcity, publishedAt: "2026-10-20T15:00:00.000Z", publishedBy: "founder@x.co" },
+  published: { versionId: "milcity@v3", profile: published.milcity, publishedAt: "2026-10-20T15:00:00.000Z", publishedBy: "founder@example.com" },
   publishedProblem: null, draftDiffers: false, seeds: { snapshot: "Tracker, modified 2026-10-14", orgs: 12, cohorts: 3, backlog: 4 },
   postsMade: 9, publisherBrands: ["txmx", "vemos", "milcity", "ampd"], brandBook: false, ...over,
 })
