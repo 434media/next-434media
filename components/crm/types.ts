@@ -474,7 +474,11 @@ export interface PipelineMedia {
 /** A Create row's card text and template, as the Run job filled them (ContentPost.create_text). */
 export interface CreateText { brand: string; kind: string; headline: string; subHeadline: string; fields: Record<string, string>; /** A roundup's chosen published posts, in order. */ roundup?: string[] }
 /** A published post's card that a roundup (ICYMI) carries after its cover, as it was posted (ContentPost.roundup_slides). */
-export interface RoundupSlide { postId: string; url: string; title: string }
+export interface RoundupSlide {
+  postId: string; url: string; title: string
+  /** A card the run made for a video story (it had no still card): the key of the text and photo it was made from. */
+  card?: { key: string; designId?: string }
+}
 
 export interface HandPost {
   platform: SocialPlatform

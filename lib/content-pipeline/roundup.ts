@@ -32,15 +32,19 @@ export interface RoundupChoices { window: string; min: number; max: number; stor
 /** The stories a roundup may recap now, newest first; `hold` says why there are too few for one. */
 export function roundupChoices(posts: ContentPost[], nowMs: number, lookbackDays: number | null): RoundupChoices {
   const window = icymiWindow(nowMs, lookbackDays), size = roundupSize()
-  const found = icymiStory(brandPostRows(posts), window, size)
+  // Video posts (no still card) qualify too: the Create table makes each an ICYMI story card (coordinator, 2026-10-26).
+  const found = icymiStory(brandPostRows(posts), window, size, { cardless: true })
   if (!Array.isArray(found)) return { window: window.label, ...size, stories: [], items: [], hold: found.hold }
   const byId = new Map(posts.map(p => [p.id, p]))
-  const stories = (found[0]?.roundup ?? []).flatMap((item): RoundupStory[] => {
-    if (!item.card) return []
+  const stories = (found[0]?.roundup ?? []).map((item): RoundupStory => {
     const post = byId.get(item.postId), photo = item.media && /^https:\/\//.test(item.media.url) && /^https:\/\//.test(item.media.pageUrl) ? { url: item.media.url, pageUrl: item.media.pageUrl } : undefined
-    return [{ postId: item.postId, title: item.title, card: item.card.url, ...(item.publishedAt ? { publishedAt: item.publishedAt } : {}), ...(item.publishedUrl ? { publishedUrl: item.publishedUrl } : {}), ...(post?.create_text?.headline ? { headline: post.create_text.headline } : {}), ...(photo ? { photo } : {}) }]
+    return {
+      postId: item.postId, title: item.title, ...(item.card ? { card: item.card.url } : { needsCard: true as const }),
+      ...(item.publishedAt ? { publishedAt: item.publishedAt } : {}), ...(item.publishedUrl ? { publishedUrl: item.publishedUrl } : {}),
+      ...(post?.create_text?.headline ? { headline: post.create_text.headline } : {}), ...(post?.create_text?.subHeadline ? { deck: post.create_text.subHeadline } : {}), ...(photo ? { photo } : {}),
+    }
   })
-  return { window: window.label, ...size, stories, items: (found[0]?.roundup ?? []).filter(i => i.card) }
+  return { window: window.label, ...size, stories, items: found[0]?.roundup ?? [] }
 }
 
 /** Production: the content posts (through the CRM's 30-second list cache, as the pipeline's roundup read them) and the window setting. */

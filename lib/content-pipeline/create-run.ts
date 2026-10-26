@@ -2,7 +2,7 @@ import { BRAND, activeProfile } from "./brand"
 import { SERIES, checkFields, normalizeFields } from "./series"
 import { contentPropertyOf } from "./properties"
 import { pipelineMarked, adoptablePost, PIPELINE_KEY_PREFIX } from "./ownership"
-import { FORMAT_LABEL, createTemplates, storySlotUsed, ddmmmyy, designText, exportFileBase, formatsOf, mediaShapeOf, rowProblems, SOCIAL_LABEL, type CreateSocial, type CreateFormat, type CreateRow, type CreateTemplate, type RoundupStory } from "./create-table"
+import { FORMAT_LABEL, createTemplates, storySlotUsed, ddmmmyy, designText, exportFileBase, formatsOf, mediaShapeOf, rowProblems, SOCIAL_LABEL, type CreateSocial, type CreateFormat, type CreateRow, type CreateTemplate, type RoundupStory, type StoryCard, type StoryCardTemplate } from "./create-table"
 import { allowedPlatforms, frozen, isApproved } from "./row-approval"
 import { createHash } from "node:crypto"
 import type { ContentPost, CreateText, RoundupSlide } from "@/components/crm/types"
@@ -30,7 +30,7 @@ export interface CreateRunDeps {
    * `rebind`: the post takes a new design in place of its old one (a re-run after the row changed). `canvaItems`: how
    * many of the items, from the first, are the design's pages (a roundup's published cards follow them as they are).
    */
-  attachExports(input: { postId: string; items: { url: string; label: string }[]; canva: { designId: string }; canvaItems?: number; fileBase: string; rebind?: boolean }): Promise<{ holds: string[]; assets?: { duration?: number }[] }>
+  attachExports(input: { postId: string; items: { url: string; label: string }[]; canva: { designId: string }; canvaItems?: number; fileBase: string; rebind?: boolean }): Promise<{ holds: string[]; assets?: { url?: string; duration?: number }[] }>
   /** The published posts a roundup may recap now (last week's live News and Breaking posts with their cards), newest first. */
   roundupStories(): Promise<RoundupStory[]>
   /**
@@ -67,29 +67,75 @@ export const createRequestId = (rowId: string, format: CreateFormat) => `${PIPEL
 /** What a design is made from: its template, card text and media (and a roundup's cards after it). A change makes a new design. */
 export function designInputHash(input: { templateId: string; text: Record<string, string>; media?: { kind: string; url: string; bytes?: number } | null; slides?: readonly RoundupSlide[] }): string {
   const text = Object.fromEntries(Object.entries(input.text).sort(([a], [b]) => a.localeCompare(b)))
-  return createHash("sha256").update(JSON.stringify({ t: input.templateId, text, m: input.media ? { k: input.media.kind, u: input.media.url, b: input.media.bytes ?? 0 } : null, ...(input.slides?.length ? { s: input.slides.map(x => x.url) } : {}) })).digest("hex").slice(0, 16)
+  return createHash("sha256").update(JSON.stringify({ t: input.templateId, text, m: input.media ? { k: input.media.kind, u: input.media.url, b: input.media.bytes ?? 0 } : null, ...(input.slides?.length ? { s: input.slides.map(x => x.card ? `card:${x.card.key}` : x.url) } : {}) })).digest("hex").slice(0, 16)
 }
+
+/** What a made story card is made from: its headline, deck and photo. A change makes a new card. */
+export const storyCardKey = (c: StoryCard) => createHash("sha256").update(JSON.stringify([c.headline.trim(), c.deck.trim(), c.media?.url ?? ""])).digest("hex").slice(0, 12)
 
 /**
  * A roundup's chosen stories as slides, checked again on the server against what may be recapped now (Step 4 item 1):
  * each must still be a live News or Breaking post from the window, with its card. The browser's list is never trusted.
  */
-export async function roundupSlides(deps: Pick<CreateRunDeps, "roundupStories">, ids: readonly string[]): Promise<RoundupSlide[]> {
+export async function roundupSlides(deps: Pick<CreateRunDeps, "roundupStories">, ids: readonly string[], cards: CreateRow["storyCards"] = {}): Promise<RoundupSlide[]> {
   const live = await deps.roundupStories()
   const missing = ids.filter(id => !live.some(s => s.postId === id))
   if (missing.length) throw new CreateRowError([`${missing.length === 1 ? "A ticked story is" : `${missing.length} ticked stories are`} no longer a live post from the window (${missing.join(", ")}); choose the stories again`], 409)
-  return ids.map(id => { const s = live.find(x => x.postId === id)!; return { postId: s.postId, url: s.card, title: s.title } })
+  return ids.map((id, i) => {
+    const s = live.find(x => x.postId === id)!
+    if (s.card) return { postId: s.postId, url: s.card, title: s.title }
+    // A video story has no still card: the run makes one from the row's card text and photo.
+    const c = cards[id]
+    if (!c) throw new CreateRowError([`Story ${i + 1} (${s.title}) is a video post: write its card headline and add a photo`])
+    return { postId: s.postId, url: "", title: s.title, card: { key: storyCardKey(c) } }
+  })
 }
 /**
  * A roundup run's slides. A re-run of a row whose post already holds its slides, for the same ticks in the same order,
  * resumes with those (a run that failed on Sunday and is retried on Monday must not find its stories "gone" because
  * the window moved); only new or changed ticks are checked against what may be recapped now.
  */
-async function slidesForRun(deps: Pick<CreateRunDeps, "roundupStories" | "findByRequestId">, row: Pick<CreateRow, "id" | "roundup">): Promise<RoundupSlide[]> {
+async function slidesForRun(deps: Pick<CreateRunDeps, "roundupStories" | "findByRequestId">, row: Pick<CreateRow, "id" | "roundup" | "storyCards">): Promise<RoundupSlide[]> {
   const ids = row.roundup ?? []
   const prior = adoptablePost(await deps.findByRequestId(createRequestId(row.id, "feed")))?.roundup_slides
-  if (prior?.length && prior.length === ids.length && prior.every((s, i) => s.postId === ids[i])) return prior
-  return roundupSlides(deps, ids)
+  // A made card whose text or photo changed since is made again; the rest are reused as they were.
+  if (prior?.length && prior.length === ids.length && prior.every((s, i) => s.postId === ids[i])) return prior.map(s => {
+    const c = s.card && row.storyCards?.[s.postId]
+    return c && storyCardKey(c) !== s.card!.key ? { postId: s.postId, url: "", title: s.title, card: { key: storyCardKey(c) } } : s
+  })
+  return roundupSlides(deps, ids, row.storyCards)
+}
+
+/** A made card's text as the template takes it, checked against the ICYMI story series' limits. */
+export function storyCardText(card: StoryCard, n: number, of: number): { text: Record<string, string>; problems: string[] } {
+  const series = SERIES.icymi_story
+  if (!series) return { text: {}, problems: ["the profile has no ICYMI story series"] }
+  const written = normalizeFields(series, { headline: card.headline, deck: card.deck })
+  const own = { ...series, fields: series.fields.filter(f => f.name === "headline" || f.name === "deck") }
+  const problems = checkFields(own, written).filter(p => !(p.startsWith("Deck") && !card.deck.trim()))
+  const text: Record<string, string> = { counter: `${String(n).padStart(2, "0")} / ${String(of).padStart(2, "0")}` }
+  for (const [k, v] of Object.entries(written)) if ((k === "headline" || k === "deck") && v.trim()) text[k] = v.trim()
+  return { text, problems: problems.map(p => `Story ${n}'s card: ${p}`) }
+}
+
+/** Makes the cards a roundup's video stories need (slides with no url), from the ICYMI story template, as JPGs. */
+async function makeStoryCards(deps: Pick<CreateRunDeps, "templateFields" | "createDesign" | "exportDesign">, t: StoryCardTemplate | undefined, slides: RoundupSlide[], row: Pick<CreateRow, "storyCards">, postKey: string): Promise<RoundupSlide[]> {
+  const todo = slides.map((s, i) => ({ s, i })).filter(x => !x.s.url)
+  if (!todo.length) return slides
+  if (!t) throw new CreateRowError(["A ticked story is a video post, and this brand has no ICYMI story template to make its card"])
+  const dataset = await deps.templateFields(t.template)
+  if (dataset[t.media] !== "image") throw new CreateRowError([`The ICYMI story template has no photo frame "${t.media}"`])
+  const out = [...slides]
+  for (const { s, i } of todo) {
+    const c = row.storyCards![s.postId]!
+    const { text } = storyCardText(c, i + 1, slides.length)
+    for (const k of Object.keys(text)) if (dataset[k] !== "text") delete text[k]
+    const design = await deps.createDesign({ requestId: `${postKey}:card:${s.postId}:${s.card!.key}`, templateId: t.template, title: `ICYMI story ${i + 1}: ${s.title}`.slice(0, 200), text, image: { field: t.media, url: c.media!.url, name: c.media!.name } })
+    const urls = design.previewUrls.length ? design.previewUrls : await deps.exportDesign(design.designId, "jpg")
+    if (!urls.length) throw new CreateRowError([`Canva returned no export for story ${i + 1}'s card`], 502)
+    out[i] = { ...s, url: urls[0], card: { key: s.card!.key, designId: design.designId } }
+  }
+  return out
 }
 /** The export items for a design's pages, then a roundup's published cards as they are. */
 function exportItems(format: CreateFormat, urls: string[], asVideo: boolean, slides: readonly RoundupSlide[] = []) {
@@ -127,7 +173,12 @@ export async function runCreateRow(deps: CreateRunDeps, row: CreateRow, actor: {
 
 async function runClaimedRow(deps: CreateRunDeps, row: CreateRow, template: CreateTemplate, actor: { email: string; name: string }, versionId: string): Promise<CreatedPost[]> {
   const posts: CreatedPost[] = []
-  const slides = template.roundup ? await slidesForRun(deps, row) : []
+  let slides = template.roundup ? await slidesForRun(deps, row) : []
+  // Every card the run will make is checked before anything is made.
+  if (template.roundup) {
+    const problems = slides.flatMap((s, i) => s.url ? [] : storyCardText(row.storyCards?.[s.postId] ?? { headline: "", deck: "", media: null }, i + 1, slides.length).problems)
+    if (problems.length) throw new CreateRowError(problems)
+  }
   for (const { format, platforms } of formatsOf(row.platforms)) {
     const postKey = createRequestId(row.id, format)
     const existing = adoptablePost(await deps.findByRequestId(postKey))
@@ -147,6 +198,7 @@ async function runClaimedRow(deps: CreateRunDeps, row: CreateRow, template: Crea
     const headline = template.roundup ? `${slides.length} stories, ${ddmmmyy(row.date)}` : row.headline
     const title = `${BRAND.shortName} ${template.label} — ${headline.replace(/\s+/g, " ").trim()}`.slice(0, 200)
     const { design, urls, asVideo } = await filled.make(`${postKey}:${inputHash}`, title)
+    if (template.roundup) slides = await makeStoryCards(deps, template.roundup.storyCard, slides, row, postKey)
     const now = deps.now()
     const notes = [`Made in the Create table (${template.label}, ${FORMAT_LABEL[format]}).`, row.referenceLink ? `Reference: ${row.referenceLink}` : "", ...slides.map((x, i) => `Story ${i + 1}: ${x.title} (${x.postId})`), row.notes.trim() ? `Notes: ${row.notes.trim()}` : ""].filter(Boolean).join("\n").slice(0, 4000)
     const roundup = template.roundup ? { roundup_slides: slides } : {}
@@ -163,7 +215,9 @@ async function runClaimedRow(deps: CreateRunDeps, row: CreateRow, template: Crea
       } as Omit<ContentPost, "id" | "created_at" | "updated_at">))
     const { items, canvaItems } = exportItems(format, urls, asVideo, slides)
     const attached = await deps.attachExports({ postId: post.id, items, canva: { designId: design.designId }, ...(slides.length ? { canvaItems } : {}), fileBase: exportFileBase(BRAND.id, row.date, template.roundup ? template.label : row.headline), ...(existing ? { rebind: true } : {}) })
-    await deps.updatePost(post.id, { create_input_hash: inputHash, create_text: createTextOf(row), create_media: mediaShapeOf(row.media) })
+    // A made card is kept as its stored copy (Canva's export links expire), so Refresh and Replace media can put it back.
+    if (slides.some(s => s.card)) slides = slides.map((s, i) => s.card ? { ...s, url: attached.assets?.[canvaItems + i]?.url ?? s.url } : s)
+    await deps.updatePost(post.id, { create_input_hash: inputHash, create_text: createTextOf(row), create_media: mediaShapeOf(row.media), ...(template.roundup ? { roundup_slides: slides } : {}) })
     posts.push({ format, postId: post.id, designId: design.designId, editUrl: canvaEditUrl(design.designId), previewUrl: design.previewUrls[0], holds: [...attached.holds, ...shortExportHolds(format, row.media, attached.assets), ...(design.folderProblem ? [design.folderProblem] : [])], reused: false })
   }
   return posts

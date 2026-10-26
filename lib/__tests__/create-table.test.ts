@@ -163,7 +163,7 @@ function runDeps(live: RoundupStory[] = []) {
   const bases: string[] = [], attachCalls: { items: string[]; canvaItems?: number }[] = []
   const posts = new Map<string, ContentPost>(), made: { requestId: string; templateId: string; text: Record<string, string>; video?: unknown; image?: unknown }[] = [], exports: string[] = []
   const deps: CreateRunDeps = {
-    templateFields: async () => ({ ...ICYMI_COVER, headline: "text", deck: "text", date: "text", source: "text", media: "image" }),
+    templateFields: async () => ({ ...ICYMI_COVER, headline: "text", deck: "text", date: "text", source: "text", media: "image", counter: "text" }),
     createDesign: async i => { made.push(i); return { designId: `D${made.length}abcdefgh`, title: i.title, editUrl: "https://canva/e", viewUrl: "https://canva/v", templateId: i.templateId, fields: Object.keys(i.text), previewUrls: [`https://export/${made.length}.jpg`], createdAt: "t" } },
     exportDesign: async (id, as) => { exports.push(`${id}:${as}`); return [`https://export/${id}.${as}`] },
     findByRequestId: async id => [...posts.values()].find(p => p.intake?.requestId === id) ?? null,
@@ -483,7 +483,10 @@ const icymiRow = (over: Partial<CreateRow> = {}) => row({ kind: "icymi", referen
 
 test("ICYMI: a 4:5 roundup template with the profile's size and fixed headline; its cells are the story rows", () => {
   const t = icymi(), k = published.milcity.requestKinds.find(x => x.kind === "icymi")!, s = published.milcity.series.icymi_cover!
-  assert.deepEqual(t.roundup, { min: k.minStories, max: Math.min(k.maxStories!, t.fields.length), headline: s.fields.find(f => f.fixed)!.fixed })
+  const { storyCard, ...size } = t.roundup!
+  assert.deepEqual(size, { min: k.minStories, max: Math.min(k.maxStories!, t.fields.length), headline: s.fields.find(f => f.fixed)!.fixed })
+  const story = published.milcity.series.icymi_story
+  if (story?.templates.feed) assert.deepEqual([storyCard?.template, storyCard?.fields.map(f => f.name)], [story.templates.feed, ["headline", "deck"]], "a video story's card: headline and deck; the counter is the server's")
   assert.deepEqual(Object.keys(t.templates), ["feed"], "a carousel has no 9:16 size")
   assert.ok(t.fields.length && t.fields.every(f => f.role === "story" && /^story_0\d$/.test(f.name)), "headline, numbers and date are the server's")
 })
@@ -508,7 +511,7 @@ test("ICYMI: a row runs with min–max ticked stories, a row for each, a photo c
   assert.match(rowProblems(icymiRow({ media: null }), t).join(), /cover's photo/)
 })
 
-test("ICYMI: the list is last week's posted News and Breaking posts with a card; drafts, explainers and roundups are left out", () => {
+test("ICYMI: the list is last week's posted News and Breaking posts; a video one gets a card; drafts, explainers and roundups are left out", () => {
   const post = (id: string, over: Partial<ContentPost>): ContentPost => ({ id, title: `${published.milcity.shortName} News — Story ${id}`, status: "posted", social_copy: `Story ${id}. Source: x`, tags: published.milcity.posts.tag, posted_at: "2026-10-14T15:00:00Z", assets: [{ url: `https://blob/${id}.jpg`, kind: "image" }], create_text: { brand: "milcity", kind: "news", headline: `HEADLINE ${id}`, subHeadline: "", fields: {} }, ...over } as ContentPost)
   const posts = [post("p1", {}), post("p2", { posted_at: "2026-10-15T15:00:00Z" }), post("p3", { posted_at: "2026-10-16T15:00:00Z" }),
     post("draft", { status: "needs_approval" }), post("old", { posted_at: "2026-10-01T15:00:00Z" }), post("nocard", { assets: [] }),
@@ -516,7 +519,10 @@ test("ICYMI: the list is last week's posted News and Breaking posts with a card;
   const monday = Date.parse("2026-10-19T15:00:00Z")
   const c = roundupChoices(posts, monday, null)
   assert.equal(c.hold, undefined, c.hold)
-  assert.deepEqual(c.stories.map(x => x.postId), ["p3", "p2", "p1"], "newest first")
+  assert.deepEqual(c.stories.map(x => x.postId), ["p3", "p2", "p1", "nocard"], "newest first; a post with no still card is a video story")
+  assert.equal(c.stories[3].needsCard, true)
+  assert.equal(c.stories[3].card, undefined)
+  assert.equal(c.stories[0].needsCard, undefined)
   assert.equal(c.stories[0].headline, "HEADLINE p3")
   assert.equal(c.stories[0].card, "https://blob/p3.jpg")
   assert.match(roundupChoices(posts.slice(0, 2), monday, null).hold ?? "", /takes at least 3/)
@@ -556,7 +562,7 @@ test("ICYMI Replace media: the new cover photo, and the same published cards aft
 test("ICYMI Human+: the writer drafts the story rows and caption from the ticked posts; nothing is read from the web", async () => {
   let fetched = 0
   const ai = stubAi({ write: async () => ({ frames: [{ series: "icymi_cover", fields: { story_01: "Army fields new kit", story_02: "Navy tests drone", story_03: "Air Force picks jet" } }], caption: "Three stories from last week.\n\nSource: the brand's posts, 12–18 Oct 2026" }) })
-  const items = STORIES.slice(0, 3).map(x => ({ postId: x.postId, title: x.title, caption: `${x.title} caption.`, card: { url: x.card } }))
+  const items = STORIES.slice(0, 3).map(x => ({ postId: x.postId, title: x.title, caption: `${x.title} caption.`, card: { url: x.card! } }))
   const r = await humanPlusRoundup({ ai: () => ai, seeds: async () => null, nowMs: () => Date.parse("2026-10-19T15:00:00Z") }, { kind: "icymi", items, window: "the week of 2026-10-12", requestedBy: { actorEmail: "a@b.co", actorName: "A" } })
   assert.equal(fetched, 0)
   assert.equal(r.hold, undefined, r.hold)
@@ -575,4 +581,36 @@ test("ICYMI Run job: a re-run resumes with the slides its post already holds, ev
   assert.ok(again.posts.every(p => p.reused), "the same design and post, no 409")
   // Changed ticks are new choices, checked against the window as it is now.
   await assert.rejects(runCreateRow(s.deps, icymiRow({ roundup: ["a1", "b2", "d4"], fields: { story_01: "a", story_02: "b", story_03: "d" } }), { email: "audrey@x.co", name: "Audrey" }), /no longer a live post/)
+})
+
+test("ICYMI video story: the run makes its card with the ICYMI story template, after the cover and in its place", async (t) => {
+  const sc = icymi().roundup!.storyCard
+  if (!sc) return t.skip("the profile under test binds no 4:5 ICYMI story template")
+  const live: RoundupStory[] = [STORIES[0], { postId: "v2", title: "MCU News — Navy tests drone", needsCard: true, headline: "NAVY TESTS DRONE", deck: "A short deck." }, STORIES[2]]
+  const photo = { url: "https://abc.public.blob.vercel-storage.com/content-create/card.jpg", kind: "image" as const, name: "card.jpg", optimized: "done" }
+  const r0 = icymiRow({ roundup: ["a1", "v2", "c3"], storyCards: { v2: { headline: "Navy tests drone", deck: "A short deck.", media: photo } } })
+  assert.deepEqual(rowProblems(r0, icymi()), [])
+  // Without its card, or with a headline past the template's limits, nothing is made.
+  const none = runDeps(live)
+  await assert.rejects(runCreateRow(none.deps, { ...r0, storyCards: {} }, { email: "a@b.co", name: "A" }), /video post: write its card headline/)
+  await assert.rejects(runCreateRow(none.deps, { ...r0, storyCards: { v2: { headline: "A HEADLINE FAR TOO LONG FOR TWO LINES OF THIS CARD", deck: "", media: photo } } }, { email: "a@b.co", name: "A" }), /Story 2's card/)
+  assert.equal(none.made.length, 0)
+  const s = runDeps(live)
+  await runCreateRow(s.deps, r0, { email: "audrey@x.co", name: "Audrey" })
+  const card = s.made.find(m => m.templateId === sc.template)!
+  assert.ok(card, "a design from the ICYMI story template")
+  assert.equal(card.text.counter, "02 / 03")
+  assert.equal(card.text.headline, "NAVY TESTS DRONE")
+  assert.deepEqual(card.image, { field: sc.media, url: photo.url, name: "card.jpg" })
+  const items = s.attachCalls[0].items
+  assert.equal(items.length, 4)
+  assert.deepEqual([items[1], items[3]], [STORIES[0].card, STORIES[2].card])
+  const post = [...s.posts.values()][0]
+  assert.equal(post.roundup_slides![1].card?.designId, `D${s.made.indexOf(card) + 1}abcdefgh`, "the made card is recorded on its slide")
+  // A re-run with the same card reuses everything; a changed card headline makes a new card.
+  const made = s.made.length
+  assert.ok((await runCreateRow(s.deps, r0, { email: "audrey@x.co", name: "Audrey" })).posts.every(p => p.reused))
+  assert.equal(s.made.length, made)
+  await runCreateRow(s.deps, { ...r0, storyCards: { v2: { headline: "Navy flies drone", deck: "A short deck.", media: photo } } }, { email: "audrey@x.co", name: "Audrey" })
+  assert.equal(s.made.filter(m => m.templateId === sc.template).length, 2)
 })

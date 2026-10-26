@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react"
 import { Check, Loader2, PenLine, Play, Plus, Trash2, Upload, X, ArrowUpRight } from "lucide-react"
-import { CREATE_ROWS_STORE_KEY, CREATE_SOCIALS, FORMAT_LABEL, SOCIAL_LABEL, choiceLabel, formatChoices, formatsOf, mediaShapeOf, normalizePlatforms, pickedFormat, platformIdOf, rowProblems, templateGap, type CellField, type CreateFormat, type CreatePlatform, type CreateRow, type CreateSocial, type CreateTemplate, type MediaShape, type RoundupStory } from "@/lib/content-pipeline/create-table"
+import { CREATE_ROWS_STORE_KEY, CREATE_SOCIALS, FORMAT_LABEL, SOCIAL_LABEL, choiceLabel, formatChoices, formatsOf, mediaShapeOf, normalizePlatforms, pickedFormat, platformIdOf, rowProblems, templateGap, type CellField, type CreateFormat, type CreatePlatform, type CreateRow, type CreateSocial, type CreateTemplate, type MediaShape, type RoundupStory, type StoryCard } from "@/lib/content-pipeline/create-table"
 import { HelpTip } from "@/components/admin/HelpTip"
 import { isCanvaLink, mediaFromCanva, mediaFromFile, mediaFromLink, type MediaResult } from "./row-media"
 
@@ -24,7 +24,9 @@ import { isCanvaLink, mediaFromCanva, mediaFromFile, mediaFromLink, type MediaRe
  *
  * Step 4 item 1: ICYMI. A roundup template lists last week's live News and Breaking posts in place of the reference
  * link; the person ticks min–max, writes (or asks Human+ for) one row per story under the cover's fixed headline, and
- * Run job fills the cover and puts each story's published card after it.
+ * Run job fills the cover and puts each story's published card after it. A video story has no still card, so the row
+ * makes it one with the ICYMI story template from its headline and deck and a photo the person adds (coordinator's
+ * call, 2026-10-26).
  */
 interface BrandConfig { id: string; label: string; active: boolean; reason: string | null; versionId: string | null; templates: CreateTemplate[] }
 interface Config { brands: BrandConfig[]; platforms: CreatePlatform[] }
@@ -163,7 +165,25 @@ export function CreateTable({ onPostsReady }: { onPostsReady?: () => void }) {
     const written = Object.fromEntries(before.map((id, i) => [id, r.fields[slots[i]] ?? ""]))
     const fields = Object.fromEntries(Object.entries(r.fields).filter(([k]) => !slots.includes(k)))
     ids.forEach((id, i) => { if (slots[i]) fields[slots[i]] = written[id] ?? stories.find(x => x.postId === id)?.headline ?? "" })
-    patch(r.id, { roundup: ids, fields })
+    // A video story gets a card of its own: its headline and deck to start from, and a photo to add.
+    const storyCards: Record<string, StoryCard> = {}
+    for (const id of ids) {
+      const s = stories.find(x => x.postId === id)
+      if (s?.needsCard) storyCards[id] = r.storyCards?.[id] ?? { headline: s.headline ?? s.title.replace(/^.*? — /, ""), deck: s.deck ?? "", media: null }
+    }
+    patch(r.id, { roundup: ids, fields, storyCards })
+  }
+  const patchCard = (r: CreateRow, id: string, p: Partial<StoryCard>) => setRows(rs => rs.map(x => x.id === r.id && x.storyCards?.[id] ? { ...x, storyCards: { ...x.storyCards, [id]: { ...x.storyCards[id], ...p } } } : x))
+  /** A video story card's photo: a dropped file or a pasted link, through the same upload and optimize steps as a row's media. */
+  async function cardPhoto(r: CreateRow, id: string, get: () => Promise<MediaResult>) {
+    patchCard(r, id, { media: null })
+    patchState(r.id, { busy: "media", message: "Adding the card's photo…" })
+    try {
+      const { media } = await get()
+      if (media.kind !== "image") throw new Error("A story card takes a photo, not a video")
+      patchCard(r, id, { media })
+      patchState(r.id, s => ({ ...s, busy: undefined, message: "Card photo added" }))
+    } catch (e) { patchState(r.id, { error: e instanceof Error ? e.message : "The photo could not be added" }) }
   }
   /** The cover's photo from a ticked story's own photo, through the same optimize step as a pasted link. */
   const storyPhoto = (r: CreateRow, photo: NonNullable<RoundupStory["photo"]>) =>
@@ -298,7 +318,8 @@ export function CreateTable({ onPostsReady }: { onPostsReady?: () => void }) {
                         <td className="px-2 py-2 w-64">
                           {t?.roundup ? (
                             <RoundupCell row={r} roundup={t.roundup} load={roundups[`${r.brand}:${r.kind}`]} disabled={locked}
-                              onTick={(stories, id, on) => tickStory(r, t, stories, id, on)} onPhoto={photo => storyPhoto(r, photo)} onReload={() => loadRoundup(r.brand, r.kind)} />
+                              onTick={(stories, id, on) => tickStory(r, t, stories, id, on)} onPhoto={photo => storyPhoto(r, photo)} onReload={() => loadRoundup(r.brand, r.kind)}
+                              onCard={(id, p) => patchCard(r, id, p)} onCardFile={(id, f) => cardPhoto(r, id, () => mediaFromFile(f))} onCardLink={(id, u) => cardPhoto(r, id, () => mediaFromLink(u))} />
                           ) : <>
                           <input disabled={locked} value={r.referenceLink} onChange={e => patch(r.id, { referenceLink: e.target.value.trim() })} placeholder="https://…" className="w-full h-8 rounded border border-neutral-300 px-2" />
                           </>}
@@ -393,7 +414,7 @@ export function CreateTable({ onPostsReady }: { onPostsReady?: () => void }) {
 }
 
 /** A roundup's published stories to tick (Step 4 item 1): each with its card, its date and, when it has one, its photo for the cover. */
-function RoundupCell({ row, roundup, load, disabled, onTick, onPhoto, onReload }: { row: CreateRow; roundup: NonNullable<CreateTemplate["roundup"]>; load?: RoundupLoad; disabled?: boolean; onTick(stories: RoundupStory[], id: string, on: boolean): void; onPhoto(photo: NonNullable<RoundupStory["photo"]>): void; onReload(): void }) {
+function RoundupCell({ row, roundup, load, disabled, onTick, onPhoto, onReload, onCard, onCardFile, onCardLink }: { row: CreateRow; roundup: NonNullable<CreateTemplate["roundup"]>; load?: RoundupLoad; disabled?: boolean; onTick(stories: RoundupStory[], id: string, on: boolean): void; onPhoto(photo: NonNullable<RoundupStory["photo"]>): void; onReload(): void; onCard(id: string, p: Partial<StoryCard>): void; onCardFile(id: string, f: File): void; onCardLink(id: string, url: string): void }) {
   if (!load || (!load.data && !load.error)) return <p className="text-xs text-neutral-500 inline-flex items-center gap-1"><Loader2 className="w-3.5 h-3.5 animate-spin" /> Listing published stories…</p>
   if (load.error) return <p className="text-xs text-red-600">{load.error} <button className="underline" onClick={onReload}>Try again</button></p>
   const d = load.data!, picked = row.roundup ?? []
@@ -409,17 +430,54 @@ function RoundupCell({ row, roundup, load, disabled, onTick, onPhoto, onReload }
           return (
             <div key={x.postId} className={`flex items-start gap-1.5 rounded border px-1.5 py-1 ${on ? "border-neutral-400 bg-neutral-50" : "border-neutral-200"}`}>
               <input type="checkbox" className="mt-1" aria-label={x.title} disabled={disabled || (!on && picked.length >= roundup.max)} checked={on} onChange={e => onTick(d.stories, x.postId, e.target.checked)} />
-              {/* eslint-disable-next-line @next/next/no-img-element -- a staged card thumbnail in an admin table, not page content */}
-              <img src={x.card} alt="" className="w-9 h-11 object-cover rounded-sm border border-neutral-200 shrink-0" />
+              {x.card
+                // eslint-disable-next-line @next/next/no-img-element -- a staged card thumbnail in an admin table, not page content
+                ? <img src={x.card} alt="" className="w-9 h-11 object-cover rounded-sm border border-neutral-200 shrink-0" />
+                : <span title="A video post: the run makes it an ICYMI story card" className="w-9 h-11 shrink-0 rounded-sm border border-dashed border-neutral-300 text-[10px] text-neutral-400 inline-flex items-center justify-center">video</span>}
               <div className="min-w-0">
                 <p className="leading-snug line-clamp-2" title={x.title}>{x.headline || x.title}</p>
-                <p className="text-[11px] text-neutral-400">{x.publishedAt?.slice(0, 10)}{x.publishedUrl && <> · <a href={x.publishedUrl} target="_blank" rel="noreferrer" className="hover:underline">live</a></>}</p>
+                <p className="text-[11px] text-neutral-400">{x.publishedAt?.slice(0, 10)}{x.publishedUrl && <> · <a href={x.publishedUrl} target="_blank" rel="noreferrer" className="hover:underline">live</a></>}{x.needsCard && " · video: gets a story card"}</p>
                 {x.photo && !row.media && !disabled && <button type="button" onClick={() => onPhoto(x.photo!)} className="text-[11px] text-neutral-500 underline hover:text-neutral-900">Use its photo on the cover</button>}
               </div>
             </div>
           )
         })}
       </div>
+      {/* Each ticked video story's card: its headline, deck and photo (the counter is the server's). */}
+      {picked.filter(id => row.storyCards?.[id]).map(id => {
+        const c = row.storyCards![id], n = picked.indexOf(id) + 1, sc = roundup.storyCard
+        const head = sc?.fields.find(f => f.name === "headline"), deck = sc?.fields.find(f => f.name === "deck")
+        return (
+          <div key={id} className="mt-2 rounded border border-neutral-300 p-1.5 space-y-1">
+            <p className="font-medium text-neutral-700">Story {n} card <span className="font-normal text-neutral-400">(a video post)</span></p>
+            {!sc && <p className="text-amber-700">This brand has no ICYMI story template, so a video story can&apos;t get a card.</p>}
+            <Cell field={head} value={c.headline} disabled={disabled} rows={2} onChange={v => onCard(id, { headline: v })} />
+            {deck && <Cell field={deck} value={c.deck} disabled={disabled} rows={2} onChange={v => onCard(id, { deck: v })} />}
+            {c.media
+              ? <div className="flex items-center gap-1.5">
+                  {/* eslint-disable-next-line @next/next/no-img-element -- a Blob thumbnail in an admin table, not page content */}
+                  <img src={c.media.url} alt="" className="w-9 h-11 object-cover rounded-sm border border-neutral-200" />
+                  <span className="truncate text-neutral-500">{c.media.optimized === "done" ? "✓ " : ""}{c.media.name}</span>
+                  {!disabled && <button type="button" onClick={() => onCard(id, { media: null })} className="text-neutral-400 hover:text-red-600">Replace</button>}
+                </div>
+              : <CardPhoto disabled={disabled} onFile={f => onCardFile(id, f)} onLink={u => onCardLink(id, u)} />}
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+/** A story card's photo: drop or choose a file, or paste a link. */
+function CardPhoto({ disabled, onFile, onLink }: { disabled?: boolean; onFile(f: File): void; onLink(u: string): void }) {
+  const input = useRef<HTMLInputElement>(null)
+  const [url, setUrl] = useState("")
+  const take = () => { const u = url.trim(); setUrl(""); if (u.startsWith("https://")) onLink(u) }
+  return (
+    <div onDragOver={e => e.preventDefault()} onDrop={e => { e.preventDefault(); const f = e.dataTransfer.files?.[0]; if (f && !disabled) onFile(f) }} className="rounded border border-dashed border-neutral-300 p-1.5 text-neutral-500">
+      <button type="button" disabled={disabled} onClick={() => input.current?.click()} className="inline-flex items-center gap-1 hover:text-neutral-900"><Upload className="w-3.5 h-3.5" /> Add the card&apos;s photo</button>
+      <input ref={input} type="file" accept="image/jpeg,image/png,image/webp,image/avif,image/gif,image/tiff" className="hidden" onChange={e => { const f = e.target.files?.[0]; if (f) onFile(f); e.target.value = "" }} />
+      <input disabled={disabled} value={url} onChange={e => setUrl(e.target.value)} onKeyDown={e => { if (e.key === "Enter") take() }} onBlur={take} placeholder="or paste a link" className="mt-1 w-full h-7 rounded border border-neutral-200 px-1.5" />
     </div>
   )
 }
