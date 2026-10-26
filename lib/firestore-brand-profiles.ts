@@ -1,7 +1,7 @@
 import { getDb } from "./firebase-admin"
 import { CRM_COLLECTIONS } from "../types/crm-types"
 import { profileProblems, type BrandProfile } from "./content-pipeline/profile"
-import { preparePublish, versionDocId, BRAND_ID, MAX_PROFILE_BYTES, type BrandProfileDoc, type ProfileExamples, type ProfileVersion, type PublishResult } from "./content-pipeline/profile-store"
+import { DRAFT_CHANGED, draftToken, preparePublish, versionDocId, BRAND_ID, MAX_PROFILE_BYTES, type BrandProfileDoc, type ProfileExamples, type ProfileVersion, type PublishResult } from "./content-pipeline/profile-store"
 import type { ActiveProfile } from "./content-pipeline/brand"
 
 /**
@@ -44,16 +44,24 @@ export interface BrandProfileStore {
   /** Creates the brand's document if it does not exist; an existing document is left as it is. */
   create(doc: NewBrandDoc): Promise<{ created: boolean }>
   /** Saves the draft. Nothing reads a draft for output; only Publish changes what runs. */
-  saveDraft(id: string, draft: { profile: unknown; examples: ProfileExamples }, actor: string, at: string): Promise<BrandProfileDoc>
-  publish(id: string, actor: string, at: string): Promise<PublishResult>
+  /** `expected`: the draftToken the editor saw; a different draft in the store is refused (DraftChanged). */
+  saveDraft(id: string, draft: { profile: unknown; examples: ProfileExamples }, actor: string, at: string, expected?: string): Promise<BrandProfileDoc>
+  /** `expected`: as saveDraft; a mismatch is refused with DRAFT_CHANGED. */
+  publish(id: string, actor: string, at: string, expected?: string): Promise<PublishResult>
   /** Republishes an earlier version as a new version (one action); it becomes the draft too. A draft with unpublished
    * edits is refused unless force, and then kept in drafts_before_restore. */
-  restore(id: string, versionId: string, actor: string, at: string, force?: boolean): Promise<PublishResult>
+  restore(id: string, versionId: string, actor: string, at: string, force?: boolean, expected?: string): Promise<PublishResult>
   /** Every published version, newest first. */
   versions(id: string): Promise<ProfileVersion[]>
   /** At most `limit` published versions numbered above `n`, oldest first: what the 434-context backup does not hold yet. */
   versionsAfter(id: string, n: number, limit: number): Promise<ProfileVersion[]>
 }
+
+export class DraftChanged extends Error {
+  constructor() { super(DRAFT_CHANGED) }
+}
+/** The stored draft is not the one the editor saw. */
+const changed = (raw: FirebaseFirestore.DocumentData, expected: string | undefined) => expected !== undefined && draftToken(raw.draft ?? null) !== expected
 
 export function firestoreBrandProfiles(db: FirebaseFirestore.Firestore = getDb()): BrandProfileStore {
   const col = db.collection(COLLECTION)
@@ -75,28 +83,31 @@ export function firestoreBrandProfiles(db: FirebaseFirestore.Firestore = getDb()
       tx.create(ref, clean({ ...doc, draft: null, published: null, last_version: 0, drafts_before_restore: [] }))
       return { created: true }
     }),
-    saveDraft: (id, draft, actor, at) => db.runTransaction(async tx => {
+    saveDraft: (id, draft, actor, at, expected) => db.runTransaction(async tx => {
       if (!BRAND_ID.test(id)) throw new Error(`no brand profile document for ${id}`)
       const ref = col.doc(id), snap = await tx.get(ref)
       if (!snap.exists) throw new Error(`no brand profile document for ${id}`)
+      if (changed(snap.data()!, expected)) throw new DraftChanged()
       const size = Buffer.byteLength(JSON.stringify({ profile: draft.profile, examples: draft.examples }))
       if (size >= MAX_PROFILE_BYTES) throw new DraftTooLarge(size)
       const next = { profile: draft.profile, examples: draft.examples, updated_by: actor, updated_at: at }
       tx.set(ref, clean({ draft: next }), { mergeFields: ["draft"] })
       return { ...normalize(id, snap.data()!), draft: next }
     }),
-    publish: (id, actor, at) => db.runTransaction(async tx => {
+    publish: (id, actor, at, expected) => db.runTransaction(async tx => {
       if (!BRAND_ID.test(id)) return missing(id)
       const snap = await tx.get(col.doc(id))
       if (!snap.exists) return missing(id)
+      if (changed(snap.data()!, expected)) return { ok: false, problems: [DRAFT_CHANGED] }
       const result = preparePublish(normalize(id, snap.data()!), actor, at)
       if (result.ok) write(tx, id, result)
       return result
     }),
-    restore: (id, versionId, actor, at, force = false) => db.runTransaction(async tx => {
+    restore: (id, versionId, actor, at, force = false, expected) => db.runTransaction(async tx => {
       if (!BRAND_ID.test(id)) return missing(id)
       const ref = col.doc(id), snap = await tx.get(ref)
       if (!snap.exists) return missing(id)
+      if (changed(snap.data()!, expected)) return { ok: false, problems: [DRAFT_CHANGED] }
       const n = new RegExp(`^${id}@v(\\d+)$`).exec(versionId)?.[1]
       const old = n ? await tx.get(ref.collection(VERSIONS).doc(versionDocId(Number(n)))) : null
       if (!old?.exists) return { ok: false, problems: [`no published version ${versionId}`] }

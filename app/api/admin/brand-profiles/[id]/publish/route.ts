@@ -10,7 +10,7 @@ export const runtime = "nodejs"
  * version, kept with who published it and when, and governs the next request. 434-context pulls
  * its backup record the next day (GET /api/brand-profiles/backups).
  */
-export async function POST(_req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
+export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
   const auth = await requireSuperAdmin()
   if ("error" in auth) return NextResponse.json({ error: auth.error }, { status: auth.status })
   const { id } = await ctx.params
@@ -18,8 +18,12 @@ export async function POST(_req: NextRequest, ctx: { params: Promise<{ id: strin
   try {
     const { firestoreBrandProfiles } = await import("@/lib/firestore-brand-profiles")
     const store = firestoreBrandProfiles()
-    const result = await store.publish(id, auth.session.email.toLowerCase(), new Date().toISOString())
-    if (!result.ok) return NextResponse.json({ error: "The draft cannot be published", problems: result.problems }, { status: result.problems[0]?.startsWith("no brand profile document") ? 404 : 400 })
+    // The draftToken the editor saw, when it sends one (the Brands area does): a draft saved in between is refused.
+    const body = await req.json().catch(() => null) as { expectedDraft?: unknown } | null
+    const expected = typeof body?.expectedDraft === "string" ? body.expectedDraft.slice(0, 64) : undefined
+    const { DRAFT_CHANGED } = await import("@/lib/content-pipeline/profile-store")
+    const result = await store.publish(id, auth.session.email.toLowerCase(), new Date().toISOString(), expected)
+    if (!result.ok) return NextResponse.json({ error: result.problems[0] === DRAFT_CHANGED ? DRAFT_CHANGED : "The draft cannot be published", problems: result.problems }, { status: result.problems[0] === DRAFT_CHANGED ? 409 : result.problems[0]?.startsWith("no brand profile document") ? 404 : 400 })
     const v = result.version
     return NextResponse.json({ ok: true, versionId: v.version_id, publishedAt: v.published_at, sha256: v.profile_sha256 })
   } catch (err) {

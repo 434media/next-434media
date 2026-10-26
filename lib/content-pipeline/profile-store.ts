@@ -66,6 +66,13 @@ export const KEPT_DRAFTS = 2
  * drafts) stay well under Firestore's 1 MiB document limit. */
 export const MAX_PROFILE_BYTES = 200_000
 const contentSha = (d: { profile: unknown; examples: unknown }) => profileSha256({ profile: d.profile, examples: d.examples })
+/**
+ * Which draft an editor saw: a hash of its content and when it was saved ("none" when there is none). Save, Publish and
+ * Restore from the Brands area send it back, and a mismatch is refused (DRAFT_CHANGED), so nobody saves over, or
+ * publishes under their own name, a draft another person saved in between.
+ */
+export const draftToken = (d: ProfileDraft | null | undefined) => d ? profileSha256({ profile: d.profile, examples: d.examples, at: d.updated_at }) : "none"
+export const DRAFT_CHANGED = "the draft changed since you opened it: reload to see the latest before saving or publishing"
 /** The draft holds edits that are not published (or nothing is published yet). */
 export const draftDiffers = (doc: Pick<BrandProfileDoc, "draft" | "published">) => !!doc.draft && (!doc.published || contentSha(doc.draft) !== contentSha(doc.published))
 

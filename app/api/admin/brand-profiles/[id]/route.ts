@@ -26,6 +26,8 @@ export async function GET(_req: NextRequest, ctx: { params: Promise<{ id: string
 const draftInput = z.object({
   profile: z.record(z.string(), z.unknown()),
   examples: z.object({ approved: z.array(z.unknown()).max(50), rejected: z.array(z.unknown()).max(50) }).default({ approved: [], rejected: [] }),
+  /** The draftToken the editor saw (the Brands area sends it); a draft saved in between is refused, 409. */
+  expectedDraft: z.string().max(64).optional(),
 }).strict()
 
 /**
@@ -43,12 +45,14 @@ export async function PUT(req: NextRequest, ctx: { params: Promise<{ id: string 
     const { firestoreBrandProfiles } = await import("@/lib/firestore-brand-profiles")
     const store = firestoreBrandProfiles()
     if (!await store.get(id)) return NextResponse.json({ error: "No profile for that brand" }, { status: 404 })
-    const doc = await store.saveDraft(id, parsed.data as { profile: unknown; examples: { approved: never[]; rejected: never[] } }, auth.session.email.toLowerCase(), new Date().toISOString())
+    const { expectedDraft, ...draft } = parsed.data
+    const doc = await store.saveDraft(id, draft as { profile: unknown; examples: { approved: never[]; rejected: never[] } }, auth.session.email.toLowerCase(), new Date().toISOString(), expectedDraft)
     // The problems Publish would raise, so the editor sees them before publishing (saving is still allowed).
-    const { publishProblems } = await import("@/lib/content-pipeline/profile-store")
-    return NextResponse.json({ ok: true, draft: doc.draft, publishProblems: publishProblems(doc) })
+    const { publishProblems, draftToken } = await import("@/lib/content-pipeline/profile-store")
+    return NextResponse.json({ ok: true, draft: doc.draft, draftToken: draftToken(doc.draft), publishProblems: publishProblems(doc) })
   } catch (err) {
-    const { DraftTooLarge } = await import("@/lib/firestore-brand-profiles")
+    const { DraftTooLarge, DraftChanged } = await import("@/lib/firestore-brand-profiles")
+    if (err instanceof DraftChanged) return NextResponse.json({ error: err.message }, { status: 409 })
     if (err instanceof DraftTooLarge) return NextResponse.json({ error: "The draft is too large", problems: [err.message] }, { status: 400 })
     console.error("[PUT /api/admin/brand-profiles/[id]]", err)
     return NextResponse.json({ error: "Could not save the draft" }, { status: 500 })

@@ -24,6 +24,7 @@ import {
   ArrowUpRight,
   Home,
   Settings,
+  Shapes,
   Globe,
   LayoutDashboard,
   Palette,
@@ -261,6 +262,16 @@ const SIDEBAR_SECTIONS: SidebarSection[] = [
         matchPrefix: "/admin/content",
         description: "Plan, review & schedule social posts",
         roles: ["full_admin", "crm_only", "intern"],
+      },
+      {
+        id: "brands",
+        label: "Brands",
+        icon: Shapes,
+        href: "/admin/brands",
+        matchPrefix: "/admin/brands",
+        description: "Brand profiles, onboarding and templates",
+        // Profiles are edited and published by super-admins (the brand-profiles routes).
+        roles: ["crm_super_admin"],
       },
       {
         id: "feed",

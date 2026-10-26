@@ -5,7 +5,7 @@ import { BRAND_ID } from "@/lib/content-pipeline/profile-store"
 
 export const runtime = "nodejs"
 
-const input = z.object({ versionId: z.string().regex(/^[a-z][a-z0-9-]{1,30}@v\d{1,6}$/), force: z.boolean().default(false) }).strict()
+const input = z.object({ versionId: z.string().regex(/^[a-z][a-z0-9-]{1,30}@v\d{1,6}$/), force: z.boolean().default(false), expectedDraft: z.string().max(64).optional() }).strict()
 
 /**
  * POST /api/admin/brand-profiles/[id]/restore { versionId, force? } — restore an earlier version in one action: it is
@@ -23,8 +23,9 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
   try {
     const { firestoreBrandProfiles } = await import("@/lib/firestore-brand-profiles")
     const store = firestoreBrandProfiles()
-    const result = await store.restore(id, parsed.data.versionId, auth.session.email.toLowerCase(), new Date().toISOString(), parsed.data.force)
-    if (!result.ok) return NextResponse.json({ error: "That version cannot be restored", problems: result.problems }, { status: result.problems[0]?.startsWith("no ") ? 404 : 400 })
+    const { DRAFT_CHANGED } = await import("@/lib/content-pipeline/profile-store")
+    const result = await store.restore(id, parsed.data.versionId, auth.session.email.toLowerCase(), new Date().toISOString(), parsed.data.force, parsed.data.expectedDraft)
+    if (!result.ok) return NextResponse.json({ error: result.problems[0] === DRAFT_CHANGED ? DRAFT_CHANGED : "That version cannot be restored", problems: result.problems }, { status: result.problems[0] === DRAFT_CHANGED ? 409 : result.problems[0]?.startsWith("no ") ? 404 : 400 })
     const v = result.version
     return NextResponse.json({ ok: true, versionId: v.version_id, restoredFrom: v.restored_from, publishedAt: v.published_at })
   } catch (err) {
