@@ -333,8 +333,8 @@ export function CreateTable({ onPostsReady }: { onPostsReady?: () => void }) {
                               </div>
                             )
                           })}
-                          {/* A missing template is a gap with a note, never a fallback (plan v11.1 Step 3 item 3). */}
-                          {(["feed", "reels"] as const).map(f => templateGap(t, brand?.label ?? "this Brand", f)).filter(Boolean).map(note => <p key={note} className="mt-1 text-[11px] text-amber-700">{note}</p>)}
+                          {/* A missing template is a gap with a note, never a fallback (plan v11.1 Step 3 item 3). A roundup is a 4:5 carousel and has no 9:16 to miss. */}
+                          {(t?.roundup ? (["feed"] as const) : (["feed", "reels"] as const)).map(f => templateGap(t, brand?.label ?? "this Brand", f)).filter(Boolean).map(note => <p key={note} className="mt-1 text-[11px] text-amber-700">{note}</p>)}
                           {formats.length > 0 && <p className="mt-1 text-[11px] text-neutral-400">{formats.map(f => FORMAT_LABEL[f.format]).join(" + ")}</p>}
                         </td>
                         {t?.roundup ? (
