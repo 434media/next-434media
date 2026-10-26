@@ -6,6 +6,7 @@ import { profileProblems, type BrandProfile } from "./content-pipeline/profile"
 import { META_BRANDS } from "./owned-meta-publisher"
 import type { BrandFacts } from "./content-pipeline/brand-status"
 import type { McuSeeds } from "./content-pipeline/seeds"
+import { brandBookStatus } from "./content-pipeline/brand-book-check"
 
 /**
  * The Brands area's reads (plan v11.2.1 Step 4 item 2): every brand on the CRM roster and every brand with a profile
@@ -34,6 +35,8 @@ export async function readBrand(id: string, doc: BrandProfileDoc | null): Promis
   const [seeds, made] = await Promise.all([seedsId ? getSeedsDoc(seedsId).catch(() => null) : null, postsMade(id).catch(() => 0)])
   const pub = doc?.published ?? null
   const problems = pub ? profileProblems(id, { [id]: pub.profile }) : []
+  // The book is checked on its own: a bad one is not shown, and never makes the profile invalid.
+  const book = pub && !problems.length ? brandBookStatus((pub.profile as BrandProfile).visual) : null
   const facts: BrandFacts = {
     id, label: roster?.label ?? pub?.profile.name ?? id, onRoster: !!roster, brandType: doc?.brand_type ?? null, hasDocument: !!doc,
     identity: doc?.identity ?? null, sources: doc?.sources ?? null,
@@ -41,7 +44,7 @@ export async function readBrand(id: string, doc: BrandProfileDoc | null): Promis
     publishedProblem: !doc ? "no profile document yet" : !pub ? "nothing published yet" : problems[0] ?? null,
     draftDiffers: !!doc && draftDiffers(doc),
     seeds: seeds ? { snapshot: seeds.snapshot, orgs: seeds.orgs.length, cohorts: seeds.cohorts.length, backlog: seeds.dt101Backlog.length, ...(seeds.updatedAt ? { updatedAt: seeds.updatedAt } : {}) } : null,
-    postsMade: made, publisherBrands: META_BRANDS, brandBook: false,
+    postsMade: made, publisherBrands: META_BRANDS, brandBook: !!book?.ok, brandBookProblem: book && !book.ok ? book.reason : null,
   }
   return { facts, doc, seeds }
 }

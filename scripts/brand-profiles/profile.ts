@@ -16,12 +16,20 @@
  *   history <id>                      every published version
  *   export <id> <id@vN> <file>        write a version's backup record to a file (434-context pulls the records
  *                                     itself, daily: GET /api/brand-profiles/backups, plan v11.1 Step 2b)
+ *   book <id> <standard.md> --source <path in 434-context>
+ *                                     generate the brand book from the brand's visual standard into the draft's
+ *                                     `visual` block (lib/content-pipeline/brand-book.ts; plan v11.2.1 Step 4 item 3),
+ *                                     starting from the draft, or the published version when there is no draft.
+ *                                     Publish it from the Brands area or with publish.
  *
  * Writes need --actor <email>. Everything runs against the emulator when FIRESTORE_EMULATOR_HOST is set; against
  * production only with --production (reads too), which a working session passes for a write only after the founder's
  * go-ahead for that write.
  */
 import { readFileSync, writeFileSync } from "node:fs"
+import { createHash } from "node:crypto"
+import { parseVisualStandard } from "../../lib/content-pipeline/brand-book"
+import { bookDigest } from "../../lib/content-pipeline/brand-book-check"
 import { scriptDb } from "./load"
 import { firestoreBrandProfiles } from "../../lib/firestore-brand-profiles"
 import { profileSha256, publishProblems, type BrandType, type ProfileExamples } from "../../lib/content-pipeline/profile-store"
@@ -29,13 +37,13 @@ import { backupRecord } from "../../lib/content-pipeline/profile-backup"
 
 const argv = process.argv.slice(2)
 const flag = (name: string) => { const i = argv.indexOf(name); return i >= 0 ? argv[i + 1] : undefined }
-const VALUE_FLAGS = new Set(["--env-dir", "--actor", "--brand-type", "--client-id", "--identity-source", "--identity-record", "--seeds"])
+const VALUE_FLAGS = new Set(["--env-dir", "--actor", "--brand-type", "--client-id", "--identity-source", "--identity-record", "--seeds", "--source"])
 const positional = argv.filter((a, i) => !a.startsWith("--") && !(i > 0 && VALUE_FLAGS.has(argv[i - 1])))
 
 async function main() {
   const [command, id, a, b] = positional
-  if (!command || !id) throw new Error("usage: profile.ts <create|draft|publish|restore|show|history|export> <id> …")
-  const writes = ["create", "draft", "publish", "restore"].includes(command)
+  if (!command || !id) throw new Error("usage: profile.ts <create|draft|publish|restore|show|history|export|book> <id> …")
+  const writes = ["create", "draft", "publish", "restore", "book"].includes(command)
   const envDir = flag("--env-dir")
   if (envDir) {
     const { createRequire } = await import("node:module")
@@ -78,6 +86,20 @@ async function main() {
     const v = (await store.versions(id)).find(x => x.version_id === a)
     if (!v) throw new Error(`no version ${a}`)
     writeFileSync(b, backupRecord(v)); console.log(`wrote ${b}`)
+  } else if (command === "book") {
+    const source = flag("--source")
+    if (!a || !source) throw new Error("book <id> <standard.md> --source <its path in 434-context>")
+    const md = readFileSync(a, "utf8")
+    const parsed = parseVisualStandard(md, { path: source, sha256: createHash("sha256").update(md).digest("hex").slice(0, 16) })
+    // Stamped, so a block changed by hand after this is not shown (brand-book-check.ts).
+    const visual = { ...parsed, digest: bookDigest(parsed) }
+    const doc = await store.get(id)
+    if (!doc) throw new Error(`no brand_profiles/${id}`)
+    const base = doc.draft ?? (doc.published && { profile: doc.published.profile, examples: doc.published.examples })
+    if (!base) throw new Error("no draft or published profile to add the brand book to")
+    const saved = await store.saveDraft(id, { profile: { ...(base.profile as object), visual }, examples: base.examples }, actor, at)
+    const problems = publishProblems(saved)
+    console.log(`brand book from ${visual.standard.title} (${visual.standard.version}, sha256 ${visual.standard.sha256}): ${visual.sections.length} sections into the draft; ${problems.length ? `it would NOT publish:\n- ${problems.join("\n- ")}` : "it would publish"}`)
   } else throw new Error(`unknown command ${command}`)
 }
 

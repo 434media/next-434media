@@ -6,6 +6,8 @@ import { useParams } from "next/navigation"
 import { ArrowLeft, Check, Circle, History, Loader2, RotateCcw, Save, Upload } from "lucide-react"
 import { AdminRoleGuard } from "@/components/AdminRoleGuard"
 import { BrandStateBadge } from "@/components/admin/brands/BrandStateBadge"
+import { BrandBook } from "@/components/admin/brands/BrandBook"
+import type { BrandBook as Book } from "@/lib/content-pipeline/brand-book"
 import type { BrandState, CheckItem } from "@/lib/content-pipeline/brand-status"
 import type { McuSeeds } from "@/lib/content-pipeline/seeds"
 
@@ -14,17 +16,21 @@ import type { McuSeeds } from "@/lib/content-pipeline/seeds"
  * the missing templates, the Sources, and the profile editor: the draft is edited as JSON, saved, and published
  * (validated by the engine's own validator; an invalid draft is refused with its problems). Every published version is
  * listed, and any earlier one can be restored in one click (republished as a new version). Owned and client brands use
- * the same page. Super-admins only.
+ * the same page. 434 staff (interns excluded, as /admin/brand) see the status, Missing and the brand book; the checklist,
+ * the private Sources and the profile editor are for super-admins, who edit and publish.
  */
 interface Version { versionId: string; n: number; profileVersion: string; sha256: string; publishedBy: string; publishedAt: string; restoredFrom: string | null }
 interface BrandView {
+  canEdit: boolean
   brand: { id: string; label: string; brandType: "owned" | "client" | null; onRoster: boolean; state: BrandState; versionId: string | null; publishedAt: string | null; publishedBy: string | null; problem: string | null; draftDiffers: boolean; postsMade: number }
-  checklist: CheckItem[]
   missing: string[]
-  sources: { pointer: string | null; note: string | null; seeds: McuSeeds | null }
-  doc: { brand_type: string; client_id: string | null; identity: { source: string; record: string }; draft: { profile: unknown; examples: unknown; updated_by: string; updated_at: string } | null; draftToken: string; last_version: number; published: { version_id: string } | null } | null
-  draftProblems: string[]
-  versions: Version[]
+  book: { versionId: string; book: Book } | null
+  // Super-admins only (canEdit).
+  checklist?: CheckItem[]
+  sources?: { pointer: string | null; note: string | null; seeds: McuSeeds | null }
+  doc?: { brand_type: string; client_id: string | null; identity: { source: string; record: string }; draft: { profile: unknown; examples: unknown; updated_by: string; updated_at: string } | null; draftToken: string; draftHasBook: boolean; last_version: number; published: { version_id: string } | null } | null
+  draftProblems?: string[]
+  versions?: Version[]
 }
 
 const draftText = (d: BrandView["doc"]) => d?.draft ? JSON.stringify({ profile: d.draft.profile, examples: d.draft.examples }, null, 2) : ""
@@ -78,7 +84,7 @@ export default function BrandPage() {
     const data = await r.json()
     if (!r.ok) { setResult({ ok: false, message: data.error || "Could not publish", problems: data.problems }); await load(); return }
     await load()
-    setResult({ ok: true, message: `Published ${data.versionId}. It governs the next request.` })
+    setResult({ ok: true, message: `Published ${data.versionId}. It governs the next request.${data.bookProblem ? ` Its brand book isn't shown: ${data.bookProblem}.` : ""}` })
   })
   const restore = (v: Version) => act(`restore-${v.versionId}`, async () => {
     const unpublished = !!view?.brand.draftDiffers || edited
@@ -93,7 +99,7 @@ export default function BrandPage() {
 
   const b = view?.brand
   return (
-    <AdminRoleGuard allowedRoles={[]}>
+    <AdminRoleGuard allowedRoles={["full_admin", "crm_only"]}>
       <div className="min-h-full bg-neutral-50 px-4 sm:px-6 py-6">
         <div className="max-w-5xl mx-auto space-y-6">
           <Link href="/admin/brands" className="flex w-fit items-center gap-1 text-xs text-neutral-500 hover:text-neutral-900"><ArrowLeft className="w-3.5 h-3.5" /> Brands</Link>
@@ -112,8 +118,8 @@ export default function BrandPage() {
               </p>
             </header>
 
-            <div className="grid gap-6 md:grid-cols-2">
-              <Section title="Onboarding checklist" note="From the Brand Onboarding SOP. A step is ticked only from what the system can see.">
+            <div className={`grid gap-6 ${view.checklist ? "md:grid-cols-2" : ""}`}>
+              {view.checklist && <Section title="Onboarding checklist" note="From the Brand Onboarding SOP. A step is ticked only from what the system can see.">
                 <ol className="space-y-2">
                   {view.checklist.map(c => (
                     <li key={c.step} className="flex gap-2">
@@ -125,7 +131,7 @@ export default function BrandPage() {
                     </li>
                   ))}
                 </ol>
-              </Section>
+              </Section>}
 
               <Section title="Missing" note="A template that doesn't exist can't be ticked in Create.">
                 {view.missing.length
@@ -134,11 +140,16 @@ export default function BrandPage() {
               </Section>
             </div>
 
-            <Section title="Sources" note="Where research looks first. The seeds are private: they live in the database, never in the profile or the public repository.">
-              <Sources sources={view.sources} />
+            <Section title="Brand book" note="Generated from the brand's visual standard and published with its profile. Staff only.">
+              {view.book ? <BrandBook book={view.book.book} brand={b.label} versionId={view.book.versionId} />
+                : <p className="text-sm text-neutral-500">No brand book yet. A working session generates it from the brand&apos;s visual standard into the draft (scripts/brand-profiles/profile.ts book); it appears here once that draft is published.</p>}
             </Section>
 
-            <Section title="Profile" note="Edits are a draft and change nothing until Publish. Publish validates the draft with the engine's own validator and refuses an invalid one.">
+            {view.canEdit && view.sources && <Section title="Sources" note="Where research looks first. The seeds are private: they live in the database, never in the profile or the public repository.">
+              <Sources sources={view.sources} />
+            </Section>}
+
+            {view.canEdit && <Section title="Profile" note="Edits are a draft and change nothing until Publish. Publish validates the draft with the engine's own validator and refuses an invalid one.">
               {!view.doc ? (
                 <p className="text-sm text-neutral-500">No profile document for this brand yet. A working session creates it (scripts/brand-profiles/profile.ts create); then it is edited here.</p>
               ) : <>
@@ -147,7 +158,7 @@ export default function BrandPage() {
                   {b.draftDiffers ? <span className="text-amber-700">It has edits that aren&apos;t published.</span> : view.doc.published ? <>It matches {view.doc.published.version_id}.</> : null}
                   {edited && <span className="text-amber-700"> Changed here, not saved.</span>}
                 </p>
-                {view.draftProblems.length > 0 && !edited && <Problems title="Publish would refuse the saved draft until these are fixed:" problems={view.draftProblems} />}
+                {!!view.draftProblems?.length && !edited && <Problems title="Publish would refuse the saved draft until these are fixed:" problems={view.draftProblems} />}
                 <textarea aria-label="Draft profile (JSON)" value={text} onChange={e => setText(e.target.value)} spellCheck={false} rows={24}
                   className="mt-2 w-full rounded border border-neutral-300 bg-white px-2 py-1.5 font-mono text-xs leading-relaxed" />
                 <div className="mt-2 flex flex-wrap items-center gap-2">
@@ -159,17 +170,18 @@ export default function BrandPage() {
                   </button>
                   {edited && <button onClick={() => { setText(saved); setResult(null) }} disabled={!!busy} className="h-8 px-2 text-sm text-neutral-500 hover:text-neutral-900">Undo changes</button>}
                 </div>
+                {view.doc.draftHasBook && <p className="mt-2 text-[11px] text-neutral-400">The brand book (<span className="font-mono">visual</span>) is generated from the visual standard and isn&apos;t edited here; saving keeps it as it is.</p>}
                 {result && <div className="mt-2">{result.problems?.length ? <Problems title={result.message} problems={result.problems} tone={result.ok ? "amber" : "red"} /> : <p className={`text-sm ${result.ok ? "text-emerald-700" : "text-red-600"}`}>{result.message}</p>}</div>}
               </>}
-            </Section>
+            </Section>}
 
-            {view.versions.length > 0 && (
+            {view.canEdit && !!view.versions?.length && (
               <Section title="History" note="Every published version is kept. Restore publishes an earlier one again as a new version; history is never rewritten.">
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
                     <thead><tr className="text-left text-xs text-neutral-500"><th className="py-1 pr-3 font-medium">Version</th><th className="py-1 pr-3 font-medium">Profile</th><th className="py-1 pr-3 font-medium">Published</th><th className="py-1 font-medium"></th></tr></thead>
                     <tbody className="divide-y divide-neutral-100">
-                      {view.versions.map(v => {
+                      {view.versions!.map(v => {
                         const live = v.versionId === b.versionId
                         return (
                           <tr key={v.versionId}>
@@ -218,7 +230,7 @@ function Problems({ title, problems, tone = "red" }: { title: string; problems: 
   )
 }
 
-function Sources({ sources }: { sources: BrandView["sources"] }) {
+function Sources({ sources }: { sources: NonNullable<BrandView["sources"]> }) {
   const s = sources.seeds
   if (!sources.pointer) return <p className="text-sm text-neutral-500">No seeds named for this brand yet.{sources.note ? ` ${sources.note}` : ""}</p>
   if (!s) return <p className="text-sm text-amber-800">The profile names <span className="font-mono">{sources.pointer}</span>, which isn&apos;t loaded.</p>
