@@ -563,7 +563,7 @@ test("ICYMI Human+: the writer drafts the story rows and caption from the ticked
   let fetched = 0
   const ai = stubAi({ write: async () => ({ frames: [{ series: "icymi_cover", fields: { story_01: "Army fields new kit", story_02: "Navy tests drone", story_03: "Air Force picks jet" } }], caption: "Three stories from last week.\n\nSource: the brand's posts, 12–18 Oct 2026" }) })
   const items = STORIES.slice(0, 3).map(x => ({ postId: x.postId, title: x.title, caption: `${x.title} caption.`, card: { url: x.card! } }))
-  const r = await humanPlusRoundup({ ai: () => ai, seeds: async () => null, nowMs: () => Date.parse("2026-10-19T15:00:00Z") }, { kind: "icymi", items, window: "the week of 2026-10-12", requestedBy: { actorEmail: "a@b.co", actorName: "A" } })
+  const r = await humanPlusRoundup({ ai: () => ai, fetchPage: async () => { fetched++; return page }, seeds: async () => null, nowMs: () => Date.parse("2026-10-19T15:00:00Z") }, { kind: "icymi", items, window: "the week of 2026-10-12", requestedBy: { actorEmail: "a@b.co", actorName: "A" } })
   assert.equal(fetched, 0)
   assert.equal(r.hold, undefined, r.hold)
   assert.equal(r.fields.story_02, "Navy tests drone")

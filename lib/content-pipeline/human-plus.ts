@@ -130,7 +130,7 @@ export async function humanPlus(deps: HumanPlusDeps, input: HumanPlusInput): Pro
  * from the chosen published posts' own titles and captions, as the pipeline's roundup did. Nothing is read from the web:
  * the stories are the brand's own posts. The cover's headline is fixed and its date and numbers are the server's.
  */
-export async function humanPlusRoundup(deps: Omit<HumanPlusDeps, "fetchPage">, input: { kind: RequestKind; items: RoundupItem[]; window: string; notes?: string; requestedBy: RequestRef }): Promise<HumanPlusCopy> {
+export async function humanPlusRoundup(deps: HumanPlusDeps, input: { kind: RequestKind; items: RoundupItem[]; window: string; notes?: string; requestedBy: RequestRef; mediaFrom?: string }): Promise<HumanPlusCopy> {
   const calls: ModelCall[] = []
   const ai = deps.ai(c => { calls.push(c) })
   const story = roundupStory(input.items, input.window)
@@ -141,7 +141,9 @@ export async function humanPlusRoundup(deps: Omit<HumanPlusDeps, "fetchPage">, i
     throw new HumanPlusError("The writer could not answer just now; try Human+ again", 502)
   }
   const fields = Object.fromEntries(Object.entries(written.frames[0]?.fields ?? {}).filter(([k]) => /^story_0\d$/.test(k) || k === "date"))
-  return { fields, headline: "", subHeadline: "", caption: written.caption, notes: written.notes, facts: 0, ...(written.hold ? { hold: written.hold } : {}), source: { url: story.primaryUrl, title: story.sourceTitle }, calls }
+  // The cover's photo is the row's: a DVIDS photo gets its credit and the notice, as a one-card row's does.
+  const credited = await mediaCredit(deps, written.caption, input.mediaFrom)
+  return { fields, headline: "", subHeadline: "", caption: credited.caption, notes: credited.note ? [...written.notes, credited.note] : written.notes, facts: 0, ...(written.hold ? { hold: written.hold } : {}), source: { url: story.primaryUrl, title: story.sourceTitle }, calls }
 }
 
 /** Production wiring: the pipeline's models and search tool (run.ts pipelineDeps), without the board or Canva. */

@@ -48,7 +48,7 @@ export async function POST(req: NextRequest) {
         const { liveRoundupChoices } = await import("@/lib/content-pipeline/roundup")
         const choices = await liveRoundupChoices(), items = a.roundup.map(id => choices.items.find(i => i.postId === id))
         if (items.some(i => !i)) throw new HumanPlusError("A ticked story is no longer a live post from the window; choose the stories again", 400)
-        return humanPlusRoundup(await humanPlusDeps(), { kind: template.kind, items: items.filter(i => !!i), window: choices.window, ...(a.notes ? { notes: a.notes } : {}), requestedBy })
+        return humanPlusRoundup(await humanPlusDeps(), { kind: template.kind, items: items.filter(i => !!i), window: choices.window, ...(a.notes ? { notes: a.notes } : {}), ...(a.mediaFrom ? { mediaFrom: a.mediaFrom } : {}), requestedBy })
       }
       return humanPlus(await humanPlusDeps(), { kind: template.kind, url: a.referenceLink!, ...(a.notes ? { notes: a.notes } : {}), ...(a.mediaFrom ? { mediaFrom: a.mediaFrom } : {}), requestedBy })
     })

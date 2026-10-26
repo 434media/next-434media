@@ -194,7 +194,7 @@ export function CreateTable({ onPostsReady }: { onPostsReady?: () => void }) {
     if (!roundup && !r.referenceLink.startsWith("https://")) { patchState(r.id, { error: "Paste an https reference link first" }); return }
     patchState(r.id, { busy: "human", message: roundup ? "Drafting the story rows and caption…" : "Reading the link and drafting…" })
     try {
-      const source = roundup ? { roundup: r.roundup ?? [] } : { referenceLink: r.referenceLink, ...(r.media?.source ? { mediaFrom: r.media.source } : {}) }
+      const source = { ...(roundup ? { roundup: r.roundup ?? [] } : { referenceLink: r.referenceLink }), ...(r.media?.source ? { mediaFrom: r.media.source } : {}) }
       const res = await fetch("/api/admin/content/generate-copy", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ brand: r.brand, kind: r.kind, ...source, ...(r.notes.trim() ? { notes: r.notes.trim() } : {}) }) })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || "Human+ failed")
