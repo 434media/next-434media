@@ -77,7 +77,7 @@ export function onboardingChecklist(f: BrandFacts): CheckItem[] {
     },
     {
       step: 2, title: "Voice and editorial rules",
-      status: p && Object.keys(p.editorial ?? {}).length && p.headlineRules ? "done" : "open",
+      status: p?.editorial?.trim() && p.headlineRules?.trim() ? "done" : "open",
       detail: p ? `Editorial and headline rules are in ${f.published!.versionId}${p.checks ? ", with checks on" : ""}.` : "Written in the draft and checked on Publish.",
     },
     {
