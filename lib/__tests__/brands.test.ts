@@ -8,6 +8,7 @@ import assert from "node:assert/strict"
 import { published, loadPublishedProfileFirst } from "./published-profile"
 import { brandState, missingTemplates, onboardingChecklist, type BrandFacts } from "../content-pipeline/brand-status"
 import { seedsDocId } from "../firestore-brands"
+import { draftToken } from "../content-pipeline/profile-store"
 import type { BrandProfile } from "../content-pipeline/profile"
 
 loadPublishedProfileFirst()
@@ -60,4 +61,12 @@ test("the seeds a profile names are read from content_pipeline_config only", () 
   assert.equal(seedsDocId("mcu_seeds"), "mcu_seeds")
   assert.equal(seedsDocId("crm_clients/abc"), null)
   assert.equal(seedsDocId(null), null)
+})
+
+test("the draft token names the draft an editor saw: a new save changes it, and no draft is 'none'", () => {
+  const d = { profile: published.milcity, examples: { approved: [], rejected: [] }, updated_by: "a@example.com", updated_at: "2026-10-26T14:00:00.000Z" }
+  assert.equal(draftToken(null), "none")
+  assert.equal(draftToken(d), draftToken({ ...d }))
+  assert.notEqual(draftToken(d), draftToken({ ...d, updated_at: "2026-10-26T14:00:01.000Z" }), "the same content saved again is another draft")
+  assert.notEqual(draftToken(d), draftToken({ ...d, examples: { approved: [{ text: "x" }], rejected: [] } }))
 })

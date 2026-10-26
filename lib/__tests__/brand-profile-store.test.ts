@@ -222,3 +222,18 @@ test("Firestore: publish, refuse a broken draft, restore, and read the published
   assert.deepEqual(await store.versionsAfter(id, 3, 50), [])
   assert.deepEqual((await store.versionsAfter(id, 0, 2)).map(v => v.n), [1, 2], "limited")
 })
+
+test("Firestore: Save, Publish and Restore refuse a draft another person saved since the editor read it", { skip: !process.env.FIRESTORE_EMULATOR_HOST && "no FIRESTORE_EMULATOR_HOST" }, async () => {
+  const [{ scriptDb }, { firestoreBrandProfiles, DraftChanged }, { draftToken, DRAFT_CHANGED }] = await Promise.all([import("../../scripts/brand-profiles/load"), import("../firestore-brand-profiles"), import("../content-pipeline/profile-store")])
+  const { db } = await scriptDb()
+  const id = `zz-race-${Date.now().toString(36)}`, profile = { ...structuredClone(published.milcity), id }
+  const store = firestoreBrandProfiles(db)
+  await store.create({ id, brand_type: "owned", client_id: null, identity: { source: "test", record: "test" }, sources: { seeds: null } })
+  const mine = draftToken(null)
+  await store.saveDraft(id, { profile, examples: { approved: [], rejected: [] } }, "other@example.com", AT, mine)
+  // The editor still holds the token from before the other save.
+  await assert.rejects(store.saveDraft(id, { profile, examples: { approved: [], rejected: [] } }, BY, AT, mine), DraftChanged)
+  assert.deepEqual(await store.publish(id, BY, AT, mine), { ok: false, problems: [DRAFT_CHANGED] })
+  const fresh = draftToken((await store.get(id))!.draft)
+  assert.ok((await store.publish(id, BY, AT, fresh)).ok)
+})

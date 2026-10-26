@@ -16,7 +16,7 @@ export async function GET(_req: NextRequest, ctx: { params: Promise<{ id: string
   const { id } = await ctx.params
   if (!BRAND_ID.test(id)) return NextResponse.json({ error: "Unknown brand" }, { status: 404 })
   try {
-    const [{ readBrand }, { firestoreBrandProfiles }, { brandState, missingTemplates, onboardingChecklist }, { PIPELINE_PROPERTIES }, { publishProblems }] = await Promise.all([
+    const [{ readBrand }, { firestoreBrandProfiles }, { brandState, missingTemplates, onboardingChecklist }, { PIPELINE_PROPERTIES }, { publishProblems, draftToken }] = await Promise.all([
       import("@/lib/firestore-brands"), import("@/lib/firestore-brand-profiles"), import("@/lib/content-pipeline/brand-status"), import("@/lib/content-pipeline/properties"), import("@/lib/content-pipeline/profile-store"),
     ])
     const store = firestoreBrandProfiles(), doc = await store.get(id)
@@ -27,7 +27,7 @@ export async function GET(_req: NextRequest, ctx: { params: Promise<{ id: string
       checklist: onboardingChecklist(f),
       missing: missingTemplates(f.published?.profile ?? null, f.label, f.brandBook),
       sources: { pointer: f.sources?.seeds ?? null, note: f.sources?.note ?? null, seeds },
-      doc: doc ? { brand_type: doc.brand_type, client_id: doc.client_id, identity: doc.identity, draft: doc.draft, last_version: doc.last_version, published: doc.published ? { version_id: doc.published.version_id } : null } : null,
+      doc: doc ? { brand_type: doc.brand_type, client_id: doc.client_id, identity: doc.identity, draft: doc.draft, draftToken: draftToken(doc.draft), last_version: doc.last_version, published: doc.published ? { version_id: doc.published.version_id } : null } : null,
       draftProblems: doc?.draft ? publishProblems(doc) : [],
       versions: versions.map(v => ({ versionId: v.version_id, n: v.n, profileVersion: v.profile.profileVersion, sha256: v.profile_sha256, publishedBy: v.published_by, publishedAt: v.published_at, restoredFrom: v.restored_from })),
     }, { headers: { "cache-control": "private, no-store" } })

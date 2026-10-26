@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import Link from "next/link"
 import { useParams } from "next/navigation"
 import { ArrowLeft, Check, Circle, History, Loader2, RotateCcw, Save, Upload } from "lucide-react"
@@ -22,7 +22,7 @@ interface BrandView {
   checklist: CheckItem[]
   missing: string[]
   sources: { pointer: string | null; note: string | null; seeds: McuSeeds | null }
-  doc: { brand_type: string; client_id: string | null; identity: { source: string; record: string }; draft: { profile: unknown; examples: unknown; updated_by: string; updated_at: string } | null; last_version: number; published: { version_id: string } | null } | null
+  doc: { brand_type: string; client_id: string | null; identity: { source: string; record: string }; draft: { profile: unknown; examples: unknown; updated_by: string; updated_at: string } | null; draftToken: string; last_version: number; published: { version_id: string } | null } | null
   draftProblems: string[]
   versions: Version[]
 }
@@ -36,6 +36,7 @@ export default function BrandPage() {
   const [text, setText] = useState("")
   const [busy, setBusy] = useState<string | null>(null)
   const [result, setResult] = useState<{ ok: boolean; message: string; problems?: string[] } | null>(null)
+  const token = useRef<string | undefined>(undefined)
 
   const load = useCallback(async () => {
     try {
@@ -44,6 +45,8 @@ export default function BrandPage() {
       if (!r.ok) throw new Error(data.error || "Could not read the brand")
       setView(data as BrandView)
       setText(draftText((data as BrandView).doc))
+      // The draft this page shows: Save, Publish and Restore send it back, and a draft saved since is refused.
+      token.current = (data as BrandView).doc?.draftToken
       setError(null)
     } catch (e) { setError(e instanceof Error ? e.message : "Could not read the brand") }
   }, [id])
@@ -56,9 +59,10 @@ export default function BrandPage() {
   async function save(): Promise<boolean> {
     let body: { profile: unknown; examples: unknown }
     try { body = JSON.parse(text) } catch (e) { setResult({ ok: false, message: `The draft is not valid JSON: ${e instanceof Error ? e.message : "parse error"}` }); return false }
-    const r = await fetch(`/api/admin/brand-profiles/${encodeURIComponent(id)}`, { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify({ profile: body?.profile, examples: body?.examples ?? { approved: [], rejected: [] } }) })
+    const r = await fetch(`/api/admin/brand-profiles/${encodeURIComponent(id)}`, { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify({ profile: body?.profile, examples: body?.examples ?? { approved: [], rejected: [] }, expectedDraft: token.current }) })
     const data = await r.json()
     if (!r.ok) { setResult({ ok: false, message: data.error || "Could not save the draft", problems: data.problems }); return false }
+    token.current = data.draftToken
     setResult({ ok: true, message: data.publishProblems?.length ? "Draft saved. Publish would refuse it until these are fixed:" : "Draft saved. It can be published.", problems: data.publishProblems })
     return true
   }
@@ -70,7 +74,7 @@ export default function BrandPage() {
   const saveDraft = () => act("save", async () => { if (await save()) await load() })
   const publish = () => act("publish", async () => {
     if (edited && !await save()) return
-    const r = await fetch(`/api/admin/brand-profiles/${encodeURIComponent(id)}/publish`, { method: "POST" })
+    const r = await fetch(`/api/admin/brand-profiles/${encodeURIComponent(id)}/publish`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ expectedDraft: token.current }) })
     const data = await r.json()
     if (!r.ok) { setResult({ ok: false, message: data.error || "Could not publish", problems: data.problems }); await load(); return }
     await load()
@@ -80,7 +84,7 @@ export default function BrandPage() {
     const unpublished = !!view?.brand.draftDiffers || edited
     if (!window.confirm(`Restore ${v.versionId}? It is published again as a new version and becomes the draft.${unpublished ? "\n\nThe draft has unpublished edits. They are kept aside (the last two), not lost." : ""}`)) return
     if (edited && !await save()) return
-    const r = await fetch(`/api/admin/brand-profiles/${encodeURIComponent(id)}/restore`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ versionId: v.versionId, force: unpublished }) })
+    const r = await fetch(`/api/admin/brand-profiles/${encodeURIComponent(id)}/restore`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ versionId: v.versionId, force: unpublished, expectedDraft: token.current }) })
     const data = await r.json()
     if (!r.ok) { setResult({ ok: false, message: data.error || "Could not restore", problems: data.problems }); return }
     await load()
