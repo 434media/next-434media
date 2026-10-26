@@ -89,8 +89,11 @@ export async function listRecentPipelineJobs(limit = 8): Promise<{ job: McuJob; 
   return jobs.map(job => ({ job, drafts: (job.drafts ?? []).map(id => drafts.get(id)).filter((d): d is McuDraft => !!d) }))
 }
 
-export async function getMcuSeeds(): Promise<McuSeeds | null> {
-  const d = (await getDb().collection(CONFIG).doc(SEEDS_DOC).get()).data()
+export const getMcuSeeds = (): Promise<McuSeeds | null> => getSeedsDoc(SEEDS_DOC)
+/** A seeds document in content_pipeline_config by id (the Brands area reads the one a profile's sources name). */
+export async function getSeedsDoc(docId: string): Promise<McuSeeds | null> {
+  if (!/^[a-z0-9_-]{1,64}$/.test(docId)) return null
+  const d = (await getDb().collection(CONFIG).doc(docId).get()).data()
   return d && typeof d.purpose === "string" && Array.isArray(d.orgs) ? {
     purpose: d.purpose, snapshot: String(d.snapshot ?? ""),
     cohorts: Array.isArray(d.cohorts) ? d.cohorts.map(String) : [],
