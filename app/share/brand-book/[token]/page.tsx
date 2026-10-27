@@ -39,7 +39,7 @@ export default async function SharedBrandBook({ params }: { params: Promise<{ to
           <p className="text-xs text-neutral-500">Shared by 434 MEDIA · this link works until {new Date(expiresAt).toLocaleDateString("en-US", { timeZone: "America/Chicago", month: "long", day: "numeric", year: "numeric" })}</p>
           <DownloadPdf />
         </div>
-        <BrandBook book={book} brand={label} versionId={versionId} audience="vendor" />
+        <BrandBook book={book} brand={label} versionId={versionId} view="designer" />
       </div>
     </main>
   )

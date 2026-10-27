@@ -119,8 +119,22 @@ export default function BrandPage() {
               </p>
             </header>
 
-            <div className={`grid gap-6 ${view.checklist ? "md:grid-cols-2" : ""}`}>
-              {view.checklist && <Section title="Onboarding checklist" note="From the Brand Onboarding SOP. A step is ticked only from what the system can see.">
+            <Section open title="Brand book" note="What a designer needs: colour, type, logos and photography. This is the brand book a vendor is sent.">
+              {view.book ? <BrandBook book={view.book.book} brand={b.label} versionId={view.book.versionId} view="designer" collapsible />
+                : <p className="text-sm text-neutral-500">No brand book yet. A working session generates it from the brand&apos;s visual standard into the draft (scripts/brand-profiles/profile.ts book); it appears here once that draft is published.</p>}
+            </Section>
+
+            {view.book && <Section open title="Share with vendor" note="Emails a designer an expiring link to the brand book above, pinned to this version. Each send is recorded; each opening of the link too.">
+              <BrandShares brandId={b.id} brand={b.label} versionId={view.book.versionId} />
+            </Section>}
+
+            {view.canEdit && <Section title="Internal" note="Super-admins only: template specs, setup, sources, the profile and its history. Nothing here is sent to a designer.">
+              <div className="space-y-3">
+                {view.book && <Section nested title="Full visual standard and template specs" note="The whole standard the brand book is drawn from, as the pipeline uses it. Parts kept out of the designer's copy are marked.">
+                  <BrandBook book={view.book.book} brand={b.label} versionId={view.book.versionId} view="full" collapsible />
+                </Section>}
+
+                {view.checklist && <Section nested title="Onboarding checklist" note="From the Brand Onboarding SOP. A step is ticked only from what the system can see.">
                 <ol className="space-y-2">
                   {view.checklist.map(c => (
                     <li key={c.step} className="flex gap-2">
@@ -134,27 +148,17 @@ export default function BrandPage() {
                 </ol>
               </Section>}
 
-              <Section title="Missing" note="A template that doesn't exist can't be ticked in Create.">
+                <Section nested title="Missing templates" note="A template that doesn't exist can't be ticked in Create.">
                 {view.missing.length
                   ? <ul className="space-y-1">{view.missing.map(m => <li key={m} className="text-sm text-amber-800">{m}</li>)}</ul>
                   : <p className="text-sm text-neutral-500">Nothing missing.</p>}
               </Section>
-            </div>
 
-            <Section title="Brand book" note="Generated from the brand's visual standard and published with its profile. Staff only.">
-              {view.book ? <BrandBook book={view.book.book} brand={b.label} versionId={view.book.versionId} />
-                : <p className="text-sm text-neutral-500">No brand book yet. A working session generates it from the brand&apos;s visual standard into the draft (scripts/brand-profiles/profile.ts book); it appears here once that draft is published.</p>}
-            </Section>
-
-            {view.book && <Section title="Share with vendor" note="Emails a vendor an expiring link to this brand book, pinned to this version. Each send is recorded; each opening of the link too.">
-              <BrandShares brandId={b.id} brand={b.label} versionId={view.book.versionId} />
-            </Section>}
-
-            {view.canEdit && view.sources && <Section title="Sources" note="Where research looks first. The seeds are private: they live in the database, never in the profile or the public repository.">
+            {view.sources && <Section nested title="Brand sources" note="Where research looks first. The seeds are private: they live in the database, never in the profile or the public repository.">
               <Sources sources={view.sources} />
             </Section>}
 
-            {view.canEdit && <Section title="Profile" note="Edits are a draft and change nothing until Publish. Publish validates the draft with the engine's own validator and refuses an invalid one.">
+            <Section nested title="Profile" note="Edits are a draft and change nothing until Publish. Publish validates the draft with the engine's own validator and refuses an invalid one.">
               {!view.doc ? (
                 <p className="text-sm text-neutral-500">No profile document for this brand yet. A working session creates it (scripts/brand-profiles/profile.ts create); then it is edited here.</p>
               ) : <>
@@ -178,10 +182,10 @@ export default function BrandPage() {
                 {view.doc.draftHasBook && <p className="mt-2 text-[11px] text-neutral-400">The brand book (<span className="font-mono">visual</span>) is generated from the visual standard and isn&apos;t edited here; saving keeps it as it is.</p>}
                 {result && <div className="mt-2">{result.problems?.length ? <Problems title={result.message} problems={result.problems} tone={result.ok ? "amber" : "red"} /> : <p className={`text-sm ${result.ok ? "text-emerald-700" : "text-red-600"}`}>{result.message}</p>}</div>}
               </>}
-            </Section>}
+            </Section>
 
-            {view.canEdit && !!view.versions?.length && (
-              <Section title="History" note="Every published version is kept. Restore publishes an earlier one again as a new version; history is never rewritten.">
+            {!!view.versions?.length && (
+              <Section nested title="History" note="Every published version is kept. Restore publishes an earlier one again as a new version; history is never rewritten.">
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
                     <thead><tr className="text-left text-xs text-neutral-500"><th className="py-1 pr-3 font-medium">Version</th><th className="py-1 pr-3 font-medium">Profile</th><th className="py-1 pr-3 font-medium">Published</th><th className="py-1 font-medium"></th></tr></thead>
@@ -207,6 +211,8 @@ export default function BrandPage() {
                 <p className="mt-2 text-[11px] text-neutral-400 inline-flex items-center gap-1"><History className="w-3 h-3" /> 434-context keeps each published version as a record, pulled daily.</p>
               </Section>
             )}
+              </div>
+            </Section>}
           </>}
         </div>
       </div>
@@ -214,14 +220,17 @@ export default function BrandPage() {
   )
 }
 
-function Section({ title, note, children }: { title: string; note?: string; children: React.ReactNode }) {
+/** A card that folds under its title. `open` starts it unfolded; `nested` is a card inside another (Internal). */
+function Section({ title, note, open = false, nested = false, children }: { title: string; note?: string; open?: boolean; nested?: boolean; children: React.ReactNode }) {
   return (
     // min-w-0 and overflow-wrap: anywhere keep a long unbroken value (a sheet id, an email) inside the card on a phone.
-    <section className="min-w-0 rounded-lg border border-neutral-200 bg-white p-4 [overflow-wrap:anywhere]">
-      <h2 className="text-sm font-semibold text-neutral-900">{title}</h2>
-      {note && <p className="mt-0.5 text-xs text-neutral-500">{note}</p>}
+    <details open={open} className={`group/card min-w-0 rounded-lg border border-neutral-200 [overflow-wrap:anywhere] ${nested ? "bg-neutral-50 p-3" : "bg-white p-4"}`}>
+      <summary className="cursor-pointer list-none marker:hidden">
+        <h2 className="inline text-sm font-semibold text-neutral-900"><span className="mr-1.5 inline-block text-neutral-400 transition-transform group-open/card:rotate-90">›</span>{title}</h2>
+        {note && <p className="mt-0.5 pl-4 text-xs text-neutral-500">{note}</p>}
+      </summary>
       <div className="mt-3">{children}</div>
-    </section>
+    </details>
   )
 }
 
