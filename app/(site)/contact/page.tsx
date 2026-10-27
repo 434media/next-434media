@@ -30,6 +30,7 @@ export const metadata: Metadata = {
     title: socialTitle,
     description,
     url: `${siteUrl}/contact`,
+    type: "website",
     images: [
       {
         url: `${siteUrl}/opengraph-image`,
