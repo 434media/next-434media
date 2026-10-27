@@ -38,19 +38,10 @@ export const metadata: Metadata = {
       `${BRAND_RECORDS.canonicalDefinition} Selected work by commercial model.`,
     url: `${siteUrl}/work`,
     siteName: "434 MEDIA",
-    // The site-level card from app/opengraph-image.tsx — the wordmark, the
-    // motto in its styled form, and the canonical definition. Named explicitly
-    // rather than omitted: declaring an `openGraph` object without `images`
-    // suppresses the file-based image instead of inheriting it, and /work then
-    // resolves with no og:image at all. Verified in the rendered head.
-    images: [
-      {
-        url: `${siteUrl}/opengraph-image`,
-        width: 1200,
-        height: 630,
-        alt: BRAND_RECORDS.mottoPlain,
-      },
-    ],
+    // The image is this segment's own opengraph-image.tsx, which Next wires in
+    // with a hashed URL (/<route>/opengraph-image-<hash>), so it is not named
+    // here. A colocated card is not suppressed by this `openGraph` object; the
+    // suppression 3.8 records is of a card inherited from a parent segment.
     locale: "en_US",
     type: "website",
   },
@@ -59,8 +50,7 @@ export const metadata: Metadata = {
     title: "Our Work | 434 MEDIA",
     description:
       `${BRAND_RECORDS.canonicalDefinition} Selected work by commercial model.`,
-    // Same reasoning: the site-level card, named explicitly.
-    images: [`${siteUrl}/twitter-image`],
+    // Likewise twitter-image.tsx in this segment.
     creator: "@434media",
     site: "@434media",
   },

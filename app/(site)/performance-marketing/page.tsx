@@ -29,9 +29,10 @@ export const metadata: Metadata = {
     description,
     url: `${siteUrl}/performance-marketing`,
     siteName: "434 MEDIA",
-    // Named explicitly for the same reason as the Work page: an `openGraph`
-    // object without `images` suppresses the file-based site card.
-    images: [{ url: `${siteUrl}/opengraph-image`, width: 1200, height: 630 }],
+    // The image is this segment's own opengraph-image.tsx, which Next wires in
+    // with a hashed URL (/<route>/opengraph-image-<hash>), so it is not named
+    // here. A colocated card is not suppressed by this `openGraph` object; the
+    // suppression 3.8 records is of a card inherited from a parent segment.
     locale: "en_US",
     type: "article",
   },
@@ -39,7 +40,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "Demand Drives Performance | 434 MEDIA",
     description,
-    images: [`${siteUrl}/twitter-image`],
+    // Likewise twitter-image.tsx in this segment.
   },
 }
 
