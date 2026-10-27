@@ -7,6 +7,7 @@ import { ArrowLeft, Check, Circle, History, Loader2, RotateCcw, Save, Upload } f
 import { AdminRoleGuard } from "@/components/AdminRoleGuard"
 import { BrandStateBadge } from "@/components/admin/brands/BrandStateBadge"
 import { BrandBook } from "@/components/admin/brands/BrandBook"
+import { BrandShares } from "@/components/admin/brands/BrandShares"
 import type { BrandBook as Book } from "@/lib/content-pipeline/brand-book"
 import type { BrandState, CheckItem } from "@/lib/content-pipeline/brand-status"
 import type { McuSeeds } from "@/lib/content-pipeline/seeds"
@@ -144,6 +145,10 @@ export default function BrandPage() {
               {view.book ? <BrandBook book={view.book.book} brand={b.label} versionId={view.book.versionId} />
                 : <p className="text-sm text-neutral-500">No brand book yet. A working session generates it from the brand&apos;s visual standard into the draft (scripts/brand-profiles/profile.ts book); it appears here once that draft is published.</p>}
             </Section>
+
+            {view.book && <Section title="Share with vendor" note="Emails a vendor an expiring link to this brand book, pinned to this version. Each send is recorded; each opening of the link too.">
+              <BrandShares brandId={b.id} brand={b.label} versionId={view.book.versionId} />
+            </Section>}
 
             {view.canEdit && view.sources && <Section title="Sources" note="Where research looks first. The seeds are private: they live in the database, never in the profile or the public repository.">
               <Sources sources={view.sources} />

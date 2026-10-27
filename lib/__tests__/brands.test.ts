@@ -9,7 +9,7 @@ import { published, loadPublishedProfileFirst } from "./published-profile"
 import { brandState, missingTemplates, onboardingChecklist, type BrandFacts } from "../content-pipeline/brand-status"
 import { seedsDocId } from "../firestore-brands"
 import { validateProfile, type BrandProfile } from "../content-pipeline/profile"
-import { brandBookProblems, hexColumn, hexOf, parseVisualStandard } from "../content-pipeline/brand-book"
+import { brandBookProblems, hexColumn, hexOf, markInternal, parseVisualStandard, vendorBook } from "../content-pipeline/brand-book"
 import { bookDigest, brandBookStatus } from "../content-pipeline/brand-book-check"
 import { draftToken } from "../content-pipeline/profile-store"
 
@@ -155,4 +155,34 @@ test("a parsed book is storable in Firestore: no array sits directly inside an a
   const nested = (v: unknown, inArray = false): boolean => Array.isArray(v) ? inArray || v.some(x => nested(x, true)) : !!v && typeof v === "object" && Object.values(v).some(x => nested(x, false))
   const md = ["# T", "## 2. Colour", "| Name | Hex |", "|---|---|", "| Red | `AA1100` |", "", "- a", "  - b", "", "```", "x", "```"].join("\n")
   assert.equal(nested(parseVisualStandard(md, { path: "x.md", sha256: "0123456789abcdef" })), false)
+})
+
+test("the vendor's copy leaves out what is about 434's systems, and the staff copy marks it instead of losing it", () => {
+  // An invented standard: designer content, plus a surface's record fields, a surface index, an internal reference
+  // and a surface with no design yet.
+  const md = [
+    "# Fixture — Visual Standard", "", "**Version 2.0.0 — January 1, 2026**", "",
+    "## 2. Colour", "", "| Name | Hex | Used for |", "|---|---|---|", "| Fixture Blue | `1144AA` | Headlines |", "",
+    "## 6. Surfaces", "", "Each follows the template in the Display and Design Standard §3.2.", "",
+    "| Surface | Subsection | Status |", "|---|---|---|", "| Feed | 6.1 | Approved |", "",
+    "### 6.1 Feed post", "", "- **Status:** Approved by the founder on 1 January.", "- **What ships it:** templates in `brand_profiles/fixture` (`fixture@v3`).", "",
+    "Headline 80 px, deck 32 px.", "", "- Keep 60 px margins.", "- Reference renders: `90 Assets/fixture/`.", "",
+    "### 6.2 Story", "", "Listed: no precedent. Nothing records one (`fixture@v3`).", "",
+  ].join("\n")
+  const book = parseVisualStandard(md, { path: "x.md", sha256: "0123456789abcdef" })
+  const all = JSON.stringify(book), shared = JSON.stringify(vendorBook(book))
+  for (const kept of ["1144AA", "Headline 80 px", "Keep 60 px margins", "6.1 Feed post"]) assert.ok(shared.includes(kept), kept)
+  for (const out of ["Display and Design Standard", "Subsection", "founder", "What ships it", "fixture@v3", "90 Assets", "6.2 Story", "no precedent"]) {
+    assert.ok(all.includes(out), `the full book keeps ${out}`)
+    assert.ok(!shared.includes(out), `the vendor copy leaves out ${out}`)
+  }
+  // Nothing is lost: every block of the full book is in the marked copy, internal or not.
+  const marked = markInternal(book).flatMap(s => s.blocks)
+  assert.ok(marked.some(m => m.internal) && marked.some(m => !m.internal))
+  const text = (o: unknown) => JSON.stringify(o).match(/[A-Za-z0-9][^"\\]{3,}/g) ?? []
+  const markedAll = JSON.stringify(markInternal(book))
+  for (const t of text(book.sections)) assert.ok(markedAll.includes(t), t)
+  // Vendor copy is idempotent, and a section with nothing shareable is dropped whole.
+  assert.deepEqual(vendorBook(vendorBook(book)), vendorBook(book))
+  assert.deepEqual(vendorBook(book).sections.map(s => s.title), ["2. Colour", "6. Surfaces"])
 })
