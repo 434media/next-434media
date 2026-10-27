@@ -185,8 +185,25 @@ export function ContactForm({ className = "", isVisible = true }: ContactFormPro
       )
     }
 
+  // One numbered section, in the shape of the Work page's service header
+  // (.serviceHeader): the label on the left in heading-l, the fields in the
+  // right column on the same 1.2 : 1 split from 1000px, a hairline above. The
+  // padding is Work's: 24px, 28px / 24px from 680px, 32px / 40px from 1000px.
+  const section = (id: string, title: string, children: React.ReactNode) => (
+    <div
+      role="group"
+      aria-labelledby={id}
+      className="grid gap-4 border-t border-neutral-200 p-6 type:px-6 type:py-7 min-[1000px]:grid-cols-[1.2fr_1fr] min-[1000px]:gap-10 min-[1000px]:px-10 min-[1000px]:py-8"
+    >
+      <h2 id={id} className="t-heading-l m-0">
+        {title}
+      </h2>
+      <div className="grid grid-cols-1 gap-x-4 gap-y-3 sm:grid-cols-2">{children}</div>
+    </div>
+  )
+
   return (
-    <div className={`bg-(--434-white) border border-neutral-200 p-5 lg:p-6 ${className}`}>
+    <div className={className}>
       <AnimatePresence mode="wait">
         {hasSubmitted ? (
           <motion.div
@@ -195,16 +212,17 @@ export function ContactForm({ className = "", isVisible = true }: ContactFormPro
             initial="hidden"
             animate="visible"
             exit="exit"
-            className="py-8 flex items-center justify-center h-full"
+            className="grid gap-4 border-t border-neutral-200 p-6 type:px-6 type:py-7 min-[1000px]:grid-cols-[1.2fr_1fr] min-[1000px]:gap-10 min-[1000px]:px-10 min-[1000px]:py-8"
             aria-live="polite"
             role="status"
           >
-            <div className="text-center">
-              <div className="mx-auto h-12 w-12 text-neutral-900 flex items-center justify-center bg-(--434-color-04)">
-                <Check className="h-6 w-6" />
-              </div>
-              <h3 className="mt-4 t-heading-s text-neutral-900">Thank you. We have your request.</h3>
-              <p className="mt-1.5 t-body-s text-neutral-500">
+            <h2 className="t-heading-l m-0 flex items-center gap-3">
+              <Check className="h-7 w-7 shrink-0" aria-hidden="true" />
+              Received
+            </h2>
+            <div>
+              <p className="t-heading-s m-0">Thank you. We have your request.</p>
+              <p className="mt-1.5 t-body text-neutral-600">
                 We review every request before confirming the right next step.
               </p>
             </div>
@@ -218,52 +236,64 @@ export function ContactForm({ className = "", isVisible = true }: ContactFormPro
             exit="exit"
             aria-live="polite"
           >
-            {/* No card heading: "Production details" repeated what the page
-                headline already says, and its two lines were part of why the
-                page could not fit a laptop screen. The required note moves to
-                the line above the submit button. */}
-            <form className="space-y-4" onSubmit={handleSubmit} ref={formRef} id="contact-form" noValidate>
-              <div className="grid grid-cols-1 gap-x-4 lg:gap-x-5 gap-y-3 sm:grid-cols-2">
-                {field("firstName", "First name", (p) => <input type="text" ref={firstNameRef} required aria-required="true" {...p} />, { span: false })}
-                {field("lastName", "Last name", (p) => <input type="text" required aria-required="true" {...p} />, { span: false })}
-                {field("role", "Role", (p) => <input type="text" required aria-required="true" placeholder="Your title or role" {...p} />, { span: false })}
-                {field("company", "Organization", (p) => <input type="text" required aria-required="true" placeholder="Organization name" {...p} />, { span: false })}
-                {field("email", "Work email", (p) => <input type="email" required aria-required="true" placeholder="name@organization.com" {...p} />, { span: false })}
-                {field("phoneNumber", "Phone", (p) => <input type="tel" placeholder="(123) 456-7890" {...p} />, { required: false, span: false })}
-                {field("organizationType", "Organization type", select(ORGANIZATION_TYPES), { span: false })}
-                {field("requestType", "Request", select(REQUEST_OPTIONS), { span: false })}
-                {field("message", "What do you want to produce or accomplish?", (p) => <textarea rows={2} required aria-required="true" {...p} className={`${p.className} resize-y`} />)}
-                {field("timeline", "Timeline", (p) => <input type="text" required aria-required="true" placeholder="Target date or window" {...p} />, { span: false })}
-                {field("budgetRange", "Budget range", select(BUDGET_RANGES), { span: false })}
-                {field("referralSource", "How did you hear about 434?", (p) => <input type="text" required aria-required="true" {...p} />)}
-              </div>
-
-              {error && (
-                <p className="t-body-s text-(--color-fn-error)" role="alert">
-                  {error}
-                </p>
+            <form onSubmit={handleSubmit} ref={formRef} id="contact-form" noValidate>
+              {section(
+                "contact-you",
+                "01 / You",
+                <>
+                  {field("firstName", "First name", (p) => <input type="text" ref={firstNameRef} required aria-required="true" autoComplete="given-name" {...p} />, { span: false })}
+                  {field("lastName", "Last name", (p) => <input type="text" required aria-required="true" autoComplete="family-name" {...p} />, { span: false })}
+                  {field("role", "Role", (p) => <input type="text" required aria-required="true" autoComplete="organization-title" placeholder="Your title or role" {...p} />, { span: false })}
+                  {field("company", "Organization", (p) => <input type="text" required aria-required="true" autoComplete="organization" placeholder="Organization name" {...p} />, { span: false })}
+                  {field("email", "Work email", (p) => <input type="email" required aria-required="true" autoComplete="email" placeholder="name@organization.com" {...p} />, { span: false })}
+                  {field("phoneNumber", "Phone", (p) => <input type="tel" autoComplete="tel" placeholder="(123) 456-7890" {...p} />, { required: false, span: false })}
+                </>,
               )}
+              {section(
+                "contact-production",
+                "02 / The production",
+                <>
+                  {field("organizationType", "Organization type", select(ORGANIZATION_TYPES), { span: false })}
+                  {field("requestType", "Request", select(REQUEST_OPTIONS), { span: false })}
+                  {field("message", "What do you want to produce or accomplish?", (p) => <textarea rows={3} required aria-required="true" {...p} className={`${p.className} resize-y`} />)}
+                </>,
+              )}
+              {section(
+                "contact-timing",
+                "03 / Timing and budget",
+                <>
+                  {field("timeline", "Timeline", (p) => <input type="text" required aria-required="true" placeholder="Target date or window" {...p} />, { span: false })}
+                  {field("budgetRange", "Budget range", select(BUDGET_RANGES), { span: false })}
+                  {field("referralSource", "How did you hear about 434?", (p) => <input type="text" required aria-required="true" {...p} />)}
 
-              {/* 3.7's submit: full width, square, white on the palette black. */}
-              <div>
-                <p className="mb-2 t-caption text-neutral-500">
-                  <span className="text-(--color-fn-error)" aria-hidden="true">*</span> Required
-                </p>
-                <button
-                  type="submit"
-                  disabled={isLoading}
-                  className="t-control-emphasis flex w-full items-center justify-center gap-2 bg-(--434-color-02-black) px-6 py-3.5 text-(--434-white) transition-colors hover:bg-neutral-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-(--434-color-02-black) focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  {isLoading ? (
-                    <>
-                      <Loader2 className="animate-spin h-4 w-4" aria-hidden="true" />
-                      Sending…
-                    </>
-                  ) : (
-                    "Start a production"
+                  {error && (
+                    <p className="sm:col-span-2 t-body-s text-(--color-fn-error)" role="alert">
+                      {error}
+                    </p>
                   )}
-                </button>
-              </div>
+
+                  {/* 3.7's submit: full width, square, white on the palette black. */}
+                  <div className="sm:col-span-2 pt-2">
+                    <p className="mb-2 t-caption text-neutral-500">
+                      <span className="text-(--color-fn-error)" aria-hidden="true">*</span> Required
+                    </p>
+                    <button
+                      type="submit"
+                      disabled={isLoading}
+                      className="t-control-emphasis flex w-full items-center justify-center gap-2 bg-(--434-color-02-black) px-6 py-3.5 text-(--434-white) transition-colors hover:bg-neutral-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-(--434-color-02-black) focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      {isLoading ? (
+                        <>
+                          <Loader2 className="animate-spin h-4 w-4" aria-hidden="true" />
+                          Sending…
+                        </>
+                      ) : (
+                        "Start a production"
+                      )}
+                    </button>
+                  </div>
+                </>,
+              )}
             </form>
           </motion.div>
         )}
