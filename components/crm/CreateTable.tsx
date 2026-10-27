@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react"
 import { Check, Loader2, PenLine, Play, Plus, Trash2, Upload, X, ArrowUpRight } from "lucide-react"
-import { CREATE_ROWS_STORE_KEY, CREATE_SOCIALS, FORMAT_LABEL, SOCIAL_LABEL, choiceLabel, formatChoices, formatsOf, mediaShapeOf, normalizePlatforms, pickedFormat, platformIdOf, rowProblems, templateGap, type CellField, type CreateFormat, type CreatePlatform, type CreateRow, type CreateSocial, type CreateTemplate, type MediaShape, type RoundupStory, type StoryCard } from "@/lib/content-pipeline/create-table"
+import { CREATE_ROWS_STORE_KEY, CREATE_SOCIALS, FORMAT_LABEL, SOCIAL_LABEL, choiceLabel, formatChoices, followToday, formatsOf, isPastDate, mediaShapeOf, normalizePlatforms, pickedFormat, platformIdOf, rowProblems, templateGap, type CellField, type CreateFormat, type CreatePlatform, type CreateRow, type CreateSocial, type CreateTemplate, type MediaShape, type RoundupStory, type StoryCard } from "@/lib/content-pipeline/create-table"
 import { HelpTip } from "@/components/admin/HelpTip"
 import { isCanvaLink, mediaFromCanva, mediaFromFile, mediaFromLink, type MediaResult } from "./row-media"
 
@@ -109,7 +109,7 @@ export function CreateTable({ onPostsReady }: { onPostsReady?: () => void }) {
     loadConfig().then(c => {
       const first = c?.brands.find(b => b.active), kind = first?.templates[0]?.kind ?? ""
       // A row kept from before part 5 may tick a platform at two sizes; it keeps one, at a size its media allows.
-      const kept = loadRows()?.map(r => ({ ...r, platforms: normalizePlatforms(r.platforms, mediaShapeOf(r.media)) }))
+      const kept = loadRows()?.map(r => followToday({ ...r, platforms: normalizePlatforms(r.platforms, mediaShapeOf(r.media)) }, today()))
       setRows(kept ?? Array.from({ length: 5 }, () => blankRow(first?.id ?? "", kind)))
     })
   }, [open, loadConfig])
@@ -376,7 +376,8 @@ export function CreateTable({ onPostsReady }: { onPostsReady?: () => void }) {
                           <p className={`text-[11px] ${r.caption.length > 2100 ? "text-red-600" : "text-neutral-400"}`}>{r.caption.length}/2100</p>
                         </td>
                         <td className="px-2 py-2 w-36">
-                          <input type="date" disabled={locked} value={r.date} onChange={e => patch(r.id, { date: e.target.value })} className="w-full h-8 rounded border border-neutral-300 px-1" />
+                          <input type="date" disabled={locked} value={r.date} onChange={e => patch(r.id, { date: e.target.value, dateSet: true })} className={`w-full h-8 rounded border px-1 ${isPastDate(r.date, today()) ? "border-amber-400 bg-amber-50" : "border-neutral-300"}`} />
+                          {isPastDate(r.date, today()) && <p className="mt-1 text-[11px] text-amber-700">This date has passed.</p>}
                           {r.fields.date && <p className="mt-1 text-[11px] text-neutral-400">Card date {r.fields.date}</p>}
                         </td>
                         <td className="px-2 py-2 w-56 text-xs">

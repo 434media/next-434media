@@ -216,6 +216,8 @@ export interface CreateRow {
   caption: string
   /** The post date (YYYY-MM-DD); the card's printed date is the story's, when Human+ read one. */
   date: string
+  /** The person picked the date. A row they never touched follows today (followToday), so a saved row doesn't keep the day it was saved. */
+  dateSet?: boolean
   /** Extra card fields by name, and the card's printed date (date) when Human+ set it. */
   fields: Record<string, string>
   /** The profile version Human+ wrote under, carried to the posts with the one the Run job fills under. */
@@ -261,6 +263,20 @@ export function ddmmmyy(isoDate: string): string {
   const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(isoDate)
   return m ? `${m[3]}${MONTHS[Number(m[2]) - 1] ?? ""}${m[1].slice(2)}` : ""
 }
+
+/**
+ * A saved row's date when the table opens: a picked date stays; an untouched one follows today (an ICYMI cover once
+ * printed 19OCT26 a week late from a row saved that day). A row saved before `dateSet` existed keeps a future date,
+ * which only a person could have picked, since the default was the day it was saved.
+ */
+export function followToday(row: CreateRow, today: string): CreateRow {
+  if (row.dateSet) return row
+  if (row.dateSet === undefined && row.date > today) return { ...row, dateSet: true }
+  return row.date === today ? row : { ...row, date: today }
+}
+
+/** A post date before today: the table warns, since the post would go out (and a roundup's cover print) a past day. */
+export const isPastDate = (date: string, today: string): boolean => /^\d{4}-\d{2}-\d{2}$/.test(date) && date < today
 
 /** What keeps a row from running, in the person's words (the server checks again, with the profile's limits). */
 export function rowProblems(row: CreateRow, t: CreateTemplate | undefined): string[] {
