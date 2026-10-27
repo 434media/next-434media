@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server"
 import { z } from "zod4"
+import { requireSendCapable } from "@/lib/auth"
 import { requireStaff } from "../../../content-pipeline/auth"
 import { BRAND_ID } from "@/lib/content-pipeline/profile-store"
 import { DAILY_SHARE_CAP, DEFAULT_SHARE_DAYS, MAX_SHARE_DAYS, dayStart, shareState } from "@/lib/brand-share"
@@ -51,7 +52,7 @@ const body = z.object({
  * Resend. A refusal says why and sends nothing. The token is never returned: it exists only in the email.
  */
 export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
-  const auth = await requireStaff()
+  const auth = await requireSendCapable()
   if ("error" in auth) return NextResponse.json({ error: auth.error }, { status: auth.status })
   const { id } = await ctx.params
   if (!BRAND_ID.test(id)) return NextResponse.json({ error: "Unknown brand" }, { status: 404 })

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { Ban, Loader2, Send } from "lucide-react"
+import { commandPrefill } from "@/lib/brand-share-link"
 
 /**
  * "Share with vendor" on a brand book (plan v11.2.1 Step 4 item 4): a name, an email and the recipient's country send
@@ -26,6 +27,17 @@ export function BrandShares({ brandId, brand, versionId }: { brandId: string; br
   const [form, setForm] = useState({ name: "", email: "", country: "United States", days: "" })
   const [busy, setBusy] = useState<string | null>(null)
   const [result, setResult] = useState<{ ok: boolean; message: string } | null>(null)
+  // The send command (Step 4 item 5) opens this page with the share in the fragment (#share&email=…), which never
+  // reaches a server or a log; the requester checks it and presses Send link, signed in, through the same route.
+  const [via, setVia] = useState<"button" | "command">("button")
+  useEffect(() => {
+    const p = commandPrefill(window.location.hash)
+    if (!p) return
+    setForm(f => ({ name: p.name ?? f.name, email: p.email ?? f.email, country: p.country ?? f.country, days: p.days ?? f.days }))
+    setVia("command")
+    window.history.replaceState(null, "", window.location.pathname + window.location.search)
+    document.getElementById("share-with-vendor")?.scrollIntoView({ block: "center" })
+  }, [])
   const countries = useMemo(() => {
     const dn = new Intl.DisplayNames(["en"], { type: "region" }), out: string[] = []
     for (let a = 65; a <= 90; a++) for (let b = 65; b <= 90; b++) {
@@ -51,11 +63,11 @@ export function BrandShares({ brandId, brand, versionId }: { brandId: string; br
     if (!window.confirm(`Send the ${brand} brand book (${versionId}) to ${form.email}? The link works for ${days ?? data?.defaultDays ?? 14} days.`)) return
     setBusy("send"); setResult(null)
     try {
-      const r = await fetch(`/api/admin/brands/${encodeURIComponent(brandId)}/shares`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ name: form.name, email: form.email, country: form.country, ...(days ? { expiresDays: days } : {}), via: "button" }) })
+      const r = await fetch(`/api/admin/brands/${encodeURIComponent(brandId)}/shares`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ name: form.name, email: form.email, country: form.country, ...(days ? { expiresDays: days } : {}), via }) })
       const d = await r.json()
       if (!r.ok) { setResult({ ok: false, message: d.error || "The share was not sent" }); return }
       setResult({ ok: true, message: `Sent to ${d.share.recipientEmail}. The link works until ${day(d.share.expiresAt)}.` })
-      setForm(f => ({ ...f, name: "", email: "" }))
+      setForm(f => ({ ...f, name: "", email: "" })); setVia("button")
     } catch { setResult({ ok: false, message: "The share was not sent" }) }
     finally { setBusy(null); load() }
   }
@@ -72,6 +84,7 @@ export function BrandShares({ brandId, brand, versionId }: { brandId: string; br
   const input = "h-8 w-full rounded border border-neutral-300 bg-white px-2 text-sm"
   return (
     <div className="space-y-4 text-sm">
+      {via === "command" && <p id="share-with-vendor" className="rounded border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">Filled in by the send command. Check the recipient, country and days, then press Send link. Nothing is sent until you do.</p>}
       <form onSubmit={send} className="grid gap-2 sm:grid-cols-[1fr_1.4fr_1fr_5rem_auto] sm:items-end">
         <label className="text-xs text-neutral-500">Name<input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} maxLength={100} className={input} placeholder="Optional" /></label>
         <label className="text-xs text-neutral-500">Email<input required type="email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} className={input} /></label>
@@ -113,3 +126,4 @@ export function BrandShares({ brandId, brand, versionId }: { brandId: string; br
     </div>
   )
 }
+

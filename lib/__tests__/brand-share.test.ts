@@ -144,3 +144,12 @@ test("countries, country domains, the cap's day and the token's shape", () => {
   assert.ok(isShareToken(t)); assert.equal(isShareToken(t + "x"), false); assert.equal(isShareToken("../x"), false)
   assert.notEqual(newShareToken(), t)
 })
+
+test("the send command's prefill is read from the fragment only, trimmed and bounded", async () => {
+  const { commandPrefill } = await import("../brand-share-link")
+  assert.equal(commandPrefill(""), null)
+  assert.equal(commandPrefill("#history"), null)
+  assert.deepEqual(commandPrefill("#share&email=pat%40vendor.example&name=Pat%20Vendor&country=United%20States&days=7"), { email: "pat@vendor.example", name: "Pat Vendor", country: "United States", days: "7" })
+  assert.deepEqual(commandPrefill("#share?email=a%40vendor.example&days=seven"), { email: "a@vendor.example", name: undefined, country: undefined, days: undefined })
+  assert.equal(commandPrefill(`#share&name=${"x".repeat(300)}`)!.name!.length, 100)
+})
