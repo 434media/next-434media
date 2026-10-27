@@ -115,7 +115,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
         publisher: {
           '@type': 'Organization',
           name: '434 MEDIA',
-          logo: { '@type': 'ImageObject', url: `${baseUrl}/api/og` }
+          logo: { '@type': 'ImageObject', url: `${baseUrl}/brand/434-logo-512.png` }
         },
         mainEntityOfPage: `${baseUrl}/blog/${slug}`,
         articleSection: post.category || 'Technology',
@@ -146,14 +146,14 @@ export default async function BlogPostPage({ params }: Props) {
               '@type': 'Article',
               headline: post.title,
               description: post.excerpt || post.meta_description || '',
-              image: post.featured_image || `${baseUrl}/api/og`,
+              image: post.featured_image || `${baseUrl}/opengraph-image`,
               datePublished: post.created_at,
               dateModified: post.updated_at || post.created_at,
               author: [{ '@type': 'Person', name: post.author || '434 Media' }],
               publisher: {
                 '@type': 'Organization',
                 name: '434 MEDIA',
-                logo: { '@type': 'ImageObject', url: `${baseUrl}/api/og` }
+                logo: { '@type': 'ImageObject', url: `${baseUrl}/brand/434-logo-512.png` }
               },
               mainEntityOfPage: `${baseUrl}/blog/${slug}`,
               articleSection: post.category || 'Technology',
