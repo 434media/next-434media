@@ -4,7 +4,7 @@
  */
 import { test } from "node:test"
 import assert from "node:assert/strict"
-import { DAILY_SHARE_CAP, countryCode, dayStart, hashShareToken, isShareToken, newShareToken, shareRefusal, shareState } from "../brand-share"
+import { DAILY_SHARE_CAP, countryCode, excludedDomain, dayStart, hashShareToken, isShareToken, newShareToken, shareRefusal, shareState } from "../brand-share"
 import { sendBrandShare, type ShareDeps, type ShareRequest } from "../brand-share-send"
 import type { BrandShare, BrandShareStore, NewBrandShare } from "../firestore-brand-shares"
 
@@ -35,7 +35,7 @@ function deps(over: Partial<ShareDeps> = {}) {
   const d: ShareDeps = {
     shares: store,
     book: async id => id === "milcity" ? { ok: true, book: { label: "MilCityUSA", versionId: "milcity@v10", n: 10 } } : { ok: false, reason: "no visual standard has been generated into the profile" },
-    isSuppressed: async e => e === "gone@example.com",
+    isSuppressed: async e => e === "gone@suppressed.example",
     sendMail: async m => { mails.push(m); return { id: `msg-${mails.length}` } },
     origin: "https://www.434media.com",
     now: () => new Date(NOW.getTime() + (t++) * 60_000 * 11),
@@ -44,7 +44,7 @@ function deps(over: Partial<ShareDeps> = {}) {
   }
   return { d, store, mails }
 }
-const req = (over: Partial<ShareRequest> = {}): ShareRequest => ({ brandId: "milcity", recipientName: "Pat Vendor", recipientEmail: "Pat@Vendor.com", country: "United States", via: "button", sender: { email: "staff@434media.com", name: "Staff Person" }, ...over })
+const req = (over: Partial<ShareRequest> = {}): ShareRequest => ({ brandId: "milcity", recipientName: "Pat Vendor", recipientEmail: "Pat@Vendor.example", country: "United States", via: "button", sender: { email: "staff@434media.com", name: "Staff Person" }, ...over })
 
 test("a share stores the token's hash, never the token, and mails the link through the one send path", async () => {
   const { d, store, mails } = deps()
@@ -52,7 +52,7 @@ test("a share stores the token's hash, never the token, and mails the link throu
   assert.equal(out.ok, true)
   assert.equal(mails.length, 1)
   const m = mails[0]
-  assert.equal(m.to, "pat@vendor.com")
+  assert.equal(m.to, "pat@vendor.example")
   assert.equal(m.replyTo, "staff@434media.com")
   const token = /\/share\/brand-book\/([A-Za-z0-9_-]{43})/.exec(m.text)![1]
   assert.ok(isShareToken(token))
@@ -74,9 +74,7 @@ test("jurisdiction, the address's country domain and suppression are refused bef
     [{ country: "United Kingdom" }, /United Kingdom/],
     [{ country: "uk" }, /United Kingdom/],
     [{ country: "European Union" }, /European Union/],
-    [{ recipientEmail: "a@studio.de" }, /\.de domain/],
-    [{ recipientEmail: "a@agency.eu" }, /\.eu domain/],
-    [{ recipientEmail: "gone@example.com" }, /suppression/],
+    [{ recipientEmail: "gone@suppressed.example" }, /suppression/],
   ] as const) {
     const { d, store, mails } = deps()
     const out = await sendBrandShare(req(over), d)
@@ -100,12 +98,12 @@ test("a brand with no brand book cannot be shared", async () => {
 
 test("the daily cap refuses the next send, button and command together; a repeat within minutes is refused", async () => {
   const { d, mails } = deps()
-  for (let i = 0; i < DAILY_SHARE_CAP; i++) assert.equal((await sendBrandShare(req({ recipientEmail: `v${i}@vendor.com`, via: i % 2 ? "command" : "button" }), d)).ok, true)
-  const over = await sendBrandShare(req({ recipientEmail: "eleven@vendor.com", via: "command" }), d)
+  for (let i = 0; i < DAILY_SHARE_CAP; i++) assert.equal((await sendBrandShare(req({ recipientEmail: `v${i}@vendor.example`, via: i % 2 ? "command" : "button" }), d)).ok, true)
+  const over = await sendBrandShare(req({ recipientEmail: "eleven@vendor.example", via: "command" }), d)
   assert.equal(over.ok || over.code, "cap")
   assert.equal(mails.length, DAILY_SHARE_CAP)
   // Another requester is not capped by this one.
-  assert.equal((await sendBrandShare(req({ recipientEmail: "eleven@vendor.com", sender: { email: "other@434media.com", name: "Other" } }), d)).ok, true)
+  assert.equal((await sendBrandShare(req({ recipientEmail: "eleven@vendor.example", sender: { email: "other@434media.com", name: "Other" } }), d)).ok, true)
 
   const fixed = deps({ now: () => NOW })
   assert.equal((await sendBrandShare(req(), fixed.d)).ok, true)
@@ -134,9 +132,11 @@ test("a share's state: active until it expires or is revoked; each opening is a 
   assert.equal(shareState(s, NOW), "revoked")
 })
 
-test("countries, the cap's day and the token's shape", () => {
+test("countries, country domains, the cap's day and the token's shape", () => {
+  // An address's own country domain: an excluded jurisdiction's (and .eu) refuses even when the stated country passes.
+  assert.deepEqual(["studio.de", "agency.eu", "firm.co.uk", "media.ca", "vendor.com", "estudio.mx", "x.io"].map(excludedDomain), ["de", "eu", "uk", "ca", null, null, null])
   assert.deepEqual(["US", "us", "United States", "uk", "Germany", "Atlantis", ""].map(countryCode), ["US", "US", "US", "GB", "DE", null, null])
-  assert.equal(shareRefusal({ email: "a@b.com", country: "Mexico" }, false), null)
+  assert.equal(shareRefusal({ email: "a@vendor.example", country: "Mexico" }, false), null)
   // Midnight in San Antonio (CDT, UTC-5, on 2026-10-27).
   assert.equal(dayStart(new Date("2026-10-27T15:00:00Z")).toISOString(), "2026-10-27T05:00:00.000Z")
   assert.equal(dayStart(new Date("2026-10-27T03:00:00Z")).toISOString(), "2026-10-26T05:00:00.000Z")

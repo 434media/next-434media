@@ -69,6 +69,12 @@ export function countryCode(input: string): string | null {
   return null
 }
 
+/** The domain's top level when it is an excluded jurisdiction's country domain (studio.de → "de"; .eu too), else null. */
+export function excludedDomain(domain: string): string | null {
+  const tld = domain.trim().toLowerCase().split(".").pop() ?? ""
+  return tld === "eu" || (tld.length === 2 && EXCLUDED_COUNTRY_CODES.has(tld.toUpperCase())) ? tld : null
+}
+
 /**
  * The outbound-compliance checks a share runs before anything is stored or sent (outbound-compliance skill: master
  * 5.3's jurisdictions through EXCLUDED_COUNTRIES, never re-listed here, and the suppression list). The recipient's
@@ -84,8 +90,8 @@ export function shareRefusal(r: { email: string; country: string }, suppressed: 
   const name = COUNTRY_NAMES.get(code)?.toLowerCase() ?? ""
   // The European Union and the eurozone are named as regions too; every member is excluded, so they are.
   if (EXCLUDED_COUNTRY_CODES.has(code) || EXCLUDED_COUNTRIES.has(name) || code === "EU" || code === "EZ") return refuse(`434 MEDIA does not send to recipients in ${COUNTRY_NAMES.get(code)} (outbound jurisdiction policy). Nothing was sent.`)
-  const tld = email.split(".").pop()!.toUpperCase()
-  if (tld === "EU" || (tld.length === 2 && EXCLUDED_COUNTRY_CODES.has(tld))) return refuse(`The address is on a .${tld.toLowerCase()} domain, a jurisdiction 434 MEDIA does not send to (outbound jurisdiction policy). Nothing was sent.`)
+  const tld = excludedDomain(email.slice(email.indexOf("@") + 1))
+  if (tld) return refuse(`The address is on a .${tld} domain, a jurisdiction 434 MEDIA does not send to (outbound jurisdiction policy). Nothing was sent.`)
   if (suppressed) return refuse("That address is on the suppression list (it unsubscribed, bounced or complained). Nothing was sent.")
   return null
 }
