@@ -12,3 +12,6 @@ export function commandPrefill(hash: string): { email?: string; name?: string; c
   const days = pick("days", 3)
   return { email: pick("email", 254), name: pick("name", 100), country: pick("country", 80), days: days && /^\d+$/.test(days) ? days : undefined }
 }
+
+/** "1 day", "14 days": the link's lifetime as the confirm and the form say it. */
+export const dayCount = (n: number): string => `${n} ${n === 1 ? "day" : "days"}`

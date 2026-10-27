@@ -167,6 +167,12 @@ test("the send command's prefill is read from the fragment only, trimmed and bou
   assert.equal(commandPrefill(`#share&name=${"x".repeat(300)}`)!.name!.length, 100)
 })
 
+test("the link's lifetime reads as one day or N days", async () => {
+  const { dayCount } = await import("../brand-share-link")
+  assert.equal(dayCount(1), "1 day")
+  assert.equal(dayCount(14), "14 days")
+})
+
 test("a prefetch or a link scanner is not a view; a person's browser is", () => {
   const h = (o: Record<string, string>) => ({ get: (k: string) => o[k] ?? null })
   const chrome = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36"

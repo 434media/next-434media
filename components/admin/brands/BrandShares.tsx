@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { Ban, Loader2, Send } from "lucide-react"
-import { commandPrefill } from "@/lib/brand-share-link"
+import { commandPrefill, dayCount } from "@/lib/brand-share-link"
 
 /**
  * "Share with vendor" on a brand book (plan v11.2.1 Step 4 item 4): a name, an email and the recipient's country send
@@ -30,13 +30,19 @@ export function BrandShares({ brandId, brand, versionId }: { brandId: string; br
   // The send command (Step 4 item 5) opens this page with the share in the fragment (#share&email=…), which never
   // reaches a server or a log; the requester checks it and presses Send link, signed in, through the same route.
   const [via, setVia] = useState<"button" | "command">("button")
+  // Read on load, and again when a second command link opens in a tab already on this page (only the fragment changes).
   useEffect(() => {
-    const p = commandPrefill(window.location.hash)
-    if (!p) return
-    setForm(f => ({ name: p.name ?? f.name, email: p.email ?? f.email, country: p.country ?? f.country, days: p.days ?? f.days }))
-    setVia("command")
-    window.history.replaceState(null, "", window.location.pathname + window.location.search)
-    document.getElementById("share-with-vendor")?.scrollIntoView({ block: "center" })
+    const fill = () => {
+      const p = commandPrefill(window.location.hash)
+      if (!p) return
+      setForm(f => ({ name: p.name ?? f.name, email: p.email ?? f.email, country: p.country ?? f.country, days: p.days ?? f.days }))
+      setVia("command"); setResult(null)
+      window.history.replaceState(null, "", window.location.pathname + window.location.search)
+      document.getElementById("share-with-vendor")?.scrollIntoView({ block: "center" })
+    }
+    fill()
+    window.addEventListener("hashchange", fill)
+    return () => window.removeEventListener("hashchange", fill)
   }, [])
   const countries = useMemo(() => {
     const dn = new Intl.DisplayNames(["en"], { type: "region" }), out: string[] = []
@@ -60,7 +66,7 @@ export function BrandShares({ brandId, brand, versionId }: { brandId: string; br
   async function send(e: React.FormEvent) {
     e.preventDefault()
     const days = form.days ? Number(form.days) : undefined
-    if (!window.confirm(`Send the ${brand} brand book (${versionId}) to ${form.email}? The link works for ${days ?? data?.defaultDays ?? 14} days.`)) return
+    if (!window.confirm(`Send the ${brand} brand book (${versionId}) to ${form.email}? The link works for ${dayCount(days ?? data?.defaultDays ?? 14)}.`)) return
     setBusy("send"); setResult(null)
     try {
       const r = await fetch(`/api/admin/brands/${encodeURIComponent(brandId)}/shares`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ name: form.name, email: form.email, country: form.country, ...(days ? { expiresDays: days } : {}), via }) })
