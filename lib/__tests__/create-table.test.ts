@@ -6,7 +6,7 @@
 import { test } from "node:test"
 import assert from "node:assert/strict"
 import { published, loadPublishedProfileFirst } from "./published-profile"
-import { CREATE_PLATFORMS, choiceLabel, formatChoices, mediaShapeOf, normalizePlatforms, platformProblems, cellRoles, isHandPosted, platformIdsOf, templateGap, createTemplates, ddmmmyy, designText, followToday, isPastDate, exportFileBase, formatsOf, rowProblems, type CreateRow, type RoundupStory } from "../content-pipeline/create-table"
+import { CREATE_PLATFORMS, choiceLabel, formatChoices, mediaShapeOf, normalizePlatforms, platformProblems, cellRoles, isHandPosted, platformIdsOf, templateGap, createTemplates, ddmmmyy, designText, chicagoToday, followToday, isPastDate, exportFileBase, formatsOf, rowProblems, type CreateRow, type RoundupStory } from "../content-pipeline/create-table"
 import { PAGE_LINK_MESSAGE, blobStoreHost, dvidsImagePage, isCreateUpload, isPageLink, isPageType, mediaKind, transcodeArgs, videoContainer, videoPlan } from "../content-pipeline/create-media"
 import { cardSubject } from "../content-pipeline/series"
 import { humanPlus, humanPlusRoundup, HumanPlusError, withoutMediaLines, type HumanPlusDeps } from "../content-pipeline/human-plus"
@@ -633,4 +633,12 @@ test("an untouched row's date follows today; a picked one stays; the table flags
   assert.equal(isPastDate(today, today), false)
   assert.equal(isPastDate("2026-11-02", today), false)
   assert.equal(isPastDate("", today), false)
+})
+
+test("today is San Antonio's calendar day, whatever the browser's zone", () => {
+  // 03:30 UTC on the 28th is still the 27th in San Antonio (CDT); 05:30 UTC is the 28th.
+  assert.equal(chicagoToday(new Date("2026-10-28T03:30:00Z")), "2026-10-27")
+  assert.equal(chicagoToday(new Date("2026-10-28T05:30:00Z")), "2026-10-28")
+  // After the clocks go back (CST, UTC-6).
+  assert.equal(chicagoToday(new Date("2026-11-02T05:30:00Z")), "2026-11-01")
 })

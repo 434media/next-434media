@@ -275,6 +275,10 @@ export function followToday(row: CreateRow, today: string): CreateRow {
   return row.date === today ? row : { ...row, date: today }
 }
 
+/** Today in San Antonio (YYYY-MM-DD), whatever the browser's time zone: the post dates are 434's calendar days. */
+export const chicagoToday = (now: Date = new Date()): string =>
+  new Intl.DateTimeFormat("en-CA", { timeZone: "America/Chicago", year: "numeric", month: "2-digit", day: "2-digit" }).format(now)
+
 /** A post date before today: the table warns, since the post would go out (and a roundup's cover print) a past day. */
 export const isPastDate = (date: string, today: string): boolean => /^\d{4}-\d{2}-\d{2}$/.test(date) && date < today
 

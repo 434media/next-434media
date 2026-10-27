@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react"
 import { Check, Loader2, PenLine, Play, Plus, Trash2, Upload, X, ArrowUpRight } from "lucide-react"
-import { CREATE_ROWS_STORE_KEY, CREATE_SOCIALS, FORMAT_LABEL, SOCIAL_LABEL, choiceLabel, formatChoices, followToday, formatsOf, isPastDate, mediaShapeOf, normalizePlatforms, pickedFormat, platformIdOf, rowProblems, templateGap, type CellField, type CreateFormat, type CreatePlatform, type CreateRow, type CreateSocial, type CreateTemplate, type MediaShape, type RoundupStory, type StoryCard } from "@/lib/content-pipeline/create-table"
+import { CREATE_ROWS_STORE_KEY, CREATE_SOCIALS, FORMAT_LABEL, SOCIAL_LABEL, choiceLabel, formatChoices, chicagoToday, followToday, formatsOf, isPastDate, mediaShapeOf, normalizePlatforms, pickedFormat, platformIdOf, rowProblems, templateGap, type CellField, type CreateFormat, type CreatePlatform, type CreateRow, type CreateSocial, type CreateTemplate, type MediaShape, type RoundupStory, type StoryCard } from "@/lib/content-pipeline/create-table"
 import { HelpTip } from "@/components/admin/HelpTip"
 import { isCanvaLink, mediaFromCanva, mediaFromFile, mediaFromLink, type MediaResult } from "./row-media"
 
@@ -37,7 +37,7 @@ interface RowState { busy?: "human" | "media" | "run"; message?: string; error?:
 
 const STORE_KEY = CREATE_ROWS_STORE_KEY
 const DEFAULT_PLATFORMS = ["instagram_feed", "facebook_feed"]
-const today = () => new Date(Date.now() - new Date().getTimezoneOffset() * 60_000).toISOString().slice(0, 10)
+const today = () => chicagoToday()
 const newId = () => `row-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`
 const blankRow = (brand = "", kind = ""): CreateRow => ({ id: newId(), brand, kind, referenceLink: "", notes: "", media: null, platforms: DEFAULT_PLATFORMS, headline: "", subHeadline: "", caption: "", date: today(), fields: {} })
 function loadRows(): CreateRow[] | null {
@@ -85,6 +85,23 @@ export function CreateTable({ onPostsReady }: { onPostsReady?: () => void }) {
   const [config, setConfig] = useState<Config | null>(null)
   const [configError, setConfigError] = useState<string | null>(null)
   const [rows, setRows] = useState<CreateRow[]>([])
+  // The day the table is on. A table left open overnight rolls over when the window is next focused or shown:
+  // untouched rows move to the new day, and a picked date that has now passed is flagged.
+  const [day, setDay] = useState(today)
+  const dayRef = useRef(day)
+  useEffect(() => {
+    const roll = () => {
+      if (document.visibilityState === "hidden") return
+      const t = today()
+      if (t === dayRef.current) return
+      dayRef.current = t
+      setDay(t)
+      setRows(rs => rs.map(r => followToday(r, t)))
+    }
+    window.addEventListener("focus", roll)
+    document.addEventListener("visibilitychange", roll)
+    return () => { window.removeEventListener("focus", roll); document.removeEventListener("visibilitychange", roll) }
+  }, [])
   const [state, setState] = useState<Record<string, RowState>>({})
   const [running, setRunning] = useState(false)
   // A roundup template's published stories, per brand and template, read once per opening of the table.
@@ -376,8 +393,8 @@ export function CreateTable({ onPostsReady }: { onPostsReady?: () => void }) {
                           <p className={`text-[11px] ${r.caption.length > 2100 ? "text-red-600" : "text-neutral-400"}`}>{r.caption.length}/2100</p>
                         </td>
                         <td className="px-2 py-2 w-36">
-                          <input type="date" disabled={locked} value={r.date} onChange={e => patch(r.id, { date: e.target.value, dateSet: true })} className={`w-full h-8 rounded border px-1 ${isPastDate(r.date, today()) ? "border-amber-400 bg-amber-50" : "border-neutral-300"}`} />
-                          {isPastDate(r.date, today()) && <p className="mt-1 text-[11px] text-amber-700">This date has passed.</p>}
+                          <input type="date" disabled={locked} value={r.date} onChange={e => patch(r.id, { date: e.target.value, dateSet: true })} className={`w-full h-8 rounded border px-1 ${isPastDate(r.date, day) ? "border-amber-400 bg-amber-50" : "border-neutral-300"}`} />
+                          {isPastDate(r.date, day) && <p className="mt-1 text-[11px] text-amber-700">This date has passed.</p>}
                           {r.fields.date && <p className="mt-1 text-[11px] text-neutral-400">Card date {r.fields.date}</p>}
                         </td>
                         <td className="px-2 py-2 w-56 text-xs">
