@@ -586,6 +586,9 @@ export const CRM_COLLECTIONS = {
   // share, holding the link token's hash (never the token), the pinned profile version, recipient, sender, expiry,
   // revoked flag and the Resend message id; each view of the link in its views subcollection.
   BRAND_SHARES: "brand_shares",
+  // The send guards for brand_shares, taken in one transaction with the share: a per-requester per-day counter
+  // (cap-<hash>-<day>) and a repeat key per requester, brand, recipient and version (key-<hash>).
+  BRAND_SHARE_GUARDS: "brand_share_guards",
   // Personal data that used to be hard-coded in this public repository. Server-side reads only.
   // One document per event slug: role tag → registrant emails, joined onto named-DB registrations at read time
   // (lib/firestore-event-role-overlays.ts).

@@ -1,4 +1,4 @@
-import { DAILY_SHARE_CAP, DEFAULT_SHARE_DAYS, MAX_SHARE_DAYS, REPEAT_WINDOW_MS, countryCode, dayStart, expiryFrom, hashShareToken, newShareToken, normalEmail, shareEmail, shareRefusal, shareState, shareUrl } from "./brand-share"
+import { DAILY_SHARE_CAP, DEFAULT_SHARE_DAYS, MAX_SHARE_DAYS, REPEAT_WINDOW_MS, chicagoDay, countryCode, expiryFrom, hashShareToken, newShareToken, normalEmail, repeatKey, shareEmail, shareRefusal, shareUrl } from "./brand-share"
 import type { BrandShare, BrandShareStore, ShareVia } from "./firestore-brand-shares"
 
 /**
@@ -9,6 +9,7 @@ import type { BrandShare, BrandShareStore, ShareVia } from "./firestore-brand-sh
  *   2. outbound compliance: the recipient's jurisdiction (EXCLUDED_COUNTRIES) and the suppression list;
  *   3. the requester's daily cap (DAILY_SHARE_CAP, button and command together);
  *   4. not a repeat of the same share sent minutes ago (a double click, a retried command).
+ * Checks 3 and 4 are taken atomically with the share's record (BrandShareStore.reserve).
  * Then the share is recorded (token hash only), mailed through Resend, and the record gets the message id. A refused
  * send says why; a failed mail marks the share failed, and a failed share never opens.
  */
@@ -50,24 +51,23 @@ export async function sendBrandShare(req: ShareRequest, deps: ShareDeps): Promis
   const refusal = shareRefusal({ email, country: req.country }, await deps.isSuppressed(email))
   if (refusal) return refusal.invalid ? { ok: false, status: 400, code: "invalid", error: refusal.reason } : { ok: false, status: 409, code: "refused", error: refusal.reason }
 
+  // The cap and the repeat guard are checked and taken in one transaction with the share's record, so two clicks (or
+  // a click and a command) at the same moment cannot both pass: the second sees the first's counter and key.
   const sender = normalEmail(req.sender.email)
-  const today = await deps.shares.sentBySince(sender, dayStart(now).toISOString())
-  if (today.length >= DAILY_SHARE_CAP) return { ok: false, status: 429, code: "cap", error: `You have sent ${today.length} brand books today, the daily limit (${DAILY_SHARE_CAP}). Nothing was sent; try again tomorrow.` }
-
-  const recent = (await deps.shares.forBrand(req.brandId)).find(s => s.recipient_email === email && s.version_id === b.book.versionId
-    && shareState(s, now) === "active" && now.getTime() - Date.parse(s.created_at) < REPEAT_WINDOW_MS)
-  if (recent) return { ok: false, status: 409, code: "repeat", error: `This brand book went to ${email} a few minutes ago (sent by ${recent.sender_email}). Nothing was sent again.` }
-
   const token = (deps.newToken ?? newShareToken)()
   const expiresAt = expiryFrom(now, days)
+  const guard = { day: chicagoDay(now), key: repeatKey(sender, req.brandId, email, b.book.versionId), cap: DAILY_SHARE_CAP, windowMs: REPEAT_WINDOW_MS }
   let share: BrandShare
   try {
-    share = await deps.shares.create({
+    const r = await deps.shares.reserve({
       brand_id: req.brandId, brand_label: b.book.label, version_id: b.book.versionId, version_n: b.book.n,
       recipient_name: name, recipient_email: email, recipient_country: countryCode(req.country)!,
       sender_email: sender, sender_name: req.sender.name || sender, via: req.via,
       token_hash: hashShareToken(token), created_at: now.toISOString(), expires_at: expiresAt,
-    })
+    }, guard)
+    if (!r.ok && r.reason === "cap") return { ok: false, status: 429, code: "cap", error: `You have sent ${r.used} brand books today, the daily limit (${DAILY_SHARE_CAP}). Nothing was sent; try again tomorrow.` }
+    if (!r.ok) return { ok: false, status: 409, code: "repeat", error: `You sent this brand book to ${email} a few minutes ago. Nothing was sent again.` }
+    share = r.share
   } catch (e) {
     console.error("[brand-share] could not record the share", e)
     return { ok: false, status: 500, code: "failed", error: "The share could not be recorded. Nothing was sent." }
@@ -81,7 +81,8 @@ export async function sendBrandShare(req: ShareRequest, deps: ShareDeps): Promis
   } catch (e) {
     const why = e instanceof Error ? e.message : String(e)
     console.error("[brand-share] the mail was not sent", share.id, why)
-    await deps.shares.markFailed(share.id, why).catch(() => {})
+    // A send that didn't happen gives back its place under the cap and its repeat key, so the requester can retry.
+    await deps.shares.markFailed(share.id, why, guard).catch(() => {})
     return { ok: false, status: 502, code: "failed", error: "The email service did not accept the message. Nothing was sent; try again." }
   }
 }

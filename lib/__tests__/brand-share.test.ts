@@ -4,25 +4,34 @@
  */
 import { test } from "node:test"
 import assert from "node:assert/strict"
-import { DAILY_SHARE_CAP, countryCode, excludedDomain, dayStart, hashShareToken, isShareToken, newShareToken, shareRefusal, shareState } from "../brand-share"
+import { DAILY_SHARE_CAP, chicagoDay, countryCode, excludedDomain, isAutomatedOpen, hashShareToken, isShareToken, newShareToken, shareRefusal, shareState } from "../brand-share"
 import { sendBrandShare, type ShareDeps, type ShareRequest } from "../brand-share-send"
-import type { BrandShare, BrandShareStore, NewBrandShare } from "../firestore-brand-shares"
+import type { BrandShare, BrandShareStore, NewBrandShare, ShareGuard } from "../firestore-brand-shares"
 
 const NOW = new Date("2026-10-27T15:00:00Z")
 
-function fakeStore(): BrandShareStore & { all: BrandShare[]; viewsOf: Record<string, string[]> } {
-  const all: BrandShare[] = [], viewsOf: Record<string, string[]> = {}
+/** The store's contract, in memory. reserve runs with no await between its check and its write, as a transaction would. */
+function fakeStore(): BrandShareStore & { all: BrandShare[]; viewsOf: Record<string, string[]>; counts: Record<string, number> } {
+  const all: BrandShare[] = [], viewsOf: Record<string, string[]> = {}, counts: Record<string, number> = {}, keys: Record<string, { id: string; at: string }> = {}
   let n = 0
   const find = (id: string) => all.find(s => s.id === id) ?? null
+  const cap = (e: string, day: string) => `${e}|${day}`
   return {
-    all, viewsOf,
-    async create(s: NewBrandShare) { const share: BrandShare = { ...s, id: `share${++n}`, status: "pending", resend_message_id: null, error: null, revoked: false, revoked_by: null, revoked_at: null, view_count: 0, last_viewed_at: null }; all.push(share); return { ...share } },
+    all, viewsOf, counts,
+    async reserve(s: NewBrandShare, g: ShareGuard) {
+      const used = counts[cap(s.sender_email, g.day)] ?? 0, k = keys[g.key]
+      if (k && Date.parse(s.created_at) - Date.parse(k.at) < g.windowMs) return { ok: false as const, reason: "repeat" as const, shareId: k.id }
+      if (used >= g.cap) return { ok: false as const, reason: "cap" as const, used }
+      const share: BrandShare = { ...s, id: `share${++n}`, status: "pending", resend_message_id: null, error: null, revoked: false, revoked_by: null, revoked_at: null, view_count: 0, last_viewed_at: null }
+      all.push(share); counts[cap(s.sender_email, g.day)] = used + 1; keys[g.key] = { id: share.id, at: s.created_at }
+      return { ok: true as const, share: { ...share } }
+    },
     async markSent(id, m) { Object.assign(find(id)!, { status: "sent", resend_message_id: m }) },
-    async markFailed(id, e) { Object.assign(find(id)!, { status: "failed", error: e }) },
+    async markFailed(id, e, g) { const s = find(id)!; Object.assign(s, { status: "failed", error: e }); counts[cap(s.sender_email, g.day)]--; if (keys[g.key]?.id === id) delete keys[g.key] },
+    usedOn: async (e, day) => counts[cap(e, day)] ?? 0,
     async byTokenHash(h) { return all.find(s => s.token_hash === h) ?? null },
     get: async id => find(id),
     forBrand: async b => all.filter(s => s.brand_id === b).sort((x, y) => y.created_at.localeCompare(x.created_at)),
-    sentBySince: async (e, since) => all.filter(s => s.sender_email === e && s.status !== "failed" && s.created_at >= since),
     async revoke(id, actor, at) { const s = find(id); if (s && !s.revoked) Object.assign(s, { revoked: true, revoked_by: actor, revoked_at: at }); return s },
     async recordView(id, at) { (viewsOf[id] ??= []).push(at); const s = find(id)!; s.view_count++; s.last_viewed_at = at },
     views: async id => (viewsOf[id] ?? []).map(at => ({ at })),
@@ -105,11 +114,12 @@ test("the daily cap refuses the next send, button and command together; a repeat
   // Another requester is not capped by this one.
   assert.equal((await sendBrandShare(req({ recipientEmail: "eleven@vendor.example", sender: { email: "other@434media.com", name: "Other" } }), d)).ok, true)
 
+  // A double click: two sends at the same moment, one mail.
   const fixed = deps({ now: () => NOW })
-  assert.equal((await sendBrandShare(req(), fixed.d)).ok, true)
-  const again = await sendBrandShare(req(), fixed.d)
-  assert.equal(again.ok || again.code, "repeat")
+  const both = await Promise.all([sendBrandShare(req(), fixed.d), sendBrandShare(req(), fixed.d)])
+  assert.deepEqual(both.map(o => o.ok || o.code).sort(), [true, "repeat"].sort())
   assert.equal(fixed.mails.length, 1)
+  assert.equal(await fixed.store.usedOn("staff@434media.com", "2026-10-27"), 1)
 })
 
 test("a mail Resend refuses marks the share failed, and a failed share never opens", async () => {
@@ -117,6 +127,9 @@ test("a mail Resend refuses marks the share failed, and a failed share never ope
   const out = await sendBrandShare(req(), d)
   assert.equal(out.ok || out.status, 502)
   assert.equal(store.all[0].status, "failed")
+  // It gives back its place under the cap and its repeat key, so a retry can go.
+  assert.equal(await store.usedOn("staff@434media.com", "2026-10-27"), 0)
+  assert.equal((await sendBrandShare(req(), { ...d, sendMail: async () => ({ id: "msg-retry" }) })).ok, true)
   assert.equal(shareState(store.all[0], NOW), "failed")
 })
 
@@ -137,9 +150,9 @@ test("countries, country domains, the cap's day and the token's shape", () => {
   assert.deepEqual(["studio.de", "agency.eu", "firm.co.uk", "media.ca", "vendor.com", "estudio.mx", "x.io"].map(excludedDomain), ["de", "eu", "uk", "ca", null, null, null])
   assert.deepEqual(["US", "us", "United States", "uk", "Germany", "Atlantis", ""].map(countryCode), ["US", "US", "US", "GB", "DE", null, null])
   assert.equal(shareRefusal({ email: "a@vendor.example", country: "Mexico" }, false), null)
-  // Midnight in San Antonio (CDT, UTC-5, on 2026-10-27).
-  assert.equal(dayStart(new Date("2026-10-27T15:00:00Z")).toISOString(), "2026-10-27T05:00:00.000Z")
-  assert.equal(dayStart(new Date("2026-10-27T03:00:00Z")).toISOString(), "2026-10-26T05:00:00.000Z")
+  // The cap's day is San Antonio's (CDT, UTC-5, on 2026-10-27).
+  assert.equal(chicagoDay(new Date("2026-10-27T15:00:00Z")), "2026-10-27")
+  assert.equal(chicagoDay(new Date("2026-10-27T03:00:00Z")), "2026-10-26")
   const t = newShareToken()
   assert.ok(isShareToken(t)); assert.equal(isShareToken(t + "x"), false); assert.equal(isShareToken("../x"), false)
   assert.notEqual(newShareToken(), t)
@@ -152,4 +165,14 @@ test("the send command's prefill is read from the fragment only, trimmed and bou
   assert.deepEqual(commandPrefill("#share&email=pat%40vendor.example&name=Pat%20Vendor&country=United%20States&days=7"), { email: "pat@vendor.example", name: "Pat Vendor", country: "United States", days: "7" })
   assert.deepEqual(commandPrefill("#share?email=a%40vendor.example&days=seven"), { email: "a@vendor.example", name: undefined, country: undefined, days: undefined })
   assert.equal(commandPrefill(`#share&name=${"x".repeat(300)}`)!.name!.length, 100)
+})
+
+test("a prefetch or a link scanner is not a view; a person's browser is", () => {
+  const h = (o: Record<string, string>) => ({ get: (k: string) => o[k] ?? null })
+  const chrome = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36"
+  assert.equal(isAutomatedOpen(h({ "user-agent": chrome })), false)
+  assert.equal(isAutomatedOpen(h({ "user-agent": chrome, "sec-purpose": "prefetch;prerender" })), true)
+  assert.equal(isAutomatedOpen(h({ "user-agent": chrome, purpose: "prefetch" })), true)
+  for (const ua of ["Mozilla/5.0 (compatible; Slackbot-LinkExpanding 1.0; +https://api.slack.com/robots)", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko; Google-Safety) Chrome", "Mozilla/5.0 (Windows NT 5.1; rv:11.0) Gecko Firefox/11.0 (via ggpht.com GoogleImageProxy)", "Microsoft Office/16.0 (Windows NT 10.0; Microsoft Outlook 16.0.17928; Pro)", "facebookexternalhit/1.1", ""])
+    assert.equal(isAutomatedOpen(h({ "user-agent": ua })), true, ua)
 })

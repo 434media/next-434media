@@ -47,6 +47,21 @@ const nextConfig: NextConfig = {
     }
   },
 
+  // A brand book shared with a vendor (plan v11.2.1 Step 4 item 4): the link carries its access token, so the page is
+  // never indexed and no referrer leaves it, as response headers as well as the page's own meta tags.
+  async headers() {
+    return [
+      {
+        source: '/share/:path*',
+        headers: [
+          { key: 'X-Robots-Tag', value: 'noindex, nofollow' },
+          { key: 'Referrer-Policy', value: 'no-referrer' },
+          { key: 'Cache-Control', value: 'private, no-store' },
+        ],
+      },
+    ]
+  },
+
   // The CRM section was renamed to Opportunities and moved to /admin/opportunities.
   // Keep every old link working — bookmarks, command palette, cron/notification
   // deep-links — with query strings + sub-paths (e.g. /settings) preserved.

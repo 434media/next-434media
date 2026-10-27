@@ -1,13 +1,15 @@
 import type { Metadata } from "next"
+import { headers } from "next/headers"
 import { BrandBook } from "@/components/admin/brands/BrandBook"
-import { hashShareToken, isShareToken, shareState } from "@/lib/brand-share"
+import { hashShareToken, isAutomatedOpen, isShareToken, shareState } from "@/lib/brand-share"
 import { DownloadPdf } from "./DownloadPdf"
 
 export const dynamic = "force-dynamic"
 
 /**
  * A brand book shared with a vendor (plan v11.2.1 Step 4 item 4). The link's token is looked up by its hash; an
- * unknown, expired, revoked or failed share refuses. Each opening is recorded on the share. The book is the one the
+ * unknown, expired, revoked or failed share refuses. Each opening by a person is recorded on the share (a prefetch or a
+ * link scanner is not, and openings within a minute are one). The book is the one the
  * share pinned (its profile version), rendered by the same component as the brand page; Download PDF is the browser's
  * own rendering of this page with its print styles, made on request and never stored.
  *
@@ -50,7 +52,8 @@ async function open(token: string) {
   if (!share || shareState(share, now) !== "active" || share.status !== "sent") return null
   const pinned = await pinnedBook(share.brand_id, share.version_n)
   if (!pinned) return null
-  await store.recordView(share.id, now.toISOString()).catch(err => console.error("[share/brand-book] view not recorded", share.id, err))
+  // A prefetch or a mail or chat link scanner is answered, not counted; the store merges openings within a minute.
+  if (!isAutomatedOpen(await headers())) await store.recordView(share.id, now.toISOString()).catch(err => console.error("[share/brand-book] view not recorded", share.id, err))
   return { book: pinned.book, label: pinned.label, versionId: share.version_id, expiresAt: share.expires_at }
 }
 

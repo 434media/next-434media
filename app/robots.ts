@@ -1,6 +1,6 @@
 import type { MetadataRoute } from "next"
 
-const PRIVATE_PATHS = ["/api/*", "/admin/*"]
+const PRIVATE_PATHS = ["/api/*", "/admin/*", "/share/*"]
 
 /**
  * AI / generative-engine crawlers we explicitly allow. Listing them by name

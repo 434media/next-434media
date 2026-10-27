@@ -3,7 +3,7 @@ import { z } from "zod4"
 import { requireSendCapable } from "@/lib/auth"
 import { requireStaff } from "../../../content-pipeline/auth"
 import { BRAND_ID } from "@/lib/content-pipeline/profile-store"
-import { DAILY_SHARE_CAP, DEFAULT_SHARE_DAYS, MAX_SHARE_DAYS, dayStart, shareState } from "@/lib/brand-share"
+import { DAILY_SHARE_CAP, DEFAULT_SHARE_DAYS, MAX_SHARE_DAYS, chicagoDay, shareState } from "@/lib/brand-share"
 import type { BrandShare } from "@/lib/firestore-brand-shares"
 
 export const runtime = "nodejs"
@@ -28,8 +28,8 @@ export async function GET(_req: NextRequest, ctx: { params: Promise<{ id: string
   try {
     const { firestoreBrandShares } = await import("@/lib/firestore-brand-shares")
     const store = firestoreBrandShares(), now = new Date()
-    const [shares, mine] = await Promise.all([store.forBrand(id), store.sentBySince(auth.session.email, dayStart(now).toISOString())])
-    return NextResponse.json({ shares: shares.map(s => listed(s, now)), left: Math.max(0, DAILY_SHARE_CAP - mine.length), cap: DAILY_SHARE_CAP, defaultDays: DEFAULT_SHARE_DAYS, maxDays: MAX_SHARE_DAYS }, { headers: { "cache-control": "private, no-store" } })
+    const [shares, used] = await Promise.all([store.forBrand(id), store.usedOn(auth.session.email, chicagoDay(now))])
+    return NextResponse.json({ shares: shares.map(s => listed(s, now)), left: Math.max(0, DAILY_SHARE_CAP - used), cap: DAILY_SHARE_CAP, defaultDays: DEFAULT_SHARE_DAYS, maxDays: MAX_SHARE_DAYS }, { headers: { "cache-control": "private, no-store" } })
   } catch (err) {
     console.error("[GET /api/admin/brands/[id]/shares]", err)
     return NextResponse.json({ error: "Could not read the shares" }, { status: 500 })

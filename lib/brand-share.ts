@@ -33,13 +33,22 @@ export function expiryFrom(now: Date, days: number = DEFAULT_SHARE_DAYS): string
   return new Date(now.getTime() + days * 86_400_000).toISOString()
 }
 
-/** Midnight today in San Antonio, as an instant: the daily cap's window. */
-export function dayStart(now: Date): Date {
-  const parts = Object.fromEntries(new Intl.DateTimeFormat("en-US", { timeZone: "America/Chicago", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit", hourCycle: "h23" })
-    .formatToParts(now).map(p => [p.type, p.value]))
-  const elapsed = ((Number(parts.hour) * 60 + Number(parts.minute)) * 60 + Number(parts.second)) * 1000 + now.getMilliseconds()
-  return new Date(now.getTime() - elapsed)
+export const chicagoDay = (now: Date): string => new Intl.DateTimeFormat("en-CA", { timeZone: "America/Chicago", year: "numeric", month: "2-digit", day: "2-digit" }).format(now)
+
+/**
+ * A request that is not a person opening the link: a browser prefetch (Purpose / Sec-Purpose: prefetch), or a mail or
+ * chat link scanner fetching it to check or unfurl it. The page still answers it; it is not recorded as a view.
+ */
+const SCANNER_UA = /safelinks|microsoft office|ms-office|googleimageproxy|google-safety|feedfetcher|gmail|slackbot|slack-imgproxy|discordbot|twitterbot|facebookexternalhit|linkedinbot|whatsapp|telegrambot|skypeuripreview|teams|proofpoint|mimecast|barracuda|bot\b|crawler|spider|preview/i
+export function isAutomatedOpen(h: { get(name: string): string | null }): boolean {
+  if (/prefetch|prerender/i.test(`${h.get("purpose") ?? ""} ${h.get("sec-purpose") ?? ""} ${h.get("x-purpose") ?? ""} ${h.get("x-moz") ?? ""}`)) return true
+  const ua = h.get("user-agent") ?? ""
+  return !ua || SCANNER_UA.test(ua)
 }
+
+/** The repeat guard's key: one share of a brand version from a requester to a recipient (hashed, so no address is a document id). */
+export const repeatKey = (sender: string, brandId: string, recipient: string, versionId: string): string =>
+  createHash("sha256").update([sender, brandId, recipient, versionId].map(normalEmail).join("\n"), "utf8").digest("hex").slice(0, 40)
 
 export const normalEmail = (s: string): string => s.trim().toLowerCase()
 export const isEmail = (s: string): boolean => /^[^\s@<>()",;]+@[^\s@<>()",;]+\.[a-z]{2,}$/i.test(s) && s.length <= 254
