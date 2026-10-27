@@ -224,9 +224,9 @@ export default function BrandPage() {
 function Section({ title, note, open = false, nested = false, children }: { title: string; note?: string; open?: boolean; nested?: boolean; children: React.ReactNode }) {
   return (
     // min-w-0 and overflow-wrap: anywhere keep a long unbroken value (a sheet id, an email) inside the card on a phone.
-    <details open={open} className={`group/card min-w-0 rounded-lg border border-neutral-200 [overflow-wrap:anywhere] ${nested ? "bg-neutral-50 p-3" : "bg-white p-4"}`}>
+    <details open={open} className={`min-w-0 rounded-lg border border-neutral-200 [overflow-wrap:anywhere] ${nested ? "group/inner bg-neutral-50 p-3" : "group/card bg-white p-4"}`}>
       <summary className="cursor-pointer list-none marker:hidden">
-        <h2 className="inline text-sm font-semibold text-neutral-900"><span className="mr-1.5 inline-block text-neutral-400 transition-transform group-open/card:rotate-90">›</span>{title}</h2>
+        <h2 className="inline text-sm font-semibold text-neutral-900">{/* A card inside Internal has its own group, so its arrow follows its own state, not Internal's. */}<span className={`mr-1.5 inline-block text-neutral-400 transition-transform ${nested ? "group-open/inner:rotate-90" : "group-open/card:rotate-90"}`}>›</span>{title}</h2>
         {note && <p className="mt-0.5 pl-4 text-xs text-neutral-500">{note}</p>}
       </summary>
       <div className="mt-3">{children}</div>
