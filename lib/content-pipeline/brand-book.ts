@@ -136,3 +136,69 @@ export function brandBookProblems(v: unknown): string[] {
   })
   return p.slice(0, 20)
 }
+
+/**
+ * The vendor's copy (Share with vendor): the book minus what is about 434's own systems rather than the design. The
+ * full book stays in the profile and on the brand page, where staff see each internal block marked, so nothing is
+ * lost; the vendor's page is rendered from this on the server, so an internal block never reaches the vendor's HTML or
+ * PDF. Internal is:
+ *  - a surface's record fields (Display and Design Standard §3.2: Status, What ships it, Container, Delivered size,
+ *    Byte budget, Empty state), which name template ids, database paths, run logs and approvals;
+ *  - the index of surfaces and their approval status (a table with Subsection and Status columns);
+ *  - any paragraph, list item or table row that cites an internal system: a repository path, the database, a profile
+ *    version id, a run log, the governing documents or the founder;
+ *  - a subsection with nothing left once those are out (a surface with no design yet).
+ */
+const SURFACE_FIELD = /^\*\*(Status|What ships it|Container|Delivered size|Byte budget|Empty state):\*\*/i
+const INTERNAL_REF = /`?\b\d{2} [A-Z][A-Za-z ]+\/|\bFirestore\b|\bbrand_profiles\/|\bgit grep\b|\bnext-434media\b|\b434-context\b|\bRun Logs?\b|\brun log\b|\b[a-z][a-z0-9-]*@v\d+\b|\bDisplay and Design Standard\b|\bfounder\b|\bProvisional\b|\bno precedent\b/i
+export const isInternalText = (s: string): boolean => INTERNAL_REF.test(s)
+
+export interface MarkedBlock { block: BookBlock; internal: boolean }
+export interface MarkedSection { title: string; blocks: MarkedBlock[] }
+
+/** Each block of the book, marked internal or not; a list or table with both kinds is split into two blocks. */
+export function markInternal(book: Pick<BrandBook, "sections">): MarkedSection[] {
+  return book.sections.map(s => {
+    const out: MarkedBlock[] = []
+    for (const b of s.blocks) {
+      if (b.kind === "list") {
+        const items = b.items ?? [], fieldList = items.length > 0 && items.every(x => SURFACE_FIELD.test(x))
+        const keep = items.map(x => !fieldList && !isInternalText(x))
+        const part = (want: boolean): BookBlock => {
+          const idx = items.map((_, i) => i).filter(i => keep[i] === want)
+          return { ...b, items: idx.map(i => items[i]), ...(b.depths ? { depths: idx.map(i => b.depths![i]) } : {}) }
+        }
+        if (keep.some(Boolean)) out.push({ block: part(true), internal: false })
+        if (keep.some(k => !k)) out.push({ block: part(false), internal: true })
+      } else if (b.kind === "table") {
+        const head = (b.head ?? []).map(h => h.trim().toLowerCase())
+        if (head.includes("subsection") && head.includes("status")) { out.push({ block: b, internal: true }); continue }
+        const rows = b.rows ?? [], keep = rows.map(r => !r.cells.some(isInternalText))
+        if (keep.some(Boolean)) out.push({ block: { ...b, rows: rows.filter((_, i) => keep[i]) }, internal: false })
+        if (keep.some(k => !k)) out.push({ block: { ...b, rows: rows.filter((_, i) => !keep[i]) }, internal: true })
+      } else {
+        out.push({ block: b, internal: b.kind !== "heading" && isInternalText(b.text ?? "") })
+      }
+    }
+    // A heading whose subsection has nothing shareable left (up to the next heading at its level or above) is internal too.
+    out.forEach((m, i) => {
+      if (m.block.kind !== "heading") return
+      let shareable = false
+      for (let j = i + 1; j < out.length; j++) {
+        const n = out[j].block
+        if (n.kind === "heading" && (n.level ?? 3) <= (m.block.level ?? 3)) break
+        if (n.kind !== "heading" && !out[j].internal) { shareable = true; break }
+      }
+      if (!shareable) m.internal = true
+    })
+    return { title: s.title, blocks: out }
+  })
+}
+
+/** The book a vendor is shown: only what is not internal, and no section left empty. */
+export function vendorBook(book: BrandBook): BrandBook {
+  const sections = markInternal(book)
+    .map(s => ({ title: s.title, blocks: s.blocks.filter(m => !m.internal).map(m => m.block) }))
+    .filter(s => s.blocks.some(b => b.kind !== "heading"))
+  return { standard: book.standard, sections }
+}

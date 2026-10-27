@@ -1,26 +1,37 @@
 import { Fragment, type ReactNode } from "react"
-import { hexColumn, hexOf, type BookBlock, type BrandBook as Book } from "@/lib/content-pipeline/brand-book"
+import { hexColumn, hexOf, markInternal, vendorBook, type BookBlock, type BrandBook as Book } from "@/lib/content-pipeline/brand-book"
 
 /**
  * A brand's brand book (plan v11.2.1 Step 4 item 3), drawn from its published profile's `visual` block, which was
  * generated from the brand's visual standard. It names the profile version it was built from and the standard's
  * version. The same component renders a vendor's shared copy (Step 4 item 4, app/share/brand-book), so it takes the
  * book as data; its print styles (no swatch or row split across pages, code wrapped) are that copy's Download PDF.
+ *
+ * `audience` decides what is drawn. Staff (the brand page) see the whole book, each internal block marked "Internal:
+ * not in the vendor copy", so nothing is lost. A vendor sees only vendorBook(), with no profile id or hash in the
+ * header; the share page also filters on the server before it renders, so internal blocks never reach the vendor.
  */
-export function BrandBook({ book, brand, versionId }: { book: Book; brand: string; versionId: string }) {
+export function BrandBook({ book, brand, versionId, audience = "staff" }: { book: Book; brand: string; versionId: string; audience?: "staff" | "vendor" }) {
+  const vendor = audience === "vendor"
+  const sections = markInternal(vendor ? vendorBook(book) : book)
+  const version = book.standard.version.replace(/^Version\s+/i, "v")
   return (
     <article className="text-sm text-neutral-800">
       <header className="border-b border-neutral-200 pb-3">
         <p className="text-[11px] uppercase tracking-[0.16em] text-neutral-500">Brand book</p>
         <h3 className="mt-1 text-xl font-semibold text-neutral-900">{brand}</h3>
-        <p className="mt-1 text-xs text-neutral-500">
-          Built from profile <span className="font-mono">{versionId}</span> · {book.standard.title}, {book.standard.version.replace(/^Version\s+/i, "v")} <span className="font-mono">({book.standard.sha256.slice(0, 8)})</span>
-        </p>
+        {vendor
+          ? <p className="mt-1 text-xs text-neutral-500">{version}</p>
+          : <p className="mt-1 text-xs text-neutral-500">
+              Built from profile <span className="font-mono">{versionId}</span> · {book.standard.title}, {version} <span className="font-mono">({book.standard.sha256.slice(0, 8)})</span>
+            </p>}
       </header>
-      {book.sections.map(s => (
+      {sections.map(s => (
         <section key={s.title} className="mt-5">
           <h4 className="text-base font-semibold text-neutral-900">{s.title}</h4>
-          <div className="mt-2 space-y-2">{s.blocks.map((b, i) => <Block key={i} block={b} />)}</div>
+          <div className="mt-2 space-y-2">{s.blocks.filter(m => !vendor || !m.internal).map((m, i) => m.internal
+            ? <div key={i} className="rounded border border-dashed border-amber-300 bg-amber-50/60 px-2 py-1.5"><p className="mb-1 text-[11px] font-medium uppercase tracking-wide text-amber-700">Internal: not in the vendor copy</p><Block block={m.block} /></div>
+            : <Block key={i} block={m.block} />)}</div>
         </section>
       ))}
     </article>

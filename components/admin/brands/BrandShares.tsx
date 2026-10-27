@@ -102,7 +102,7 @@ export function BrandShares({ brandId, brand, versionId }: { brandId: string; br
         <datalist id="share-countries">{countries.map(c => <option key={c} value={c} />)}</datalist>
       </form>
       <p className="text-xs text-neutral-500">
-        The email carries a link, not a file: it opens this book as version {versionId}, with a Download PDF. Recipients in excluded jurisdictions and suppressed addresses are refused.
+        The email carries a link, not a file: it opens this book as version {versionId}, with a Download PDF. The vendor sees the book without the blocks marked Internal above. Recipients in excluded jurisdictions and suppressed addresses are refused.
         {data && <> You can send {data.left} more today (limit {data.cap}).</>}
       </p>
       {result && <p className={result.ok ? "text-emerald-700" : "text-red-600"}>{result.message}</p>}

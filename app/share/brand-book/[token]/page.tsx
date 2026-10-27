@@ -1,6 +1,7 @@
 import type { Metadata } from "next"
 import { headers } from "next/headers"
 import { BrandBook } from "@/components/admin/brands/BrandBook"
+import { vendorBook } from "@/lib/content-pipeline/brand-book"
 import { hashShareToken, isAutomatedOpen, isShareToken, shareState } from "@/lib/brand-share"
 import { DownloadPdf } from "./DownloadPdf"
 
@@ -38,7 +39,7 @@ export default async function SharedBrandBook({ params }: { params: Promise<{ to
           <p className="text-xs text-neutral-500">Shared by 434 MEDIA · this link works until {new Date(expiresAt).toLocaleDateString("en-US", { timeZone: "America/Chicago", month: "long", day: "numeric", year: "numeric" })}</p>
           <DownloadPdf />
         </div>
-        <BrandBook book={book} brand={label} versionId={versionId} />
+        <BrandBook book={book} brand={label} versionId={versionId} audience="vendor" />
       </div>
     </main>
   )
@@ -54,7 +55,8 @@ async function open(token: string) {
   if (!pinned) return null
   // A prefetch or a mail or chat link scanner is answered, not counted; the store merges openings within a minute.
   if (!isAutomatedOpen(await headers())) await store.recordView(share.id, now.toISOString()).catch(err => console.error("[share/brand-book] view not recorded", share.id, err))
-  return { book: pinned.book, label: pinned.label, versionId: share.version_id, expiresAt: share.expires_at }
+  // Only the vendor's copy leaves the server: the book's internal blocks are dropped here, before anything renders.
+  return { book: vendorBook(pinned.book), label: pinned.label, versionId: share.version_id, expiresAt: share.expires_at }
 }
 
 function Refused() {
