@@ -150,3 +150,9 @@ export async function requirePublishedProfile(id: string, db?: FirebaseFirestore
   if ("problems" in r) throw new Error(`The ${id} brand profile cannot run: ${r.problems.slice(0, 8).join("; ")}`)
   return r.active
 }
+
+/** One published version by its number (a vendor share pins one, Step 4 item 4), read fresh; null when it isn't kept. */
+export async function readProfileVersion(id: string, n: number, db: FirebaseFirestore.Firestore = getDb()): Promise<ProfileVersion | null> {
+  const snap = await db.collection(COLLECTION).doc(id).collection(VERSIONS).doc(versionDocId(n)).get()
+  return snap.exists ? snap.data() as ProfileVersion : null
+}
