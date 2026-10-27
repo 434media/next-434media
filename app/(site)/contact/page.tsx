@@ -30,6 +30,7 @@ export const metadata: Metadata = {
     title: socialTitle,
     description,
     url: `${siteUrl}/contact`,
+    type: "website",
     // The image is this segment's own opengraph-image.tsx, which Next wires in
     // with a hashed URL (/<route>/opengraph-image-<hash>), so it is not named
     // here. A colocated card is not suppressed by this `openGraph` object; the
