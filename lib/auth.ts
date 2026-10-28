@@ -85,6 +85,7 @@ export interface RosterRecord {
   isActive?: unknown
   role?: unknown
   name?: unknown
+  permissions?: unknown
 }
 
 export type SignInDecision =
@@ -203,6 +204,33 @@ export function isWorkspaceEmail(email: string): boolean {
 }
 
 /**
+ * Whether a Google userinfo (v2) response is a verified account of the workspace itself (security log ADM-9): Google
+ * says the address is verified (`verified_email`), the account belongs to the workspace (`hd`), and the address is on
+ * the workspace domain. An address merely ending in the domain is not enough. Identity only: the roster still decides
+ * admission (authorizeAdminSignIn).
+ */
+export function isVerifiedWorkspaceGoogleAccount(
+  info: { email?: unknown; verified_email?: unknown; hd?: unknown },
+  domain: string = workspaceDomain(),
+): boolean {
+  return (
+    info.verified_email === true &&
+    info.hd === domain &&
+    typeof info.email === 'string' &&
+    info.email.toLowerCase().endsWith(`@${domain}`)
+  )
+}
+
+/**
+ * The session to re-issue after a profile edit (security log ADM-13): the same identity, role, provider and verified
+ * flag, with only the display name and picture changed. Re-issuing without the role signed the user out.
+ */
+export function withProfileChanges(session: User, changes: { name: string; picture?: string | null }): User {
+  const { email, authProvider, role, emailVerified } = session
+  return { email, name: changes.name, picture: changes.picture || undefined, authProvider, role, emailVerified }
+}
+
+/**
  * Cheap per-request sanity check on an already-verified session.
  *
  * This is NOT the authorization decision — `authorizeAdminSignIn` is, and it
@@ -240,7 +268,7 @@ export async function isCrmSuperAdmin(email?: string | null): Promise<boolean> {
       .limit(1)
       .get()
     if (snap.empty) return false
-    return snap.docs[0].data().role === 'crm_super_admin'
+    return rosterIsSuperAdmin(snap.docs[0].data() as RosterRecord)
   } catch (error) {
     console.error('[auth] isCrmSuperAdmin Firestore lookup failed; owners only:', error)
     return isOwnerEmail(lower)
@@ -256,6 +284,22 @@ export async function isCrmSuperAdmin(email?: string | null): Promise<boolean> {
  * the owners.
  */
 export const CONTENT_PERMISSION = 'content'
+
+/**
+ * Super-admin powers from a roster record: the `crm_super_admin` role on an ACTIVE record (security log ADM-8).
+ * Deactivating a super admin in admin settings removes these powers at once, even inside a session that is still open.
+ * Pure, so it is tested without Firestore (lib/__tests__/admin-roster-checks.test.ts). Owners are decided before this.
+ */
+export function rosterIsSuperAdmin(data: RosterRecord): boolean {
+  return data.isActive !== false && data.role === 'crm_super_admin'
+}
+
+/** The content permission from a roster record: an active super admin, or an active member holding "content". */
+export function rosterCanRunContent(data: RosterRecord): boolean {
+  if (data.isActive === false) return false
+  if (data.role === 'crm_super_admin') return true
+  return Array.isArray(data.permissions) && data.permissions.includes(CONTENT_PERMISSION)
+}
 export async function canRunContent(email?: string | null): Promise<boolean> {
   if (!email) return false
   const lower = email.toLowerCase()
@@ -265,9 +309,7 @@ export async function canRunContent(email?: string | null): Promise<boolean> {
     const { getDb } = await import('./firebase-admin')
     const snap = await getDb().collection('crm_team_members').where('email', '==', lower).limit(1).get()
     if (snap.empty) return false
-    const data = snap.docs[0].data()
-    if (data.role === 'crm_super_admin') return true
-    return data.isActive !== false && Array.isArray(data.permissions) && data.permissions.includes(CONTENT_PERMISSION)
+    return rosterCanRunContent(snap.docs[0].data() as RosterRecord)
   } catch (error) {
     console.error('[auth] canRunContent Firestore lookup failed:', error)
     return false

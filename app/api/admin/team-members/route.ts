@@ -8,6 +8,7 @@ import {
   type AdminRole,
 } from "@/lib/auth"
 import type { SquadKey } from "@/components/crm/types"
+import { normalizeTeamMemberEmail } from "@/lib/team-member-email"
 
 const TEAM_MEMBERS_COLLECTION = "crm_team_members"
 const VALID_ROLES = ["crm_super_admin", "full_admin", "crm_only", "intern"]
@@ -137,13 +138,11 @@ export async function POST(request: Request) {
       )
     }
 
-    const trimmedEmail = email?.trim().toLowerCase() || ""
-    if (trimmedEmail && !trimmedEmail.endsWith("@434media.com")) {
-      return NextResponse.json(
-        { success: false, error: "Email must be a @434media.com address" },
-        { status: 400 },
-      )
+    const checkedEmail = normalizeTeamMemberEmail(email)
+    if ("error" in checkedEmail) {
+      return NextResponse.json({ success: false, error: checkedEmail.error }, { status: 400 })
     }
+    const trimmedEmail = checkedEmail.email
 
     const db = getDb()
     if (trimmedEmail) {
@@ -244,7 +243,7 @@ export async function PATCH(request: Request) {
     const { id, name, email, isActive, role, firstName, lastName, phone, squad } = body as {
       id?: string
       name?: string
-      email?: string
+      email?: unknown
       isActive?: boolean
       role?: AdminRole
       firstName?: string
@@ -292,7 +291,28 @@ export async function PATCH(request: Request) {
 
     const updates: Partial<TeamMember> = { updated_at: new Date().toISOString() }
     if (name !== undefined) updates.name = name.trim()
-    if (email !== undefined) updates.email = email.trim().toLowerCase()
+    if (email !== undefined) {
+      // Held to the rule members are created under (security log ADM-11): the workspace domain, and one record per
+      // address. A second record for an address would lock its owner out, since sign-in refuses duplicates.
+      const checkedEmail = normalizeTeamMemberEmail(email)
+      if ("error" in checkedEmail) {
+        return NextResponse.json({ success: false, error: checkedEmail.error }, { status: 400 })
+      }
+      if (checkedEmail.email && checkedEmail.email !== targetEmail) {
+        const clash = await db
+          .collection(TEAM_MEMBERS_COLLECTION)
+          .where("email", "==", checkedEmail.email)
+          .limit(1)
+          .get()
+        if (!clash.empty) {
+          return NextResponse.json(
+            { success: false, error: `A member with email ${checkedEmail.email} already exists` },
+            { status: 409 },
+          )
+        }
+      }
+      updates.email = checkedEmail.email
+    }
     if (isActive !== undefined) updates.isActive = isActive
     if (role !== undefined) {
       if (!VALID_ROLES.includes(role)) {
