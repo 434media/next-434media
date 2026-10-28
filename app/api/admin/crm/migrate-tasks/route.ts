@@ -1,8 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { getSession, isAuthorizedAdmin } from "@/lib/auth"
+import { getSession, isAuthorizedAdmin, isCrmSuperAdmin } from "@/lib/auth"
 import { getTaskMigrationStatus, runTaskMigration } from "@/lib/migrate-unified-tasks"
 import { invalidateTaskMigrationFlag } from "@/lib/firestore-crm"
-import { isCrmSuperAdmin } from "@/components/crm/types"
 
 export const runtime = "nodejs"
 export const maxDuration = 300
@@ -11,7 +10,7 @@ async function requireSuperAdmin() {
   const session = await getSession()
   if (!session) return { error: "Unauthorized", status: 401 as const }
   if (!isAuthorizedAdmin(session.email)) return { error: "Forbidden", status: 403 as const }
-  if (!isCrmSuperAdmin(session.email)) {
+  if (!(await isCrmSuperAdmin(session.email))) {
     return { error: "Super admin required to run task migration", status: 403 as const }
   }
   return { session }
