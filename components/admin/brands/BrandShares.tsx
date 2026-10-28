@@ -7,12 +7,12 @@ import { commandPrefill, dayCount } from "@/lib/brand-share-link"
 /**
  * "Share with vendor" on a brand book (plan v11.2.1 Step 4 item 4): a name, an email and the recipient's country send
  * a link (never an attachment) through POST /api/admin/brands/[id]/shares, the same path as the send command. The
- * active and past shares are listed with their views, and an active one can be revoked.
+ * active and past shares are listed with their views and downloads, and an active one can be revoked.
  */
 interface Share {
   id: string; state: "active" | "expired" | "revoked" | "failed"; versionId: string; recipientName: string; recipientEmail: string; recipientCountry: string
   senderEmail: string; via: "button" | "command"; createdAt: string; expiresAt: string; revokedBy: string | null; revokedAt: string | null
-  views: number; lastViewedAt: string | null
+  views: number; lastViewedAt: string | null; downloads: number; lastDownloadedAt: string | null
 }
 interface Shares { shares: Share[]; left: number; cap: number; defaultDays: number; maxDays: number }
 
@@ -102,7 +102,7 @@ export function BrandShares({ brandId, brand, versionId }: { brandId: string; br
         <datalist id="share-countries">{countries.map(c => <option key={c} value={c} />)}</datalist>
       </form>
       <p className="text-xs text-neutral-500">
-        The email carries a link, not a file: it opens this book as version {versionId}, with a Download PDF. The designer gets the brand book above, nothing from Internal. Recipients in excluded jurisdictions and suppressed addresses are refused.
+        The email carries a link, not a file: it opens this book as version {versionId}, where the designer can tick logo and font files and download them as one zip, or save the book as a PDF. The designer gets the brand book above, nothing from Internal. Recipients in excluded jurisdictions and suppressed addresses are refused.
         {data && <> You can send {data.left} more today (limit {data.cap}).</>}
       </p>
       {result && <p className={result.ok ? "text-emerald-700" : "text-red-600"}>{result.message}</p>}
@@ -110,7 +110,7 @@ export function BrandShares({ brandId, brand, versionId }: { brandId: string; br
       {data && data.shares.length > 0 && (
         <div className="overflow-x-auto">
           <table className="w-full text-xs">
-            <thead><tr className="text-left text-neutral-500"><th className="py-1 pr-3 font-medium">Recipient</th><th className="py-1 pr-3 font-medium">Sent</th><th className="py-1 pr-3 font-medium">Status</th><th className="py-1 pr-3 font-medium">Views</th><th className="py-1 font-medium"></th></tr></thead>
+            <thead><tr className="text-left text-neutral-500"><th className="py-1 pr-3 font-medium">Recipient</th><th className="py-1 pr-3 font-medium">Sent</th><th className="py-1 pr-3 font-medium">Status</th><th className="py-1 pr-3 font-medium">Views</th><th className="py-1 pr-3 font-medium">Downloads</th><th className="py-1 font-medium"></th></tr></thead>
             <tbody className="divide-y divide-neutral-100">
               {data.shares.map(s => (
                 <tr key={s.id} className="align-top">
@@ -118,6 +118,7 @@ export function BrandShares({ brandId, brand, versionId }: { brandId: string; br
                   <td className="py-1.5 pr-3 text-neutral-600">{when(s.createdAt)} by {s.senderEmail}{s.via === "command" ? " (command)" : ""} · <span className="font-mono">{s.versionId}</span></td>
                   <td className={`py-1.5 pr-3 ${STATE_TONE[s.state]}`}>{STATE_LABEL[s.state]}{s.state === "active" ? ` until ${day(s.expiresAt)}` : s.state === "revoked" && s.revokedBy ? ` by ${s.revokedBy}` : ""}</td>
                   <td className="py-1.5 pr-3 text-neutral-600">{s.views}{s.lastViewedAt ? `, last ${when(s.lastViewedAt)}` : ""}</td>
+                  <td className="py-1.5 pr-3 text-neutral-600">{s.downloads ?? 0}{s.lastDownloadedAt ? `, last ${when(s.lastDownloadedAt)}` : ""}</td>
                   <td className="py-1.5 text-right">
                     {s.state === "active" && <button onClick={() => revoke(s)} disabled={!!busy} className="inline-flex h-7 items-center gap-1 whitespace-nowrap rounded border border-neutral-300 bg-white px-2 hover:bg-neutral-50 disabled:opacity-40">
                       {busy === s.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Ban className="h-3.5 w-3.5" />} Revoke

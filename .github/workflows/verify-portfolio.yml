@@ -124,6 +124,8 @@ jobs:
       # Share with vendor (plan v11.2.1 Step 4 items 4–5): the token is stored as a hash only, jurisdiction and
       # suppression refuse before anything is stored, the daily cap and repeats, a failed mail never opens.
       - run: tsx --test lib/__tests__/brand-share.test.ts
+      # The vendor's downloads (Step 4 item 6): what a shared book offers, and a zip of exactly the ticked files.
+      - run: tsx --test lib/__tests__/brand-assets.test.ts
       # The approval drawer (plan v11.1 Step 3): a row's variations approved together, bound to the files shown.
       - run: tsx --test lib/__tests__/row-approval.test.ts
       # Event roles and travel routes from Firestore, the create-or-skip import, and the personal-data check itself.
