@@ -55,7 +55,7 @@ async function main() {
   if (!/^[^@\s]+@[^@\s]+$/.test(actor)) throw new Error("--actor <email>")
   if (!!local === production) throw new Error("choose one target: --local <folder> or --production")
   const version = flag("--version") ?? "", key = flag("--key")
-  if (!new RegExp(`^${brandId}@v\\d+$`).test(version)) throw new Error(`--version <${brandId}@vN>: the published profile version whose brand book names these files`)
+  if (!(version.startsWith(`${brandId}@v`) && /^\d+$/.test(version.slice(brandId.length + 2)))) throw new Error(`--version <${brandId}@vN>: the published profile version whose brand book names these files`)
   if (production && !key) throw new Error("--production needs --key <a create-only publishing credential>; the site's own credential is never used to publish")
   for (const f of files) if (!NAME.test(f)) throw new Error(`${f}: a delivered name carries its version (name-v1.png)`)
 
