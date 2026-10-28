@@ -79,119 +79,76 @@ export function canAccessPath(user: User | null, path: string): boolean {
 }
 
 /**
- * Provider-based role FALLBACK — used only when a user has no explicit
- * `crm_team_members.role` record. Real roles come from `resolveRole` below.
- *  - Google OAuth is workspace-restricted to @434media.com (verified staff) → full_admin.
- *  - Firebase email/password is how the cohort self-registers → intern (least-privilege).
+ * One roster record as the sign-in gate reads it (`crm_team_members`).
  */
-export function getRoleForProvider(authProvider: AuthProvider): AdminRole {
-  return authProvider === 'google' ? 'full_admin' : 'intern'
+export interface RosterRecord {
+  isActive?: unknown
+  role?: unknown
+  name?: unknown
 }
 
-/**
- * Resolve a user's effective admin role at login. Firestore is the source of
- * truth; the provider fallback only catches users with no record yet. Order:
- *   1. an owner (ADMIN_OWNER_EMAILS) → crm_super_admin
- *   2. explicit crm_team_members.role (set via settings / the 1.0 backfill)
- *   3. provider fallback (getRoleForProvider)
- *
- * Server-side only — uses firebase-admin via dynamic import.
- */
-export async function resolveRole(email: string, provider: AuthProvider): Promise<AdminRole> {
-  const lower = email.toLowerCase()
-  if (isOwnerEmail(lower)) return 'crm_super_admin'
-  try {
-    const { getDb } = await import('./firebase-admin')
-    const snap = await getDb()
-      .collection('crm_team_members')
-      .where('email', '==', lower)
-      .limit(1)
-      .get()
-    if (!snap.empty) {
-      const role = snap.docs[0].data().role
-      if (
-        role === 'crm_super_admin' ||
-        role === 'full_admin' ||
-        role === 'crm_only' ||
-        role === 'intern'
-      ) {
-        return role
-      }
+export type SignInDecision =
+  | { authorized: true; role: AdminRole; name?: string }
+  | {
+      authorized: false
+      reason: 'not_on_roster' | 'duplicate_roster_records' | 'deactivated' | 'no_role' | 'lookup_failed'
     }
-  } catch (error) {
-    console.error('[auth] resolveRole lookup failed; using provider fallback:', error)
-  }
-  return getRoleForProvider(provider)
-}
 
 /**
- * Read + verify the session cookie.
+ * The sign-in decision for anyone who is not an owner, given the roster records that carry the address. Pure, so it is
+ * tested without Firestore (lib/__tests__/admin-signin-roster.test.ts).
  *
- * Cookie format is `<base64url(payload)>.<base64url(hmac)>`. Anything that
- * doesn't carry a valid signature is rejected — including every legacy
- * unsigned cookie, which has no `.` separator at all. That is deliberate: the
- * unsigned format was forgeable, so existing sessions must not survive.
+ * The roster is the only source of a role, on every sign-in path (security log ADM-2). Least privilege throughout:
+ *  - no record: refused. A workspace address or a Google account proves identity, not membership;
+ *  - more than one record for the address: refused, since which one would decide is arbitrary;
+ *  - `isActive: false`: refused. Deactivating someone in admin settings keeps them out, whichever way they sign in;
+ *  - a role outside ADMIN_ROLES, or none: refused. No role is granted by default, least of all full_admin.
  */
+export function decideRosterSignIn(records: RosterRecord[]): SignInDecision {
+  if (records.length === 0) return { authorized: false, reason: 'not_on_roster' }
+  if (records.length > 1) return { authorized: false, reason: 'duplicate_roster_records' }
+  const data = records[0]
+  if (data.isActive === false) return { authorized: false, reason: 'deactivated' }
+  const role = data.role as AdminRole
+  if (!ADMIN_ROLES.includes(role)) return { authorized: false, reason: 'no_role' }
+  const name = typeof data.name === 'string' && data.name ? data.name : undefined
+  return { authorized: true, role, name }
+}
+
 /**
  * Decide whether an authenticated identity may be issued an admin session.
  *
- * This is THE authorization gate. It exists because Firebase Auth is shared
- * across every 434 web project in the GCP project — a user created for one site
- * holds a perfectly valid token for this admin. "Has a Firebase account" was
- * never the same thing as "may administer 434 Media", and treating them as
- * equivalent is how a partner account read data from every named database.
+ * This is THE authorization gate, for the Google callback, the email-and-password sign-in, and the owned-meta service
+ * and MCP entries alike. Neither way of proving who someone is says they may administer 434 Media: Firebase Auth is
+ * shared across every 434 web project, and a Google account on the workspace domain stays valid for anyone who has
+ * been deactivated here.
  *
  * Allowed:
- *  - @434media.com workspace addresses (Google OAuth, domain-verified)
- *  - an owner (ADMIN_OWNER_EMAILS)
- *  - an ACTIVE `crm_team_members` record, which is managed in admin settings
+ *  - an owner (ADMIN_OWNER_EMAILS), as a super admin, even with no roster record or Firestore unreachable;
+ *  - anyone else only with exactly one ACTIVE `crm_team_members` record holding a valid role, managed in admin
+ *    settings. That record's role is the session's role (decideRosterSignIn).
  *
- * Everything else is refused a session. Adding someone to Firebase Auth no
- * longer grants admin access on its own — they must also be on the roster.
+ * The provider does not change the answer. Until ADM-2 a workspace address on Google was let in with no record, past a
+ * deactivation, and defaulted to full_admin, even when the roster lookup failed.
  *
- * Fails CLOSED: if the Firestore lookup throws, non-workspace users are denied
- * rather than waved through on a provider default.
+ * Fails CLOSED: if the Firestore lookup throws, everyone but the owners is denied.
  */
-export async function authorizeAdminSignIn(
-  email: string,
-  provider: AuthProvider,
-): Promise<{ authorized: true; role: AdminRole; name?: string } | { authorized: false; reason: string }> {
-  const lower = email.toLowerCase()
+export async function authorizeAdminSignIn(email: string, _provider: AuthProvider): Promise<SignInDecision> {
+  const lower = email.trim().toLowerCase()
 
   if (isOwnerEmail(lower)) {
     return { authorized: true, role: 'crm_super_admin' }
   }
 
-  // Verified staff on the workspace domain. The Google callback already refuses
-  // anything else, so this only ever passes real @434media.com accounts.
-  if (provider === 'google' && isWorkspaceEmail(lower)) {
-    const role = await resolveRole(lower, 'google')
-    return { authorized: true, role }
-  }
-
   try {
     const { getDb } = await import('./firebase-admin')
+    // Two is enough to tell one record from several.
     const snap = await getDb()
       .collection('crm_team_members')
       .where('email', '==', lower)
-      .limit(1)
+      .limit(2)
       .get()
-
-    if (snap.empty) {
-      return {
-        authorized: false,
-        reason: 'not_on_roster',
-      }
-    }
-
-    const data = snap.docs[0].data()
-    if (data.isActive === false) {
-      return { authorized: false, reason: 'deactivated' }
-    }
-
-    const stored = data.role
-    const role: AdminRole = ADMIN_ROLES.includes(stored) ? stored : 'intern'
-    return { authorized: true, role, name: data.name || undefined }
+    return decideRosterSignIn(snap.docs.map((d) => d.data() as RosterRecord))
   } catch (error) {
     console.error('[auth] authorizeAdminSignIn lookup failed; denying:', error)
     return { authorized: false, reason: 'lookup_failed' }
@@ -251,7 +208,7 @@ export function isWorkspaceEmail(email: string): boolean {
  * This is NOT the authorization decision — `authorizeAdminSignIn` is, and it
  * runs once at login. By the time a route calls this, two things already hold:
  * the cookie carried a valid HMAC (so we minted it), and we only mint sessions
- * for identities on the roster or the workspace domain.
+ * for owners and active roster members.
  *
  * It previously read `return !!email` while its docstring claimed Firebase
  * Console membership was an effective allowlist. It wasn't — the Console is
@@ -336,8 +293,8 @@ export function canSend(role?: AdminRole | null): boolean {
  * Guard for outbound-send API routes (anything that calls Resend for a user).
  * Returns the session when the caller may send, otherwise an error to 4xx on.
  *
- * Blocks `crm_only` and `intern` sessions from firing 1:1 sends. Staff send via
- * Google (`full_admin`). A super admin always passes via the Firestore-backed
+ * Blocks `crm_only` and `intern` sessions from firing 1:1 sends. Staff send with
+ * a `full_admin` roster role. A super admin always passes via the Firestore-backed
  * check — even on a stale session role — so the owners are never locked out.
  */
 export async function requireSendCapable(): Promise<
