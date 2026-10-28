@@ -85,6 +85,7 @@ function inline(text: string): ReactNode {
     if (/^`[^`]+`$/.test(p)) return <code key={i} className="font-mono text-[0.92em] bg-neutral-100 rounded px-1">{p.slice(1, -1)}</code>
     if (/^\*\*[^*]+\*\*$/.test(p)) return <strong key={i} className="font-semibold">{p.slice(2, -2)}</strong>
     if (/^\*[^*]+\*$/.test(p)) return <em key={i}>{p.slice(1, -1)}</em>
-    return <Fragment key={i}>{p}</Fragment>
+    const t = p.replace(/\\\*/g, "*")
+    return t.startsWith("✓") ? <span key={i} className="text-green-700">{t}</span> : <Fragment key={i}>{t}</Fragment>
   })
 }
