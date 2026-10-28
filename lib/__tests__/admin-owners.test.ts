@@ -5,7 +5,7 @@
  */
 import { test } from "node:test"
 import assert from "node:assert/strict"
-import { authorizeAdminSignIn, isCrmSuperAdmin, isOwnerEmail, ownerEmails, resolveRole } from "../auth"
+import { authorizeAdminSignIn, isCrmSuperAdmin, isOwnerEmail, ownerEmails } from "../auth"
 
 const FORMER = ["founder@example.test", "second-owner@example.test"] // stand-ins for the two owners lib/auth.ts held in code
 const FOUNDER = "founder@example.test"
@@ -38,14 +38,15 @@ test("a former fallback address is no longer a super admin by code, on either si
   for (const email of FORMER) {
     const firebase = await authorizeAdminSignIn(email, "firebase")
     assert.deepEqual(firebase, { authorized: false, reason: "lookup_failed" }, `${email} via email: fails closed, no super admin`)
-    assert.notEqual(await resolveRole(email, "google"), "crm_super_admin", `${email} via Google`)
+    const google = await authorizeAdminSignIn(email, "google")
+    assert.deepEqual(google, { authorized: false, reason: "lookup_failed" }, `${email} via Google: fails closed, no super admin`)
     assert.equal(await isCrmSuperAdmin(email), false, `${email}: isCrmSuperAdmin`)
   }
 }))
 
 test("an owner in the setting is a super admin with the roster unreachable, on both paths", withOwners(FOUNDER, async () => {
   assert.deepEqual(await authorizeAdminSignIn(FOUNDER, "firebase"), { authorized: true, role: "crm_super_admin" })
-  assert.equal(await resolveRole(FOUNDER, "google"), "crm_super_admin")
+  assert.deepEqual(await authorizeAdminSignIn(FOUNDER, "google"), { authorized: true, role: "crm_super_admin" })
   assert.equal(await isCrmSuperAdmin(FOUNDER), true)
 }))
 

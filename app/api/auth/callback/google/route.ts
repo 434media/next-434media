@@ -106,8 +106,9 @@ export async function GET(request: NextRequest) {
     // Note: Google Workspace accounts with 'hd' parameter are always verified,
     // so we don't need to check email_verified for workspace accounts
 
-    // Same authorization gate the Firebase path uses. Workspace staff pass on
-    // the domain check above; this keeps one decision point for both providers.
+    // Same authorization gate the Firebase path uses (security log ADM-2): the
+    // domain check above proves identity only. Membership, active status and
+    // role come from the roster; no record, a deactivated one or no role is refused.
     const decision = await authorizeAdminSignIn(userInfo.email, 'google')
     if (!decision.authorized) {
       console.warn(`[auth] denied admin sign-in for ${userInfo.email} (${decision.reason})`)
