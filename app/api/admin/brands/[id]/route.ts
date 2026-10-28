@@ -7,7 +7,7 @@ export const dynamic = "force-dynamic"
 
 /**
  * GET /api/admin/brands/[id] — one brand's page (plan v11.2.1 Step 4 items 2 and 3): its status, the missing templates
- * and its brand book for 434 staff (interns excluded, as /admin/brand); and for super-admins, who edit and publish,
+ * and the designer's copy of its brand book for 434 staff (interns excluded, as /admin/brand); and for super-admins, the full book, who edit and publish,
  * also the onboarding checklist, its sources (the seeds the profile names, as loaded), and its profile document (draft
  * and published) with the version history. Editing, Publish and Restore go through /api/admin/brand-profiles/[id].
  * The draft is sent without its `visual` block: the book is generated, never edited by hand (the PUT keeps the stored one).
@@ -18,8 +18,8 @@ export async function GET(_req: NextRequest, ctx: { params: Promise<{ id: string
   const { id } = await ctx.params
   if (!BRAND_ID.test(id)) return NextResponse.json({ error: "Unknown brand" }, { status: 404 })
   try {
-    const [{ readBrand }, { firestoreBrandProfiles }, { brandState, missingTemplates, onboardingChecklist }, { PIPELINE_PROPERTIES }, { publishProblems, draftToken }, { brandBookStatus }] = await Promise.all([
-      import("@/lib/firestore-brands"), import("@/lib/firestore-brand-profiles"), import("@/lib/content-pipeline/brand-status"), import("@/lib/content-pipeline/properties"), import("@/lib/content-pipeline/profile-store"), import("@/lib/content-pipeline/brand-book-check"),
+    const [{ readBrand }, { firestoreBrandProfiles }, { brandState, missingTemplates, onboardingChecklist }, { PIPELINE_PROPERTIES }, { publishProblems, draftToken }, { brandBookStatus }, { designerBook }] = await Promise.all([
+      import("@/lib/firestore-brands"), import("@/lib/firestore-brand-profiles"), import("@/lib/content-pipeline/brand-status"), import("@/lib/content-pipeline/properties"), import("@/lib/content-pipeline/profile-store"), import("@/lib/content-pipeline/brand-book-check"), import("@/lib/content-pipeline/brand-book"),
     ])
     const store = firestoreBrandProfiles(), doc = await store.get(id)
     if (!doc && !PIPELINE_PROPERTIES.some(p => p.id === id)) return NextResponse.json({ error: "Unknown brand" }, { status: 404 })
@@ -30,7 +30,8 @@ export async function GET(_req: NextRequest, ctx: { params: Promise<{ id: string
     const brand = { id: f.id, label: f.label, brandType: f.brandType, onRoster: f.onRoster, state: brandState(f), versionId: f.published?.versionId ?? null, publishedAt: f.published?.publishedAt ?? null, publishedBy: f.published?.publishedBy ?? null, problem: f.published ? null : f.publishedProblem, draftDiffers: f.draftDiffers, postsMade: f.postsMade }
     const missing = missingTemplates(f.published?.profile ?? null, f.label, f.brandBook, f.brandBookProblem)
     const headers = { "cache-control": "private, no-store" }
-    if (!auth.superAdmin) return NextResponse.json({ canEdit: false, brand, missing, book }, { headers })
+    // Staff get the designer's copy, filtered here, so the internal parts never reach a staff browser; only super-admins get the full book.
+    if (!auth.superAdmin) return NextResponse.json({ canEdit: false, brand, missing, book: book && { ...book, book: designerBook(book.book) } }, { headers })
     return NextResponse.json({
       canEdit: true, brand, missing, book,
       checklist: onboardingChecklist(f),

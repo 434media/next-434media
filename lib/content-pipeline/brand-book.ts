@@ -195,10 +195,78 @@ export function markInternal(book: Pick<BrandBook, "sections">): MarkedSection[]
   })
 }
 
-/** The book a vendor is shown: only what is not internal, and no section left empty. */
-export function vendorBook(book: BrandBook): BrandBook {
-  const sections = markInternal(book)
+/**
+ * The designer's brand book: what someone designing something new for the brand needs, and nothing about how 434
+ * fills its templates. It is what a vendor is sent and what staff see first; the whole standard (template geometry,
+ * text-fit, the templates, surfaces, scheduling) stays in the full book, which only super-admins open.
+ *  - Kept: the identity sections (colour, typography, marks or logos, photography or imagery), without the columns
+ *    that place a value in a template slot ("Used for", "Where"), and without notes about where 434 keeps the files.
+ *  - Gathered: photography direction found elsewhere in the standard, as its own section.
+ *  - Then anything internal (markInternal) is left out, and an empty section is dropped.
+ */
+const DESIGNER_SECTION = /colou?r|typograph|\bfonts?\b|\btype\b|\bmarks?\b|\blogos?\b|photograph|imagery/i
+const SLOT_COLUMN = /^(used for|where)$/i
+const TOOL_NOTE = /\bCanva brand kit\b/i
+const PHOTO = /photograph/i
+
+export function designerBook(book: BrandBook): BrandBook {
+  const titleOf = (t: string) => t.replace(/^\d+(\.\d+)*\.?\s*/, "")
+  const kept: BookSection[] = [], photo: string[] = []
+  for (const s of book.sections) {
+    if (DESIGNER_SECTION.test(titleOf(s.title))) {
+      const blocks = s.blocks.flatMap((b): BookBlock[] => {
+        if (b.kind === "code") return []
+        if (b.kind === "paragraph" && TOOL_NOTE.test(b.text ?? "")) return []
+        if (b.kind === "table") {
+          const keep = (b.head ?? []).map(h => !SLOT_COLUMN.test(h.trim()))
+          return [{ ...b, head: (b.head ?? []).filter((_, i) => keep[i]), rows: (b.rows ?? []).map(r => ({ cells: r.cells.filter((_, i) => keep[i]) })) }]
+        }
+        return [b]
+      })
+      kept.push({ title: titleOf(s.title), blocks })
+    } else {
+      for (const b of s.blocks) if (b.kind === "list") photo.push(...(b.items ?? []).filter(x => PHOTO.test(x)))
+    }
+  }
+  if (photo.length) {
+    // One Photography section: the standard's own, when it has one, takes the gathered items it doesn't already hold.
+    const own = kept.find(s => PHOTO.test(s.title))
+    if (!own) kept.push({ title: "Photography", blocks: [{ kind: "list", items: photo }] })
+    else {
+      const has = new Set(own.blocks.flatMap(b => b.kind === "list" ? b.items ?? [] : []))
+      const add = photo.filter(x => !has.has(x))
+      if (add.length) own.blocks = [...own.blocks, { kind: "list", items: add }]
+    }
+  }
+  const sections = markInternal({ sections: kept })
     .map(s => ({ title: s.title, blocks: s.blocks.filter(m => !m.internal).map(m => m.block) }))
     .filter(s => s.blocks.some(b => b.kind !== "heading"))
   return { standard: book.standard, sections }
+}
+
+/** What a vendor is sent: the designer's brand book. */
+export const vendorBook = designerBook
+
+export interface InlineToken { kind: "text" | "code" | "strong" | "em"; text: string }
+/**
+ * The inline marks a standard's text uses: `code`, **strong** and *em*. An escaped asterisk (\*), the marker that ties
+ * a note to a value (Display and Design Standard §3.0), is plain text: it never opens or closes emphasis, and it is
+ * shown as * without its backslash.
+ */
+export function inlineTokens(text: string): InlineToken[] {
+  const out: InlineToken[] = []
+  const push = (kind: InlineToken["kind"], t: string) => {
+    if (!t) return
+    const last = out[out.length - 1]
+    if (kind === "text" && last?.kind === "text") last.text += t
+    else out.push({ kind, text: t })
+  }
+  for (const p of text.split(/(\\\*|`[^`]+`|\*\*[^*]+\*\*|\*[^*\s][^*]*\*)/g)) {
+    if (p === "\\*") push("text", "*")
+    else if (/^`[^`]+`$/.test(p)) push("code", p.slice(1, -1))
+    else if (/^\*\*[^*]+\*\*$/.test(p)) push("strong", p.slice(2, -2))
+    else if (/^\*[^*]+\*$/.test(p)) push("em", p.slice(1, -1))
+    else push("text", p)
+  }
+  return out
 }

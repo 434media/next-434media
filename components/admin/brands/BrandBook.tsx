@@ -1,5 +1,5 @@
 import { Fragment, type ReactNode } from "react"
-import { hexColumn, hexOf, markInternal, vendorBook, type BookBlock, type BrandBook as Book } from "@/lib/content-pipeline/brand-book"
+import { designerBook, hexColumn, hexOf, inlineTokens, markInternal, type BookBlock, type BrandBook as Book } from "@/lib/content-pipeline/brand-book"
 
 /**
  * A brand's brand book (plan v11.2.1 Step 4 item 3), drawn from its published profile's `visual` block, which was
@@ -7,33 +7,35 @@ import { hexColumn, hexOf, markInternal, vendorBook, type BookBlock, type BrandB
  * version. The same component renders a vendor's shared copy (Step 4 item 4, app/share/brand-book), so it takes the
  * book as data; its print styles (no swatch or row split across pages, code wrapped) are that copy's Download PDF.
  *
- * `audience` decides what is drawn. Staff (the brand page) see the whole book, each internal block marked "Internal:
- * not in the vendor copy", so nothing is lost. A vendor sees only vendorBook(), with no profile id or hash in the
- * header; the share page also filters on the server before it renders, so internal blocks never reach the vendor.
+ * `view` decides what is drawn. "designer" is the brand book a designer needs (designerBook: colour, type, marks,
+ * photography), sent to vendors and shown to staff first, with no profile id or hash in the header. "full" is the whole
+ * visual standard for super-admins, every internal block marked, so nothing is lost. The share page also filters on
+ * the server before it renders, so nothing else reaches a vendor. `collapsible` folds each section under its heading
+ * (the admin page); the vendor's page and its PDF show every section open.
  */
-export function BrandBook({ book, brand, versionId, audience = "staff" }: { book: Book; brand: string; versionId: string; audience?: "staff" | "vendor" }) {
-  const vendor = audience === "vendor"
-  const sections = markInternal(vendor ? vendorBook(book) : book)
+export function BrandBook({ book, brand, versionId, view = "designer", collapsible = false }: { book: Book; brand: string; versionId: string; view?: "designer" | "full"; collapsible?: boolean }) {
+  const designer = view === "designer"
+  const sections = markInternal(designer ? designerBook(book) : book)
   const version = book.standard.version.replace(/^Version\s+/i, "v")
   return (
     <article className="text-sm text-neutral-800">
       <header className="border-b border-neutral-200 pb-3">
-        <p className="text-[11px] uppercase tracking-[0.16em] text-neutral-500">Brand book</p>
+        <p className="text-[11px] uppercase tracking-[0.16em] text-neutral-500">{designer ? "Brand book" : "Visual standard, in full"}</p>
         <h3 className="mt-1 text-xl font-semibold text-neutral-900">{brand}</h3>
-        {vendor
+        {designer
           ? <p className="mt-1 text-xs text-neutral-500">{version}</p>
           : <p className="mt-1 text-xs text-neutral-500">
               Built from profile <span className="font-mono">{versionId}</span> · {book.standard.title}, {version} <span className="font-mono">({book.standard.sha256.slice(0, 8)})</span>
             </p>}
       </header>
-      {sections.map(s => (
-        <section key={s.title} className="mt-5">
-          <h4 className="text-base font-semibold text-neutral-900">{s.title}</h4>
-          <div className="mt-2 space-y-2">{s.blocks.filter(m => !vendor || !m.internal).map((m, i) => m.internal
-            ? <div key={i} className="rounded border border-dashed border-amber-300 bg-amber-50/60 px-2 py-1.5"><p className="mb-1 text-[11px] font-medium uppercase tracking-wide text-amber-700">Internal: not in the vendor copy</p><Block block={m.block} /></div>
-            : <Block key={i} block={m.block} />)}</div>
-        </section>
-      ))}
+      {sections.map(s => {
+        const body = <div className="mt-2 space-y-2">{s.blocks.map((m, i) => m.internal
+          ? <div key={i} className="rounded border border-dashed border-amber-300 bg-amber-50/60 px-2 py-1.5"><p className="mb-1 text-[11px] font-medium uppercase tracking-wide text-amber-700">Internal: not in the designer&apos;s copy</p><Block block={m.block} /></div>
+          : <Block key={i} block={m.block} />)}</div>
+        return collapsible
+          ? <details key={s.title} className="group/bk mt-3 border-b border-neutral-100 pb-3"><summary className="cursor-pointer list-none text-base font-semibold text-neutral-900 marker:hidden"><span className="mr-1.5 inline-block text-neutral-400 transition-transform group-open/bk:rotate-90">›</span>{s.title}</summary>{body}</details>
+          : <section key={s.title} className="mt-5"><h4 className="text-base font-semibold text-neutral-900">{s.title}</h4>{body}</section>
+      })}
     </article>
   )
 }
@@ -78,11 +80,10 @@ function Block({ block: b }: { block: BookBlock }) {
 
 /** The standard's inline marks as elements (never as HTML): `code`, **bold** and *italic*. */
 function inline(text: string): ReactNode {
-  const parts = text.split(/(`[^`]+`|\*\*[^*]+\*\*|\*[^*\s][^*]*\*)/g)
-  return parts.map((p, i) => {
-    if (/^`[^`]+`$/.test(p)) return <code key={i} className="font-mono text-[0.92em] bg-neutral-100 rounded px-1">{p.slice(1, -1)}</code>
-    if (/^\*\*[^*]+\*\*$/.test(p)) return <strong key={i} className="font-semibold">{p.slice(2, -2)}</strong>
-    if (/^\*[^*]+\*$/.test(p)) return <em key={i}>{p.slice(1, -1)}</em>
-    return <Fragment key={i}>{p}</Fragment>
+  return inlineTokens(text).map((t, i) => {
+    if (t.kind === "code") return <code key={i} className="font-mono text-[0.92em] bg-neutral-100 rounded px-1">{t.text}</code>
+    if (t.kind === "strong") return <strong key={i} className="font-semibold">{t.text}</strong>
+    if (t.kind === "em") return <em key={i}>{t.text}</em>
+    return t.text.startsWith("✓") ? <span key={i} className="text-green-700">{t.text}</span> : <Fragment key={i}>{t.text}</Fragment>
   })
 }

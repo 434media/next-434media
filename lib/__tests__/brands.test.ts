@@ -9,7 +9,7 @@ import { published, loadPublishedProfileFirst } from "./published-profile"
 import { brandState, missingTemplates, onboardingChecklist, type BrandFacts } from "../content-pipeline/brand-status"
 import { seedsDocId } from "../firestore-brands"
 import { validateProfile, type BrandProfile } from "../content-pipeline/profile"
-import { brandBookProblems, hexColumn, hexOf, markInternal, parseVisualStandard, vendorBook } from "../content-pipeline/brand-book"
+import { brandBookProblems, hexColumn, hexOf, inlineTokens, markInternal, parseVisualStandard, vendorBook } from "../content-pipeline/brand-book"
 import { bookDigest, brandBookStatus } from "../content-pipeline/brand-book-check"
 import { draftToken } from "../content-pipeline/profile-store"
 
@@ -157,32 +157,58 @@ test("a parsed book is storable in Firestore: no array sits directly inside an a
   assert.equal(nested(parseVisualStandard(md, { path: "x.md", sha256: "0123456789abcdef" })), false)
 })
 
-test("the vendor's copy leaves out what is about 434's systems, and the staff copy marks it instead of losing it", () => {
-  // An invented standard: designer content, plus a surface's record fields, a surface index, an internal reference
-  // and a surface with no design yet.
+test("the designer's brand book is identity only; the full book keeps everything, marked", () => {
+  // An invented standard: identity sections, template specs, a surface's record fields, a surface index, a
+  // tool note, a slot column, internal references, and photography direction filed under rules.
   const md = [
     "# Fixture — Visual Standard", "", "**Version 2.0.0 — January 1, 2026**", "",
-    "## 2. Colour", "", "| Name | Hex | Used for |", "|---|---|---|", "| Fixture Blue | `1144AA` | Headlines |", "",
+    "## 2. Colour", "", "| Name | Hex | Used for |", "|---|---|---|", "| Fixture Blue | `1144AA` | BREAKING chip |", "",
+    "## 3. Typography", "", "| Role | Face | Where |", "|---|---|---|", "| Heading | Fixture Sans | Headline slot |", "",
+    "## 4. Marks", "", "Two files, in the Canva brand kit under Logos.", "", "| File | Use |", "|---|---|", "| `fx-logo.png` | Dark backgrounds |", "",
+    "## 5. Frame geometry", "", "Headline 80 px, deck 32 px.", "",
     "## 6. Surfaces", "", "Each follows the template in the Display and Design Standard §3.2.", "",
     "| Surface | Subsection | Status |", "|---|---|---|", "| Feed | 6.1 | Approved |", "",
     "### 6.1 Feed post", "", "- **Status:** Approved by the founder on 1 January.", "- **What ships it:** templates in `brand_profiles/fixture` (`fixture@v3`).", "",
-    "Headline 80 px, deck 32 px.", "", "- Keep 60 px margins.", "- Reference renders: `90 Assets/fixture/`.", "",
     "### 6.2 Story", "", "Listed: no precedent. Nothing records one (`fixture@v3`).", "",
+    "## 7. Rules", "", "- Space tentpole posts three apart on the grid.", "- Photographers shoot vertical crops with headroom.", "",
   ].join("\n")
   const book = parseVisualStandard(md, { path: "x.md", sha256: "0123456789abcdef" })
-  const all = JSON.stringify(book), shared = JSON.stringify(vendorBook(book))
-  for (const kept of ["1144AA", "Headline 80 px", "Keep 60 px margins", "6.1 Feed post"]) assert.ok(shared.includes(kept), kept)
-  for (const out of ["Display and Design Standard", "Subsection", "founder", "What ships it", "fixture@v3", "90 Assets", "6.2 Story", "no precedent"]) {
+  const all = JSON.stringify(book), designer = vendorBook(book), shared = JSON.stringify(designer)
+  assert.deepEqual(designer.sections.map(s => s.title), ["Colour", "Typography", "Marks", "Photography"])
+  for (const kept of ["1144AA", "Fixture Sans", "fx-logo.png", "Dark backgrounds", "vertical crops with headroom"]) assert.ok(shared.includes(kept), kept)
+  for (const out of ["BREAKING chip", "Used for", "Headline slot", "Canva brand kit", "Headline 80 px", "Display and Design Standard", "Subsection", "founder", "What ships it", "fixture@v3", "6.2 Story", "tentpole"]) {
     assert.ok(all.includes(out), `the full book keeps ${out}`)
-    assert.ok(!shared.includes(out), `the vendor copy leaves out ${out}`)
+    assert.ok(!shared.includes(out), `the designer's copy leaves out ${out}`)
   }
-  // Nothing is lost: every block of the full book is in the marked copy, internal or not.
-  const marked = markInternal(book).flatMap(s => s.blocks)
-  assert.ok(marked.some(m => m.internal) && marked.some(m => !m.internal))
-  const text = (o: unknown) => JSON.stringify(o).match(/[A-Za-z0-9][^"\\]{3,}/g) ?? []
-  const markedAll = JSON.stringify(markInternal(book))
-  for (const t of text(book.sections)) assert.ok(markedAll.includes(t), t)
-  // Vendor copy is idempotent, and a section with nothing shareable is dropped whole.
-  assert.deepEqual(vendorBook(vendorBook(book)), vendorBook(book))
-  assert.deepEqual(vendorBook(book).sections.map(s => s.title), ["2. Colour", "6. Surfaces"])
+  // Nothing is lost: every piece of the full book is in its marked copy, which is what super-admins open.
+  const marked = markInternal(book), markedAll = JSON.stringify(marked)
+  assert.ok(marked.flatMap(s => s.blocks).some(m => m.internal))
+  for (const t of JSON.stringify(book.sections).match(/[A-Za-z0-9][^"\\]{3,}/g) ?? []) assert.ok(markedAll.includes(t), t)
+  assert.deepEqual(vendorBook(designer), designer, "the designer's copy is stable")
+})
+
+test("photography direction joins the standard's own Photography section; there is only one", () => {
+  const md = [
+    "# Fixture — Visual Standard", "", "**Version 2.0.0 — January 1, 2026**", "",
+    "## 2. Colour", "", "| Name | Hex |", "|---|---|", "| Fixture Blue | `1144AA` |", "",
+    "## 3. Photography", "", "- Photography is natural light only.", "",
+    "## 7. Rules", "", "- Photographers shoot vertical crops with headroom.", "- Photography is natural light only.", "",
+  ].join("\n")
+  const designer = vendorBook(parseVisualStandard(md, { path: "x.md", sha256: "0123456789abcdef" }))
+  assert.deepEqual(designer.sections.map(s => s.title), ["Colour", "Photography"])
+  const photo = JSON.stringify(designer.sections[1])
+  assert.ok(photo.includes("vertical crops with headroom"))
+  assert.equal(photo.split("natural light only").length - 1, 1, "an item already there is not added twice")
+  assert.deepEqual(vendorBook(designer), designer, "the designer's copy is stable")
+})
+
+test("an escaped asterisk ties a note to a value: shown as *, never opening emphasis", () => {
+  assert.deepEqual(inlineTokens("Data\\*"), [{ kind: "text", text: "Data*" }])
+  assert.deepEqual(inlineTokens("\\* Data means dates. Never *set* one in `Montserrat`."), [
+    { kind: "text", text: "* Data means dates. Never " }, { kind: "em", text: "set" }, { kind: "text", text: " one in " }, { kind: "code", text: "Montserrat" }, { kind: "text", text: "." },
+  ])
+  assert.deepEqual(inlineTokens("Data\\* and Body\\* are **both** here"), [
+    { kind: "text", text: "Data* and Body* are " }, { kind: "strong", text: "both" }, { kind: "text", text: " here" },
+  ])
+  assert.ok(!JSON.stringify(inlineTokens("a \\* b \\* c")).includes("\\\\"), "no backslash is left")
 })
