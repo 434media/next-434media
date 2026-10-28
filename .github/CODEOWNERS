@@ -1,9 +1,10 @@
 # Review and merge in four lanes (434-context, 06 Standards/434_Contributor_Standard.md §10).
 #
 # This file is the lane map. A path owned by @434media/founder is lane 1 (rule changes)
-# or lane 2 (sensitive code): the founder approves it. A path listed below with no owner
-# is lane 3 (code people see): the founder sees a preview, the review agent and the
-# checks approve. Anything not matched is lane 4: it merges once the checks pass.
+# or lane 2 (sensitive code): the founder approves it. A path with no owner inside the
+# Lane 3 block below is lane 3 (code people see): the founder sees a preview, the review
+# agent and the checks approve. An ownerless line anywhere else, or no match, is lane 4:
+# it merges once the checks pass.
 # A change that touches more than one lane takes the strictest.
 #
 # Inert until the rulesets exist. Today it requires nothing: GitHub only asks a code owner
@@ -13,6 +14,7 @@
 #
 # Last matching pattern wins, so lane 3 comes first and the owned lanes override it.
 # CODEOWNERS has no [ ] ranges, so Next.js segments like [id] are matched with *.
+# Lane 3 is every .tsx and .css under app/; the lane-2 lines below override it.
 
 # ── Lane 3: code people see (no owner; the lanes check enforces it) ─────────────────
 /app/**/*.tsx
