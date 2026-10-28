@@ -323,7 +323,7 @@ AIRTABLE_TOKEN=pat_xxx                       # server-only; protected travel iti
 TRAVEL_SESSION_SECRET=your-32-byte-secret    # optional; falls back to ADMIN_SESSION_SECRET
 BRAND_PROFILE_BACKUP_READ_TOKEN=random-48+   # read-only; gates GET /api/brand-profiles/backups (434-context pulls daily); unset = refused
 ADMIN_OWNER_EMAILS=owner@example.com          # owners: super admin on every check, roster or not (lib/auth.ts); unset = no owner, roles from crm_team_members only
-ADMIN_FOUNDER_EMAIL=one-address              # the founder-only guard (lib/founder-guard.ts): /admin/finance and /api/admin/finance; unset = everyone refused
+ADMIN_FOUNDER_EMAIL=founder@example.com      # the founder's own address(es), comma-separated; the founder-only guard (lib/founder-guard.ts): /admin/finance and /api/admin/finance; unset = everyone refused
 
 # FINANCE: QUICKBOOKS ONLINE (Phase 1 reads these; set once Intuit issues the production keys)
 # QUICKBOOKS_CLIENT_ID=...                   # Intuit app keys: Production keys in Production only, sandbox keys in Preview

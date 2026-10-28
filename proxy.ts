@@ -3,7 +3,7 @@ import { i18n } from "./i18n-config"
 import { META_PIXEL_COOKIE, metaPixelAllowed } from "./lib/meta-pixel-gate"
 import { isTrackedPath } from "./lib/tracking-scope"
 import { SESSION_COOKIE, parseSessionCookie } from "./lib/session-cookie"
-import { founderDecision, founderEmail } from "./lib/founder-guard"
+import { founderDecision, founderEmails } from "./lib/founder-guard"
 
 // Define a list of paths that should bypass the proxy
 const BYPASS_PATHS = ["/_next/", "/api/", "/favicon.ico", ".jpg", ".jpeg", ".png", ".gif", ".svg", ".mp3", ".mp4"]
@@ -56,7 +56,7 @@ const FOUNDER_ONLY_PAGES = ["/admin/finance"]
 function founderOnlyRefusal(request: NextRequest): NextResponse | null {
   const pathname = request.nextUrl.pathname
   if (!FOUNDER_ONLY_PAGES.some((p) => pathname === p || pathname.startsWith(`${p}/`))) return null
-  const decision = founderDecision(parseSessionCookie(request.cookies.get(SESSION_COOKIE)?.value), founderEmail())
+  const decision = founderDecision(parseSessionCookie(request.cookies.get(SESSION_COOKIE)?.value), founderEmails())
   if (decision.allowed || decision.reason === "no_session") return null
   return NextResponse.rewrite(request.nextUrl, { status: 403 })
 }
