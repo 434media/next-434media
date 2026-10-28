@@ -230,9 +230,12 @@ export async function clearSession(): Promise<void> {
   cookieStore.delete(SESSION_COOKIE)
 }
 
+export function workspaceDomain(): string {
+  return process.env.WORKSPACE_DOMAIN || '434media.com'
+}
+
 export function isWorkspaceEmail(email: string): boolean {
-  const workspaceDomain = process.env.WORKSPACE_DOMAIN || '434media.com'
-  return email.endsWith(`@${workspaceDomain}`)
+  return email.endsWith(`@${workspaceDomain()}`)
 }
 
 /**
