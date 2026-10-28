@@ -130,6 +130,8 @@ jobs:
       - run: tsx --test lib/__tests__/personal-data.test.ts
       # Admin email sign-in (security log ADM-1): verified email required; workspace addresses use Google in production.
       - run: tsx --test lib/__tests__/firebase-signin.test.ts
+      # Owners come only from ADMIN_OWNER_EMAILS: no address in code, and none is a super admin by default.
+      - run: tsx --test lib/__tests__/admin-owners.test.ts
 
       # Optional: the same suites again on MilCityUSA's real published profile, when the BRAND_PROFILE_FIXTURE Actions
       # secret holds a published version's 434-context backup record. Secrets are not given to pull requests from

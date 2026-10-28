@@ -49,15 +49,11 @@ function signatureMatches(expected: string, received: string): boolean {
  * unreachable, so the people who run the admin can always reach its settings. Everyone else's role comes from the
  * roster (`crm_team_members`).
  *
- * While the setting is unset, the two addresses this list used to hold in code still apply. The next change removes
- * them, after which an unset setting names no owner.
+ * No address is written into code. Unset, the setting names no owner, and every role comes from the roster.
  */
-const DEFAULT_OWNER_EMAILS = ['marcos@434media.com', 'jesse@434media.com']
 
 export function ownerEmails(env: Record<string, string | undefined> = process.env): string[] {
-  const raw = env.ADMIN_OWNER_EMAILS
-  if (raw === undefined) return DEFAULT_OWNER_EMAILS
-  return raw
+  return (env.ADMIN_OWNER_EMAILS ?? '')
     .split(',')
     .map((e) => e.trim().toLowerCase())
     .filter((e) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e))
