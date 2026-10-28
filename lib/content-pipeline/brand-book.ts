@@ -228,7 +228,16 @@ export function designerBook(book: BrandBook): BrandBook {
       for (const b of s.blocks) if (b.kind === "list") photo.push(...(b.items ?? []).filter(x => PHOTO.test(x)))
     }
   }
-  if (photo.length) kept.push({ title: "Photography", blocks: [{ kind: "list", items: photo }] })
+  if (photo.length) {
+    // One Photography section: the standard's own, when it has one, takes the gathered items it doesn't already hold.
+    const own = kept.find(s => PHOTO.test(s.title))
+    if (!own) kept.push({ title: "Photography", blocks: [{ kind: "list", items: photo }] })
+    else {
+      const has = new Set(own.blocks.flatMap(b => b.kind === "list" ? b.items ?? [] : []))
+      const add = photo.filter(x => !has.has(x))
+      if (add.length) own.blocks = [...own.blocks, { kind: "list", items: add }]
+    }
+  }
   const sections = markInternal({ sections: kept })
     .map(s => ({ title: s.title, blocks: s.blocks.filter(m => !m.internal).map(m => m.block) }))
     .filter(s => s.blocks.some(b => b.kind !== "heading"))
@@ -237,3 +246,27 @@ export function designerBook(book: BrandBook): BrandBook {
 
 /** What a vendor is sent: the designer's brand book. */
 export const vendorBook = designerBook
+
+export interface InlineToken { kind: "text" | "code" | "strong" | "em"; text: string }
+/**
+ * The inline marks a standard's text uses: `code`, **strong** and *em*. An escaped asterisk (\*), the marker that ties
+ * a note to a value (Display and Design Standard §3.0), is plain text: it never opens or closes emphasis, and it is
+ * shown as * without its backslash.
+ */
+export function inlineTokens(text: string): InlineToken[] {
+  const out: InlineToken[] = []
+  const push = (kind: InlineToken["kind"], t: string) => {
+    if (!t) return
+    const last = out[out.length - 1]
+    if (kind === "text" && last?.kind === "text") last.text += t
+    else out.push({ kind, text: t })
+  }
+  for (const p of text.split(/(\\\*|`[^`]+`|\*\*[^*]+\*\*|\*[^*\s][^*]*\*)/g)) {
+    if (p === "\\*") push("text", "*")
+    else if (/^`[^`]+`$/.test(p)) push("code", p.slice(1, -1))
+    else if (/^\*\*[^*]+\*\*$/.test(p)) push("strong", p.slice(2, -2))
+    else if (/^\*[^*]+\*$/.test(p)) push("em", p.slice(1, -1))
+    else push("text", p)
+  }
+  return out
+}

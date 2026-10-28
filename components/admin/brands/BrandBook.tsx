@@ -1,5 +1,5 @@
 import { Fragment, type ReactNode } from "react"
-import { designerBook, hexColumn, hexOf, markInternal, type BookBlock, type BrandBook as Book } from "@/lib/content-pipeline/brand-book"
+import { designerBook, hexColumn, hexOf, inlineTokens, markInternal, type BookBlock, type BrandBook as Book } from "@/lib/content-pipeline/brand-book"
 
 /**
  * A brand's brand book (plan v11.2.1 Step 4 item 3), drawn from its published profile's `visual` block, which was
@@ -80,12 +80,10 @@ function Block({ block: b }: { block: BookBlock }) {
 
 /** The standard's inline marks as elements (never as HTML): `code`, **bold** and *italic*. */
 function inline(text: string): ReactNode {
-  const parts = text.split(/(`[^`]+`|\*\*[^*]+\*\*|\*[^*\s][^*]*\*)/g)
-  return parts.map((p, i) => {
-    if (/^`[^`]+`$/.test(p)) return <code key={i} className="font-mono text-[0.92em] bg-neutral-100 rounded px-1">{p.slice(1, -1)}</code>
-    if (/^\*\*[^*]+\*\*$/.test(p)) return <strong key={i} className="font-semibold">{p.slice(2, -2)}</strong>
-    if (/^\*[^*]+\*$/.test(p)) return <em key={i}>{p.slice(1, -1)}</em>
-    const t = p.replace(/\\\*/g, "*")
-    return t.startsWith("✓") ? <span key={i} className="text-green-700">{t}</span> : <Fragment key={i}>{t}</Fragment>
+  return inlineTokens(text).map((t, i) => {
+    if (t.kind === "code") return <code key={i} className="font-mono text-[0.92em] bg-neutral-100 rounded px-1">{t.text}</code>
+    if (t.kind === "strong") return <strong key={i} className="font-semibold">{t.text}</strong>
+    if (t.kind === "em") return <em key={i}>{t.text}</em>
+    return t.text.startsWith("✓") ? <span key={i} className="text-green-700">{t.text}</span> : <Fragment key={i}>{t.text}</Fragment>
   })
 }

@@ -128,6 +128,12 @@ export default function BrandPage() {
               <BrandShares brandId={b.id} brand={b.label} versionId={view.book.versionId} />
             </Section>}
 
+            <Section title="Missing templates" note="A template that doesn't exist can't be ticked in Create.">
+              {view.missing.length
+                ? <ul className="space-y-1">{view.missing.map(m => <li key={m} className="text-sm text-amber-800">{m}</li>)}</ul>
+                : <p className="text-sm text-neutral-500">Nothing missing.</p>}
+            </Section>
+
             {view.canEdit && <Section title="Internal" note="Super-admins only: template specs, setup, sources, the profile and its history. Nothing here is sent to a designer.">
               <div className="space-y-3">
                 {view.book && <Section nested title="Full visual standard and template specs" note="The whole standard the brand book is drawn from, as the pipeline uses it. Parts kept out of the designer's copy are marked.">
@@ -147,12 +153,6 @@ export default function BrandPage() {
                   ))}
                 </ol>
               </Section>}
-
-                <Section nested title="Missing templates" note="A template that doesn't exist can't be ticked in Create.">
-                {view.missing.length
-                  ? <ul className="space-y-1">{view.missing.map(m => <li key={m} className="text-sm text-amber-800">{m}</li>)}</ul>
-                  : <p className="text-sm text-neutral-500">Nothing missing.</p>}
-              </Section>
 
             {view.sources && <Section nested title="Brand sources" note="Where research looks first. The seeds are private: they live in the database, never in the profile or the public repository.">
               <Sources sources={view.sources} />

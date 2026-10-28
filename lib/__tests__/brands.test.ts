@@ -9,7 +9,7 @@ import { published, loadPublishedProfileFirst } from "./published-profile"
 import { brandState, missingTemplates, onboardingChecklist, type BrandFacts } from "../content-pipeline/brand-status"
 import { seedsDocId } from "../firestore-brands"
 import { validateProfile, type BrandProfile } from "../content-pipeline/profile"
-import { brandBookProblems, hexColumn, hexOf, markInternal, parseVisualStandard, vendorBook } from "../content-pipeline/brand-book"
+import { brandBookProblems, hexColumn, hexOf, inlineTokens, markInternal, parseVisualStandard, vendorBook } from "../content-pipeline/brand-book"
 import { bookDigest, brandBookStatus } from "../content-pipeline/brand-book-check"
 import { draftToken } from "../content-pipeline/profile-store"
 
@@ -185,4 +185,30 @@ test("the designer's brand book is identity only; the full book keeps everything
   assert.ok(marked.flatMap(s => s.blocks).some(m => m.internal))
   for (const t of JSON.stringify(book.sections).match(/[A-Za-z0-9][^"\\]{3,}/g) ?? []) assert.ok(markedAll.includes(t), t)
   assert.deepEqual(vendorBook(designer), designer, "the designer's copy is stable")
+})
+
+test("photography direction joins the standard's own Photography section; there is only one", () => {
+  const md = [
+    "# Fixture — Visual Standard", "", "**Version 2.0.0 — January 1, 2026**", "",
+    "## 2. Colour", "", "| Name | Hex |", "|---|---|", "| Fixture Blue | `1144AA` |", "",
+    "## 3. Photography", "", "- Photography is natural light only.", "",
+    "## 7. Rules", "", "- Photographers shoot vertical crops with headroom.", "- Photography is natural light only.", "",
+  ].join("\n")
+  const designer = vendorBook(parseVisualStandard(md, { path: "x.md", sha256: "0123456789abcdef" }))
+  assert.deepEqual(designer.sections.map(s => s.title), ["Colour", "Photography"])
+  const photo = JSON.stringify(designer.sections[1])
+  assert.ok(photo.includes("vertical crops with headroom"))
+  assert.equal(photo.split("natural light only").length - 1, 1, "an item already there is not added twice")
+  assert.deepEqual(vendorBook(designer), designer, "the designer's copy is stable")
+})
+
+test("an escaped asterisk ties a note to a value: shown as *, never opening emphasis", () => {
+  assert.deepEqual(inlineTokens("Data\\*"), [{ kind: "text", text: "Data*" }])
+  assert.deepEqual(inlineTokens("\\* Data means dates. Never *set* one in `Montserrat`."), [
+    { kind: "text", text: "* Data means dates. Never " }, { kind: "em", text: "set" }, { kind: "text", text: " one in " }, { kind: "code", text: "Montserrat" }, { kind: "text", text: "." },
+  ])
+  assert.deepEqual(inlineTokens("Data\\* and Body\\* are **both** here"), [
+    { kind: "text", text: "Data* and Body* are " }, { kind: "strong", text: "both" }, { kind: "text", text: " here" },
+  ])
+  assert.ok(!JSON.stringify(inlineTokens("a \\* b \\* c")).includes("\\\\"), "no backslash is left")
 })
