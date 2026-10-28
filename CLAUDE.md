@@ -41,7 +41,9 @@ merge"; 434-context Contributor Standard §10), and takes the strictest lane of 
 
 The lane map is [.github/CODEOWNERS](.github/CODEOWNERS). Code you add in a lane-2 category at a
 path it does not cover goes into the map in the same pull request; if unsure, take the stricter
-lane. An agent never merges, approves (except the review agent, in lane 3), enables a bypass or
+lane. An agent never merges (except the coordinating session, which may merge one named pull
+request on the founder's typed go-ahead until the repository's agents have their own identity;
+Contributor Standard §10), approves (except the review agent, in lane 3), enables a bypass or
 changes a ruleset. **Until the rulesets are in force** (434-context
 `04 Build/434_Four_Lane_Setup.md`), the map is inert and every merge waits for the founder. One designated writer per task: if another
 agent already holds a task or branch, report the conflict rather than writing alongside it.
@@ -98,8 +100,8 @@ relays prompts from a claude.ai thread; threads are for context and review.
 **Before any merge in lanes 1 and 2 in either repository, and before any change
 to the master, the register, a standard or the build sequence, write a short
 summary of the change and its evidence for the founder to take to a thread, and
-wait for his go-ahead.** Lane 3 waits only for him to see the preview, and lane 4
-for nobody. The gate is narrow on purpose: it covers those merges and the four
+wait for his go-ahead.** Once a repository enforces the lanes, lane 3 waits only
+for him to see the preview, and lane 4 for nobody. The gate is narrow on purpose: it covers those merges and the four
 governing artifacts, not ordinary work, reads, branches or drafts. Everything
 reversible proceeds; a rule change or sensitive code stops for the founder.
 
