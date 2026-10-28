@@ -21,10 +21,12 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Verify the token is genuine, and that it has not been revoked. This proves WHO they are — it says nothing about
+    // Verify the token is genuine. This proves WHO they are — it says nothing about
     // whether they may administer 434 Media, because this Firebase project's Auth tenant is shared with our other web
     // properties. decideFirebaseSignIn then requires a verified email and the roster (lib/firebase-signin.ts).
-    const decodedToken = await verifyFirebaseToken(idToken, true)
+    // Not checkRevoked: that reads the user record from Firebase Auth, which this site's service account may not do
+    // (auth/insufficient-permission), and an ID token expires within the hour anyway.
+    const decodedToken = await verifyFirebaseToken(idToken)
     const tokenName = decodedToken.name || decodedToken.email?.split('@')[0] || 'User'
     const picture = decodedToken.picture
 
@@ -68,7 +70,7 @@ export async function POST(request: NextRequest) {
     
     // Handle specific Firebase errors
     if (error instanceof Error) {
-      if (error.message.includes('Firebase ID token has expired') || error.message.includes('has been revoked')) {
+      if (error.message.includes('Firebase ID token has expired')) {
         return NextResponse.json(
           { error: 'token_expired', message: 'Session expired. Please sign in again.' },
           { status: 401 }

@@ -15,8 +15,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "invalid_request" }, { status: 400 })
     }
     // The Firebase tenant is shared, and an account can be created there under any address, so the address counts
-    // only once Firebase says it is verified (security log ADM-15, the same class as ADM-1). Revoked tokens are refused.
-    const identity = verifiedEmail(await verifyFirebaseToken(idToken, true))
+    // only once Firebase says it is verified (security log ADM-15, the same class as ADM-1).
+    const identity = verifiedEmail(await verifyFirebaseToken(idToken))
     if (!identity.ok) {
       console.warn(`[travel-auth] denied sign-in (${identity.reason})`)
       return NextResponse.json({ error: identity.error }, { status: identity.status })
