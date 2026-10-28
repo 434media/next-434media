@@ -49,6 +49,17 @@
 
 # Sign-in and permissions
 /lib/auth.ts                                 @434media/founder
+/lib/session-cookie.ts                       @434media/founder
+/lib/firebase-signin.ts                      @434media/founder
+/lib/founder-guard.ts                        @434media/founder
+/lib/__tests__/admin-owners.test.ts          @434media/founder
+/lib/__tests__/firebase-signin.test.ts       @434media/founder
+/lib/__tests__/founder-guard.test.ts         @434media/founder
+/lib/__tests__/finance-routes-guarded.test.ts @434media/founder
+/lib/brand-share-open.ts                     @434media/founder
+/lib/brand-asset-store.ts                    @434media/founder
+/app/share/brand-book/*/download/            @434media/founder
+/app/share/brand-book/*/file/                @434media/founder
 /proxy.ts                                    @434media/founder
 /app/api/auth/                               @434media/founder
 /components/AdminRoleGuard.tsx               @434media/founder
@@ -76,6 +87,7 @@
 /lib/quickbooks*                             @434media/founder
 /app/admin/finance/                          @434media/founder
 /app/api/admin/finance/                      @434media/founder
+/scripts/finance/                            @434media/founder
 
 # Secrets: where a credential is loaded, minted, verified or stored
 /.github/                                    @434media/founder
@@ -93,6 +105,7 @@
 /app/api/brand-profiles/                     @434media/founder
 /scripts/personal-data/                      @434media/founder
 /scripts/sor/load.ts                         @434media/founder
+/scripts/brand-profiles/assets.ts            @434media/founder
 
 # Sends email
 /lib/resend.ts                               @434media/founder
