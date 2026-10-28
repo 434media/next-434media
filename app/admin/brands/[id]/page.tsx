@@ -223,8 +223,8 @@ export default function BrandPage() {
 /** A card that folds under its title. `open` starts it unfolded; `nested` is a card inside another (Internal). */
 function Section({ title, note, open = false, nested = false, children }: { title: string; note?: string; open?: boolean; nested?: boolean; children: React.ReactNode }) {
   return (
-    // min-w-0 and overflow-wrap: anywhere keep a long unbroken value (a sheet id, an email) inside the card on a phone.
-    <details open={open} className={`min-w-0 rounded-lg border border-neutral-200 [overflow-wrap:anywhere] ${nested ? "group/inner bg-neutral-50 p-3" : "group/card bg-white p-4"}`}>
+    // min-w-0 and overflow-wrap: break-word keep a long unbroken value (a sheet id, an email) inside the card on a phone. Not "anywhere": that shrinks a table's columns to a letter wide and breaks its words; tables scroll sideways instead.
+    <details open={open} className={`min-w-0 rounded-lg border border-neutral-200 [overflow-wrap:break-word] ${nested ? "group/inner bg-neutral-50 p-3" : "group/card bg-white p-4"}`}>
       <summary className="cursor-pointer list-none marker:hidden">
         <h2 className="inline text-sm font-semibold text-neutral-900">{/* A card inside Internal has its own group, so its arrow follows its own state, not Internal's. */}<span className={`mr-1.5 inline-block text-neutral-400 transition-transform ${nested ? "group-open/inner:rotate-90" : "group-open/card:rotate-90"}`}>›</span>{title}</h2>
         {note && <p className="mt-0.5 pl-4 text-xs text-neutral-500">{note}</p>}
