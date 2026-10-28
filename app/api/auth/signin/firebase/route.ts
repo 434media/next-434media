@@ -57,6 +57,7 @@ export async function POST(request: NextRequest) {
       picture,
       authProvider: 'firebase',
       role: decision.role,
+      emailVerified: decodedToken.email_verified === true,
     })
 
     return NextResponse.json({

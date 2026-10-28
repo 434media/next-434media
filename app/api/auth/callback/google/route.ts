@@ -121,6 +121,8 @@ export async function GET(request: NextRequest) {
       picture: userInfo.picture,
       authProvider: 'google',
       role: decision.role,
+      // A workspace account on the domain checked above; Google verifies these addresses.
+      emailVerified: true,
     })
 
     // Clear OAuth state cookie

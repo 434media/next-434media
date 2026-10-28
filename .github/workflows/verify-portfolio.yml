@@ -128,6 +128,8 @@ jobs:
       - run: tsx --test lib/__tests__/row-approval.test.ts
       # Event roles and travel routes from Firestore, the create-or-skip import, and the personal-data check itself.
       - run: tsx --test lib/__tests__/personal-data.test.ts
+      # The founder-only guard (V1 item 1, finance Phase 0): deny by default, one configured identity, a verified email.
+      - run: tsx --test lib/__tests__/founder-guard.test.ts
 
       # Optional: the same suites again on MilCityUSA's real published profile, when the BRAND_PROFILE_FIXTURE Actions
       # secret holds a published version's 434-context backup record. Secrets are not given to pull requests from

@@ -2,6 +2,8 @@ import { type NextRequest, NextResponse } from "next/server"
 import { i18n } from "./i18n-config"
 import { META_PIXEL_COOKIE, metaPixelAllowed } from "./lib/meta-pixel-gate"
 import { isTrackedPath } from "./lib/tracking-scope"
+import { SESSION_COOKIE, parseSessionCookie } from "./lib/session-cookie"
+import { founderDecision, founderEmail } from "./lib/founder-guard"
 
 // Define a list of paths that should bypass the proxy
 const BYPASS_PATHS = ["/_next/", "/api/", "/favicon.ico", ".jpg", ".jpeg", ".png", ".gif", ".svg", ".mp3", ".mp4"]
@@ -44,8 +46,26 @@ function withMetaPixelGate(request: NextRequest, response: NextResponse): NextRe
   return response
 }
 
+/**
+ * The founder-only pages (lib/founder-guard.ts) answer a signed-in non-founder with a real 403. The page refuses as
+ * well, but a page's status is fixed once streaming starts, so the status is set here, before rendering. A request with
+ * no session passes through: the admin layout shows its sign-in form, and the page renders nothing behind the lock.
+ */
+const FOUNDER_ONLY_PAGES = ["/admin/finance"]
+
+function founderOnlyRefusal(request: NextRequest): NextResponse | null {
+  const pathname = request.nextUrl.pathname
+  if (!FOUNDER_ONLY_PAGES.some((p) => pathname === p || pathname.startsWith(`${p}/`))) return null
+  const decision = founderDecision(parseSessionCookie(request.cookies.get(SESSION_COOKIE)?.value), founderEmail())
+  if (decision.allowed || decision.reason === "no_session") return null
+  return NextResponse.rewrite(request.nextUrl, { status: 403 })
+}
+
 export function proxy(request: NextRequest) {
   const pathname = request.nextUrl.pathname
+
+  const refusal = founderOnlyRefusal(request)
+  if (refusal) return refusal
 
   // Skip proxy for paths that should bypass
   if (BYPASS_PATHS.some((path) => pathname.includes(path))) {
