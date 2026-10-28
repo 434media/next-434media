@@ -20,8 +20,8 @@ type AdminRole = "crm_super_admin" | "full_admin" | "crm_only" | "intern"
 const COLLECTION = "crm_team_members"
 
 // ─── CONFIG — edit before running ────────────────────────────────────────────
-// Owners. Matches CRM_SUPER_ADMIN_FALLBACK in lib/auth.ts.
-const SUPER_ADMIN_EMAILS = ["marcos@434media.com", "jesse@434media.com"]
+// Owners: the same server-only setting lib/auth.ts reads (ADMIN_OWNER_EMAILS), never written here.
+const SUPER_ADMIN_EMAILS = (process.env.ADMIN_OWNER_EMAILS ?? "").split(",").filter((e) => e.includes("@"))
 
 // ⚠ LIST EVERY STAFF MEMBER who should keep send/publish/approve power here,
 // BEFORE --apply. Anyone not listed (and without an explicit role already) will

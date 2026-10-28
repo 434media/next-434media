@@ -1,71 +1,33 @@
 import { cookies } from 'next/headers'
-import { createHmac, timingSafeEqual } from 'node:crypto'
+import { ADMIN_ROLES, SESSION_COOKIE, parseSessionCookie, signPayload } from './session-cookie'
+import type { AdminRole, AuthProvider, User } from './session-cookie'
 
-export type AuthProvider = 'google' | 'firebase'
-export type AdminRole = 'crm_super_admin' | 'full_admin' | 'crm_only' | 'intern'
-
-const SESSION_COOKIE = 'admin-auth-session'
-const ADMIN_ROLES: AdminRole[] = ['crm_super_admin', 'full_admin', 'crm_only', 'intern']
+export type { AdminRole, AuthProvider, User } from './session-cookie'
+export { parseSessionCookie } from './session-cookie'
 
 /**
- * HMAC key for the session cookie.
+ * The owners: super admins named in server-only configuration, `ADMIN_OWNER_EMAILS` (comma-separated), set in the
+ * Vercel project. An owner is a super admin on every check, even with no roster record and while Firestore is
+ * unreachable, so the people who run the admin can always reach its settings. Everyone else's role comes from the
+ * roster (`crm_team_members`).
  *
- * The cookie used to be plain base64 JSON with no signature, which meant anyone
- * could craft `{"email":"...","role":"crm_super_admin"}`, base64 it, set the
- * cookie and be a super admin — no Firebase account required. Signing closes
- * that. Rotating this value invalidates every outstanding session, which is the
- * correct response to a suspected compromise.
- *
- * Missing/short secret is fatal rather than a silent downgrade: setSession
- * throws (login fails loudly) and getSession returns null (everyone is logged
- * out). Both fail closed.
+ * No access check in this repository names an address: owners, and the owners-only Facebook recovery in the publisher
+ * (app/api/admin/crm/content-posts/[id]/owned-meta), read this setting. Unset, it names no owner, every role comes from
+ * the roster, and that recovery is open to no one.
  */
-function getSessionSecret(): string {
-  const secret = process.env.ADMIN_SESSION_SECRET
-  if (!secret || secret.length < 32) {
-    throw new Error(
-      'ADMIN_SESSION_SECRET is missing or shorter than 32 chars. Admin sessions cannot be signed. ' +
-        'Generate one with: node -e "console.log(require(\'crypto\').randomBytes(32).toString(\'base64url\'))"',
-    )
-  }
-  return secret
+
+export function ownerEmails(env: Record<string, string | undefined> = process.env): string[] {
+  return (env.ADMIN_OWNER_EMAILS ?? '')
+    .split(',')
+    .map((e) => e.trim().toLowerCase())
+    .filter((e) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e))
 }
 
-function signPayload(payload: string): string {
-  return createHmac('sha256', getSessionSecret()).update(payload).digest('base64url')
-}
-
-/** Constant-time compare that can't throw on length mismatch. */
-function signatureMatches(expected: string, received: string): boolean {
-  const a = Buffer.from(expected)
-  const b = Buffer.from(received)
-  if (a.length !== b.length) return false
-  return timingSafeEqual(a, b)
-}
-
-/**
- * Hardcoded fallback list of CRM super admins. Used when the Firestore
- * `crm_team_members.role` field hasn't been backfilled yet — guarantees
- * Marcos and Jesse can always reach the settings page even on a brand-new
- * environment. Once the backfill runs, role lookups read from Firestore.
- */
-export const CRM_SUPER_ADMIN_FALLBACK = [
-  'marcos@434media.com',
-  'jesse@434media.com',
-]
-
-export function isCrmSuperAdminFromFallback(email?: string | null): boolean {
+export function isOwnerEmail(email?: string | null, env: Record<string, string | undefined> = process.env): boolean {
   if (!email) return false
-  return CRM_SUPER_ADMIN_FALLBACK.includes(email.toLowerCase())
+  return ownerEmails(env).includes(email.toLowerCase())
 }
 
-export interface User {
-  email: string
-  name: string
-  picture?: string
-  authProvider?: AuthProvider
-  role?: AdminRole
-}
 
 // Define which admin sections each role can access.
 //
@@ -129,7 +91,7 @@ export function getRoleForProvider(authProvider: AuthProvider): AdminRole {
 /**
  * Resolve a user's effective admin role at login. Firestore is the source of
  * truth; the provider fallback only catches users with no record yet. Order:
- *   1. super-admin fallback list (owners) → crm_super_admin
+ *   1. an owner (ADMIN_OWNER_EMAILS) → crm_super_admin
  *   2. explicit crm_team_members.role (set via settings / the 1.0 backfill)
  *   3. provider fallback (getRoleForProvider)
  *
@@ -137,7 +99,7 @@ export function getRoleForProvider(authProvider: AuthProvider): AdminRole {
  */
 export async function resolveRole(email: string, provider: AuthProvider): Promise<AdminRole> {
   const lower = email.toLowerCase()
-  if (isCrmSuperAdminFromFallback(lower)) return 'crm_super_admin'
+  if (isOwnerEmail(lower)) return 'crm_super_admin'
   try {
     const { getDb } = await import('./firebase-admin')
     const snap = await getDb()
@@ -181,7 +143,7 @@ export async function resolveRole(email: string, provider: AuthProvider): Promis
  *
  * Allowed:
  *  - @434media.com workspace addresses (Google OAuth, domain-verified)
- *  - the hardcoded owner fallback
+ *  - an owner (ADMIN_OWNER_EMAILS)
  *  - an ACTIVE `crm_team_members` record, which is managed in admin settings
  *
  * Everything else is refused a session. Adding someone to Firebase Auth no
@@ -196,7 +158,7 @@ export async function authorizeAdminSignIn(
 ): Promise<{ authorized: true; role: AdminRole; name?: string } | { authorized: false; reason: string }> {
   const lower = email.toLowerCase()
 
-  if (isCrmSuperAdminFromFallback(lower)) {
+  if (isOwnerEmail(lower)) {
     return { authorized: true, role: 'crm_super_admin' }
   }
 
@@ -238,43 +200,7 @@ export async function authorizeAdminSignIn(
 
 export async function getSession(): Promise<User | null> {
   const cookieStore = await cookies()
-  const sessionCookie = cookieStore.get(SESSION_COOKIE)
-
-  if (!sessionCookie) {
-    return null
-  }
-
-  try {
-    const [encodedPayload, signature] = sessionCookie.value.split('.')
-    if (!encodedPayload || !signature) {
-      // Unsigned legacy cookie (or malformed) — never trust it.
-      return null
-    }
-
-    if (!signatureMatches(signPayload(encodedPayload), signature)) {
-      console.warn('[auth] rejected session cookie with an invalid signature')
-      return null
-    }
-
-    const session = JSON.parse(Buffer.from(encodedPayload, 'base64url').toString('utf-8'))
-
-    // Verify session is not expired
-    if (session.expiresAt && new Date(session.expiresAt) < new Date()) {
-      return null
-    }
-
-    // A signed cookie proves we issued it; this guards against a session minted
-    // by older code with a role we no longer recognize.
-    const user: User | undefined = session.user
-    if (!user?.email || !user.role || !ADMIN_ROLES.includes(user.role)) {
-      return null
-    }
-
-    return user
-  } catch (error) {
-    console.error('Failed to parse session:', error)
-    return null
-  }
+  return parseSessionCookie(cookieStore.get(SESSION_COOKIE)?.value)
 }
 
 export async function setSession(user: User): Promise<void> {
@@ -287,6 +213,7 @@ export async function setSession(user: User): Promise<void> {
       picture: user.picture,
       authProvider: user.authProvider,
       role: user.role,
+      emailVerified: user.emailVerified === true,
     },
     expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(), // 24 hours
   }
@@ -310,9 +237,12 @@ export async function clearSession(): Promise<void> {
   cookieStore.delete(SESSION_COOKIE)
 }
 
+export function workspaceDomain(): string {
+  return process.env.WORKSPACE_DOMAIN || '434media.com'
+}
+
 export function isWorkspaceEmail(email: string): boolean {
-  const workspaceDomain = process.env.WORKSPACE_DOMAIN || '434media.com'
-  return email.endsWith(`@${workspaceDomain}`)
+  return email.endsWith(`@${workspaceDomain()}`)
 }
 
 /**
@@ -335,15 +265,15 @@ export function isAuthorizedAdmin(email: string): boolean {
 
 /**
  * Async super-admin check. Reads the `role` field from `crm_team_members`
- * in Firestore. Falls back to `CRM_SUPER_ADMIN_FALLBACK` if Firestore
- * lookup fails or the user has no record yet.
+ * in Firestore. An owner (ADMIN_OWNER_EMAILS) is a super admin whatever
+ * the roster says, including when the Firestore lookup fails.
  *
  * Server-side only — uses firebase-admin SDK.
  */
 export async function isCrmSuperAdmin(email?: string | null): Promise<boolean> {
   if (!email) return false
   const lower = email.toLowerCase()
-  if (isCrmSuperAdminFromFallback(lower)) return true
+  if (isOwnerEmail(lower)) return true
   try {
     // Lazy import to keep this auth lib usable from edge runtime contexts
     const { getDb } = await import('./firebase-admin')
@@ -355,8 +285,8 @@ export async function isCrmSuperAdmin(email?: string | null): Promise<boolean> {
     if (snap.empty) return false
     return snap.docs[0].data().role === 'crm_super_admin'
   } catch (error) {
-    console.error('[auth] isCrmSuperAdmin Firestore lookup failed; using fallback:', error)
-    return isCrmSuperAdminFromFallback(lower)
+    console.error('[auth] isCrmSuperAdmin Firestore lookup failed; owners only:', error)
+    return isOwnerEmail(lower)
   }
 }
 
@@ -366,13 +296,13 @@ export async function isCrmSuperAdmin(email?: string | null): Promise<boolean> {
  * the Create table (Human+, Run job), approve or reject content, and schedule and publish it, whatever their role;
  * their role still governs the rest of the Admin. Super-admins have it always. Recovery confirmations on the publisher
  * and connecting Canva stay super-admin only. Read from Firestore on every call; a failed lookup grants nothing beyond
- * the super-admin fallback.
+ * the owners.
  */
 export const CONTENT_PERMISSION = 'content'
 export async function canRunContent(email?: string | null): Promise<boolean> {
   if (!email) return false
   const lower = email.toLowerCase()
-  if (isCrmSuperAdminFromFallback(lower)) return true
+  if (isOwnerEmail(lower)) return true
   try {
     // One read answers both: a super-admin by role (as isCrmSuperAdmin), or an active member holding "content".
     const { getDb } = await import('./firebase-admin')
@@ -408,7 +338,7 @@ export function canSend(role?: AdminRole | null): boolean {
  *
  * Blocks `crm_only` and `intern` sessions from firing 1:1 sends. Staff send via
  * Google (`full_admin`). A super admin always passes via the Firestore-backed
- * check — even on a stale session role — so the two owners are never locked out.
+ * check — even on a stale session role — so the owners are never locked out.
  */
 export async function requireSendCapable(): Promise<
   { session: User } | { error: string; status: 401 | 403 }

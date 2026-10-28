@@ -322,6 +322,15 @@ CRON_SECRET=your-cron-secret                 # guards /api/cron/* (Vercel cron)
 AIRTABLE_TOKEN=pat_xxx                       # server-only; protected travel itinerary sync
 TRAVEL_SESSION_SECRET=your-32-byte-secret    # optional; falls back to ADMIN_SESSION_SECRET
 BRAND_PROFILE_BACKUP_READ_TOKEN=random-48+   # read-only; gates GET /api/brand-profiles/backups (434-context pulls daily); unset = refused
+ADMIN_OWNER_EMAILS=owner@example.com          # owners: super admin on every check, roster or not (lib/auth.ts); unset = no owner, roles from crm_team_members only
+ADMIN_FOUNDER_EMAIL=founder@example.com      # the founder's own address(es), comma-separated; the founder-only guard (lib/founder-guard.ts): /admin/finance and /api/admin/finance; unset = everyone refused
+
+# FINANCE: QUICKBOOKS ONLINE (Phase 1 reads these; set once Intuit issues the production keys)
+# QUICKBOOKS_CLIENT_ID=...                   # Intuit app keys: Production keys in Production only, sandbox keys in Preview
+# QUICKBOOKS_CLIENT_SECRET=...
+# QUICKBOOKS_ENVIRONMENT=production          # or sandbox: which Intuit API base the code calls
+# QUICKBOOKS_TOKEN_KEY=base64-32-bytes       # AES-256-GCM key sealing the stored OAuth tokens, as CANVA_TOKEN_KEY
+# QUICKBOOKS_REDIRECT_URI=...                # optional; defaults to https://www.434media.com/api/admin/finance/quickbooks/callback
 
 # AI GATEWAY (image/video generation, lead drafting + research)
 AI_GATEWAY_API_KEY=your-vercel-ai-gateway-key

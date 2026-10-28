@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
-import { setSession, isWorkspaceEmail, authorizeAdminSignIn } from '@/lib/auth'
+import { setSession, isWorkspaceEmail, authorizeAdminSignIn, workspaceDomain } from '@/lib/auth'
 
 interface GoogleTokenResponse {
   access_token: string
@@ -10,10 +10,11 @@ interface GoogleTokenResponse {
   id_token: string
 }
 
+// The v2 userinfo endpoint's shape: `id` and `verified_email`, not the OpenID Connect `sub` and `email_verified`.
 interface GoogleUserInfo {
-  sub: string
+  id: string
   email: string
-  email_verified: boolean
+  verified_email?: boolean
   name: string
   picture?: string
   hd?: string // Hosted domain
@@ -121,6 +122,9 @@ export async function GET(request: NextRequest) {
       picture: userInfo.picture,
       authProvider: 'google',
       role: decision.role,
+      // Verified only when Google says so and the account belongs to the workspace itself (`hd`), not merely an
+      // address ending in the domain. The founder-only guard requires it (lib/founder-guard.ts).
+      emailVerified: userInfo.verified_email === true && userInfo.hd === workspaceDomain(),
     })
 
     // Clear OAuth state cookie

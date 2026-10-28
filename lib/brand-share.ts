@@ -112,7 +112,7 @@ export function shareEmail(p: { brand: string; recipientName: string; senderName
   const subject = `${p.brand} brand book`
   const text = [
     hello, "",
-    `${p.senderName} at 434 MEDIA shared the ${p.brand} brand book with you. It opens in your browser, and you can download it as a PDF from there.`, "",
+    `${p.senderName} at 434 MEDIA shared the ${p.brand} brand book with you. It opens in your browser, where you can pick the logo and font files you need and download them, or save the book as a PDF.`, "",
     p.url, "",
     `The link works until ${until}. Please don't forward it; ask ${p.senderEmail} if someone else needs a copy.`, "",
     `Brand book version: ${p.versionId}`,
@@ -120,7 +120,7 @@ export function shareEmail(p: { brand: string; recipientName: string; senderName
   const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;")
   const html = `<div style="font-family:Helvetica,Arial,sans-serif;font-size:15px;line-height:1.5;color:#171717">
 <p>${esc(hello)}</p>
-<p>${esc(p.senderName)} at 434 MEDIA shared the ${esc(p.brand)} brand book with you. It opens in your browser, and you can download it as a PDF from there.</p>
+<p>${esc(p.senderName)} at 434 MEDIA shared the ${esc(p.brand)} brand book with you. It opens in your browser, where you can pick the logo and font files you need and download them, or save the book as a PDF.</p>
 <p><a href="${esc(p.url)}" rel="noreferrer" style="display:inline-block;background:#171717;color:#ffffff;text-decoration:none;padding:10px 16px;border-radius:4px">Open the ${esc(p.brand)} brand book</a></p>
 <p style="color:#525252;font-size:13px">The link works until ${esc(until)}. Please don't forward it; ask <a href="mailto:${esc(p.senderEmail)}">${esc(p.senderEmail)}</a> if someone else needs a copy.</p>
 <p style="color:#a3a3a3;font-size:12px">Brand book version ${esc(p.versionId)}</p>

@@ -8,11 +8,6 @@ import { Shield, AlertCircle } from "lucide-react"
 // component (lib/auth pulls in next/headers). Keep the two in sync.
 type AdminRole = 'crm_super_admin' | 'full_admin' | 'crm_only' | 'intern'
 
-// Hardcoded super-admin fallback — same list as lib/auth.ts CRM_SUPER_ADMIN_FALLBACK.
-// Used to upgrade the effective role for sidebar/page guards before any
-// session-side role rehydration runs.
-const SUPER_ADMIN_EMAILS = ['marcos@434media.com', 'jesse@434media.com']
-
 interface User {
   email: string
   name: string
@@ -62,12 +57,9 @@ export function AdminRoleGuard({
       setUser(data.user)
 
       // Check if user's role is in allowed roles. Super-admin satisfies any
-      // requirement; super-admin fallback emails are upgraded automatically.
-      const baseRole: AdminRole = data.user.role || 'crm_only'
-      const isFallbackSuperAdmin = SUPER_ADMIN_EMAILS.includes(
-        (data.user.email || '').toLowerCase(),
-      )
-      const userRole: AdminRole = isFallbackSuperAdmin ? 'crm_super_admin' : baseRole
+      // requirement. The role is the session's, which the server sets from the
+      // owners setting and the roster (lib/auth.ts).
+      const userRole: AdminRole = data.user.role || 'crm_only'
       const canAccess = userRole === 'crm_super_admin' || allowedRoles.includes(userRole)
 
       setHasAccess(canAccess)
@@ -138,11 +130,7 @@ export function useAdminAccess(allowedRoles: AdminRole[]) {
           const data = await response.json()
           if (data.authenticated && data.user) {
             setUser(data.user)
-            const baseRole: AdminRole = data.user.role || 'crm_only'
-            const isFallbackSuperAdmin = SUPER_ADMIN_EMAILS.includes(
-              (data.user.email || '').toLowerCase(),
-            )
-            const userRole: AdminRole = isFallbackSuperAdmin ? 'crm_super_admin' : baseRole
+            const userRole: AdminRole = data.user.role || 'crm_only'
             setHasAccess(userRole === 'crm_super_admin' || allowedRoles.includes(userRole))
           }
         }

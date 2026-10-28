@@ -124,10 +124,20 @@ jobs:
       # Share with vendor (plan v11.2.1 Step 4 items 4–5): the token is stored as a hash only, jurisdiction and
       # suppression refuse before anything is stored, the daily cap and repeats, a failed mail never opens.
       - run: tsx --test lib/__tests__/brand-share.test.ts
+      # The vendor's downloads (Step 4 item 6): what a shared book offers, and a zip of exactly the ticked files.
+      - run: tsx --test lib/__tests__/brand-assets.test.ts
       # The approval drawer (plan v11.1 Step 3): a row's variations approved together, bound to the files shown.
       - run: tsx --test lib/__tests__/row-approval.test.ts
       # Event roles and travel routes from Firestore, the create-or-skip import, and the personal-data check itself.
       - run: tsx --test lib/__tests__/personal-data.test.ts
+      # The founder-only guard (V1 item 1, finance Phase 0): deny by default, one configured identity, a verified email.
+      - run: tsx --test lib/__tests__/founder-guard.test.ts
+      # Every finance API handler calls requireFounder first: the proxy guards the page only.
+      - run: tsx --test lib/__tests__/finance-routes-guarded.test.ts
+      # Admin email sign-in (security log ADM-1): verified email required; workspace addresses use Google in production.
+      - run: tsx --test lib/__tests__/firebase-signin.test.ts
+      # Owners come only from ADMIN_OWNER_EMAILS: no address in code, and none is a super admin by default.
+      - run: tsx --test lib/__tests__/admin-owners.test.ts
 
       # Optional: the same suites again on MilCityUSA's real published profile, when the BRAND_PROFILE_FIXTURE Actions
       # secret holds a published version's 434-context backup record. Secrets are not given to pull requests from
