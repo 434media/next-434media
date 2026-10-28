@@ -1,47 +1,9 @@
 import { cookies } from 'next/headers'
-import { createHmac, timingSafeEqual } from 'node:crypto'
+import { ADMIN_ROLES, SESSION_COOKIE, parseSessionCookie, signPayload } from './session-cookie'
+import type { AdminRole, AuthProvider, User } from './session-cookie'
 
-export type AuthProvider = 'google' | 'firebase'
-export type AdminRole = 'crm_super_admin' | 'full_admin' | 'crm_only' | 'intern'
-
-const SESSION_COOKIE = 'admin-auth-session'
-const ADMIN_ROLES: AdminRole[] = ['crm_super_admin', 'full_admin', 'crm_only', 'intern']
-
-/**
- * HMAC key for the session cookie.
- *
- * The cookie used to be plain base64 JSON with no signature, which meant anyone
- * could craft `{"email":"...","role":"crm_super_admin"}`, base64 it, set the
- * cookie and be a super admin — no Firebase account required. Signing closes
- * that. Rotating this value invalidates every outstanding session, which is the
- * correct response to a suspected compromise.
- *
- * Missing/short secret is fatal rather than a silent downgrade: setSession
- * throws (login fails loudly) and getSession returns null (everyone is logged
- * out). Both fail closed.
- */
-function getSessionSecret(): string {
-  const secret = process.env.ADMIN_SESSION_SECRET
-  if (!secret || secret.length < 32) {
-    throw new Error(
-      'ADMIN_SESSION_SECRET is missing or shorter than 32 chars. Admin sessions cannot be signed. ' +
-        'Generate one with: node -e "console.log(require(\'crypto\').randomBytes(32).toString(\'base64url\'))"',
-    )
-  }
-  return secret
-}
-
-function signPayload(payload: string): string {
-  return createHmac('sha256', getSessionSecret()).update(payload).digest('base64url')
-}
-
-/** Constant-time compare that can't throw on length mismatch. */
-function signatureMatches(expected: string, received: string): boolean {
-  const a = Buffer.from(expected)
-  const b = Buffer.from(received)
-  if (a.length !== b.length) return false
-  return timingSafeEqual(a, b)
-}
+export type { AdminRole, AuthProvider, User } from './session-cookie'
+export { parseSessionCookie } from './session-cookie'
 
 /**
  * The owners: super admins named in server-only configuration, `ADMIN_OWNER_EMAILS` (comma-separated), set in the
@@ -66,13 +28,6 @@ export function isOwnerEmail(email?: string | null, env: Record<string, string |
   return ownerEmails(env).includes(email.toLowerCase())
 }
 
-export interface User {
-  email: string
-  name: string
-  picture?: string
-  authProvider?: AuthProvider
-  role?: AdminRole
-}
 
 // Define which admin sections each role can access.
 //
@@ -245,43 +200,7 @@ export async function authorizeAdminSignIn(
 
 export async function getSession(): Promise<User | null> {
   const cookieStore = await cookies()
-  const sessionCookie = cookieStore.get(SESSION_COOKIE)
-
-  if (!sessionCookie) {
-    return null
-  }
-
-  try {
-    const [encodedPayload, signature] = sessionCookie.value.split('.')
-    if (!encodedPayload || !signature) {
-      // Unsigned legacy cookie (or malformed) — never trust it.
-      return null
-    }
-
-    if (!signatureMatches(signPayload(encodedPayload), signature)) {
-      console.warn('[auth] rejected session cookie with an invalid signature')
-      return null
-    }
-
-    const session = JSON.parse(Buffer.from(encodedPayload, 'base64url').toString('utf-8'))
-
-    // Verify session is not expired
-    if (session.expiresAt && new Date(session.expiresAt) < new Date()) {
-      return null
-    }
-
-    // A signed cookie proves we issued it; this guards against a session minted
-    // by older code with a role we no longer recognize.
-    const user: User | undefined = session.user
-    if (!user?.email || !user.role || !ADMIN_ROLES.includes(user.role)) {
-      return null
-    }
-
-    return user
-  } catch (error) {
-    console.error('Failed to parse session:', error)
-    return null
-  }
+  return parseSessionCookie(cookieStore.get(SESSION_COOKIE)?.value)
 }
 
 export async function setSession(user: User): Promise<void> {
@@ -294,6 +213,7 @@ export async function setSession(user: User): Promise<void> {
       picture: user.picture,
       authProvider: user.authProvider,
       role: user.role,
+      emailVerified: user.emailVerified === true,
     },
     expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(), // 24 hours
   }
@@ -317,9 +237,12 @@ export async function clearSession(): Promise<void> {
   cookieStore.delete(SESSION_COOKIE)
 }
 
+export function workspaceDomain(): string {
+  return process.env.WORKSPACE_DOMAIN || '434media.com'
+}
+
 export function isWorkspaceEmail(email: string): boolean {
-  const workspaceDomain = process.env.WORKSPACE_DOMAIN || '434media.com'
-  return email.endsWith(`@${workspaceDomain}`)
+  return email.endsWith(`@${workspaceDomain()}`)
 }
 
 /**

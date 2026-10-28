@@ -130,6 +130,10 @@ jobs:
       - run: tsx --test lib/__tests__/row-approval.test.ts
       # Event roles and travel routes from Firestore, the create-or-skip import, and the personal-data check itself.
       - run: tsx --test lib/__tests__/personal-data.test.ts
+      # The founder-only guard (V1 item 1, finance Phase 0): deny by default, one configured identity, a verified email.
+      - run: tsx --test lib/__tests__/founder-guard.test.ts
+      # Every finance API handler calls requireFounder first: the proxy guards the page only.
+      - run: tsx --test lib/__tests__/finance-routes-guarded.test.ts
       # Admin email sign-in (security log ADM-1): verified email required; workspace addresses use Google in production.
       - run: tsx --test lib/__tests__/firebase-signin.test.ts
       # Owners come only from ADMIN_OWNER_EMAILS: no address in code, and none is a super admin by default.

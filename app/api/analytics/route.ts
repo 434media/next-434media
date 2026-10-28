@@ -58,7 +58,6 @@ export async function GET(request: NextRequest) {
   console.log("[Analytics API] =================================")
   console.log("[Analytics API] Request received:", request.url)
   console.log("[Analytics API] Method:", request.method)
-  console.log("[Analytics API] Headers:", Object.fromEntries(request.headers.entries()))
 
   try {
     // Properties endpoint just enumerates configured property env vars;

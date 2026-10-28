@@ -21,6 +21,8 @@ const nextConfig: NextConfig = {
     '/deck/[shareId]/opengraph-image': ['./fonts/Menda-Black.otf'],
   },
   experimental: {
+    // forbidden() for the founder-only finance page, so a non-founder gets a real 403 (lib/founder-guard.ts).
+    authInterrupts: true,
     serverActions: {
       bodySizeLimit: '50mb',
     },
