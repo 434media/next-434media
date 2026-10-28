@@ -92,6 +92,7 @@
 /lib/content-pipeline/profile-backup.ts      @434media/founder
 /app/api/brand-profiles/                     @434media/founder
 /scripts/personal-data/                      @434media/founder
+/scripts/sor/load.ts                         @434media/founder
 
 # Sends email
 /lib/resend.ts                               @434media/founder

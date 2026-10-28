@@ -31,7 +31,8 @@ production. A manual deploy creates a duplicate. Push and let it fire.
 pull request; a direct commit to `main` needs explicit founder approval (master 7.6 and 11.4;
 register IMP-31, IMP-59). Every pull request merges by one of four lanes (master 7.6, "Review and
 merge"; 434-context Contributor Standard §10), and takes the strictest lane of any file it changes:
-1. **Rule changes** (`CLAUDE.md`, `.claude/`, `docs/standards/`, `CODEOWNERS`): the founder approves.
+1. **Rule changes** (`CLAUDE.md`, `AGENTS.md`, `.claude/`, `docs/standards/`, `CODEOWNERS`): the
+   founder approves.
 2. **Sensitive code**: sign-in and permissions, money, secrets, and anything that sends email or
    posts. The founder approves, even when nobody sees it.
 3. **Code people see**: post the preview link; the founder sees it (`/seen`); the review agent and
