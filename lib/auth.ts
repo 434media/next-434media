@@ -49,7 +49,9 @@ function signatureMatches(expected: string, received: string): boolean {
  * unreachable, so the people who run the admin can always reach its settings. Everyone else's role comes from the
  * roster (`crm_team_members`).
  *
- * No address is written into code. Unset, the setting names no owner, and every role comes from the roster.
+ * No access check in this repository names an address: owners, and the owners-only Facebook recovery in the publisher
+ * (app/api/admin/crm/content-posts/[id]/owned-meta), read this setting. Unset, it names no owner, every role comes from
+ * the roster, and that recovery is open to no one.
  */
 
 export function ownerEmails(env: Record<string, string | undefined> = process.env): string[] {
