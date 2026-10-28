@@ -83,13 +83,14 @@ export default function Footer() {
       className="bg-[var(--color-chrome-bg)] mt-auto relative overflow-hidden"
       aria-labelledby="footer-heading"
     >
-      <div className="max-w-7xl mx-auto px-6 lg:px-8 relative">
+      <div className="px-(--site-gutter) relative">
         {/* Fades in once, when it nears the viewport (.m-footer-in,
-            globals.css). It never leaves, so there was no exit to keep. */}
-        {isVisible && (
-            <div
-              className="m-footer-in"
-            >
+            globals.css). It never leaves, so there was no exit to keep.
+
+            Always rendered, invisible until then. It used to mount only when
+            visible, so until the observer fired the footer had no height and
+            the page was shorter than it would end up. */}
+        <div className={isVisible ? "m-footer-in" : "opacity-0"}>
               {/* Main footer grid — Brand / Build / Newsletter */}
               <div className="py-12 md:py-16 border-b border-[var(--color-chrome-divider)]">
                 <div className="grid grid-cols-2 md:grid-cols-12 gap-y-10 gap-x-6 md:gap-x-8">
@@ -101,9 +102,9 @@ export default function Footer() {
                         <Image
                           src="/brand/434-primary-light.svg"
                           alt="434 MEDIA"
-                          width={168}
-                          height={36}
-                          className="h-auto w-[120px]"
+                          width={160}
+                          height={14}
+                          className="h-auto w-[160px]"
                         />
                       </Link>
                     </h2>
@@ -147,7 +148,7 @@ export default function Footer() {
                         <li key={link.label}>
                           <Link
                             href={link.href}
-                            className={`font-geist-sans text-sm transition-colors duration-200 leading-tight ${
+                            className={`font-geist-sans t-body-s transition-colors duration-200 ${
                               link.emphasis
                                 ? "text-[var(--color-chrome-text)] font-medium hover:text-[var(--color-chrome-text-secondary)]"
                                 : "text-[var(--color-chrome-text-secondary)] hover:text-[var(--color-chrome-text)]"
@@ -180,10 +181,15 @@ export default function Footer() {
 
               {/* Bottom strip — copyright, legal, contact echo. The echo is the
                   only place the address appears now; the Build with us column
-                  routes to /contact instead. */}
+                  routes to /contact instead.
+
+                  The motto is not repeated here. It read "© 2026 434 MEDIA ·
+                  Actions.Speak.Louder", which joins the motto to other text
+                  (master 1.4), and it already stands on its own in the brand
+                  column above. */}
               <div className="py-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <p className="font-geist-sans t-caption text-[var(--color-chrome-label)]">
-                  &copy; {currentYear} 434 MEDIA · {BRAND_RECORDS.mottoStyled}
+                  &copy; {currentYear} 434 MEDIA
                 </p>
                 <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
                   {legalLinks.map((link) => (
@@ -204,8 +210,7 @@ export default function Footer() {
                   </a>
                 </div>
               </div>
-            </div>
-          )}
+        </div>
       </div>
     </footer>
   )

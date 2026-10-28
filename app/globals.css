@@ -89,10 +89,31 @@
   --color-chrome-label: var(--color-on-dark-text-secondary);
   --color-chrome-divider: color-mix(in srgb, var(--434-white) 12%, transparent);
   --color-chrome-icon: var(--color-on-dark-text-secondary);
-  
+
+  /* Site chrome geometry, one value for every page that sits under the fixed
+     header (Display and Design Standard, the site chrome subsection).
+
+     --site-header-h is the header's one height. It used to change with the
+     padding (72px at rest and 56px scrolled at 1440, 58/42 at 1280), and each
+     page that cleared it carried its own measured copy, which went stale: the
+     Work page cleared 58px under a 72px header.
+
+     64px holds the primary lockup at 160px wide (14px tall) with 25px above
+     and below it, which keeps the logo standard's 24px digital clear space.
+
+     --site-gutter is the Work page's horizontal inset, 24px and 40px from
+     1000px, so the logo, the menu button, the page headings and the footer
+     share one left and right edge. */
+  --site-header-h: 64px;
+  --site-gutter: 24px;
+
   --font-geist-sans: var(--font-geist-sans, sans-serif);
   --font-geist-mono: var(--font-geist-mono, monospace);
   --font-menda-black: var(--font-menda-black, sans-serif);
+}
+
+@media (min-width: 1000px) {
+  :root { --site-gutter: 40px; }
 }
 
 @theme {
@@ -356,66 +377,56 @@
    background colour. */
 .m-menu-button {
   animation: m-pop-in 0.3s var(--m-ease-out) 0.2s backwards;
-  transition: all 300ms cubic-bezier(0.4, 0, 0.2, 1), transform 0.3s var(--m-ease-out) 0.2s;
+  transition: background-color 200ms, transform 150ms var(--m-ease-out);
 }
-.m-menu-button:hover { transform: scale(1.05); }
-.m-menu-button:active { transform: scale(0.95); }
+.m-menu-button:active { transform: scale(0.96); }
 
-/* Hamburger lines → cross (0.3s easeOut). */
-.m-burger-line { transition: transform 0.3s var(--m-ease-out), opacity 0.3s var(--m-ease-out); }
-.m-burger-line:nth-child(1) { transform: translateY(-4px); }
-.m-burger-line:nth-child(3) { transform: translateY(4px); }
-[data-open="true"] > .m-burger-line:nth-child(1) { transform: rotate(45deg); }
-[data-open="true"] > .m-burger-line:nth-child(2) { opacity: 0; }
-[data-open="true"] > .m-burger-line:nth-child(3) { transform: rotate(-45deg); }
+/* The menu icon: two lines, which widen the lower line on hover. It no
+   longer turns into a cross: the open panel covers the button and carries
+   its own close button, so the cross was never seen. */
+.m-burger-line { transition: width 0.2s var(--m-ease-out); }
+.m-menu-button:hover .m-burger-line:nth-child(2) { width: 100%; }
 
 /* Nav menu. It stays mounted and is hidden with visibility, so the closing
-   fade and slide play in CSS without delaying an unmount. Open: the dialog
-   and backdrop fade in (0.3s), the panel springs in from the right, the mark
-   and close button fade in after 0.2s, the items slide in from 20px (0.4s
-   easeOut, 0.15s / 0.2s), the footer fades in after 0.5s. Close: the dialog
-   and backdrop fade out and the panel springs out, as before; the inner
-   pieces reset after the fade, out of sight. */
+   slide plays in CSS without delaying an unmount.
+
+   Only two things move: the backdrop's opacity and the panel's transform,
+   both compositor-only. The dialog itself no longer fades. It used to, and
+   because the panel is inside it, the panel slid in half-transparent and
+   grey, and the backdrop's blur was re-rendered on every frame of that fade.
+   The blur is gone too: a dark scrim does the same job for nothing. The
+   503ms spring and the staggered entrances (up to 0.5s) made a two-item menu
+   feel slow; it is now one 320ms ease, with the items following by 60ms.
+
+   Close: the panel slides out and the backdrop fades over 240ms, and the
+   dialog hides once they finish. */
 .m-navmenu {
+  --m-menu-ease: cubic-bezier(0.32, 0.72, 0, 1);
   visibility: hidden;
-  opacity: 0;
   pointer-events: none;
-  transition: opacity 0.3s var(--m-ease-out), visibility 0s linear 0.3s;
+  transition: visibility 0s linear 0.24s;
 }
 .m-navmenu[data-open="true"] {
   visibility: visible;
-  opacity: 1;
   pointer-events: auto;
-  transition: opacity 0.3s var(--m-ease-out), visibility 0s;
+  transition: visibility 0s;
 }
-.m-navmenu-backdrop { opacity: 0; transition: opacity 0.3s var(--m-ease-out); }
-[data-open="true"] > .m-navmenu-backdrop { opacity: 1; }
+.m-navmenu-backdrop { opacity: 0; transition: opacity 0.24s var(--m-ease-out); }
+[data-open="true"] > .m-navmenu-backdrop { opacity: 1; transition-duration: 0.32s; }
 .m-navmenu-panel {
   transform: translateX(100%);
-  transition: transform var(--m-spring-panel-duration) var(--m-spring-panel);
+  transition: transform 0.24s var(--m-menu-ease);
+  will-change: transform;
 }
-[data-open="true"] > .m-navmenu-panel { transform: none; }
-.m-navmenu .m-delayed-fade { opacity: 0; transition: opacity 0s 0.3s; }
-.m-navmenu[data-open="true"] .m-delayed-fade { opacity: 1; transition: opacity 0.3s var(--m-ease-default) var(--m-delay, 0s); }
-.m-navmenu .m-nav-item { opacity: 0; transform: translateX(20px); transition: opacity 0s 0.3s, transform 0s 0.3s; }
+[data-open="true"] > .m-navmenu-panel { transform: none; transition-duration: 0.32s; }
+.m-navmenu .m-nav-item { opacity: 0; transform: translateX(12px); transition: opacity 0s 0.24s, transform 0s 0.24s; }
 .m-navmenu[data-open="true"] .m-nav-item {
   opacity: 1;
   transform: none;
-  transition: opacity 0.4s var(--m-ease-out) var(--m-delay, 0s), transform 0.4s var(--m-ease-out) var(--m-delay, 0s);
+  transition: opacity 0.28s var(--m-ease-out) var(--m-delay, 0s), transform 0.28s var(--m-menu-ease) var(--m-delay, 0s);
 }
-/* Close button: tap shrinks to 0.9 on motion's default scale spring, after
-   the 0.2s delay its transition carried. */
-.m-tap-close {
-  transition: all 200ms cubic-bezier(0.4, 0, 0.2, 1), opacity 0s 0.3s,
-    transform var(--m-spring-scale-duration) var(--m-spring-scale) 0.2s;
-}
-.m-navmenu[data-open="true"] .m-tap-close {
-  transition: all 200ms cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s var(--m-ease-default) 0.2s,
-    transform var(--m-spring-scale-duration) var(--m-spring-scale) 0.2s;
-}
-.m-navmenu .m-tap-close { opacity: 0; }
-.m-navmenu[data-open="true"] .m-tap-close { opacity: 1; }
-.m-tap-close:active { transform: scale(0.9); }
+.m-tap-close { transition: background-color 200ms, color 200ms, transform 150ms var(--m-ease-out); }
+.m-tap-close:active { transform: scale(0.92); }
 
 /* Footer content fades in when it nears the viewport (0.6s). */
 .m-footer-in { animation: m-fade-in 0.6s var(--m-ease-out) backwards; }
@@ -459,9 +470,9 @@
     animation: none !important;
   }
   .m-menu-button, .m-burger-line, .m-navmenu, .m-navmenu[data-open="true"], .m-navmenu-backdrop,
-  .m-navmenu-panel, .m-navmenu .m-delayed-fade, .m-navmenu[data-open="true"] .m-delayed-fade,
-  .m-navmenu .m-nav-item, .m-navmenu[data-open="true"] .m-nav-item, .m-tap-close,
-  .m-navmenu[data-open="true"] .m-tap-close, .m-fade-in-view {
+  .m-navmenu-panel, .m-navmenu .m-nav-item, .m-navmenu[data-open="true"] .m-nav-item,
+  .m-navmenu[data-open="true"] > .m-navmenu-panel, .m-navmenu[data-open="true"] > .m-navmenu-backdrop,
+  .m-tap-close, .m-fade-in-view {
     transition: none !important;
   }
   .m-menu-button:hover, .m-menu-button:active, .m-tap-close:active { transform: none; }

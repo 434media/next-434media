@@ -33,14 +33,14 @@ const navigationItems: NavigationItem[] = [
     title: "Work",
     subtitle: "Original IP, platforms, and productions",
     href: "/work",
-    delay: 0.15,
+    delay: 0.06,
   },
   {
     id: "contact",
     title: "Start a production",
     subtitle: "Take the next step",
     href: "/contact",
-    delay: 0.2,
+    delay: 0.12,
   },
 ]
 
@@ -57,18 +57,18 @@ export default function NavMenu({ isOpen, onClose, id = "nav-menu" }: NavMenuPro
         <Link
           href={item.href}
           onClick={onClose}
-          className="group flex items-center gap-4 py-4 border-b border-white/6 transition-colors duration-200 hover:bg-white/3 -mx-2 px-2 rounded-lg"
+          className="group flex items-center gap-4 py-4 border-b border-(--color-chrome-divider) transition-colors duration-200 hover:bg-white/5 -mx-2 px-2"
         >
           <div className="flex-1 min-w-0">
-            <span className="font-geist-sans t-control-emphasis text-white tracking-tight block mb-1">
+            <span className="font-geist-sans t-heading-s text-(--color-chrome-text) block mb-1">
               {item.title}
             </span>
-            <span className="font-geist-sans t-body-s text-white/40 tracking-tight block">
+            <span className="font-geist-sans t-body-s text-(--color-chrome-text-secondary) block">
               {item.subtitle}
             </span>
           </div>
           <svg
-            className="shrink-0 w-4 h-4 text-white/20 group-hover:text-white/50 transition-colors duration-200"
+            className="shrink-0 w-4 h-4 text-(--color-chrome-icon) group-hover:text-(--color-chrome-text) transition-colors duration-200"
             viewBox="0 0 16 16"
             fill="none"
             stroke="currentColor"
@@ -123,35 +123,42 @@ export default function NavMenu({ isOpen, onClose, id = "nav-menu" }: NavMenuPro
       aria-labelledby="nav-menu-title"
       id={id}
     >
-      {/* Backdrop */}
-      <div className="m-navmenu-backdrop absolute inset-0 bg-black/60 backdrop-blur-sm" />
+      {/* Backdrop. A plain scrim: a backdrop blur here was re-rendered on
+          every frame of the opening fade. */}
+      <div className="m-navmenu-backdrop absolute inset-0 bg-black/70" />
 
       {/* Panel — full on mobile, ~40% on desktop, slides from right */}
       <div
         ref={menuRef}
-        className="m-navmenu-panel absolute right-0 top-0 bottom-0 w-full md:w-105 lg:w-115 bg-neutral-950 border-l border-white/6 overflow-y-auto"
+        className="m-navmenu-panel absolute right-0 top-0 bottom-0 w-full md:w-105 lg:w-115 bg-(--color-chrome-bg) border-l border-(--color-chrome-divider) overflow-y-auto"
       >
-        <div className="flex flex-col h-full px-6 md:px-8 py-6">
-          {/* Header */}
-          <div className="flex items-center justify-between mb-8">
-            <span
-              className="m-delayed-fade opacity-30"
-              style={{ "--m-delay": "0.2s" } as React.CSSProperties}
-            >
+        <div className="flex flex-col h-full px-(--site-gutter) pb-6">
+          {/* Header: the same height as the site header, so on a phone the
+              logo and the close button land exactly where the logo and the
+              menu button were.
+
+              The full primary lockup, not the standalone 434 mark: the mark
+              alone read as "434", which is not the company's name. 128px, as
+              in the site header at phone width. */}
+          <div className="flex h-(--site-header-h) shrink-0 items-center justify-between mb-4">
+            <h2 id="nav-menu-title" className="leading-none">
+              <span className="sr-only">Menu</span>
               <Image
-                src="/brand/434-mark-light.svg"
+                src="/brand/434-primary-light.svg"
                 alt="434 MEDIA"
-                width={176}
-                height={44}
-                className="h-auto w-[44px]"
+                width={160}
+                height={14}
+                className="h-auto w-[128px]"
               />
-            </span>
+            </h2>
             <button
+              type="button"
               onClick={onClose}
-              className="m-tap-close text-white/40 hover:text-white p-1.5 rounded-md hover:bg-white/6 focus:outline-none focus:ring-2 focus:ring-white/20"
+              className="m-tap-close -mr-2 flex h-10 items-center gap-3 px-2 text-(--color-chrome-text) hover:bg-white/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
               aria-label="Close menu"
             >
-              <XIcon className="h-5 w-5" />
+              <span className="font-geist-mono t-label" aria-hidden="true">Close</span>
+              <XIcon className="h-5 w-5" aria-hidden="true" />
             </button>
           </div>
 
@@ -161,11 +168,8 @@ export default function NavMenu({ isOpen, onClose, id = "nav-menu" }: NavMenuPro
           </nav>
 
           {/* Footer */}
-          <div
-            className="m-delayed-fade mt-auto pt-8"
-            style={{ "--m-delay": "0.5s" } as React.CSSProperties}
-          >
-            <p className="font-geist-sans t-caption text-white/20 tracking-tight">
+          <div className="mt-auto pt-8">
+            <p className="font-geist-sans t-caption text-(--color-chrome-label)">
               &copy; {new Date().getFullYear()} 434 Media. All rights reserved.
             </p>
           </div>

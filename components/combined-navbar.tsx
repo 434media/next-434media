@@ -50,15 +50,19 @@ export function CombinedNavbar({ cart }: { cart?: ReactNode }) {
 
   return (
     <>
+      {/* One height, one inset (globals.css, --site-header-h and
+          --site-gutter). Scrolling deepens the background and adds the
+          divider; it no longer changes the height, so every page clears the
+          same 64px. */}
       <header
-        className={`m-header-in fixed top-0 left-0 right-0 z-50 transition-all duration-300 backdrop-blur-md ${
+        className={`m-header-in fixed top-0 left-0 right-0 z-50 h-(--site-header-h) px-(--site-gutter) transition-[background-color,border-color] duration-300 backdrop-blur-md border-b ${
           isScrolled
-            ? "bg-[color-mix(in_srgb,var(--color-chrome-bg)_95%,transparent)] shadow-lg py-2"
-            : "bg-[color-mix(in_srgb,var(--color-chrome-bg)_85%,transparent)] py-3 md:py-4"
+            ? "bg-[color-mix(in_srgb,var(--color-chrome-bg)_95%,transparent)] border-(--color-chrome-divider)"
+            : "bg-[color-mix(in_srgb,var(--color-chrome-bg)_85%,transparent)] border-transparent"
         }`}
       >
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between">
+        <div className="h-full">
+          <div className="h-full flex items-center justify-between">
             {/* The logo is artwork, not type.
 
                 It used to be the string "434 MEDIA" set in Menda Black and
@@ -71,8 +75,11 @@ export function CombinedNavbar({ cart }: { cart?: ReactNode }) {
                 worth reintroducing the prohibition to keep. The hover scale
                 stays.
 
-                Width is the lockup's digital minimum from the token document
-                (--434-min-width-horizontal-digital, 72px) and no smaller. */}
+                Width: 128px, 160px from 768px. It was the lockup's 72px
+                digital minimum (96px from 640px), which on a lockup this wide
+                (11.4:1) is 8px tall: legible, but lost in the bar. At 160px
+                it is 14px tall, and the 64px bar leaves 25px above and below
+                it, inside the logo standard's 24px clear space. */}
             <Link
               href="/"
               className="flex items-center group leading-none shrink-0"
@@ -81,10 +88,10 @@ export function CombinedNavbar({ cart }: { cart?: ReactNode }) {
               <Image
                 src="/brand/434-primary-light.svg"
                 alt="434 MEDIA"
-                width={112}
-                height={24}
+                width={160}
+                height={14}
                 priority
-                className="h-auto w-[72px] sm:w-[96px] transition-transform duration-300 group-hover:scale-105"
+                className="h-auto w-[128px] md:w-[160px] transition-opacity duration-200 group-hover:opacity-80"
               />
             </Link>
 
@@ -103,22 +110,24 @@ export function CombinedNavbar({ cart }: { cart?: ReactNode }) {
               {/* Motion lives in globals.css (2b fix 10): .m-menu-button and
                   .m-burger-line reproduce the entrance, hover, tap and the
                   lines-to-cross the motion library drew. */}
+              {/* A labelled button rather than a bare three-line icon. The
+                  menu holds two items, so it says "Menu" in words, with a
+                  two-line icon beside it. The right padding is pulled back
+                  with a negative margin so the icon, not the hover fill, sits
+                  on the gutter edge. */}
               <button
+                  type="button"
                   onClick={toggleActionMenu}
-                  className="m-menu-button relative text-white p-2 rounded-md flex items-center justify-center hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-white/30"
+                  className="m-menu-button group -mr-2 flex h-10 items-center gap-3 px-2 text-(--color-chrome-text) hover:bg-white/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
                   aria-expanded={isActionMenuOpen}
-                  aria-haspopup="true"
+                  aria-haspopup="dialog"
                   aria-controls="nav-menu"
-                  aria-label="Open navigation menu"
                 >
-                  <div
-                    className="relative w-6 h-6 flex flex-col justify-center items-center"
-                    data-open={isActionMenuOpen ? "true" : "false"}
-                  >
-                    <span className="m-burger-line absolute w-5 h-0.5 bg-white rounded-full" />
-                    <span className="m-burger-line absolute w-5 h-0.5 bg-white rounded-full" />
-                    <span className="m-burger-line absolute w-5 h-0.5 bg-white rounded-full" />
-                  </div>
+                  <span className="font-geist-mono t-label">Menu</span>
+                  <span className="flex w-5 flex-col items-end gap-1.5" aria-hidden="true">
+                    <span className="m-burger-line block h-0.5 w-full bg-current" />
+                    <span className="m-burger-line block h-0.5 w-3/5 bg-current" />
+                  </span>
                 </button>
             </div>
           </div>
