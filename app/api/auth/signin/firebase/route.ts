@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 import { verifyFirebaseToken } from '@/lib/firebase-admin'
-import { setSession, authorizeAdminSignIn } from '@/lib/auth'
+import { setSession, authorizeAdminSignIn, isWorkspaceEmail } from '@/lib/auth'
+import { decideFirebaseSignIn } from '@/lib/firebase-signin'
 
 // Auto-registration used to live here: any address that could obtain a Firebase
 // token was written into `crm_team_members` and handed a session. Because the
@@ -20,36 +21,29 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Verify the token is genuine. This proves WHO they are — it says nothing
-    // about whether they may administer 434 Media, because this Firebase
-    // project's Auth tenant is shared with our other web properties.
-    const decodedToken = await verifyFirebaseToken(idToken)
-
-    const email = decodedToken.email
+    // Verify the token is genuine, and that it has not been revoked. This proves WHO they are — it says nothing about
+    // whether they may administer 434 Media, because this Firebase project's Auth tenant is shared with our other web
+    // properties. decideFirebaseSignIn then requires a verified email and the roster (lib/firebase-signin.ts).
+    const decodedToken = await verifyFirebaseToken(idToken, true)
     const tokenName = decodedToken.name || decodedToken.email?.split('@')[0] || 'User'
     const picture = decodedToken.picture
 
-    if (!email) {
-      return NextResponse.json(
-        { error: 'Email not found in token' },
-        { status: 400 }
-      )
+    const decision = await decideFirebaseSignIn(decodedToken, {
+      authorize: (email) => authorizeAdminSignIn(email, 'firebase'),
+      isWorkspaceEmail,
+      vercelEnv: process.env.VERCEL_ENV,
+    })
+    if (!decision.ok) {
+      console.warn(`[auth] denied admin sign-in for ${decodedToken.email ?? 'no email'} (${decision.reason})`)
+      const messages: Record<typeof decision.error, string> = {
+        email_missing: 'Email not found in token',
+        email_not_verified: 'Verify your email address before signing in.',
+        workspace_use_google: '434 Media workspace accounts sign in with Google.',
+        not_authorized: 'This account is not authorized for the 434 Media admin. Ask an administrator to add you.',
+      }
+      return NextResponse.json({ error: decision.error, message: messages[decision.error] }, { status: decision.status })
     }
-
-    // Authorization: must be on the roster (or workspace staff). No session is
-    // issued otherwise — a valid token alone is not enough.
-    const decision = await authorizeAdminSignIn(email, 'firebase')
-    if (!decision.authorized) {
-      console.warn(`[auth] denied admin sign-in for ${email} (${decision.reason})`)
-      return NextResponse.json(
-        {
-          error: 'not_authorized',
-          message:
-            'This account is not authorized for the 434 Media admin. Ask an administrator to add you.',
-        },
-        { status: 403 }
-      )
-    }
+    const email = decision.email
 
     await setSession({
       email,
@@ -75,7 +69,7 @@ export async function POST(request: NextRequest) {
     
     // Handle specific Firebase errors
     if (error instanceof Error) {
-      if (error.message.includes('Firebase ID token has expired')) {
+      if (error.message.includes('Firebase ID token has expired') || error.message.includes('has been revoked')) {
         return NextResponse.json(
           { error: 'token_expired', message: 'Session expired. Please sign in again.' },
           { status: 401 }

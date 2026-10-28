@@ -4,7 +4,7 @@ import type React from "react"
 import { useState, useEffect } from "react"
 import { AlertCircle, Mail, Lock, Loader2 } from "lucide-react"
 import { NotificationProvider } from "@/context/notification-context"
-import { signInWithEmailAndPassword, sendPasswordResetEmail } from "firebase/auth"
+import { signInWithEmailAndPassword, sendPasswordResetEmail, sendEmailVerification, signOut } from "firebase/auth"
 import { auth } from "@/lib/firebase"
 import { AdminShell } from "@/components/admin/AdminShell"
 
@@ -74,6 +74,8 @@ export default function AdminLayout({
       'unauthorized_domain': 'Access denied. Only 434 Media workspace accounts are allowed.',
       'unauthorized_email': 'This email is not authorized to access the admin area.',
       'email_not_verified': 'Your email address must be verified.',
+      'workspace_use_google': '434 Media workspace accounts sign in with Google.',
+      'not_authorized': 'This account is not authorized for the 434 Media admin. Ask an administrator to add you.',
       'authentication_failed': 'Authentication failed. Please try again.',
       'invalid_state': 'Invalid session. Please try again.',
       'oauth_not_configured': 'OAuth is not properly configured.',
@@ -106,7 +108,19 @@ export default function AdminLayout({
       const data = await response.json()
 
       if (!response.ok) {
-        setError(getErrorMessage(data.error || 'authentication_failed'))
+        // An unverified address can't sign in (lib/firebase-signin.ts). Send the account's own verification link, so
+        // its holder can prove the inbox and try again.
+        if (data.error === 'email_not_verified') {
+          try {
+            await sendEmailVerification(userCredential.user)
+            setError(`Verify your email first: we sent a link to ${userCredential.user.email}. Open it, then sign in again.`)
+          } catch {
+            setError(getErrorMessage('email_not_verified'))
+          }
+        } else {
+          setError(getErrorMessage(data.error || 'authentication_failed'))
+        }
+        await signOut(auth).catch(() => {})
         return
       }
 
