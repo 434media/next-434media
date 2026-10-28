@@ -29,7 +29,20 @@ production. A manual deploy creates a duplicate. Push and let it fire.
 
 **Don't write to `main`.** Application changes take a dedicated branch, the `verify` check, and a
 pull request; a direct commit to `main` needs explicit founder approval (master 7.6 and 11.4;
-register IMP-31). Present the diff and wait for a call. One designated writer per task: if another
+register IMP-31, IMP-59). Every pull request merges by one of four lanes (master 7.6, "Review and
+merge"; 434-context Contributor Standard §10), and takes the strictest lane of any file it changes:
+1. **Rule changes** (`CLAUDE.md`, `.claude/`, `docs/standards/`, `CODEOWNERS`): the founder approves.
+2. **Sensitive code**: sign-in and permissions, money, secrets, and anything that sends email or
+   posts. The founder approves, even when nobody sees it.
+3. **Code people see**: post the preview link; the founder sees it (`/seen`); the review agent and
+   the checks approve.
+4. **Everything else**: merges once the checks pass.
+
+The lane map is [.github/CODEOWNERS](.github/CODEOWNERS). Code you add in a lane-2 category at a
+path it does not cover goes into the map in the same pull request; if unsure, take the stricter
+lane. An agent never merges, approves (except the review agent, in lane 3), enables a bypass or
+changes a ruleset. **Until the rulesets are in force** (434-context
+`04 Build/434_Four_Lane_Setup.md`), the map is inert and every merge waits for the founder. One designated writer per task: if another
 agent already holds a task or branch, report the conflict rather than writing alongside it.
 
 **Before building or materially revising anything anyone will look at, run the
@@ -81,12 +94,13 @@ served-stylesheet check above stays until the founder retires it.
 
 **The founder works directly here, and merges wait for review.** He no longer
 relays prompts from a claude.ai thread; threads are for context and review.
-**Before any merge to `main` in either repository, and before any change to the
-master, the register, a standard or the build sequence, write a short summary of
-the change and its evidence for the founder to take to a thread, and wait for
-his go-ahead.** The gate is narrow on purpose: it covers merges and the four
+**Before any merge in lanes 1 and 2 in either repository, and before any change
+to the master, the register, a standard or the build sequence, write a short
+summary of the change and its evidence for the founder to take to a thread, and
+wait for his go-ahead.** Lane 3 waits only for him to see the preview, and lane 4
+for nobody. The gate is narrow on purpose: it covers those merges and the four
 governing artifacts, not ordinary work, reads, branches or drafts. Everything
-reversible proceeds; everything that lands or governs stops for a second reader.
+reversible proceeds; a rule change or sensitive code stops for the founder.
 
 **One thread directs this agent at a time.** Only one conversation holds the writer role for Claude Code; a second thread issuing work at the same time is the two-writer failure 11.4 forbids, arriving through the front door. If another thread is mid-task, report the conflict rather than writing alongside it.
 

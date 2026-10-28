@@ -1,0 +1,135 @@
+# Review and merge in four lanes (434-context, 06 Standards/434_Contributor_Standard.md §10).
+#
+# This file is the lane map. A path owned by @434media/founder is lane 1 (rule changes)
+# or lane 2 (sensitive code): the founder approves it. A path listed below with no owner
+# is lane 3 (code people see): the founder sees a preview, the review agent and the
+# checks approve. Anything not matched is lane 4: it merges once the checks pass.
+# A change that touches more than one lane takes the strictest.
+#
+# Inert until the rulesets exist. Today it requires nothing: GitHub only asks a code owner
+# to review, and the team @434media/founder does not exist yet, so GitHub reports this file
+# as having an unknown owner until the setup creates it. The setup is
+# 434-context `04 Build/434_Four_Lane_Setup.md`.
+#
+# Last matching pattern wins, so lane 3 comes first and the owned lanes override it.
+# CODEOWNERS has no [ ] ranges, so Next.js segments like [id] are matched with *.
+
+# ── Lane 3: code people see (no owner; the lanes check enforces it) ─────────────────
+/app/**/page.tsx
+/app/**/layout.tsx
+/app/**/loading.tsx
+/app/**/error.tsx
+/app/**/not-found.tsx
+/app/**/template.tsx
+/app/**/opengraph-image.tsx
+/app/**/twitter-image.tsx
+/app/**/*Client.tsx
+/app/**/*.css
+/components/
+/public/
+/fonts/
+/dictionaries/
+/lib/og/
+/lib/deck/
+/lib/visual/
+/lib/work-records.ts
+/lib/brand-records.ts
+/lib/commercial-models.ts
+/lib/work-sections.ts
+/lib/work-media.ts
+
+# ── Lane 1: rule changes ─────────────────────────────────────────────────────────────
+/CLAUDE.md                                   @434media/founder
+/AGENTS.md                                   @434media/founder
+/.claude/                                    @434media/founder
+/docs/standards/                             @434media/founder
+/.github/CODEOWNERS                          @434media/founder
+
+# ── Lane 2: sensitive code ───────────────────────────────────────────────────────────
+
+# Sign-in and permissions
+/lib/auth.ts                                 @434media/founder
+/proxy.ts                                    @434media/founder
+/app/api/auth/                               @434media/founder
+/components/AdminRoleGuard.tsx               @434media/founder
+/app/api/admin/team-members/                 @434media/founder
+/app/api/admin/profile/                      @434media/founder
+/components/crm/settings/TeamMembersTab.tsx  @434media/founder
+/app/api/admin/content-pipeline/auth.ts      @434media/founder
+/lib/travel/auth.ts                          @434media/founder
+/lib/travel/access-id.ts                     @434media/founder
+/app/api/travel/auth/                        @434media/founder
+/scripts/add-team-member.ts                  @434media/founder
+/scripts/backfill-team-roles.ts              @434media/founder
+/scripts/offboard-interns.ts                 @434media/founder
+/scripts/provision-travel-viewer.ts          @434media/founder
+/firestore/                                  @434media/founder
+/firebase.json                               @434media/founder
+/app/api/sor/mcp/                            @434media/founder
+/app/api/owned-meta/mcp/                     @434media/founder
+/app/api/owned-meta/oauth-protected-resource/ @434media/founder
+
+# Money
+/lib/shopify/                                @434media/founder
+/components/shopify/cart/                    @434media/founder
+/lib/finance/                                @434media/founder
+/lib/quickbooks*                             @434media/founder
+/app/admin/finance/                          @434media/founder
+/app/api/admin/finance/                      @434media/founder
+
+# Secrets: where a credential is loaded, minted, verified or stored
+/.github/                                    @434media/founder
+/vercel.json                                 @434media/founder
+/next.config.ts                              @434media/founder
+/lib/firebase-admin.ts                       @434media/founder
+/lib/cron-auth.ts                            @434media/founder
+/lib/unsubscribe-token.ts                    @434media/founder
+/lib/owned-meta-oauth.ts                     @434media/founder
+/lib/owned-meta-connection.ts                @434media/founder
+/lib/canva-connect.ts                        @434media/founder
+/lib/brand-share-link.ts                     @434media/founder
+/lib/brand-share.ts                          @434media/founder
+/lib/content-pipeline/profile-backup.ts      @434media/founder
+/app/api/brand-profiles/                     @434media/founder
+/scripts/personal-data/                      @434media/founder
+
+# Sends email
+/lib/resend.ts                               @434media/founder
+/lib/notifications.ts                        @434media/founder
+/lib/email-templates/                        @434media/founder
+/lib/broadcast-*.ts                          @434media/founder
+/lib/*-notification.ts                       @434media/founder
+/lib/brand-share-send.ts                     @434media/founder
+/app/api/admin/brands/*/shares/              @434media/founder
+/lib/brand-share-deps.ts                     @434media/founder
+/lib/lead-with-ops-call-request.ts           @434media/founder
+/lib/outreach-*.ts                           @434media/founder
+/lib/mailchimp-*.ts                          @434media/founder
+/lib/newsletter-subscribe.ts                 @434media/founder
+/lib/firestore-suppression.ts                @434media/founder
+/lib/prospecting/scorer.ts                   @434media/founder
+/lib/prospecting/icp-base.md                 @434media/founder
+/app/api/cron/                               @434media/founder
+/app/api/webhooks/                           @434media/founder
+/app/api/mailchimp/                          @434media/founder
+/app/api/newsletter/                         @434media/founder
+/app/api/sdoh-newsletter/                    @434media/founder
+/app/api/thefeed-newsletter/                 @434media/founder
+/app/api/txmx-newsletter/                    @434media/founder
+/app/api/unsubscribe/                        @434media/founder
+/app/api/lead-with-ops/                      @434media/founder
+/app/api/admin/mailchimp/                    @434media/founder
+/app/api/admin/audiences/                    @434media/founder
+/app/api/admin/contact-forms/*/reply/        @434media/founder
+/app/api/admin/contact-forms/bulk-acknowledge/ @434media/founder
+/app/api/admin/leads/*/send-outreach/        @434media/founder
+/app/api/admin/migrate-partner-leads-to-audience/ @434media/founder
+/scripts/send-broadcast*.ts                  @434media/founder
+
+# Posts
+/lib/instagram-publishing.ts                 @434media/founder
+/lib/owned-meta-*.ts                         @434media/founder
+/app/api/owned-meta/                         @434media/founder
+/app/api/admin/owned-meta/                   @434media/founder
+/app/api/admin/crm/content-posts/*/publish/  @434media/founder
+/app/api/admin/crm/content-posts/*/owned-meta/ @434media/founder
