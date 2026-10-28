@@ -66,8 +66,10 @@ async function main() {
     ;(fromNext("@next/env") as { loadEnvConfig: (dir: string, dev?: boolean, log?: unknown) => unknown }).loadEnvConfig(envDir, false, { info: () => {}, error: console.error })
   }
   // Writes go through the create-only publishing credential; reads (the check after each write) through the site's.
-  const bucket = production ? getStorage(initializeApp({ credential: cert(JSON.parse(await readFile(key!, "utf8"))) }, "brand-assets-publisher")).bucket(BRAND_ASSETS_BUCKET) : null
+  // The reader comes first: the site's getFirebaseApp() adopts whichever app already exists, so made second it would
+  // read with the publishing credential, which cannot read.
   const reader = production ? (await import("../../lib/firebase-admin")).getBucket(BRAND_ASSETS_BUCKET) : null
+  const bucket = production ? getStorage(initializeApp({ credential: cert(JSON.parse(await readFile(key!, "utf8"))) }, "brand-assets-publisher")).bucket(BRAND_ASSETS_BUCKET) : null
   console.log(`target: ${production ? `gs://${BRAND_ASSETS_BUCKET}` : local}`)
 
   /** Creates the object, or confirms an identical one is already there; a different one stops the run. */
