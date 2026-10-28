@@ -109,7 +109,7 @@ test("ADM-11: a member's address must stay on the workspace domain, on edit as o
   assert.deepEqual(normalizeTeamMemberEmail(" Staff@434Media.com "), { email: "staff@434media.com" })
   assert.deepEqual(normalizeTeamMemberEmail(""), { email: "" })
   assert.deepEqual(normalizeTeamMemberEmail(undefined), { email: "" })
-  for (const bad of ["someone@gmail.com", "x@434media.com.evil.test", "x@not434media.com", 42, {}]) {
+  for (const bad of ["someone@example.com", "x@434media.com.evil.test", "x@not434media.test", 42, {}]) {
     assert.ok("error" in normalizeTeamMemberEmail(bad), String(bad))
   }
   const src = read("app/api/admin/team-members/route.ts")
