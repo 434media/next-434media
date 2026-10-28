@@ -52,3 +52,23 @@ test("a token with no email is refused", async () => {
   const d = await decideFirebaseSignIn({ email_verified: true }, deps("production"))
   assert.deepEqual(d.ok ? null : [d.status, d.error], [400, "email_missing"])
 })
+
+test("verifiedEmail, the rule the travel portal shares: unverified and missing are refused", async () => {
+  const { verifiedEmail } = await import("../firebase-signin")
+  assert.deepEqual(verifiedEmail({ email: "Viewer@Example.test", email_verified: true }), { ok: true, email: "viewer@example.test" })
+  for (const email_verified of [false, undefined]) {
+    const r = verifiedEmail({ email: "viewer@example.test", email_verified })
+    assert.deepEqual(r.ok ? null : [r.status, r.error], [403, "email_not_verified"])
+  }
+  const none = verifiedEmail({ email_verified: true })
+  assert.deepEqual(none.ok ? null : [none.status, none.error], [400, "email_missing"])
+})
+
+test("the travel sign-in route gates on verifiedEmail before it reads the access list", async () => {
+  const { readFileSync } = await import("node:fs")
+  const { join } = await import("node:path")
+  const src = readFileSync(join(__dirname, "..", "..", "app", "api", "travel", "auth", "signin", "route.ts"), "utf8")
+  const gate = src.indexOf("verifiedEmail(await verifyFirebaseToken(idToken, true))")
+  assert.ok(gate > 0, "the route verifies the token with revocation and passes it through verifiedEmail")
+  assert.ok(gate < src.indexOf("authorizeTravelViewer("), "the gate runs before the access list is read")
+})

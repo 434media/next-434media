@@ -27,10 +27,23 @@ export interface FirebaseSignInDeps {
   vercelEnv?: string
 }
 
-export async function decideFirebaseSignIn(token: FirebaseIdentity, deps: FirebaseSignInDeps): Promise<FirebaseSignInDecision> {
+/**
+ * The rule every email-and-password sign-in on this site shares (the admin, and the travel portal): the token must
+ * carry an email, and Firebase must say it is verified. Returns the address, lower-cased, or the refusal.
+ */
+export function verifiedEmail(
+  token: FirebaseIdentity,
+): { ok: true; email: string } | { ok: false; status: 400 | 403; error: "email_missing" | "email_not_verified"; reason: string } {
   const email = token.email?.trim().toLowerCase()
   if (!email) return { ok: false, status: 400, error: "email_missing", reason: "no email in token" }
   if (token.email_verified !== true) return { ok: false, status: 403, error: "email_not_verified", reason: "email not verified" }
+  return { ok: true, email }
+}
+
+export async function decideFirebaseSignIn(token: FirebaseIdentity, deps: FirebaseSignInDeps): Promise<FirebaseSignInDecision> {
+  const verified = verifiedEmail(token)
+  if (!verified.ok) return verified
+  const email = verified.email
   if (deps.vercelEnv === "production" && deps.isWorkspaceEmail(email)) {
     return { ok: false, status: 403, error: "workspace_use_google", reason: "workspace address on the email path" }
   }
