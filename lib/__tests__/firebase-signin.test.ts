@@ -33,9 +33,17 @@ test("a workspace address on the email path is refused in production, verified o
   assert.deepEqual(d.ok ? null : [d.status, d.error], [403, "workspace_use_google"])
 })
 
-test("a verified workspace address may use the email path on a preview, where Google sign-in does not work", async () => {
-  const d = await decideFirebaseSignIn({ email: "staff@workspace.test", email_verified: true }, deps("preview"))
-  assert.equal(d.ok, true)
+test("a verified workspace address may use the email path on a preview or development deployment only", async () => {
+  for (const env of ["preview", "development"]) {
+    assert.equal((await decideFirebaseSignIn({ email: "staff@workspace.test", email_verified: true }, deps(env))).ok, true, env)
+  }
+})
+
+test("an unset or unknown VERCEL_ENV counts as production: the workspace refusal fails closed", async () => {
+  for (const env of [undefined, "", "staging", "Production"]) {
+    const d = await decideFirebaseSignIn({ email: "staff@workspace.test", email_verified: true }, deps(env))
+    assert.deepEqual(d.ok ? null : [d.status, d.error], [403, "workspace_use_google"], String(env))
+  }
 })
 
 test("a verified roster member is admitted with the roster's role", async () => {

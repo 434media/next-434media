@@ -7,8 +7,9 @@ import type { AdminRole } from "./auth"
  * The Firebase Auth tenant is shared across 434's web projects, and its accounts can be created with any address. A
  * token's `email` alone proves nothing about who holds that inbox, so:
  *  - the token must say `email_verified`: the holder has opened a link sent to the address;
- *  - in production, a 434 workspace address must come through Google sign-in instead. Previews keep the email path for
- *    workspace staff, because Google sign-in does not work on preview hosts.
+ *  - a 434 workspace address must come through Google sign-in instead, except on a Vercel preview or development
+ *    deployment, where Google sign-in does not work. Anything else, an unset VERCEL_ENV included, counts as production:
+ *    the refusal fails closed.
  * Only then does the roster decide (authorizeAdminSignIn).
  */
 export interface FirebaseIdentity {
@@ -44,7 +45,8 @@ export async function decideFirebaseSignIn(token: FirebaseIdentity, deps: Fireba
   const verified = verifiedEmail(token)
   if (!verified.ok) return verified
   const email = verified.email
-  if (deps.vercelEnv === "production" && deps.isWorkspaceEmail(email)) {
+  const emailPathOpenToWorkspace = deps.vercelEnv === "preview" || deps.vercelEnv === "development"
+  if (!emailPathOpenToWorkspace && deps.isWorkspaceEmail(email)) {
     return { ok: false, status: 403, error: "workspace_use_google", reason: "workspace address on the email path" }
   }
   const decision = await deps.authorize(email)
