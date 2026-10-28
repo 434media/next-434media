@@ -76,10 +76,15 @@ async function main() {
       try {
         await bucket.file(p).save(data, { resumable: false, contentType, metadata: { metadata }, preconditionOpts: { ifGenerationMatch: 0 } })
       } catch (err) {
-        if ((err as { code?: number }).code !== 412) throw err
-        const [have] = await reader!.file(p).download()
-        if (sha256(have) !== sha256(data)) throw new Error(`${p} is already published with different bytes; publish the change under a new version name`)
-        console.log(`  ${p}: already published, identical`); return
+        const { code, message } = err as { code?: number; message?: string }
+        if (code === 412) {
+          const [have] = await reader!.file(p).download()
+          if (sha256(have) !== sha256(data)) throw new Error(`${p} is already published with different bytes; publish the change under a new version name`)
+          console.log(`  ${p}: already published, identical`); return
+        }
+        // Storage creates the object, then answers with its metadata, which a create-only credential may not read: the
+        // write has landed, and the read-back below is the check.
+        if (!(code === 403 && message?.includes("storage.objects.get"))) throw err
       }
       const [back] = await reader!.file(p).download()
       if (sha256(back) !== sha256(data)) throw new Error(`${p}: read back differs`)
