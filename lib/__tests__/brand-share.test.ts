@@ -22,7 +22,7 @@ function fakeStore(): BrandShareStore & { all: BrandShare[]; viewsOf: Record<str
       const used = counts[cap(s.sender_email, g.day)] ?? 0, k = keys[g.key]
       if (k && Date.parse(s.created_at) - Date.parse(k.at) < g.windowMs) return { ok: false as const, reason: "repeat" as const, shareId: k.id }
       if (used >= g.cap) return { ok: false as const, reason: "cap" as const, used }
-      const share: BrandShare = { ...s, id: `share${++n}`, status: "pending", resend_message_id: null, error: null, revoked: false, revoked_by: null, revoked_at: null, view_count: 0, last_viewed_at: null }
+      const share: BrandShare = { ...s, id: `share${++n}`, status: "pending", resend_message_id: null, error: null, revoked: false, revoked_by: null, revoked_at: null, view_count: 0, last_viewed_at: null, download_count: 0, last_downloaded_at: null }
       all.push(share); counts[cap(s.sender_email, g.day)] = used + 1; keys[g.key] = { id: share.id, at: s.created_at }
       return { ok: true as const, share: { ...share } }
     },
@@ -35,6 +35,8 @@ function fakeStore(): BrandShareStore & { all: BrandShare[]; viewsOf: Record<str
     async revoke(id, actor, at) { const s = find(id); if (s && !s.revoked) Object.assign(s, { revoked: true, revoked_by: actor, revoked_at: at }); return s },
     async recordView(id, at) { (viewsOf[id] ??= []).push(at); const s = find(id)!; s.view_count++; s.last_viewed_at = at },
     views: async id => (viewsOf[id] ?? []).map(at => ({ at })),
+    async recordDownload(id, at) { const s = find(id)!; s.download_count++; s.last_downloaded_at = at },
+    downloads: async () => [],
   }
 }
 

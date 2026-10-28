@@ -13,12 +13,12 @@ export const dynamic = "force-dynamic"
 const listed = (s: BrandShare, now: Date) => ({
   id: s.id, state: shareState(s, now), versionId: s.version_id, recipientName: s.recipient_name, recipientEmail: s.recipient_email, recipientCountry: s.recipient_country,
   senderEmail: s.sender_email, via: s.via, createdAt: s.created_at, expiresAt: s.expires_at, revokedBy: s.revoked_by, revokedAt: s.revoked_at,
-  views: s.view_count, lastViewedAt: s.last_viewed_at, messageId: s.resend_message_id,
+  views: s.view_count, lastViewedAt: s.last_viewed_at, downloads: s.download_count, lastDownloadedAt: s.last_downloaded_at, messageId: s.resend_message_id,
 })
 
 /**
  * GET /api/admin/brands/[id]/shares — the brand's vendor shares (plan v11.2.1 Step 4 item 4), newest first, with their
- * state and views, and how many the caller has left today. 434 staff (interns excluded), as the brand book.
+ * state, views and downloads, and how many the caller has left today. 434 staff (interns excluded), as the brand book.
  */
 export async function GET(_req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
   const auth = await requireStaff()

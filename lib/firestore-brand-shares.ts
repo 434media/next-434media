@@ -6,6 +6,7 @@ import { CRM_COLLECTIONS } from "../types/crm-types"
 /**
  * Firestore for brand-book shares with vendors (plan v11.2.1 Step 4 item 4): `brand_shares/<id>`, one per share, and
  * `brand_shares/<id>/views/<auto>`, one per opening of the link (deduplicated per minute, at most MAX_STORED_VIEWS kept);
+ * `brand_shares/<id>/downloads/<auto>`, one per zip downloaded through the link, with the files it held (Step 4 item 6);
  * and `brand_share_guards`, the daily counter and the repeat key, taken in one transaction with the share. The record is the send's audit record too: who sent
  * which brand and version to whom, when, how (button or command) and the Resend message id.
  *
@@ -18,6 +19,7 @@ import { CRM_COLLECTIONS } from "../types/crm-types"
 const COLLECTION = CRM_COLLECTIONS.BRAND_SHARES
 const GUARDS = CRM_COLLECTIONS.BRAND_SHARE_GUARDS
 const VIEWS = "views"
+const DOWNLOADS = "downloads"
 /** A share's views stored at most: the count keeps going, the time records stop (a link pasted somewhere busy). */
 export const MAX_STORED_VIEWS = 200
 
@@ -48,9 +50,14 @@ export interface BrandShare {
   revoked_at: string | null
   view_count: number
   last_viewed_at: string | null
+  /** Zips downloaded through the link (Step 4 item 6), recorded like views. */
+  download_count: number
+  last_downloaded_at: string | null
 }
-export type NewBrandShare = Omit<BrandShare, "id" | "status" | "resend_message_id" | "error" | "revoked" | "revoked_by" | "revoked_at" | "view_count" | "last_viewed_at">
+export type NewBrandShare = Omit<BrandShare, "id" | "status" | "resend_message_id" | "error" | "revoked" | "revoked_by" | "revoked_at" | "view_count" | "last_viewed_at" | "download_count" | "last_downloaded_at">
 export interface ShareView { at: string }
+/** One download: when, and the ids of the files in the zip (file names, and `font:<face>`). */
+export interface ShareDownload { at: string; files: string[] }
 /** The send guards (lib/brand-share-send.ts): the requester's day, the repeat key, the cap and the repeat window. */
 export interface ShareGuard { day: string; key: string; cap: number; windowMs: number }
 export type Reserved = { ok: true; share: BrandShare } | { ok: false; reason: "cap"; used: number } | { ok: false; reason: "repeat"; shareId: string }
@@ -72,6 +79,9 @@ export interface BrandShareStore {
   /** Records an opening, unless one was recorded in the last minute; the time is kept for the first MAX_STORED_VIEWS. */
   recordView(id: string, at: string): Promise<void>
   views(id: string): Promise<ShareView[]>
+  /** Records a download and what it held; the time and files are kept for the first MAX_STORED_VIEWS. */
+  recordDownload(id: string, at: string, files: string[]): Promise<void>
+  downloads(id: string): Promise<ShareDownload[]>
 }
 
 const str = (v: unknown) => typeof v === "string" ? v : ""
@@ -102,6 +112,7 @@ function normalize(id: string, raw: FirebaseFirestore.DocumentData): BrandShare 
     // Anything but an explicit false is treated as revoked: a malformed record never opens.
     revoked: raw.revoked !== false, revoked_by: strOrNull(raw.revoked_by), revoked_at: strOrNull(toIsoString(raw.revoked_at)),
     view_count: Number(raw.view_count) || 0, last_viewed_at: strOrNull(toIsoString(raw.last_viewed_at)),
+    download_count: Number(raw.download_count) || 0, last_downloaded_at: strOrNull(toIsoString(raw.last_downloaded_at)),
   }
 }
 
@@ -117,7 +128,7 @@ export function firestoreBrandShares(db: FirebaseFirestore.Firestore = getDb()):
         const taken = key.exists ? key.data()! : null
         if (taken && Date.parse(share.created_at) - Date.parse(String(taken.at)) < guard.windowMs) return { ok: false, reason: "repeat", shareId: String(taken.share_id) }
         if (used >= guard.cap) return { ok: false, reason: "cap", used }
-        const doc = { ...share, status: "pending", resend_message_id: null, error: null, revoked: false, revoked_by: null, revoked_at: null, view_count: 0, last_viewed_at: null }
+        const doc = { ...share, status: "pending", resend_message_id: null, error: null, revoked: false, revoked_by: null, revoked_at: null, view_count: 0, last_viewed_at: null, download_count: 0, last_downloaded_at: null }
         tx.create(ref, doc)
         tx.set(capRef, { day: guard.day, count: used + 1 }, { merge: true })
         tx.set(keyRef, { share_id: ref.id, at: share.created_at })
@@ -166,5 +177,16 @@ export function firestoreBrandShares(db: FirebaseFirestore.Firestore = getDb()):
       })
     },
     views: async id => (await col.doc(id).collection(VIEWS).orderBy("at", "asc").get()).docs.map(d => ({ at: toIsoString(d.data().at) })),
+    async recordDownload(id, at, files) {
+      const ref = col.doc(id)
+      await db.runTransaction(async tx => {
+        const snap = await tx.get(ref)
+        if (!snap.exists) return
+        if ((Number(snap.data()!.download_count) || 0) < MAX_STORED_VIEWS) tx.create(ref.collection(DOWNLOADS).doc(), { at, files: files.slice(0, 50) })
+        tx.update(ref, { download_count: FieldValue.increment(1), last_downloaded_at: at })
+      })
+    },
+    downloads: async id => (await col.doc(id).collection(DOWNLOADS).orderBy("at", "asc").get()).docs
+      .map(d => ({ at: toIsoString(d.data().at), files: Array.isArray(d.data().files) ? d.data().files.map(String) : [] })),
   }
 }

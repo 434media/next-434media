@@ -106,6 +106,11 @@ export function getDb(): admin.firestore.Firestore {
   return db
 }
 
+/** A Cloud Storage bucket, read with the same service account as Firestore. */
+export function getBucket(name: string) {
+  return admin.storage(getFirebaseApp()).bucket(name)
+}
+
 // Named database instances cache
 const namedDbs: Record<string, admin.firestore.Firestore> = {}
 
