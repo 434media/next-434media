@@ -119,7 +119,7 @@ export function BrandShares({ brandId, brand, versionId }: { brandId: string; br
                   <td className={`py-1.5 pr-3 ${STATE_TONE[s.state]}`}>{STATE_LABEL[s.state]}{s.state === "active" ? ` until ${day(s.expiresAt)}` : s.state === "revoked" && s.revokedBy ? ` by ${s.revokedBy}` : ""}</td>
                   <td className="py-1.5 pr-3 text-neutral-600">{s.views}{s.lastViewedAt ? `, last ${when(s.lastViewedAt)}` : ""}</td>
                   <td className="py-1.5 text-right">
-                    {s.state === "active" && <button onClick={() => revoke(s)} disabled={!!busy} className="inline-flex h-7 items-center gap-1 rounded border border-neutral-300 bg-white px-2 hover:bg-neutral-50 disabled:opacity-40">
+                    {s.state === "active" && <button onClick={() => revoke(s)} disabled={!!busy} className="inline-flex h-7 items-center gap-1 whitespace-nowrap rounded border border-neutral-300 bg-white px-2 hover:bg-neutral-50 disabled:opacity-40">
                       {busy === s.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Ban className="h-3.5 w-3.5" />} Revoke
                     </button>}
                   </td>
