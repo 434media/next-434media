@@ -4,7 +4,7 @@ import {
   getSession,
   isAuthorizedAdmin,
   isCrmSuperAdmin,
-  CRM_SUPER_ADMIN_FALLBACK,
+  ownerEmails,
   type AdminRole,
 } from "@/lib/auth"
 import type { SquadKey } from "@/components/crm/types"
@@ -45,7 +45,7 @@ async function requireSuperAdmin() {
 }
 
 /**
- * Canonical full names for the hardcoded super-admin fallback.
+ * Canonical full names for the owners.
  * MUST match the names used elsewhere in the CRM (TEAM_MEMBERS in
  * components/crm/types.ts, OWNER_MAP, normalizeAssigneeName) so that
  * filtering "show me my clients" actually matches `client.assigned_to`.
@@ -56,7 +56,7 @@ const SUPER_ADMIN_CANONICAL_NAMES: Record<string, string> = {
 }
 
 /**
- * Silent backfill: ensure the hardcoded fallback super-admins have
+ * Silent backfill: ensure the owners (ADMIN_OWNER_EMAILS) have
  * `role: "crm_super_admin"` AND the canonical full name in Firestore.
  * Runs on every GET; idempotent. Self-heals records seeded by an earlier
  * version of this backfill that used a short name (e.g., "Jesse" instead
@@ -66,7 +66,7 @@ async function ensureSuperAdminBackfill(): Promise<{ promoted: string[]; renamed
   const db = getDb()
   const promoted: string[] = []
   const renamed: string[] = []
-  for (const email of CRM_SUPER_ADMIN_FALLBACK) {
+  for (const email of ownerEmails()) {
     const canonicalName = SUPER_ADMIN_CANONICAL_NAMES[email] ?? email.split("@")[0]
     const snap = await db
       .collection(TEAM_MEMBERS_COLLECTION)
