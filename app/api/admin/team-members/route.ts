@@ -294,11 +294,11 @@ export async function PATCH(request: Request) {
     if (email !== undefined) {
       // Held to the rule members are created under (security log ADM-11): the workspace domain, and one record per
       // address. A second record for an address would lock its owner out, since sign-in refuses duplicates.
-      const checkedEmail = normalizeTeamMemberEmail(email)
+      const checkedEmail = normalizeTeamMemberEmail(email, { required: true })
       if ("error" in checkedEmail) {
         return NextResponse.json({ success: false, error: checkedEmail.error }, { status: 400 })
       }
-      if (checkedEmail.email && checkedEmail.email !== targetEmail) {
+      if (checkedEmail.email !== targetEmail) {
         const clash = await db
           .collection(TEAM_MEMBERS_COLLECTION)
           .where("email", "==", checkedEmail.email)

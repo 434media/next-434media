@@ -1,5 +1,5 @@
 import { cookies } from 'next/headers'
-import { ADMIN_ROLES, SESSION_COOKIE, parseSessionCookie, signPayload } from './session-cookie'
+import { ADMIN_ROLES, SESSION_COOKIE, parseSessionCookieWithExpiry, sessionLifetime, signPayload } from './session-cookie'
 import type { AdminRole, AuthProvider, User } from './session-cookie'
 
 export type { AdminRole, AuthProvider, User } from './session-cookie'
@@ -158,11 +158,22 @@ export async function authorizeAdminSignIn(email: string, _provider: AuthProvide
 
 export async function getSession(): Promise<User | null> {
   const cookieStore = await cookies()
-  return parseSessionCookie(cookieStore.get(SESSION_COOKIE)?.value)
+  return parseSessionCookieWithExpiry(cookieStore.get(SESSION_COOKIE)?.value)?.user ?? null
 }
 
-export async function setSession(user: User): Promise<void> {
+/** The session with its signed expiry, for a re-issue that must keep it (setSession's `keepExpiresAt`). */
+export async function getSessionWithExpiry(): Promise<{ user: User; expiresAt: Date | null } | null> {
   const cookieStore = await cookies()
+  return parseSessionCookieWithExpiry(cookieStore.get(SESSION_COOKIE)?.value)
+}
+
+/**
+ * Issue the session cookie. A sign-in gets 24 hours. A re-issue of an existing session passes `keepExpiresAt`, the
+ * expiry it carried, so the re-issue does not extend it (sessionLifetime).
+ */
+export async function setSession(user: User, opts: { keepExpiresAt?: Date | null } = {}): Promise<void> {
+  const cookieStore = await cookies()
+  const lifetime = sessionLifetime(opts.keepExpiresAt)
 
   const sessionData = {
     user: {
@@ -173,7 +184,7 @@ export async function setSession(user: User): Promise<void> {
       role: user.role,
       emailVerified: user.emailVerified === true,
     },
-    expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(), // 24 hours
+    expiresAt: lifetime.expiresAt,
   }
 
   // Throws if the secret is missing — a login that can't be signed must fail,
@@ -185,7 +196,7 @@ export async function setSession(user: User): Promise<void> {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'lax',
-    maxAge: 24 * 60 * 60, // 24 hours
+    maxAge: lifetime.maxAge,
     path: '/',
   })
 }
@@ -288,7 +299,7 @@ export const CONTENT_PERMISSION = 'content'
 /**
  * Super-admin powers from a roster record: the `crm_super_admin` role on an ACTIVE record (security log ADM-8).
  * Deactivating a super admin in admin settings removes these powers at once, even inside a session that is still open.
- * Pure, so it is tested without Firestore (lib/__tests__/admin-roster-checks.test.ts). Owners are decided before this.
+ * Pure, so it is tested without Firestore (lib/__tests__/admin-small-findings.test.ts). Owners are decided before this.
  */
 export function rosterIsSuperAdmin(data: RosterRecord): boolean {
   return data.isActive !== false && data.role === 'crm_super_admin'

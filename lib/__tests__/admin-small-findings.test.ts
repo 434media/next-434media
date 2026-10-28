@@ -16,6 +16,7 @@ import {
 import { blogFiltersFor } from "../blog-access"
 import { bearerSecretMatches } from "../secret-compare"
 import { normalizeTeamMemberEmail } from "../team-member-email"
+import { SESSION_LIFETIME_MS, parseSessionCookieWithExpiry, sessionLifetime, signPayload } from "../session-cookie"
 
 const ROOT = join(__dirname, "..", "..")
 const read = (p: string) => readFileSync(join(ROOT, p), "utf8")
@@ -113,7 +114,16 @@ test("ADM-11: a member's address must stay on the workspace domain, on edit as o
     assert.ok("error" in normalizeTeamMemberEmail(bad), String(bad))
   }
   const src = read("app/api/admin/team-members/route.ts")
-  assert.equal(src.match(/normalizeTeamMemberEmail\(email\)/g)?.length, 2, "POST and PATCH both check the address")
+  assert.equal(src.match(/normalizeTeamMemberEmail\(email\)/g)?.length, 1, "POST checks the address")
+  assert.equal(src.match(/normalizeTeamMemberEmail\(email, \{ required: true \}\)/g)?.length, 1, "PATCH checks it too")
+})
+
+test("ADM-11 follow-up: an edit cannot clear a member's address, which would lock them out", () => {
+  for (const empty of ["", "   ", null]) {
+    assert.ok("error" in normalizeTeamMemberEmail(empty, { required: true }), JSON.stringify(empty))
+  }
+  assert.deepEqual(normalizeTeamMemberEmail("a@434media.com", { required: true }), { email: "a@434media.com" })
+  assert.ok("error" in normalizeTeamMemberEmail("someone@example.com", { required: true }))
 })
 
 // ADM-13
@@ -137,4 +147,41 @@ test("ADM-13: a profile edit re-issues the session with its role, provider and v
   const src = read("app/api/admin/profile/route.ts")
   assert.match(src, /setSession\(withProfileChanges\(session,/)
   assert.doesNotMatch(src, /\.add\(/, "a profile edit never creates a roster record")
+})
+
+test("ADM-13 follow-up: a re-issue keeps the session's expiry, so a profile edit cannot extend it", () => {
+  const now = new Date("2026-10-28T12:00:00.000Z")
+  const fresh = sessionLifetime(undefined, now)
+  assert.equal(fresh.expiresAt, new Date(now.getTime() + SESSION_LIFETIME_MS).toISOString())
+  assert.equal(fresh.maxAge, 24 * 60 * 60)
+  const inTwoHours = new Date(now.getTime() + 2 * 60 * 60 * 1000)
+  assert.deepEqual(sessionLifetime(inTwoHours, now), { expiresAt: inTwoHours.toISOString(), maxAge: 2 * 60 * 60 })
+  const inThreeDays = new Date(now.getTime() + 3 * SESSION_LIFETIME_MS)
+  assert.equal(sessionLifetime(inThreeDays, now).expiresAt, fresh.expiresAt, "never later than 24 hours from now")
+  assert.equal(sessionLifetime(new Date(now.getTime() - 1000), now).maxAge, 0)
+  assert.equal(sessionLifetime(new Date("not a date"), now).expiresAt, fresh.expiresAt)
+})
+
+test("ADM-13 follow-up: the signed expiry is read back from the cookie", () => {
+  const before = process.env.ADMIN_SESSION_SECRET
+  process.env.ADMIN_SESSION_SECRET = "made-up-test-secret-at-least-32-characters-long"
+  try {
+    const expiresAt = new Date(Date.now() + 60 * 60 * 1000).toISOString()
+    const payload = Buffer.from(
+      JSON.stringify({ user: { email: "staffer@workspace.test", name: "S", role: "crm_only" }, expiresAt }),
+    ).toString("base64url")
+    const parsed = parseSessionCookieWithExpiry(`${payload}.${signPayload(payload)}`)
+    assert.equal(parsed?.expiresAt?.toISOString(), expiresAt)
+    assert.equal(parsed?.user.role, "crm_only")
+    assert.equal(parseSessionCookieWithExpiry(`${payload}.bad`), null)
+  } finally {
+    if (before === undefined) delete process.env.ADMIN_SESSION_SECRET
+    else process.env.ADMIN_SESSION_SECRET = before
+  }
+})
+
+test("ADM-13 follow-up: the profile route keeps the expiry and refuses a deactivated member", () => {
+  const src = read("app/api/admin/profile/route.ts")
+  assert.match(src, /keepExpiresAt: current\?\.expiresAt/)
+  assert.match(src, /isActive === false\) \{\s*return NextResponse\.json\(\{ error: "Forbidden: this account is deactivated" \}, \{ status: 403 \}\)/)
 })
