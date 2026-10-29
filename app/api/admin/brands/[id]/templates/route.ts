@@ -61,10 +61,10 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
     const templateId = spec?.templates[format], mediaField = spec?.media?.[format]
     if (!spec || !templateId) return NextResponse.json({ error: "The profile has no such template" }, { status: 404 })
     if (!mediaField) return NextResponse.json({ error: "This template takes no photo, so there is no frame to test" }, { status: 400 })
-    const [{ probeTemplateMedia }, sharp] = await Promise.all([import("@/lib/canva-create"), import("sharp").then(m => m.default)])
+    const [{ probeTemplateMedia, PROBE_LIMITS }, sharp] = await Promise.all([import("@/lib/canva-create"), import("sharp").then(m => m.default)])
     // A plain grey 4:5 PNG: small, and nothing anyone would mistake for a real photo.
     const image = await sharp({ create: { width: 400, height: 500, channels: 3, background: { r: 128, g: 128, b: 128 } } }).png().toBuffer()
-    const result = await probeTemplateMedia(s.canva, { templateId, mediaField, image })
+    const result = await probeTemplateMedia(s.canva, { templateId, mediaField, image }, PROBE_LIMITS)
     console.info("[POST /api/admin/brands/[id]/templates]", JSON.stringify({ by: auth.session.email, brand: id, version: s.active.versionId, series, format, template: templateId, outcome: result.outcome, code: result.code, cleanup: result.cleanup }))
     return NextResponse.json(result)
   } catch (err) {

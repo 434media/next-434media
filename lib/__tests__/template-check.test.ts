@@ -8,7 +8,7 @@ import assert from "node:assert/strict"
 import { published, loadPublishedProfileFirst } from "./published-profile"
 import { checkTemplates, templateProblems, DATASET_LIMIT } from "../content-pipeline/template-check"
 import { brokenFrameError } from "../content-pipeline/create-run"
-import { failedJobReason, probeTemplateMedia, profileTemplateIds, PROBE_TITLE } from "../canva-create"
+import { failedJobReason, probeTemplateMedia, profileTemplateIds, PROBE_TITLE, PROBE_LIMITS } from "../canva-create"
 import { seal, CanvaError, type CanvaDeps, type CanvaTokenRecord, type CanvaTokenStore } from "../canva-export"
 import type { ProfileSeries } from "../content-pipeline/profile"
 
@@ -168,4 +168,33 @@ test("a test fill that couldn't run says nothing is known; a frame the dataset l
   const missing = await probeTemplateMedia(s.deps, { templateId: TPL, mediaField: "photo", image: PNG }, LIMITS)
   assert.equal(missing.outcome, "autofill_error")
   assert.ok(!s.calls.some(c => c.url.includes("asset-uploads")))
+})
+
+test("a test fill Canva doesn't finish in time says a design may still appear and should be deleted by hand", async () => {
+  const s = probeSetup("success", url => url.endsWith("/autofills/af1") ? Response.json({ job: { id: "af1", status: "in_progress" } }) : null)
+  const r = await probeTemplateMedia(s.deps, { templateId: TPL, mediaField: "media", image: PNG }, LIMITS)
+  assert.equal(r.outcome, "error"); assert.equal(r.code, "timeout"); assert.match(r.reason, /nothing is known/)
+  assert.deepEqual(r.cleanup, [`A test design titled "${PROBE_TITLE}" may still appear in the connected Canva account's Projects (Canva didn't report it back in time); delete it by hand`])
+  assert.ok(s.calls.some(c => c.method === "DELETE" && c.url.endsWith("/assets/MAtest01")), "the image it knows of still goes to Trash")
+  const up = probeSetup("success", url => url.endsWith("/asset-uploads/up1") ? Response.json({ job: { id: "up1", status: "in_progress" } }) : null)
+  const u = await probeTemplateMedia(up.deps, { templateId: TPL, mediaField: "media", image: PNG }, LIMITS)
+  assert.equal(u.outcome, "error")
+  assert.deepEqual(u.cleanup, [`A test image titled "${PROBE_TITLE}" may still appear in the connected Canva account's Uploads (Canva didn't report it back in time); delete it by hand`])
+  assert.ok(!up.calls.some(c => c.url.endsWith("/autofills")), "no fill without the image")
+})
+
+test("a fill that succeeds without naming its design says one may still appear", async () => {
+  const s = probeSetup("success", url => url.endsWith("/autofills/af1") ? Response.json({ job: { id: "af1", status: "success", result: {} } }) : null)
+  const r = await probeTemplateMedia(s.deps, { templateId: TPL, mediaField: "media", image: PNG }, LIMITS)
+  assert.match(r.cleanup.join(), /may still appear in the connected Canva account's Projects/)
+})
+
+test("a design moved into the check's folder whose delete failed is said to be in that folder, not in Projects", async () => {
+  const s = probeSetup("success", (url, init) => url.endsWith("/folders/FAFprobe01") && init.method === "DELETE" ? Response.json({ code: "internal_error" }, { status: 500 }) : null)
+  const r = await probeTemplateMedia(s.deps, { templateId: TPL, mediaField: "media", image: PNG }, LIMITS)
+  assert.deepEqual(r.cleanup, [`The test design "${PROBE_TITLE}" is in a folder named "${PROBE_TITLE}" in the connected Canva account's Projects (internal_error); delete the folder by hand`])
+})
+
+test("the probe's own waits fit the route's 120 s", () => {
+  assert.ok(2 * PROBE_LIMITS.polls * PROBE_LIMITS.intervalMs <= 60_000)
 })
