@@ -1,3 +1,4 @@
+import { jsonLdScript } from "@/lib/json-ld"
 import type { Metadata } from "next"
 import { notFound } from "next/navigation"
 import { getBlogPostBySlugFromFirestore } from "@/lib/firestore-blog"
@@ -101,7 +102,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     },
     other: {
       // Provide JSON-LD inline if consumer wants to embed later
-      structuredData: JSON.stringify({
+      structuredData: jsonLdScript({
         '@context': 'https://schema.org',
         '@type': 'Article',
         headline: post.title,
@@ -139,7 +140,7 @@ export default async function BlogPostPage({ params }: Props) {
         <>
           <script
             type="application/ld+json"
-            dangerouslySetInnerHTML={{ __html: JSON.stringify({
+            dangerouslySetInnerHTML={{ __html: jsonLdScript({
               '@context': 'https://schema.org',
               '@type': 'Article',
               headline: post.title,
@@ -160,7 +161,7 @@ export default async function BlogPostPage({ params }: Props) {
           />
           <script
             type="application/ld+json"
-            dangerouslySetInnerHTML={{ __html: JSON.stringify({
+            dangerouslySetInnerHTML={{ __html: jsonLdScript({
               '@context': 'https://schema.org',
               '@type': 'BreadcrumbList',
               itemListElement: [

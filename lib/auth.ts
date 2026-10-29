@@ -1,6 +1,7 @@
 import { cookies } from 'next/headers'
 import { ADMIN_ROLES, SESSION_COOKIE, parseSessionCookieWithExpiry, sessionLifetime, signPayload } from './session-cookie'
 import type { AdminRole, AuthProvider, User } from './session-cookie'
+import { applyRosterDecision, createRosterChecker } from './session-roster'
 
 export type { AdminRole, AuthProvider, User } from './session-cookie'
 export { parseSessionCookie } from './session-cookie'
@@ -156,15 +157,37 @@ export async function authorizeAdminSignIn(email: string, _provider: AuthProvide
   }
 }
 
-export async function getSession(): Promise<User | null> {
+/**
+ * The roster re-check every session read goes through (lib/session-roster.ts): the same decision as sign-in, reused for
+ * up to a minute per address, so a deactivation, removal or role change takes effect on the next request after that
+ * minute instead of when the 24-hour cookie expires.
+ */
+const rosterChecker = createRosterChecker((email) => authorizeAdminSignIn(email, 'firebase'))
+
+/** The signed cookie's session, re-checked against the roster: null if no longer admitted, else the current role. */
+async function currentSession(): Promise<{ user: User; expiresAt: Date | null } | null> {
   const cookieStore = await cookies()
-  return parseSessionCookieWithExpiry(cookieStore.get(SESSION_COOKIE)?.value)?.user ?? null
+  const parsed = parseSessionCookieWithExpiry(cookieStore.get(SESSION_COOKIE)?.value)
+  if (!parsed) return null
+  const decision = await rosterChecker.decide(parsed.user.email)
+  const user = applyRosterDecision(parsed.user, decision)
+  if (!user) {
+    console.warn(`[auth] session for ${parsed.user.email} refused on roster re-check (${'reason' in decision ? decision.reason : 'denied'})`)
+    return null
+  }
+  return { user, expiresAt: parsed.expiresAt }
 }
 
-/** The session with its signed expiry, for a re-issue that must keep it (setSession's `keepExpiresAt`). */
+export async function getSession(): Promise<User | null> {
+  return (await currentSession())?.user ?? null
+}
+
+/**
+ * The session with its signed expiry, for a re-issue that must keep it (setSession's `keepExpiresAt`). Re-checked like
+ * getSession, so a profile edit re-issues the roster's current role and can never revive a deactivated session.
+ */
 export async function getSessionWithExpiry(): Promise<{ user: User; expiresAt: Date | null } | null> {
-  const cookieStore = await cookies()
-  return parseSessionCookieWithExpiry(cookieStore.get(SESSION_COOKIE)?.value)
+  return currentSession()
 }
 
 /**

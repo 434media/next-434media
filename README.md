@@ -185,7 +185,7 @@ Centralized email collection across all brand websites:
 | `app/api/newsletter/route.ts` | 434Media signup (BotID protected) |
 | `app/api/sdoh-newsletter/route.ts` | SDOH signup (BotID protected) |
 | `app/api/txmx-newsletter/route.ts` | TXMX signup (BotID protected) |
-| `app/api/public/email-signup/route.ts` | External API (BotID + optional API key) |
+| `app/api/public/email-signup/route.ts` | External API (BotID + required `x-api-key`, `EMAIL_SIGNUP_API_KEY`; refuses every request in production when unset) |
 | `app/admin/audiences/` | Admin UI for viewing/exporting cohorts |
 
 **Flow:**

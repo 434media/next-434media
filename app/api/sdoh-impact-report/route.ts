@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server"
-import { checkBotId } from "botid/server"
+import { requireHumanRequest } from "@/lib/botid-guard"
 import { subscribeEmail } from "@/lib/newsletter-subscribe"
 import { tagsForSource, brandTag } from "@/lib/mailchimp-tags"
 
@@ -14,12 +14,11 @@ import { tagsForSource, brandTag } from "@/lib/mailchimp-tags"
  */
 export async function POST(request: Request) {
   try {
-    const { email, subscribeToNewsletter } = await request.json()
+    // BotID guard first, through the shared helper: blocks bots and fails closed if the check itself errors.
+    const human = await requireHumanRequest()
+    if (!human.ok) return human.response
 
-    const verification = await checkBotId()
-    if (verification.isBot) {
-      return NextResponse.json({ error: "Access denied" }, { status: 403 })
-    }
+    const { email, subscribeToNewsletter } = await request.json()
     if (!email || typeof email !== "string" || !email.includes("@")) {
       return NextResponse.json({ error: "Valid email is required" }, { status: 400 })
     }

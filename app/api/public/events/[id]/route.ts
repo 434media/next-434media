@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server"
+import { hasQueryApiKey, secretMatches } from "@/lib/require-secret"
 import { getAimsEventByIdFromFirestore } from "@/lib/firestore-aims-events"
 
 // ============================================
@@ -28,7 +29,9 @@ function getCorsHeaders(requestOrigin: string | null): Record<string, string> {
   return headers
 }
 
-// Validate API key from request
+// Validate API key from request. Header only (X-API-Key, or Authorization: Bearer), compared in constant time. The
+// `?api_key=` query form was removed (security sweep 2026-10-29): it put the key in URLs and request logs, and its one
+// documented caller, aimsatx.com, no longer serves this site. A request still using it is refused and logged.
 function validateApiKey(request: Request): { valid: boolean; error?: string } {
   if (!REQUIRE_API_KEY) {
     return { valid: true }
@@ -39,22 +42,15 @@ function validateApiKey(request: Request): { valid: boolean; error?: string } {
     return { valid: false, error: "API not properly configured" }
   }
 
-  const apiKeyHeader = request.headers.get("X-API-Key")
-  if (apiKeyHeader === API_SECRET) {
-    return { valid: true }
-  }
-
   const authHeader = request.headers.get("Authorization")
-  if (authHeader?.startsWith("Bearer ") && authHeader.slice(7) === API_SECRET) {
+  const bearer = authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : null
+  if (secretMatches(request.headers.get("X-API-Key") || bearer, API_SECRET)) {
     return { valid: true }
   }
 
-  const { searchParams } = new URL(request.url)
-  const apiKeyParam = searchParams.get("api_key")
-  if (apiKeyParam === API_SECRET) {
-    return { valid: true }
+  if (hasQueryApiKey(request)) {
+    console.warn("[Events API] refused a request passing ?api_key= (removed; send the X-API-Key header instead)")
   }
-
   return { valid: false, error: "Invalid or missing API key" }
 }
 

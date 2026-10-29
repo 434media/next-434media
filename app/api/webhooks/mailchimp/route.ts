@@ -1,5 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { captureLeadFromEmailSignup } from "@/lib/firestore-leads"
+import { secretMatches } from "@/lib/secret-compare"
 
 export const runtime = "nodejs"
 
@@ -24,7 +25,8 @@ function authorize(req: NextRequest): { ok: true } | { ok: false; status: number
   }
   const url = new URL(req.url)
   const provided = url.searchParams.get(SECRET_PARAM)
-  if (provided !== expected) {
+  // Constant time. The secret stays in the query: Mailchimp webhooks cannot send a custom header.
+  if (!secretMatches(provided, expected)) {
     return { ok: false, status: 401, error: "Invalid or missing secret" }
   }
   return { ok: true }
