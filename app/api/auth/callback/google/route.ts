@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
-import { setSession, isWorkspaceEmail, authorizeAdminSignIn, workspaceDomain } from '@/lib/auth'
+import { setSession, isVerifiedWorkspaceGoogleAccount, authorizeAdminSignIn, workspaceDomain } from '@/lib/auth'
 
 interface GoogleTokenResponse {
   access_token: string
@@ -96,15 +96,13 @@ export async function GET(request: NextRequest) {
 
     const userInfo: GoogleUserInfo = await userInfoResponse.json()
 
-    // Verify email is from workspace domain
-    if (!isWorkspaceEmail(userInfo.email)) {
+    // A verified account of the workspace itself (security log ADM-9): Google's `verified_email`, the hosted domain
+    // `hd`, and the address on the domain. A suffix alone admitted any Google account whose address merely ends in it.
+    if (!isVerifiedWorkspaceGoogleAccount(userInfo)) {
       return NextResponse.redirect(
         `${request.nextUrl.origin}/admin?error=unauthorized_domain`
       )
     }
-
-    // Note: Google Workspace accounts with 'hd' parameter are always verified,
-    // so we don't need to check email_verified for workspace accounts
 
     // Same authorization gate the Firebase path uses (security log ADM-2): the
     // domain check above proves identity only. Membership, active status and
@@ -123,8 +121,8 @@ export async function GET(request: NextRequest) {
       picture: userInfo.picture,
       authProvider: 'google',
       role: decision.role,
-      // Verified only when Google says so and the account belongs to the workspace itself (`hd`), not merely an
-      // address ending in the domain. The founder-only guard requires it (lib/founder-guard.ts).
+      // Admission above already required `verified_email` and `hd`; kept explicit because the founder-only guard
+      // reads it (lib/founder-guard.ts).
       emailVerified: userInfo.verified_email === true && userInfo.hd === workspaceDomain(),
     })
 

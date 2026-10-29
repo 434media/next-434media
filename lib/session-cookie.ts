@@ -61,6 +61,28 @@ function signatureMatches(expected: string, received: string): boolean {
  * proxy.ts passes the value from the request it is handling.
  */
 export function parseSessionCookie(value: string | undefined): User | null {
+  return parseSessionCookieWithExpiry(value)?.user ?? null
+}
+
+/** The session's default lifetime: 24 hours from issue. */
+export const SESSION_LIFETIME_MS = 24 * 60 * 60 * 1000
+
+/**
+ * The expiry and cookie max-age for a session being issued. A new sign-in gets the full 24 hours. A re-issue of an
+ * existing session (a profile edit) passes the original expiry and keeps it, never later than 24 hours from now, so
+ * re-issuing cannot extend a session (security log ADM-13 follow-up).
+ */
+export function sessionLifetime(keepExpiresAt: Date | null | undefined, now: Date = new Date()): {
+  expiresAt: string
+  maxAge: number
+} {
+  const max = now.getTime() + SESSION_LIFETIME_MS
+  const at = keepExpiresAt && !Number.isNaN(keepExpiresAt.getTime()) ? Math.min(keepExpiresAt.getTime(), max) : max
+  return { expiresAt: new Date(at).toISOString(), maxAge: Math.max(0, Math.ceil((at - now.getTime()) / 1000)) }
+}
+
+/** As parseSessionCookie, with the session's signed expiry (null when the payload carries none). */
+export function parseSessionCookieWithExpiry(value: string | undefined): { user: User; expiresAt: Date | null } | null {
   if (!value) {
     return null
   }
@@ -91,7 +113,7 @@ export function parseSessionCookie(value: string | undefined): User | null {
       return null
     }
 
-    return user
+    return { user, expiresAt: session.expiresAt ? new Date(session.expiresAt) : null }
   } catch (error) {
     console.error('Failed to parse session:', error)
     return null

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
 import type { NextRequest } from "next/server"
-import { getSession, setSession, isAuthorizedAdmin } from "@/lib/auth"
+import { getSession, getSessionWithExpiry, setSession, isAuthorizedAdmin, withProfileChanges } from "@/lib/auth"
 import { getDb } from "@/lib/firebase-admin"
 
 const TEAM_MEMBERS_COLLECTION = "crm_team_members"
@@ -68,7 +68,10 @@ export async function GET() {
 // PATCH - Update current user's profile (name and/or picture)
 export async function PATCH(request: NextRequest) {
   try {
-    const session = await getSession()
+    // The session with its signed expiry: the re-issue below keeps that expiry, so a profile edit cannot extend a
+    // session (security log ADM-13 follow-up).
+    const current = await getSessionWithExpiry()
+    const session = current?.user
 
     if (!session) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
@@ -113,18 +116,14 @@ export async function PATCH(request: NextRequest) {
       .limit(1)
       .get()
 
-    if (snapshot.empty) {
-      // Create new team member entry
-      await db.collection(TEAM_MEMBERS_COLLECTION).add({
-        name: name?.trim() || session.name,
-        email: normalizedEmail,
-        picture: picture || session.picture || "",
-        isActive: true,
-        created_at: now,
-        updated_at: now,
-      })
-    } else {
-      // Update existing team member
+    // Only an existing roster record is updated. A profile edit never creates one: a record made here carried no role
+    // (security log ADM-13), and roster membership is managed in admin settings. With no record (an owner who is not
+    // on the roster), the change applies to the session only.
+    // A deactivated member's open session cannot edit the profile or be re-issued.
+    if (!snapshot.empty && snapshot.docs[0].data().isActive === false) {
+      return NextResponse.json({ error: "Forbidden: this account is deactivated" }, { status: 403 })
+    }
+    if (!snapshot.empty) {
       const docId = snapshot.docs[0].id
       await db.collection(TEAM_MEMBERS_COLLECTION).doc(docId).update(updates)
     }
@@ -133,11 +132,10 @@ export async function PATCH(request: NextRequest) {
     const finalName = name?.trim() || session.name
     const finalPicture = picture !== undefined ? picture : session.picture
 
-    // Update the session with new values
-    await setSession({
-      email: session.email,
-      name: finalName,
-      picture: finalPicture,
+    // Re-issue the session with the same role, provider and verified flag (security log ADM-13): re-issuing without
+    // the role signed the user out.
+    await setSession(withProfileChanges(session, { name: finalName, picture: finalPicture }), {
+      keepExpiresAt: current?.expiresAt,
     })
 
     return NextResponse.json({

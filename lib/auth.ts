@@ -1,5 +1,5 @@
 import { cookies } from 'next/headers'
-import { ADMIN_ROLES, SESSION_COOKIE, parseSessionCookie, signPayload } from './session-cookie'
+import { ADMIN_ROLES, SESSION_COOKIE, parseSessionCookieWithExpiry, sessionLifetime, signPayload } from './session-cookie'
 import type { AdminRole, AuthProvider, User } from './session-cookie'
 
 export type { AdminRole, AuthProvider, User } from './session-cookie'
@@ -85,6 +85,7 @@ export interface RosterRecord {
   isActive?: unknown
   role?: unknown
   name?: unknown
+  permissions?: unknown
 }
 
 export type SignInDecision =
@@ -157,11 +158,22 @@ export async function authorizeAdminSignIn(email: string, _provider: AuthProvide
 
 export async function getSession(): Promise<User | null> {
   const cookieStore = await cookies()
-  return parseSessionCookie(cookieStore.get(SESSION_COOKIE)?.value)
+  return parseSessionCookieWithExpiry(cookieStore.get(SESSION_COOKIE)?.value)?.user ?? null
 }
 
-export async function setSession(user: User): Promise<void> {
+/** The session with its signed expiry, for a re-issue that must keep it (setSession's `keepExpiresAt`). */
+export async function getSessionWithExpiry(): Promise<{ user: User; expiresAt: Date | null } | null> {
   const cookieStore = await cookies()
+  return parseSessionCookieWithExpiry(cookieStore.get(SESSION_COOKIE)?.value)
+}
+
+/**
+ * Issue the session cookie. A sign-in gets 24 hours. A re-issue of an existing session passes `keepExpiresAt`, the
+ * expiry it carried, so the re-issue does not extend it (sessionLifetime).
+ */
+export async function setSession(user: User, opts: { keepExpiresAt?: Date | null } = {}): Promise<void> {
+  const cookieStore = await cookies()
+  const lifetime = sessionLifetime(opts.keepExpiresAt)
 
   const sessionData = {
     user: {
@@ -172,7 +184,7 @@ export async function setSession(user: User): Promise<void> {
       role: user.role,
       emailVerified: user.emailVerified === true,
     },
-    expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(), // 24 hours
+    expiresAt: lifetime.expiresAt,
   }
 
   // Throws if the secret is missing — a login that can't be signed must fail,
@@ -184,7 +196,7 @@ export async function setSession(user: User): Promise<void> {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'lax',
-    maxAge: 24 * 60 * 60, // 24 hours
+    maxAge: lifetime.maxAge,
     path: '/',
   })
 }
@@ -200,6 +212,33 @@ export function workspaceDomain(): string {
 
 export function isWorkspaceEmail(email: string): boolean {
   return email.endsWith(`@${workspaceDomain()}`)
+}
+
+/**
+ * Whether a Google userinfo (v2) response is a verified account of the workspace itself (security log ADM-9): Google
+ * says the address is verified (`verified_email`), the account belongs to the workspace (`hd`), and the address is on
+ * the workspace domain. An address merely ending in the domain is not enough. Identity only: the roster still decides
+ * admission (authorizeAdminSignIn).
+ */
+export function isVerifiedWorkspaceGoogleAccount(
+  info: { email?: unknown; verified_email?: unknown; hd?: unknown },
+  domain: string = workspaceDomain(),
+): boolean {
+  return (
+    info.verified_email === true &&
+    info.hd === domain &&
+    typeof info.email === 'string' &&
+    info.email.toLowerCase().endsWith(`@${domain}`)
+  )
+}
+
+/**
+ * The session to re-issue after a profile edit (security log ADM-13): the same identity, role, provider and verified
+ * flag, with only the display name and picture changed. Re-issuing without the role signed the user out.
+ */
+export function withProfileChanges(session: User, changes: { name: string; picture?: string | null }): User {
+  const { email, authProvider, role, emailVerified } = session
+  return { email, name: changes.name, picture: changes.picture || undefined, authProvider, role, emailVerified }
 }
 
 /**
@@ -240,7 +279,7 @@ export async function isCrmSuperAdmin(email?: string | null): Promise<boolean> {
       .limit(1)
       .get()
     if (snap.empty) return false
-    return snap.docs[0].data().role === 'crm_super_admin'
+    return rosterIsSuperAdmin(snap.docs[0].data() as RosterRecord)
   } catch (error) {
     console.error('[auth] isCrmSuperAdmin Firestore lookup failed; owners only:', error)
     return isOwnerEmail(lower)
@@ -256,6 +295,22 @@ export async function isCrmSuperAdmin(email?: string | null): Promise<boolean> {
  * the owners.
  */
 export const CONTENT_PERMISSION = 'content'
+
+/**
+ * Super-admin powers from a roster record: the `crm_super_admin` role on an ACTIVE record (security log ADM-8).
+ * Deactivating a super admin in admin settings removes these powers at once, even inside a session that is still open.
+ * Pure, so it is tested without Firestore (lib/__tests__/admin-small-findings.test.ts). Owners are decided before this.
+ */
+export function rosterIsSuperAdmin(data: RosterRecord): boolean {
+  return data.isActive !== false && data.role === 'crm_super_admin'
+}
+
+/** The content permission from a roster record: an active super admin, or an active member holding "content". */
+export function rosterCanRunContent(data: RosterRecord): boolean {
+  if (data.isActive === false) return false
+  if (data.role === 'crm_super_admin') return true
+  return Array.isArray(data.permissions) && data.permissions.includes(CONTENT_PERMISSION)
+}
 export async function canRunContent(email?: string | null): Promise<boolean> {
   if (!email) return false
   const lower = email.toLowerCase()
@@ -265,9 +320,7 @@ export async function canRunContent(email?: string | null): Promise<boolean> {
     const { getDb } = await import('./firebase-admin')
     const snap = await getDb().collection('crm_team_members').where('email', '==', lower).limit(1).get()
     if (snap.empty) return false
-    const data = snap.docs[0].data()
-    if (data.role === 'crm_super_admin') return true
-    return data.isActive !== false && Array.isArray(data.permissions) && data.permissions.includes(CONTENT_PERMISSION)
+    return rosterCanRunContent(snap.docs[0].data() as RosterRecord)
   } catch (error) {
     console.error('[auth] canRunContent Firestore lookup failed:', error)
     return false
