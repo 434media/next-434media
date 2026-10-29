@@ -1,7 +1,7 @@
 /** Offline. Brand-template autofill into a new working design (lib/canva-create.ts). No network, no Firestore. */
 import { test } from "node:test"
 import assert from "node:assert/strict"
-import { seal, CanvaError, type CanvaDeps, type CanvaTokenRecord, type CanvaTokenStore } from "../canva-export"
+import { seal, CanvaError, shownCanvaCode, type CanvaDeps, type CanvaTokenRecord, type CanvaTokenStore } from "../canva-export"
 import { createFromTemplate, failedJobReason, templateFields, profileTemplateIds, canvaEditUrl, type CreateDeps, type CreatedDesign, type WorkingFolder } from "../canva-create"
 import { TOOL_SCOPE } from "../owned-meta-connector"
 import { SERVICE_TOOL_SCOPE } from "../owned-meta-service"
@@ -213,5 +213,14 @@ test("a failed media import says what to do; an unknown code is named rather tha
   assert.match(failedJobReason("/asset-uploads", "file_too_big"), /too large/)
   assert.match(failedJobReason("/autofills", "trial_quota_exceeded"), /allowance/)
   assert.equal(failedJobReason("/autofills", "something_new"), "Canva could not complete the job (something_new)")
-  assert.equal(failedJobReason("/autofills"), "Canva could not complete the job (no reason given)")
+  assert.equal(failedJobReason("/autofills"), "Canva could not complete the job (unrecognised)")
+})
+
+test("a code that isn't a plain snake_case code never reaches the screen", () => {
+  for (const code of ["Some Canva sentence about the element", "AUTOFILL", "x".repeat(65), "<b>no</b>", ""]) {
+    assert.equal(failedJobReason("/autofills", code), "Canva could not complete the job (unrecognised)")
+    assert.equal(failedJobReason("/url-asset-uploads", code), "Canva could not import the media file (unrecognised)")
+  }
+  assert.equal(shownCanvaCode("design_update_error"), "design_update_error")
+  assert.equal(shownCanvaCode(42), "unrecognised")
 })

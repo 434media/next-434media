@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto"
-import { canvaAccessToken, CanvaError, exportDesignJpg, CANVA_API, type CanvaDeps } from "./canva-export"
+import { canvaAccessToken, CanvaError, exportDesignJpg, shownCanvaCode, CANVA_API, type CanvaDeps } from "./canva-export"
 
 /**
  * Canva Connect API: create a working design from an approved Brand Template (autofill) for the shared Slack app's
@@ -106,8 +106,9 @@ async function api(deps: CanvaDeps, token: string, path: string, init: RequestIn
   const response = await deps.fetcher(new URL(`${CANVA_API}${path}`), { ...init, headers: { authorization: `Bearer ${token}`, ...(init.body && !(init.headers as Record<string, string> | undefined)?.["content-type"] ? { "content-type": "application/json" } : {}), ...(init.headers as Record<string, string> | undefined) }, redirect: "error", cache: "no-store", signal: init.signal ?? AbortSignal.timeout(30_000) })
   const data = await response.json().catch(() => ({})) as Record<string, unknown>
   // Never surface Canva's message: only its short code or the HTTP status. Its text is kept on .detail for the log.
-  if (response.status === 401 || response.status === 403) throw new CanvaError("Canva refused this action; reconnect Canva with the design-creation permissions", (data.code as string) || `http_${response.status}`)
-  if (!response.ok) throw new CanvaError("Canva request failed", (data.code as string) || `http_${response.status}`, typeof data.message === "string" ? data.message.slice(0, 500) : undefined)
+  const detail = typeof data.message === "string" ? data.message.slice(0, 500) : undefined
+  if (response.status === 401 || response.status === 403) throw new CanvaError("Canva refused this action; reconnect Canva with the design-creation permissions", (data.code as string) || `http_${response.status}`, detail)
+  if (!response.ok) throw new CanvaError("Canva request failed", (data.code as string) || `http_${response.status}`, detail)
   return data
 }
 
@@ -133,7 +134,7 @@ export function failedJobReason(path: string, code?: string): string {
     if (code === "file_too_big") return "Canva refused the media file as too large; use a smaller file"
     if (code === "import_failed") return "Canva could not read the media file; export it again (MP4, or JPEG/PNG for a photo) and add it again"
     if (code === "fetch_failed") return "Canva could not download the media file; add it to the row again"
-    return `Canva could not import the media file (${code || "no reason given"})`
+    return `Canva could not import the media file (${shownCanvaCode(code)})`
   }
   if (path.includes("autofills")) {
     if (code === "autofill_error") return "Canva could not fill the template with this row (autofill_error). If the row has a video, the template's media frame may not take one: try a photo instead"
@@ -141,7 +142,7 @@ export function failedJobReason(path: string, code?: string): string {
     if (code === "thumbnail_generation_error" || code === "create_design_error" || code === "design_update_error") return `Canva filled the template but could not save the new design (${code}); run the row again`
     if (code === "design_approval_error") return "Canva could not apply the template's approval settings to the new design (design_approval_error)"
   }
-  return `Canva could not complete the job (${code || "no reason given"})`
+  return `Canva could not complete the job (${shownCanvaCode(code)})`
 }
 
 /** The template's fillable fields (name → type). An empty map means it cannot be autofilled. */

@@ -33,6 +33,12 @@ export interface CanvaTokenStore {
 export interface CanvaDeps { client: CanvaClient; store: CanvaTokenStore; fetcher: typeof fetch; nowMs(): number; sleep(ms: number): Promise<void> }
 
 /**
+ * Canva's error code as it may appear on screen: a short snake_case code passes; anything else (absent, or text that
+ * isn't a code) shows as "unrecognised", so nothing of Canva's own wording reaches the browser through a code.
+ */
+export const shownCanvaCode = (code?: unknown): string => typeof code === "string" && /^[a-z0-9_]{1,64}$/.test(code) ? code : "unrecognised"
+
+/**
  * `message` is ours and safe to show staff; `detail` is Canva's own text (a failed job's error.message), kept for the
  * server log only, never sent to the browser.
  */
@@ -129,7 +135,7 @@ async function exportDesign(deps: CanvaDeps, input: { designId: string; pages?: 
     await deps.sleep(limits.intervalMs)
     job = await call(`/exports/${encodeURIComponent(job.id!)}`)
   }
-  if (job.status === "failed") throw new CanvaError(`Canva could not export this design (${job.error?.code || "no reason given"})`, job.error?.code, typeof job.error?.message === "string" ? job.error.message.slice(0, 500) : undefined)
+  if (job.status === "failed") throw new CanvaError(`Canva could not export this design (${shownCanvaCode(job.error?.code)})`, job.error?.code, typeof job.error?.message === "string" ? job.error.message.slice(0, 500) : undefined)
   if (job.status !== "success" || !Array.isArray(job.urls) || !job.urls.length) throw new CanvaError("Canva export is still running; try again shortly", "timeout")
   if (input.pages && input.format.type === "jpg" && job.urls.length !== input.pages.length) throw new CanvaError("Canva returned a different number of pages than requested")
   return job.urls
