@@ -2,6 +2,7 @@ import { SHOPIFY_GRAPHQL_API_ENDPOINT, TAGS } from "../constants"
 import { isShopifyError } from "../type-guards"
 import { ensureStartsWith } from "../utils"
 import { revalidateTag } from "next/cache"
+import { secretMatches } from "../secret-compare"
 import { NextResponse, NextRequest } from "next/server"
 import { cookies, headers } from "next/headers"
 import {
@@ -571,7 +572,8 @@ export async function revalidate(req: NextRequest): Promise<NextResponse> {
   const isCollectionUpdate = collectionWebhooks.includes(topic);
   const isProductUpdate = productWebhooks.includes(topic);
 
-  if (!secret || secret !== process.env.SHOPIFY_REVALIDATION_SECRET) {
+  // Constant time; unset secret never matches.
+  if (!secretMatches(secret, process.env.SHOPIFY_REVALIDATION_SECRET)) {
     console.error('Invalid revalidation secret.');
     return NextResponse.json({ status: 401 });
   }

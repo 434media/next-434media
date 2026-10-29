@@ -145,6 +145,10 @@ jobs:
       # super-admin and content checks, verified Google workspace accounts, header-only constant-time cron secrets,
       # workspace-domain member addresses on edit, and a profile edit that keeps the session's role.
       - run: tsx --test lib/__tests__/admin-small-findings.test.ts
+      # Security sweep 2026-10-29: escaped JSON-LD, header-only constant-time API keys that fail closed when unset,
+      # the Mailchimp analytics route behind requireAdmin, the roster re-checked on every session read, and every
+      # BotID-guarded route in the client protect list with the guard failing closed.
+      - run: tsx --test lib/__tests__/security-sweep-2026-10-29.test.ts
 
       # Optional: the same suites again on MilCityUSA's real published profile, when the BRAND_PROFILE_FIXTURE Actions
       # secret holds a published version's 434-context backup record. Secrets are not given to pull requests from
