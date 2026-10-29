@@ -1,8 +1,8 @@
 /** Offline. Brand-template autofill into a new working design (lib/canva-create.ts). No network, no Firestore. */
 import { test } from "node:test"
 import assert from "node:assert/strict"
-import { seal, type CanvaDeps, type CanvaTokenRecord, type CanvaTokenStore } from "../canva-export"
-import { createFromTemplate, templateFields, profileTemplateIds, canvaEditUrl, type CreateDeps, type CreatedDesign, type WorkingFolder } from "../canva-create"
+import { seal, CanvaError, shownCanvaCode, type CanvaDeps, type CanvaTokenRecord, type CanvaTokenStore } from "../canva-export"
+import { createFromTemplate, failedJobReason, templateFields, profileTemplateIds, canvaEditUrl, type CreateDeps, type CreatedDesign, type WorkingFolder } from "../canva-create"
 import { TOOL_SCOPE } from "../owned-meta-connector"
 import { SERVICE_TOOL_SCOPE } from "../owned-meta-service"
 
@@ -188,4 +188,39 @@ test("a design that can't be moved is still made and says why; a stale folder id
   const folder = folderStore("FAFgone0001")
   assert.equal((await createFromTemplate({ ...stale.deps, folder }, INPUT, { polls: 3, intervalMs: 1 })).design.folderId, "FAFteam001")
   assert.equal(folder.kept, "FAFteam001")
+})
+
+// ── a failed Canva job says why (2026-10-29: a video row failed seven times as "Canva could not complete the job") ──
+test("a failed autofill carries Canva's code and message: a plain reason for the row, Canva's own text for the log", async () => {
+  const s = setup((url, init) => {
+    if (url.endsWith("/url-asset-uploads") && init.method === "POST") return Response.json({ job: { id: "uv1", status: "in_progress" } })
+    if (url.endsWith("/url-asset-uploads/uv1")) return Response.json({ job: { id: "uv1", status: "success", asset: { id: "MAvideo1", type: "video" } } })
+    if (url.endsWith("/autofills/af1")) return Response.json({ job: { id: "af1", status: "failed", error: { code: "autofill_error", message: "Canva's own words about the element" } } })
+    return happy(url, init)
+  })
+  const { image: _image, ...rest } = INPUT
+  const err = await createFromTemplate(s.deps, { ...rest, requestId: "admin:create:row00009:feed", video: { field: "media", url: "https://abc.public.blob.vercel-storage.com/content-create/clip.mp4", name: "Clip", bytes: 40 * 1024 * 1024 } }, { polls: 3, intervalMs: 1 }).catch(e => e)
+  assert.ok(err instanceof CanvaError)
+  assert.equal(err.code, "autofill_error")
+  assert.equal(err.detail, "Canva's own words about the element")
+  assert.match(err.message, /could not fill the template/); assert.match(err.message, /video/)
+  assert.doesNotMatch(err.message, /own words/, "Canva's text never reaches the screen")
+  assert.equal(s.ledger.size, 0, "nothing is recorded as made")
+})
+
+test("a failed media import says what to do; an unknown code is named rather than hidden", () => {
+  assert.match(failedJobReason("/url-asset-uploads", "import_failed"), /could not read the media file/)
+  assert.match(failedJobReason("/asset-uploads", "file_too_big"), /too large/)
+  assert.match(failedJobReason("/autofills", "trial_quota_exceeded"), /allowance/)
+  assert.equal(failedJobReason("/autofills", "something_new"), "Canva could not complete the job (something_new)")
+  assert.equal(failedJobReason("/autofills"), "Canva could not complete the job (unrecognised)")
+})
+
+test("a code that isn't a plain snake_case code never reaches the screen", () => {
+  for (const code of ["Some Canva sentence about the element", "AUTOFILL", "x".repeat(65), "<b>no</b>", ""]) {
+    assert.equal(failedJobReason("/autofills", code), "Canva could not complete the job (unrecognised)")
+    assert.equal(failedJobReason("/url-asset-uploads", code), "Canva could not import the media file (unrecognised)")
+  }
+  assert.equal(shownCanvaCode("design_update_error"), "design_update_error")
+  assert.equal(shownCanvaCode(42), "unrecognised")
 })
