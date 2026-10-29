@@ -32,7 +32,11 @@ export interface CanvaTokenStore {
 }
 export interface CanvaDeps { client: CanvaClient; store: CanvaTokenStore; fetcher: typeof fetch; nowMs(): number; sleep(ms: number): Promise<void> }
 
-export class CanvaError extends Error { constructor(message: string, public readonly code?: string) { super(message); this.name = "CanvaError" } }
+/**
+ * `message` is ours and safe to show staff; `detail` is Canva's own text (a failed job's error.message), kept for the
+ * server log only, never sent to the browser.
+ */
+export class CanvaError extends Error { constructor(message: string, public readonly code?: string, public readonly detail?: string) { super(message); this.name = "CanvaError" } }
 
 export function seal(key: Buffer, value: CanvaTokens): string {
   const iv = randomBytes(12), cipher = createCipheriv("aes-256-gcm", key, iv)
@@ -115,7 +119,7 @@ async function exportDesign(deps: CanvaDeps, input: { designId: string; pages?: 
   const token = await canvaAccessToken(deps)
   const call = async (path: string, init: RequestInit = {}) => {
     const response = await deps.fetcher(new URL(`${CANVA_API}${path}`), { ...init, headers: { authorization: `Bearer ${token}`, ...(init.body ? { "content-type": "application/json" } : {}) }, redirect: "error", cache: "no-store", signal: AbortSignal.timeout(10_000) })
-    const data = await response.json().catch(() => ({})) as { job?: { id?: string; status?: string; urls?: string[]; error?: { code?: string } }; code?: string }
+    const data = await response.json().catch(() => ({})) as { job?: { id?: string; status?: string; urls?: string[]; error?: { code?: string; message?: string } }; code?: string }
     if (response.status === 401 || response.status === 403) throw new CanvaError("Canva refused access to this design or export; reconnect Canva or check sharing", data.code || `http_${response.status}`)
     if (!response.ok || !data.job?.id) throw new CanvaError("Canva export request failed", data.code || `http_${response.status}`)
     return data.job
@@ -125,7 +129,7 @@ async function exportDesign(deps: CanvaDeps, input: { designId: string; pages?: 
     await deps.sleep(limits.intervalMs)
     job = await call(`/exports/${encodeURIComponent(job.id!)}`)
   }
-  if (job.status === "failed") throw new CanvaError("Canva could not export this design", job.error?.code)
+  if (job.status === "failed") throw new CanvaError(`Canva could not export this design (${job.error?.code || "no reason given"})`, job.error?.code, typeof job.error?.message === "string" ? job.error.message.slice(0, 500) : undefined)
   if (job.status !== "success" || !Array.isArray(job.urls) || !job.urls.length) throw new CanvaError("Canva export is still running; try again shortly", "timeout")
   if (input.pages && input.format.type === "jpg" && job.urls.length !== input.pages.length) throw new CanvaError("Canva returned a different number of pages than requested")
   return job.urls
