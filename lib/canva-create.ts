@@ -269,3 +269,61 @@ async function uploadVideo(deps: CreateDeps, token: string, v: NonNullable<Creat
 export function profileTemplateIds(profiles: readonly { series: Record<string, { templates: { feed?: string; reels?: string } } | undefined> }[]): ReadonlySet<string> {
   return new Set(profiles.flatMap(p => Object.values(p.series).flatMap(s => [s?.templates.feed, s?.templates.reels])).filter((id): id is string => !!id && ID.test(id)))
 }
+
+/**
+ * The test fill (founder 2026-10-29, the MCU pre-run): the only check that catches a template whose photo frame is gone
+ * while Canva's dataset still lists it, since that read passes and only a real fill fails. Run by hand, per template,
+ * from the Brands page; never on a schedule.
+ *
+ * It does what a run does, with a placeholder: uploads `image` (a small grey PNG the route makes), fills the template's
+ * every text field with "TEMPLATE CHECK" and the photo frame with that image, and reads the outcome. Then it cleans up:
+ * Canva Connect has no call that deletes a design, so the design is moved into a new folder named for the check and the
+ * folder is deleted, which moves the design to the connected account's Trash (canva.dev, read 2026-10-29: "the user's
+ * content in the folder moves to the Trash"); the uploaded image is deleted the same way (DELETE /assets, to Trash).
+ * Canva empties its Trash after 30 days. The design is titled "434 template check (safe to delete)" in case the clean-up
+ * fails, and the result says so. It is never moved into the team folder.
+ *
+ * outcome: "filled" (the frame took the photo), "autofill_error" (Canva could not fill it: the frame is most likely
+ * broken), or "error" (the check itself couldn't run: Canva refused, a quota, a timeout; nothing is known).
+ */
+export const PROBE_TITLE = "434 template check (safe to delete)"
+export interface ProbeResult { outcome: "filled" | "autofill_error" | "error"; reason: string; code?: string; cleanup: string[] }
+export async function probeTemplateMedia(deps: Pick<CreateDeps, "canva" | "allowedTemplates">, input: { templateId: string; mediaField: string; image: Uint8Array }, limits = { polls: 30, intervalMs: 2_000 }): Promise<ProbeResult> {
+  const fields = await templateFields(deps, input.templateId)
+  if (fields[input.mediaField] !== "image") return { outcome: "autofill_error", reason: `Canva lists no photo frame "${input.mediaField}" on this template`, cleanup: [] }
+  if (!kind(input.image)) throw new CanvaError("The test image must be a PNG or JPEG", "image_type")
+  const token = await canvaAccessToken(deps.canva)
+  const cleanup: string[] = []
+  let assetId: string | undefined, designId: string | undefined
+  try {
+    const started = await api(deps.canva, token, "/asset-uploads", { method: "POST", body: Buffer.from(input.image), headers: { "content-type": "application/octet-stream", "asset-upload-metadata": JSON.stringify({ name_base64: Buffer.from("434 template check", "utf8").toString("base64") }) } })
+    assetId = (await poll(deps.canva, token, "/asset-uploads", started.job as Job, limits)).asset?.id
+    if (!assetId) throw new CanvaError("Canva did not return the uploaded test image", "asset")
+    const data: Record<string, unknown> = Object.fromEntries(Object.entries(fields).filter(([, t]) => t === "text").map(([k]) => [k, { type: "text", text: "TEMPLATE CHECK" }]))
+    data[input.mediaField] = { type: "image", asset_id: assetId }
+    const fill = await api(deps.canva, token, "/autofills", { method: "POST", body: JSON.stringify({ brand_template_id: input.templateId, title: PROBE_TITLE, data }) })
+    const job = await poll(deps.canva, token, "/autofills", fill.job as Job, limits)
+    designId = job.result?.design?.id
+    return { outcome: "filled", reason: `Canva filled the photo frame "${input.mediaField}" with a test image`, cleanup }
+  } catch (err) {
+    if (!(err instanceof CanvaError)) throw err
+    if (err.code === "autofill_error") return { outcome: "autofill_error", code: err.code, reason: `Canva could not fill this template with a photo in "${input.mediaField}" (autofill_error): the photo frame is most likely broken in the template`, cleanup }
+    return { outcome: "error", code: shownCanvaCode(err.code), reason: `The test fill couldn't run, so nothing is known about this template: ${err.message}`, cleanup }
+  } finally {
+    if (designId) await trashDesign(deps.canva, token, designId).catch((e: unknown) => { cleanup.push(`The test design "${PROBE_TITLE}" is still in the connected Canva account's Projects (${e instanceof CanvaError ? shownCanvaCode(e.code) : "the clean-up failed"}); delete it by hand`) })
+    if (assetId) await api(deps.canva, token, `/assets/${encodeURIComponent(assetId)}`, { method: "DELETE" }).catch((e: unknown) => { cleanup.push(`The test image "434 template check" is still in the connected Canva account's Uploads (${e instanceof CanvaError ? shownCanvaCode(e.code) : "the clean-up failed"}); delete it by hand`) })
+  }
+}
+
+/** A design to Trash: Connect has no design delete, so it goes into a new folder, and the folder is deleted. */
+async function trashDesign(deps: CanvaDeps, token: string, designId: string): Promise<void> {
+  const made = await api(deps, token, "/folders", { method: "POST", body: JSON.stringify({ name: PROBE_TITLE, parent_folder_id: "root" }) })
+  const folderId = (made.folder as { id?: string } | undefined)?.id
+  if (!folderId || !ID.test(folderId)) throw new CanvaError("Canva did not return the new folder", "folder")
+  try {
+    await api(deps, token, "/folders/move", { method: "POST", body: JSON.stringify({ to_folder_id: folderId, item_id: designId }) })
+  } finally {
+    // The folder goes either way: empty, or holding the design (which then goes to Trash with it).
+    await api(deps, token, `/folders/${encodeURIComponent(folderId)}`, { method: "DELETE" })
+  }
+}
