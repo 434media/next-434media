@@ -1,3 +1,4 @@
+import { metaDescription } from "@/lib/seo/describe"
 import type { Metadata } from "next"
 import { notFound } from "next/navigation"
 import { getBlogPostBySlugFromFirestore } from "@/lib/firestore-blog"
@@ -29,7 +30,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const ogImageParams = new URLSearchParams({
     title: post.title,
     category: post.category || "Blog",
-    author: post.author || "434 Media",
+    // Trimmed: a stored author carried a trailing newline into the card URL.
+    author: post.author?.trim() || "434 Media",
     date: new Date(post.created_at).toLocaleDateString("en-US", {
       year: "numeric",
       month: "short",
@@ -46,14 +48,14 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   return {
     // absolute: the root template would append "| 434 MEDIA" a second time.
     title: { absolute: `${post.title} | 434 MEDIA Blog` },
-    description: post.excerpt || "Read this article on the 434 MEDIA blog",
+    description: metaDescription(post.excerpt) || "Read this article on the 434 MEDIA blog",
     keywords: keywordsArray,
-    authors: [{ name: post.author || "434 Media" }],
-    creator: post.author || "434 Media",
+    authors: [{ name: post.author?.trim() || "434 Media" }],
+    creator: post.author?.trim() || "434 Media",
     publisher: "434 Media",
     openGraph: {
       title: post.title,
-      description: post.excerpt || "Read this article on the 434 MEDIA blog",
+      description: metaDescription(post.excerpt) || "Read this article on the 434 MEDIA blog",
       url: `${baseUrl}/blog/${slug}`,
       siteName: "434 MEDIA",
       images: [
@@ -75,7 +77,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     twitter: {
       card: "summary_large_image",
       title: post.title,
-      description: post.excerpt || "Read this article on the 434 MEDIA blog",
+      description: metaDescription(post.excerpt) || "Read this article on the 434 MEDIA blog",
       images: [ogImageUrl],
       creator: "@434media",
       site: "@434media",
@@ -113,7 +115,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
         publisher: {
           '@type': 'Organization',
           name: '434 MEDIA',
-          logo: { '@type': 'ImageObject', url: `${baseUrl}/api/og` }
+          logo: { '@type': 'ImageObject', url: `${baseUrl}/brand/434-logo-512.png` }
         },
         mainEntityOfPage: `${baseUrl}/blog/${slug}`,
         articleSection: post.category || 'Technology',
@@ -144,14 +146,14 @@ export default async function BlogPostPage({ params }: Props) {
               '@type': 'Article',
               headline: post.title,
               description: post.excerpt || post.meta_description || '',
-              image: post.featured_image || `${baseUrl}/api/og`,
+              image: post.featured_image || `${baseUrl}/opengraph-image`,
               datePublished: post.created_at,
               dateModified: post.updated_at || post.created_at,
               author: [{ '@type': 'Person', name: post.author || '434 Media' }],
               publisher: {
                 '@type': 'Organization',
                 name: '434 MEDIA',
-                logo: { '@type': 'ImageObject', url: `${baseUrl}/api/og` }
+                logo: { '@type': 'ImageObject', url: `${baseUrl}/brand/434-logo-512.png` }
               },
               mainEntityOfPage: `${baseUrl}/blog/${slug}`,
               articleSection: post.category || 'Technology',
