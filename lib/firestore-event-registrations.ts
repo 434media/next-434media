@@ -1,4 +1,5 @@
 import { getDb, getNamedDb, COLLECTIONS, NAMED_DATABASES } from "./firebase-admin"
+import { getTechdayDb } from "./techday-db"
 import { getEventRoleOverlay, roleTagsFor, type EventRoleOverlay } from "./firestore-event-role-overlays"
 
 // Event Registration interface
@@ -209,7 +210,7 @@ async function getTechdayRegistrations(filters?: { event?: string }): Promise<Ev
     // If filtering by a non-techday event, skip
     if (filters?.event && filters.event !== "SATechDay2026") return []
 
-    const tdDb = getNamedDb(NAMED_DATABASES.TECHDAY)
+    const tdDb = getTechdayDb()
     const [snapshot, roleOverlay] = await Promise.all([
       tdDb.collection("registrations").get(),
       getEventRoleOverlay(TECHDAY_EVENT_SLUG),
@@ -331,7 +332,7 @@ function deduplicateRegistrations(registrations: EventRegistration[]): EventRegi
  * Get event registrations with optional filtering
  * Merges results from:
  *  1. Default DB (groovy-ego) — event_registrations collection
- *  2. Techday named DB (groovy-ego/techday) — registrations collection
+ *  2. Tech Day DB (groovy-ego/techday until the switch, then c434-techday/techday; see techday-db.ts) — registrations collection
  *  3. Digital Canvas project (media-analytics-proxy) — event-registrations collection
  */
 export async function getEventRegistrations(filters?: {
@@ -473,7 +474,7 @@ export async function updateEventRegistration(
     // techday / Digital Canvas — pass through, no backfill enforcement.
     if (id.startsWith("techday:")) {
       const realId = id.replace("techday:", "")
-      const tdDb = getNamedDb(NAMED_DATABASES.TECHDAY)
+      const tdDb = getTechdayDb()
       await tdDb.collection("registrations").doc(realId).update(fields)
       invalidateRegistrationsCache()
       return { success: true }
@@ -599,7 +600,7 @@ export async function deleteEventRegistration(id: string): Promise<{ success: bo
     // Check if this is a techday-prefixed ID
     if (id.startsWith("techday:")) {
       const realId = id.replace("techday:", "")
-      const tdDb = getNamedDb(NAMED_DATABASES.TECHDAY)
+      const tdDb = getTechdayDb()
       await tdDb.collection("registrations").doc(realId).delete()
       invalidateRegistrationsCache()
       return { success: true }
@@ -666,7 +667,7 @@ export async function markEventRegistrationPromoted(
 
   if (id.startsWith("techday:")) {
     const realId = id.replace("techday:", "")
-    const tdDb = getNamedDb(NAMED_DATABASES.TECHDAY)
+    const tdDb = getTechdayDb()
     await tdDb.collection("registrations").doc(realId).update(update)
     invalidateRegistrationsCache()
     return
@@ -692,7 +693,7 @@ export async function getEventRegistrationById(
 ): Promise<EventRegistration | null> {
   if (id.startsWith("techday:")) {
     const realId = id.replace("techday:", "")
-    const tdDb = getNamedDb(NAMED_DATABASES.TECHDAY)
+    const tdDb = getTechdayDb()
     const doc = await tdDb.collection("registrations").doc(realId).get()
     if (!doc.exists) return null
     return mapTechdayDoc(doc, await getEventRoleOverlay(TECHDAY_EVENT_SLUG))
