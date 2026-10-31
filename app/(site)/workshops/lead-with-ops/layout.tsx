@@ -5,7 +5,7 @@ const flyerUrl =
   "https://firebasestorage.googleapis.com/v0/b/groovy-ego-462522-v2.firebasestorage.app/o/digitalcanvas%2FInvitation%20only%20Limited%20Executive%20Seating.PNG?alt=media"
 
 const description =
-  "An executive working lunch with Adam Carroll, Founder of Carroll Strategy & Operations, on how operators can lead with operations, layer in AI, and make technology decisions that support business outcomes. Held June 18, 2026 at VelocityTX."
+  "An executive working lunch with Adam Carroll of Carroll Strategy & Operations on leading with operations and layering in AI. June 18, 2026, at VelocityTX."
 
 export const metadata: Metadata = {
   title: "Lead with Ops. Layer in AI. | June 18, 2026",

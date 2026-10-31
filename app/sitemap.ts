@@ -6,10 +6,13 @@ import { getPublicFeedItems } from "@/lib/thefeed"
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://www.434media.com"
 
+  // Static pages carry no lastModified. It used to be `new Date()` on every
+  // one, so every build told search engines that every page had just changed,
+  // which teaches them to ignore the date altogether. A page lists a date only
+  // where it is a real one. /events was listed here and returns 404; removed.
   const staticEntries: MetadataRoute.Sitemap = [
     {
       url: `${baseUrl}`,
-      lastModified: new Date(),
       changeFrequency: "weekly",
       priority: 1.0,
     },
@@ -17,38 +20,27 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       // Launched 2026-09-29. It was absent from here for as long as it
       // redirected, which was correct then and wrong the moment it went live.
       url: `${baseUrl}/work`,
-      lastModified: new Date(),
       changeFrequency: "monthly",
       priority: 0.9,
     },
     {
       // Launched 2026-10-14 (434-context#131).
       url: `${baseUrl}/performance-marketing`,
-      lastModified: new Date(),
       changeFrequency: "monthly",
       priority: 0.7,
     },
     {
       url: `${baseUrl}/contact`,
-      lastModified: new Date(),
       changeFrequency: "monthly",
       priority: 0.8,
     },
     {
-      url: `${baseUrl}/events`,
-      lastModified: new Date(),
-      changeFrequency: "weekly",
-      priority: 0.7,
-    },
-    {
       url: `${baseUrl}/shop`,
-      lastModified: new Date(),
       changeFrequency: "weekly",
       priority: 0.7,
     },
     {
       url: `${baseUrl}/blog`,
-      lastModified: new Date(),
       changeFrequency: "daily",
       priority: 0.7,
     },
@@ -57,7 +49,6 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       // (founder, 2026-10-24). The Lead with Ops feedback form is noindex and
       // stays out.
       url: `${baseUrl}/thefeed`,
-      lastModified: new Date(),
       changeFrequency: "weekly",
       priority: 0.7,
     },
@@ -69,19 +60,16 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     },
     {
       url: `${baseUrl}/privacy-policy`,
-      lastModified: new Date(),
       changeFrequency: "yearly",
       priority: 0.3,
     },
     {
       url: `${baseUrl}/terms-of-service`,
-      lastModified: new Date(),
       changeFrequency: "yearly",
       priority: 0.3,
     },
     {
       url: `${baseUrl}/en/sdoh`,
-      lastModified: new Date(),
       changeFrequency: "monthly",
       priority: 0.6,
       alternates: {
@@ -93,7 +81,6 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     },
     {
       url: `${baseUrl}/es/sdoh`,
-      lastModified: new Date(),
       changeFrequency: "monthly",
       priority: 0.6,
       alternates: {
@@ -114,8 +101,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
   const blogEntries: MetadataRoute.Sitemap = Array.isArray(posts)
     ? posts
-        .filter((p: any) => p.status === "published")
-        .map((p: any) => ({
+        .filter((p) => p.status === "published")
+        .map((p) => ({
           url: `${baseUrl}/blog/${p.slug}`,
           lastModified: p.updated_at ? new Date(p.updated_at) : new Date(p.created_at),
           changeFrequency: "monthly",
@@ -124,9 +111,9 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     : []
 
   const productEntries: MetadataRoute.Sitemap = Array.isArray(products)
-    ? products.map((prod: any) => ({
+    ? products.map((prod) => ({
         url: `${baseUrl}/product/${prod.handle}`,
-        lastModified: new Date(),
+        ...(prod.updatedAt ? { lastModified: new Date(prod.updatedAt) } : {}),
         changeFrequency: "weekly",
         priority: 0.6,
       }))

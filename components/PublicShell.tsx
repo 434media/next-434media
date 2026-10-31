@@ -31,7 +31,22 @@ export function PublicShell({
 }) {
   return (
     <>
-      {/* Structured Data: Organization & WebSite with potential SearchAction */}
+      {/* Structured data: the Organization, the WebSite and the
+          ProfessionalService, joined by @id so search engines and agents read
+          them as one entity.
+
+          - logo: a 512px square PNG of the supplied stacked lockup on white,
+            public/brand/434-logo-512.png, rendered from
+            public/brand/434-stacked-dark.svg (byte-identical to
+            07 Visual System/logos). It was /api/og, a 1200x630 social card,
+            and search engines read this field for the logo beside a result.
+          - sameAs lists 434 MEDIA's own profiles only. It carried
+            instagram.com/digitalcanvas.community, Digital Canvas's account,
+            which tied 434's identity to another brand. 434 has no Instagram.
+          - The WebSite no longer declares a SearchAction. Its target, /search,
+            is the shop's product search ("Search | 434 MEDIA Store"), and
+            Google retired the sitelinks search box it fed in 2024.
+          - founder: master 8.1, "Marcos Resendez is the founder of 434 MEDIA". */}
       <script
         type="application/ld+json"
         // Keep this lightweight & generated server-side (no dynamic client data required)
@@ -39,17 +54,18 @@ export function PublicShell({
           __html: jsonLdScript({
             '@context': 'https://schema.org',
             '@type': 'Organization',
+            '@id': `${siteUrl}/#organization`,
             name: BRAND.name,
             alternateName: '434 Media',
             slogan: BRAND_RECORDS.mottoPlain,
             description: BRAND.description,
             url: siteUrl,
-            logo: `${siteUrl}/api/og`,
+            logo: `${siteUrl}/brand/434-logo-512.png`,
+            founder: { '@type': 'Person', name: 'Marcos Resendez' },
             sameAs: [
               'https://www.facebook.com/434media',
               'https://www.linkedin.com/company/434media',
-              'https://x.com/434media',
-              'https://www.instagram.com/digitalcanvas.community'
+              'https://x.com/434media'
             ],
             contactPoint: [{
               '@type': 'ContactPoint',
@@ -66,13 +82,10 @@ export function PublicShell({
           __html: jsonLdScript({
             '@context': 'https://schema.org',
             '@type': 'WebSite',
+            '@id': `${siteUrl}/#website`,
             name: '434 MEDIA',
             url: siteUrl,
-            potentialAction: {
-              '@type': 'SearchAction',
-              target: `${siteUrl}/search?q={search_term_string}`,
-              'query-input': 'required name=search_term_string'
-            }
+            publisher: { '@id': `${siteUrl}/#organization` }
           })
         }}
       />
@@ -87,8 +100,9 @@ export function PublicShell({
             alternateName: '434 Media',
             slogan: BRAND_RECORDS.mottoPlain,
             url: siteUrl,
-            image: `${siteUrl}/api/og`,
-            logo: `${siteUrl}/api/og`,
+            image: `${siteUrl}/opengraph-image`,
+            logo: `${siteUrl}/brand/434-logo-512.png`,
+            parentOrganization: { '@id': `${siteUrl}/#organization` },
             email: 'build@434media.com',
             description: BRAND.description,
             address: {
@@ -111,8 +125,7 @@ export function PublicShell({
             sameAs: [
               'https://www.facebook.com/434media',
               'https://www.linkedin.com/company/434media',
-              'https://x.com/434media',
-              'https://www.instagram.com/digitalcanvas.community'
+              'https://x.com/434media'
             ]
           })
         }}
