@@ -6,6 +6,8 @@ import {
   testFirestoreBlogConnection,
 } from "../lib/firestore-blog"
 import type { BlogFilters } from "../types/blog-types"
+import { getSession, isAuthorizedAdmin } from "../lib/auth"
+import { blogFiltersFor } from "../lib/blog-access"
 
 // Firestore connection verification
 async function ensureFirestoreConnected() {
@@ -19,7 +21,10 @@ export async function getBlogPostsAction(filters: BlogFilters = {}) {
   try {
     await ensureFirestoreConnected()
 
-    const posts = await getBlogPostsFromFirestore(filters)
+    // Drafts need an admin session; everyone else reads published posts only (security log ADM-7).
+    const session = await getSession()
+    const isAdmin = !!session && isAuthorizedAdmin(session.email)
+    const posts = await getBlogPostsFromFirestore(blogFiltersFor(filters, isAdmin))
     return { success: true, posts }
   } catch (error) {
     console.error("Error fetching blog posts:", error)

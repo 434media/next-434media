@@ -12,6 +12,9 @@ import { checkBotId } from "botid/server"
  * In development (NODE_ENV !== 'production') the SDK bypasses by default and
  * returns { isHuman: true, bypassed: true } — no setup needed for local dev.
  *
+ * Every route that calls this must also be listed in `protect` in instrumentation-client.ts, or the client never
+ * attaches the BotID headers and every request reads as a bot (lib/__tests__/botid-protect-list.test.ts checks it).
+ *
  * Verified bots (Googlebot etc.) are treated as bots for write endpoints since
  * legitimate crawlers have no business POSTing to a contact form.
  */
@@ -39,10 +42,16 @@ export async function requireHumanRequest(): Promise<
       ),
     }
   } catch (err) {
-    // Fail-open on SDK errors. We'd rather accept a small amount of bot traffic
-    // than break legitimate signups when BotID's worker is unreachable. Log it
-    // so we notice if it becomes a pattern.
-    console.error("[botid] check failed, allowing request:", err)
-    return { ok: true }
+    // Fail CLOSED on SDK errors (security sweep 2026-10-29). Failing open meant an outage of BotID's check, or a route
+    // missing from the client protect list, silently disabled the guard. The visitor gets a retryable 503; the log line
+    // tells us if it becomes a pattern.
+    console.error("[botid] check failed, refusing request:", err)
+    return {
+      ok: false,
+      response: NextResponse.json(
+        { error: "Temporarily unavailable, please try again" },
+        { status: 503 },
+      ),
+    }
   }
 }

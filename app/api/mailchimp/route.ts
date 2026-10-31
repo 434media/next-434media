@@ -10,8 +10,18 @@ import {
   getMailchimpRealtimeData,
   getMailchimpTags,
 } from "@/lib/mailchimp-analytics"
+import { requireAdmin } from "@/lib/auth"
 
+export const runtime = "nodejs"
+
+// Admin only (security sweep 2026-10-29). Campaign stats, audience lists and tags are internal; the only caller is the
+// admin (app/admin/opportunities). It was reachable by anyone before.
 export async function GET(request: NextRequest) {
+  const auth = await requireAdmin()
+  if ("error" in auth) {
+    return NextResponse.json({ error: auth.error }, { status: auth.status })
+  }
+
   try {
     const { searchParams } = new URL(request.url)
     const endpoint = searchParams.get("endpoint")

@@ -6,7 +6,7 @@
 import { test } from "node:test"
 import assert from "node:assert/strict"
 import { published, loadPublishedProfileFirst } from "./published-profile"
-import { CREATE_PLATFORMS, choiceLabel, formatChoices, mediaShapeOf, normalizePlatforms, platformProblems, cellRoles, isHandPosted, platformIdsOf, templateGap, createTemplates, ddmmmyy, designText, exportFileBase, formatsOf, rowProblems, type CreateRow, type RoundupStory } from "../content-pipeline/create-table"
+import { CREATE_PLATFORMS, choiceLabel, formatChoices, mediaShapeOf, normalizePlatforms, platformProblems, cellRoles, isHandPosted, platformIdsOf, templateGap, createTemplates, ddmmmyy, designText, chicagoToday, followToday, isPastDate, exportFileBase, formatsOf, rowProblems, type CreateRow, type RoundupStory } from "../content-pipeline/create-table"
 import { PAGE_LINK_MESSAGE, blobStoreHost, dvidsImagePage, isCreateUpload, isPageLink, isPageType, mediaKind, transcodeArgs, videoContainer, videoPlan } from "../content-pipeline/create-media"
 import { cardSubject } from "../content-pipeline/series"
 import { humanPlus, humanPlusRoundup, HumanPlusError, withoutMediaLines, type HumanPlusDeps } from "../content-pipeline/human-plus"
@@ -614,4 +614,31 @@ test("ICYMI video story: the run makes its card with the ICYMI story template, a
   assert.equal(s.made.length, made)
   await runCreateRow(s.deps, { ...r0, storyCards: { v2: { headline: "Navy flies drone", deck: "A short deck.", media: photo } } }, { email: "audrey@x.co", name: "Audrey" })
   assert.equal(s.made.filter(m => m.templateId === sc.template).length, 2)
+})
+
+test("an untouched row's date follows today; a picked one stays; the table flags a past date", () => {
+  const today = "2026-10-27"
+  // The 19OCT26 ICYMI cover: a row saved on the 19th and never touched opens on today's date.
+  assert.equal(followToday(row({ date: "2026-10-19" }), today).date, today)
+  assert.equal(followToday(row({ date: "2026-10-19", dateSet: false }), today).date, today)
+  // A picked date stays, past or future.
+  assert.equal(followToday(row({ date: "2026-10-19", dateSet: true }), today).date, "2026-10-19")
+  assert.equal(followToday(row({ date: "2026-11-02", dateSet: true }), today).date, "2026-11-02")
+  // A row saved before dateSet existed keeps a future date (only a person could have picked it), now marked as picked.
+  const legacy = followToday(row({ date: "2026-11-02" }), today)
+  assert.deepEqual([legacy.date, legacy.dateSet], ["2026-11-02", true])
+  // But a future date that was never picked (dateSet false) follows today too.
+  assert.equal(followToday(row({ date: "2026-11-02", dateSet: false }), today).date, today)
+  assert.equal(isPastDate("2026-10-19", today), true)
+  assert.equal(isPastDate(today, today), false)
+  assert.equal(isPastDate("2026-11-02", today), false)
+  assert.equal(isPastDate("", today), false)
+})
+
+test("today is San Antonio's calendar day, whatever the browser's zone", () => {
+  // 03:30 UTC on the 28th is still the 27th in San Antonio (CDT); 05:30 UTC is the 28th.
+  assert.equal(chicagoToday(new Date("2026-10-28T03:30:00Z")), "2026-10-27")
+  assert.equal(chicagoToday(new Date("2026-10-28T05:30:00Z")), "2026-10-28")
+  // After the clocks go back (CST, UTC-6).
+  assert.equal(chicagoToday(new Date("2026-11-02T05:30:00Z")), "2026-11-01")
 })

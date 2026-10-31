@@ -4,10 +4,11 @@ import {
   getSession,
   isAuthorizedAdmin,
   isCrmSuperAdmin,
-  CRM_SUPER_ADMIN_FALLBACK,
+  ownerEmails,
   type AdminRole,
 } from "@/lib/auth"
 import type { SquadKey } from "@/components/crm/types"
+import { normalizeTeamMemberEmail } from "@/lib/team-member-email"
 
 const TEAM_MEMBERS_COLLECTION = "crm_team_members"
 const VALID_ROLES = ["crm_super_admin", "full_admin", "crm_only", "intern"]
@@ -45,29 +46,16 @@ async function requireSuperAdmin() {
 }
 
 /**
- * Canonical full names for the hardcoded super-admin fallback.
- * MUST match the names used elsewhere in the CRM (TEAM_MEMBERS in
- * components/crm/types.ts, OWNER_MAP, normalizeAssigneeName) so that
- * filtering "show me my clients" actually matches `client.assigned_to`.
- */
-const SUPER_ADMIN_CANONICAL_NAMES: Record<string, string> = {
-  "marcos@434media.com": "Marcos Resendez",
-  "jesse@434media.com": "Jesse Hernandez",
-}
-
-/**
- * Silent backfill: ensure the hardcoded fallback super-admins have
- * `role: "crm_super_admin"` AND the canonical full name in Firestore.
- * Runs on every GET; idempotent. Self-heals records seeded by an earlier
- * version of this backfill that used a short name (e.g., "Jesse" instead
- * of "Jesse Hernandez") which broke assignee filtering across the CRM.
+ * Silent backfill: ensure the owners (ADMIN_OWNER_EMAILS) have
+ * `role: "crm_super_admin"` in Firestore. Runs on every GET; idempotent.
+ * A missing record is created with the address's local part as its name,
+ * to be corrected in settings; an existing name is left alone.
  */
 async function ensureSuperAdminBackfill(): Promise<{ promoted: string[]; renamed: string[] }> {
   const db = getDb()
   const promoted: string[] = []
   const renamed: string[] = []
-  for (const email of CRM_SUPER_ADMIN_FALLBACK) {
-    const canonicalName = SUPER_ADMIN_CANONICAL_NAMES[email] ?? email.split("@")[0]
+  for (const email of ownerEmails()) {
     const snap = await db
       .collection(TEAM_MEMBERS_COLLECTION)
       .where("email", "==", email)
@@ -75,7 +63,7 @@ async function ensureSuperAdminBackfill(): Promise<{ promoted: string[]; renamed
       .get()
     if (snap.empty) {
       await db.collection(TEAM_MEMBERS_COLLECTION).add({
-        name: canonicalName,
+        name: email.split("@")[0],
         email,
         isActive: true,
         role: "crm_super_admin",
@@ -91,11 +79,6 @@ async function ensureSuperAdminBackfill(): Promise<{ promoted: string[]; renamed
     if (data.role !== "crm_super_admin") {
       updates.role = "crm_super_admin"
       promoted.push(email)
-    }
-    // Heal records that were created with a wrong/short name
-    if (data.name !== canonicalName) {
-      updates.name = canonicalName
-      renamed.push(email)
     }
     if (Object.keys(updates).length > 0) {
       updates.updated_at = new Date().toISOString()
@@ -155,13 +138,11 @@ export async function POST(request: Request) {
       )
     }
 
-    const trimmedEmail = email?.trim().toLowerCase() || ""
-    if (trimmedEmail && !trimmedEmail.endsWith("@434media.com")) {
-      return NextResponse.json(
-        { success: false, error: "Email must be a @434media.com address" },
-        { status: 400 },
-      )
+    const checkedEmail = normalizeTeamMemberEmail(email)
+    if ("error" in checkedEmail) {
+      return NextResponse.json({ success: false, error: checkedEmail.error }, { status: 400 })
     }
+    const trimmedEmail = checkedEmail.email
 
     const db = getDb()
     if (trimmedEmail) {
@@ -262,7 +243,7 @@ export async function PATCH(request: Request) {
     const { id, name, email, isActive, role, firstName, lastName, phone, squad } = body as {
       id?: string
       name?: string
-      email?: string
+      email?: unknown
       isActive?: boolean
       role?: AdminRole
       firstName?: string
@@ -310,7 +291,28 @@ export async function PATCH(request: Request) {
 
     const updates: Partial<TeamMember> = { updated_at: new Date().toISOString() }
     if (name !== undefined) updates.name = name.trim()
-    if (email !== undefined) updates.email = email.trim().toLowerCase()
+    if (email !== undefined) {
+      // Held to the rule members are created under (security log ADM-11): the workspace domain, and one record per
+      // address. A second record for an address would lock its owner out, since sign-in refuses duplicates.
+      const checkedEmail = normalizeTeamMemberEmail(email, { required: true })
+      if ("error" in checkedEmail) {
+        return NextResponse.json({ success: false, error: checkedEmail.error }, { status: 400 })
+      }
+      if (checkedEmail.email !== targetEmail) {
+        const clash = await db
+          .collection(TEAM_MEMBERS_COLLECTION)
+          .where("email", "==", checkedEmail.email)
+          .limit(1)
+          .get()
+        if (!clash.empty) {
+          return NextResponse.json(
+            { success: false, error: `A member with email ${checkedEmail.email} already exists` },
+            { status: 409 },
+          )
+        }
+      }
+      updates.email = checkedEmail.email
+    }
     if (isActive !== undefined) updates.isActive = isActive
     if (role !== undefined) {
       if (!VALID_ROLES.includes(role)) {

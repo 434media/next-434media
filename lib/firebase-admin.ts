@@ -106,6 +106,11 @@ export function getDb(): admin.firestore.Firestore {
   return db
 }
 
+/** A Cloud Storage bucket, read with the same service account as Firestore. */
+export function getBucket(name: string) {
+  return admin.storage(getFirebaseApp()).bucket(name)
+}
+
 // Named database instances cache
 const namedDbs: Record<string, admin.firestore.Firestore> = {}
 
@@ -234,6 +239,7 @@ export async function testFirestoreConnection(): Promise<boolean> {
 export async function verifyFirebaseToken(idToken: string): Promise<admin.auth.DecodedIdToken> {
   const app = getFirebaseApp()
   const auth = admin.auth(app)
+  // No checkRevoked: it reads the user from Firebase Auth, which this service account is not permitted to do.
   return auth.verifyIdToken(idToken)
 }
 

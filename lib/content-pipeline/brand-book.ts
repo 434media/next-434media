@@ -136,3 +136,137 @@ export function brandBookProblems(v: unknown): string[] {
   })
   return p.slice(0, 20)
 }
+
+/**
+ * The vendor's copy (Share with vendor): the book minus what is about 434's own systems rather than the design. The
+ * full book stays in the profile and on the brand page, where staff see each internal block marked, so nothing is
+ * lost; the vendor's page is rendered from this on the server, so an internal block never reaches the vendor's HTML or
+ * PDF. Internal is:
+ *  - a surface's record fields (Display and Design Standard §3.2: Status, What ships it, Container, Delivered size,
+ *    Byte budget, Empty state), which name template ids, database paths, run logs and approvals;
+ *  - the index of surfaces and their approval status (a table with Subsection and Status columns);
+ *  - any paragraph, list item or table row that cites an internal system: a repository path, the database, a profile
+ *    version id, a run log, the governing documents or the founder;
+ *  - a subsection with nothing left once those are out (a surface with no design yet).
+ */
+const SURFACE_FIELD = /^\*\*(Status|What ships it|Container|Delivered size|Byte budget|Empty state):\*\*/i
+const INTERNAL_REF = /`?\b\d{2} [A-Z][A-Za-z ]+\/|\bFirestore\b|\bbrand_profiles\/|\bgit grep\b|\bnext-434media\b|\b434-context\b|\bRun Logs?\b|\brun log\b|\b[a-z][a-z0-9-]*@v\d+\b|\bDisplay and Design Standard\b|\bfounder\b|\bProvisional\b|\bno precedent\b/i
+export const isInternalText = (s: string): boolean => INTERNAL_REF.test(s)
+
+export interface MarkedBlock { block: BookBlock; internal: boolean }
+export interface MarkedSection { title: string; blocks: MarkedBlock[] }
+
+/** Each block of the book, marked internal or not; a list or table with both kinds is split into two blocks. */
+export function markInternal(book: Pick<BrandBook, "sections">): MarkedSection[] {
+  return book.sections.map(s => {
+    const out: MarkedBlock[] = []
+    for (const b of s.blocks) {
+      if (b.kind === "list") {
+        const items = b.items ?? [], fieldList = items.length > 0 && items.every(x => SURFACE_FIELD.test(x))
+        const keep = items.map(x => !fieldList && !isInternalText(x))
+        const part = (want: boolean): BookBlock => {
+          const idx = items.map((_, i) => i).filter(i => keep[i] === want)
+          return { ...b, items: idx.map(i => items[i]), ...(b.depths ? { depths: idx.map(i => b.depths![i]) } : {}) }
+        }
+        if (keep.some(Boolean)) out.push({ block: part(true), internal: false })
+        if (keep.some(k => !k)) out.push({ block: part(false), internal: true })
+      } else if (b.kind === "table") {
+        const head = (b.head ?? []).map(h => h.trim().toLowerCase())
+        if (head.includes("subsection") && head.includes("status")) { out.push({ block: b, internal: true }); continue }
+        const rows = b.rows ?? [], keep = rows.map(r => !r.cells.some(isInternalText))
+        if (keep.some(Boolean)) out.push({ block: { ...b, rows: rows.filter((_, i) => keep[i]) }, internal: false })
+        if (keep.some(k => !k)) out.push({ block: { ...b, rows: rows.filter((_, i) => !keep[i]) }, internal: true })
+      } else {
+        out.push({ block: b, internal: b.kind !== "heading" && isInternalText(b.text ?? "") })
+      }
+    }
+    // A heading whose subsection has nothing shareable left (up to the next heading at its level or above) is internal too.
+    out.forEach((m, i) => {
+      if (m.block.kind !== "heading") return
+      let shareable = false
+      for (let j = i + 1; j < out.length; j++) {
+        const n = out[j].block
+        if (n.kind === "heading" && (n.level ?? 3) <= (m.block.level ?? 3)) break
+        if (n.kind !== "heading" && !out[j].internal) { shareable = true; break }
+      }
+      if (!shareable) m.internal = true
+    })
+    return { title: s.title, blocks: out }
+  })
+}
+
+/**
+ * The designer's brand book: what someone designing something new for the brand needs, and nothing about how 434
+ * fills its templates. It is what a vendor is sent and what staff see first; the whole standard (template geometry,
+ * text-fit, the templates, surfaces, scheduling) stays in the full book, which only super-admins open.
+ *  - Kept: the identity sections (colour, typography, marks or logos, photography or imagery), without the columns
+ *    that place a value in a template slot ("Used for", "Where"), and without notes about where 434 keeps the files.
+ *  - Gathered: photography direction found elsewhere in the standard, as its own section.
+ *  - Then anything internal (markInternal) is left out, and an empty section is dropped.
+ */
+const DESIGNER_SECTION = /colou?r|typograph|\bfonts?\b|\btype\b|\bmarks?\b|\blogos?\b|photograph|imagery/i
+const SLOT_COLUMN = /^(used for|where)$/i
+const TOOL_NOTE = /\bCanva brand kit\b/i
+const PHOTO = /photograph/i
+
+export function designerBook(book: BrandBook): BrandBook {
+  const titleOf = (t: string) => t.replace(/^\d+(\.\d+)*\.?\s*/, "")
+  const kept: BookSection[] = [], photo: string[] = []
+  for (const s of book.sections) {
+    if (DESIGNER_SECTION.test(titleOf(s.title))) {
+      const blocks = s.blocks.flatMap((b): BookBlock[] => {
+        if (b.kind === "code") return []
+        if (b.kind === "paragraph" && TOOL_NOTE.test(b.text ?? "")) return []
+        if (b.kind === "table") {
+          const keep = (b.head ?? []).map(h => !SLOT_COLUMN.test(h.trim()))
+          return [{ ...b, head: (b.head ?? []).filter((_, i) => keep[i]), rows: (b.rows ?? []).map(r => ({ cells: r.cells.filter((_, i) => keep[i]) })) }]
+        }
+        return [b]
+      })
+      kept.push({ title: titleOf(s.title), blocks })
+    } else {
+      for (const b of s.blocks) if (b.kind === "list") photo.push(...(b.items ?? []).filter(x => PHOTO.test(x)))
+    }
+  }
+  if (photo.length) {
+    // One Photography section: the standard's own, when it has one, takes the gathered items it doesn't already hold.
+    const own = kept.find(s => PHOTO.test(s.title))
+    if (!own) kept.push({ title: "Photography", blocks: [{ kind: "list", items: photo }] })
+    else {
+      const has = new Set(own.blocks.flatMap(b => b.kind === "list" ? b.items ?? [] : []))
+      const add = photo.filter(x => !has.has(x))
+      if (add.length) own.blocks = [...own.blocks, { kind: "list", items: add }]
+    }
+  }
+  const sections = markInternal({ sections: kept })
+    .map(s => ({ title: s.title, blocks: s.blocks.filter(m => !m.internal).map(m => m.block) }))
+    .filter(s => s.blocks.some(b => b.kind !== "heading"))
+  return { standard: book.standard, sections }
+}
+
+/** What a vendor is sent: the designer's brand book. */
+export const vendorBook = designerBook
+
+export interface InlineToken { kind: "text" | "code" | "strong" | "em"; text: string }
+/**
+ * The inline marks a standard's text uses: `code`, **strong** and *em*. An escaped asterisk (\*), the marker that ties
+ * a note to a value (Display and Design Standard §3.0), is plain text: it never opens or closes emphasis, and it is
+ * shown as * without its backslash.
+ */
+export function inlineTokens(text: string): InlineToken[] {
+  const out: InlineToken[] = []
+  const push = (kind: InlineToken["kind"], t: string) => {
+    if (!t) return
+    const last = out[out.length - 1]
+    if (kind === "text" && last?.kind === "text") last.text += t
+    else out.push({ kind, text: t })
+  }
+  for (const p of text.split(/(\\\*|`[^`]+`|\*\*[^*]+\*\*|\*[^*\s][^*]*\*)/g)) {
+    if (p === "\\*") push("text", "*")
+    else if (/^`[^`]+`$/.test(p)) push("code", p.slice(1, -1))
+    else if (/^\*\*[^*]+\*\*$/.test(p)) push("strong", p.slice(2, -2))
+    else if (/^\*[^*]+\*$/.test(p)) push("em", p.slice(1, -1))
+    else push("text", p)
+  }
+  return out
+}

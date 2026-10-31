@@ -1,3 +1,4 @@
+import { jsonLdScript } from "@/lib/json-ld"
 import type React from "react"
 import { Suspense } from "react"
 import { CombinedNavbar } from "@/components/combined-navbar"
@@ -50,7 +51,7 @@ export function PublicShell({
         type="application/ld+json"
         // Keep this lightweight & generated server-side (no dynamic client data required)
         dangerouslySetInnerHTML={{
-          __html: JSON.stringify({
+          __html: jsonLdScript({
             '@context': 'https://schema.org',
             '@type': 'Organization',
             '@id': `${siteUrl}/#organization`,
@@ -78,7 +79,7 @@ export function PublicShell({
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{
-          __html: JSON.stringify({
+          __html: jsonLdScript({
             '@context': 'https://schema.org',
             '@type': 'WebSite',
             '@id': `${siteUrl}/#website`,
@@ -91,7 +92,7 @@ export function PublicShell({
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{
-          __html: JSON.stringify({
+          __html: jsonLdScript({
             '@context': 'https://schema.org',
             '@type': 'ProfessionalService',
             '@id': `${siteUrl}/#localbusiness`,

@@ -1,5 +1,6 @@
 "use client"
 
+import { jsonLdScript } from "@/lib/json-ld"
 import { useEffect } from "react"
 import { useLanguage } from "@/context/language-context"
 import SDOHHero from "@/components/sdoh/SDOHHero"
@@ -109,7 +110,7 @@ export default function SDOHClientPage() {
         id="event-schema"
         type="application/ld+json"
         dangerouslySetInnerHTML={{
-          __html: JSON.stringify({
+          __html: jsonLdScript({
             "@context": "https://schema.org",
             "@type": "Event",
             name: "¿Qué es SDOH? Panel Discussion",

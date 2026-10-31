@@ -1,6 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { Timestamp } from "firebase-admin/firestore"
 import { getDb } from "./firebase-admin"
+import { bearerSecretMatches } from "./secret-compare"
 
 export const CRON_RUNS_COLLECTION = "cron_runs"
 
@@ -34,8 +35,8 @@ export function authorizeCronRequest(request: NextRequest): NextResponse | null 
 
   // Bearer only. The `?secret=` form put the secret in URLs and request logs;
   // a manual run sends the same header Vercel Cron does (2b fix 11).
-  const header = request.headers.get("authorization") || ""
-  if (header !== `Bearer ${expected}`) {
+  // Compared in constant time (security log ADM-10).
+  if (!bearerSecretMatches(request.headers.get("authorization"), expected)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   }
 

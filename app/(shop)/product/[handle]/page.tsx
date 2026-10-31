@@ -1,3 +1,4 @@
+import { jsonLdScript } from "@/lib/json-ld"
 import type { Metadata } from "next"
 import { notFound } from "next/navigation"
 import Link from "next/link"
@@ -157,13 +158,13 @@ export default async function ProductPage({ params }: { params: Promise<{ handle
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{
-          __html: JSON.stringify(productJsonLd),
+          __html: jsonLdScript(productJsonLd),
         }}
       />
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{
-          __html: JSON.stringify(breadcrumbJsonLd),
+          __html: jsonLdScript(breadcrumbJsonLd),
         }}
       />
 

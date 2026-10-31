@@ -35,11 +35,11 @@ jobs:
   verify:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4.3.0
         with:
           version: 10.4.1
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: 22
           cache: pnpm
@@ -121,10 +121,34 @@ jobs:
       - run: tsx --test lib/__tests__/brand-profile.test.ts lib/__tests__/brand-profile-store.test.ts
       # The Create table (plan v11 Step 2): templates from the profile, Human+ on the writer, media, Run job.
       - run: tsx --test lib/__tests__/create-table.test.ts lib/__tests__/brands.test.ts
+      # Share with vendor (plan v11.2.1 Step 4 items 4–5): the token is stored as a hash only, jurisdiction and
+      # suppression refuse before anything is stored, the daily cap and repeats, a failed mail never opens.
+      - run: tsx --test lib/__tests__/brand-share.test.ts
+      # The vendor's downloads (Step 4 item 6): what a shared book offers, and a zip of exactly the ticked files.
+      - run: tsx --test lib/__tests__/brand-assets.test.ts
       # The approval drawer (plan v11.1 Step 3): a row's variations approved together, bound to the files shown.
       - run: tsx --test lib/__tests__/row-approval.test.ts
       # Event roles and travel routes from Firestore, the create-or-skip import, and the personal-data check itself.
       - run: tsx --test lib/__tests__/personal-data.test.ts
+      # The founder-only guard (V1 item 1, finance Phase 0): deny by default, one configured identity, a verified email.
+      - run: tsx --test lib/__tests__/founder-guard.test.ts
+      # Every finance API handler calls requireFounder first: the proxy guards the page only.
+      - run: tsx --test lib/__tests__/finance-routes-guarded.test.ts
+      # Admin email sign-in (security log ADM-1): verified email required; workspace addresses use Google in production.
+      - run: tsx --test lib/__tests__/firebase-signin.test.ts
+      # Owners come only from ADMIN_OWNER_EMAILS: no address in code, and none is a super admin by default.
+      - run: tsx --test lib/__tests__/admin-owners.test.ts
+      # Every admin sign-in, Google included, needs one active roster record with a valid role (security log ADM-2):
+      # no record, a deactivation, no role or a failed lookup is refused, never defaulted to full_admin.
+      - run: tsx --test lib/__tests__/admin-signin-roster.test.ts
+      # Small admin findings (security log ADM-7 to ADM-11, ADM-13): published-only public blog reads, isActive on
+      # super-admin and content checks, verified Google workspace accounts, header-only constant-time cron secrets,
+      # workspace-domain member addresses on edit, and a profile edit that keeps the session's role.
+      - run: tsx --test lib/__tests__/admin-small-findings.test.ts
+      # Security sweep 2026-10-29: escaped JSON-LD, header-only constant-time API keys that fail closed when unset,
+      # the Mailchimp analytics route behind requireAdmin, the roster re-checked on every session read, and every
+      # BotID-guarded route in the client protect list with the guard failing closed.
+      - run: tsx --test lib/__tests__/security-sweep-2026-10-29.test.ts
 
       # Optional: the same suites again on MilCityUSA's real published profile, when the BRAND_PROFILE_FIXTURE Actions
       # secret holds a published version's 434-context backup record. Secrets are not given to pull requests from

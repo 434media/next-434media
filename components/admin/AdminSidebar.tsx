@@ -64,10 +64,6 @@ const SIGNPOST_COMMON: SignpostLink[] = [
   { label: "SOPs", href: "/admin/sops", icon: FileText },
 ]
 
-// Hardcoded super-admin fallback — kept in sync with lib/auth.ts CRM_SUPER_ADMIN_FALLBACK.
-// Used so the sidebar can render the Settings entry without an async Firestore lookup.
-const SUPER_ADMIN_EMAILS = ["marcos@434media.com", "jesse@434media.com"]
-
 export interface SidebarUser {
   email: string
   name: string
@@ -353,12 +349,8 @@ export function AdminSidebar({
   onNavigate,
 }: AdminSidebarProps) {
   const pathname = usePathname() ?? ""
-  // Effective role: session role takes precedence; super-admin fallback ensures
-  // Marcos and Jesse always see Settings even before their session role is upgraded.
-  const baseRole: AdminRole = user.role ?? "crm_only"
-  const effectiveRole: AdminRole =
-    SUPER_ADMIN_EMAILS.includes(user.email.toLowerCase()) ? "crm_super_admin" : baseRole
-  const role = effectiveRole
+  // The session's role, which the server sets from the owners setting and the roster (lib/auth.ts).
+  const role: AdminRole = user.role ?? "crm_only"
   // Super-admins see everything full_admins see, plus super-admin-only items.
   const grantedRoles: AdminRole[] =
     role === "crm_super_admin" ? ["crm_super_admin", "full_admin", "crm_only"] : [role]
