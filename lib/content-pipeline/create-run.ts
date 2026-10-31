@@ -7,6 +7,7 @@ import { allowedPlatforms, frozen, isApproved } from "./row-approval"
 import { createHash } from "node:crypto"
 import type { ContentPost, CreateText, RoundupSlide } from "@/components/crm/types"
 import { canvaEditUrl, type CreateInput, type CreatedDesign } from "../canva-create"
+import { CanvaError } from "../canva-export"
 
 /**
  * Run job for one Create row (plan v11 Step 2), inside withProfile() with the brand's published profile read fresh by
@@ -249,13 +250,25 @@ async function fillFormat(deps: Pick<CreateRunDeps, "templateFields" | "createDe
       requestId, templateId, title, text,
       ...(media?.kind === "image" ? { image: { field: mediaField!, url: media.url, name: media.name } } : {}),
       ...(media?.kind === "video" ? { video: { field: mediaField!, url: media.url, name: media.name, bytes: media.bytes ?? 0 } } : {}),
-    })
+    }).catch((err: unknown) => { throw media ? brokenFrameError(err, format, { kind: media.kind, field: mediaField! }) : err })
     const asVideo = media?.kind === "video" || format === "reels"
     const urls = asVideo ? await deps.exportDesign(design.designId, "mp4") : design.previewUrls.length ? design.previewUrls : await deps.exportDesign(design.designId, "jpg")
     if (!urls.length) throw new CreateRowError([`Canva returned no export for the ${FORMAT_LABEL[format]} design`], 502)
     return { design, urls, asVideo }
   }
   return { inputHash, hasMedia: !!mediaField, make }
+}
+
+/**
+ * A fill with media that Canva refused (autofill_error) after the dataset check passed: Canva's dataset can still list a
+ * photo frame the template no longer has (2026-10-29, MilCityUSA DT101 feed: the frame became the page background). The
+ * row says so, on top of failedJobReason's reason, and keeps Canva's code and detail for the route's log.
+ */
+export function brokenFrameError(err: unknown, format: CreateFormat, media: { kind: "image" | "video"; field: string }): unknown {
+  if (!(err instanceof CanvaError) || err.code !== "autofill_error") return err
+  // A video row keeps failedJobReason's own advice (the frame may not take a video); a photo row has no use for it.
+  const first = media.kind === "video" ? err.message : `Canva could not fill the ${FORMAT_LABEL[format]} template with this row's photo (autofill_error)`
+  return new CanvaError(`${first}. The ${FORMAT_LABEL[format]} template's photo frame "${media.field}" may be broken in Canva; tell the coordinator, who can test it from the brand's page (Template check, Test fill)`, err.code, err.detail)
 }
 
 export interface ReplacedPost { format: CreateFormat; postId: string; designId: string; reused: boolean; holds: string[] }
