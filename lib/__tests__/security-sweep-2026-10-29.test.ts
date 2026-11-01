@@ -4,7 +4,7 @@
  */
 import { test } from "node:test"
 import assert from "node:assert/strict"
-import { readFileSync, readdirSync, statSync } from "node:fs"
+import { existsSync, readFileSync, readdirSync, statSync } from "node:fs"
 import { join, relative, sep } from "node:path"
 import { jsonLdScript } from "../json-ld"
 import { decideSharedSecret, secretMatches } from "../secret-compare"
@@ -68,12 +68,8 @@ test("public routes: no fail-open key check, no ?api_key= acceptance, no plain =
   assert.match(feed, /requireSecret\(request, "FEED_API_SECRET"/)
   assert.doesNotMatch(feed, /providedKey === /)
   assert.doesNotMatch(feed, /status === "all"/)
-  for (const f of ["app/api/public/events/route.ts", "app/api/public/events/[id]/route.ts"]) {
-    const src = read(f)
-    assert.doesNotMatch(src, /apiKeyParam/, f)
-    assert.doesNotMatch(src, /=== API_SECRET/, f)
-    assert.match(src, /secretMatches\(/, f)
-  }
+  // The events API was retired on 2026-11-01: its only caller, aimsatx.com, now redirects to velocitytx.org.
+  assert.ok(!existsSync(join(ROOT, "app/api/public/events")), "the retired events API stays deleted")
   assert.match(read("app/api/webhooks/mailchimp/route.ts"), /secretMatches\(provided, expected\)/)
   assert.doesNotMatch(read("lib/shopify/index.ts"), /secret !== process\.env/)
 })
