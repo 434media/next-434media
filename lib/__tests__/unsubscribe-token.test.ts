@@ -37,7 +37,7 @@ test("new links are signed with the current secret only", () => {
 
 test("a wrong, empty or wrong-length token never verifies", () => {
   withSecrets("new-secret", "old-secret", () => {
-    const other = signUnsubscribe("someone@else.com")
+    const other = signUnsubscribe("someone@example.test")
     assert.equal(verifyUnsubscribe(email, other), false)
     assert.equal(verifyUnsubscribe(email, ""), false)
     assert.equal(verifyUnsubscribe(email, "abc"), false)
