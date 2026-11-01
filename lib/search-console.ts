@@ -1,4 +1,5 @@
 import { GoogleAuth } from "google-auth-library"
+import { isKeyless, keylessAccessToken, SCOPES } from "./gcp-keyless"
 
 /**
  * Google Search Console (Webmasters v3) integration.
@@ -87,10 +88,13 @@ async function searchConsoleFetch<T>(
   path: string,
   body: unknown,
 ): Promise<SearchConsoleFetchResult<T>> {
-  const auth = getAuth()
-  const client = await auth.getClient()
-  const tokenResponse = await client.getAccessToken()
-  const token = tokenResponse.token
+  let token: string | null | undefined
+  if (isKeyless()) {
+    token = (await keylessAccessToken(SCOPES.searchConsole)).token
+  } else {
+    const client = await getAuth().getClient()
+    token = (await client.getAccessToken()).token
+  }
   if (!token) {
     return { ok: false, status: 401, reason: "Failed to get Search Console access token" }
   }

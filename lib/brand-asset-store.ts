@@ -1,5 +1,6 @@
 import { readFile, stat } from "node:fs/promises"
 import path from "node:path"
+import { isKeyless, keylessAccessToken, SCOPES } from "./gcp-keyless"
 
 /**
  * Where a vendor's downloadable brand files are kept (plan v11.3 Step 4 item 6): the delivered copies of a brand's
@@ -37,7 +38,38 @@ export function brandAssetStore(): BrandAssetStore {
     if (process.env.NODE_ENV === "production") throw new Error("BRAND_ASSETS_DIR is for local work only")
     return localStore(dir)
   }
-  return bucketStore()
+  return isKeyless() ? restStore() : bucketStore()
+}
+
+/**
+ * The same bucket through the Cloud Storage JSON API, for the keyless path (lib/gcp-keyless.ts): firebase-admin's
+ * Storage client takes only a key, and these reads are two plain GETs.
+ */
+function restStore(): BrandAssetStore {
+  const object = async (p: string, media: boolean) => {
+    const url =
+      `https://storage.googleapis.com/storage/v1/b/${encodeURIComponent(BRAND_ASSETS_BUCKET)}` +
+      `/o/${encodeURIComponent(p)}${media ? "?alt=media" : ""}`
+    const res = await fetch(url, { headers: { authorization: `Bearer ${(await keylessAccessToken(SCOPES.cloud)).token}` } })
+    if (res.status === 404) return null
+    if (!res.ok) throw new Error(`Brand asset read failed (HTTP ${res.status})`)
+    return res
+  }
+  const get = async (p: string) => {
+    const res = await object(p, true)
+    return res ? Buffer.from(await res.arrayBuffer()) : null
+  }
+  return {
+    async info(brandId, file) {
+      if (!safe(brandId, file)) return null
+      const res = await object(assetPath(brandId, file), false)
+      if (!res) return null
+      const m = (await res.json()) as { size?: string; metadata?: { tile?: string } }
+      return { bytes: Number(m.size) || 0, dark: m.metadata?.tile === "dark" }
+    },
+    read: async (brandId, file) => safe(brandId, file) ? get(assetPath(brandId, file)) : null,
+    thumb: async (brandId, file) => safe(brandId, file) ? get(thumbPath(brandId, file)) : null,
+  }
 }
 
 function bucketStore(): BrandAssetStore {
