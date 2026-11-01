@@ -10,7 +10,7 @@ const FULL = {
   GCP_PROJECT_NUMBER: "123456789012",
   GCP_WORKLOAD_IDENTITY_POOL_ID: "vercel",
   GCP_WORKLOAD_IDENTITY_POOL_PROVIDER_ID: "vercel-434media",
-  GCP_SERVICE_ACCOUNT_EMAIL: "reader@example-project.iam.gserviceaccount.com",
+  GCP_SERVICE_ACCOUNT_EMAIL: "reader@example.test",
   FIREBASE_PROJECT_ID: "example-project",
 }
 
