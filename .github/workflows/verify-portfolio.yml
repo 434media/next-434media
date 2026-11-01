@@ -82,6 +82,10 @@ jobs:
       # (2b fix 11). In-memory store with Firestore-style transaction retries.
       - run: tsx --test lib/__tests__/outreach-claim.test.ts
 
+      # Unsubscribe links signed before an UNSUBSCRIBE_SECRET rotation keep working while the old value is
+      # UNSUBSCRIBE_SECRET_PREVIOUS (VC-1); new links use the new secret only.
+      - run: tsx --test lib/__tests__/unsubscribe-token.test.ts
+
       # Lead with Ops feedback: a call request emails Carroll once (cc the founder, Reply-To the submitter),
       # the other answers send nothing, and a failed send still returns 200. BotID, Firestore and Resend faked.
       - run: tsx --test lib/__tests__/lead-with-ops-feedback.test.ts
