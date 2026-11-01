@@ -1,5 +1,6 @@
 import admin from "firebase-admin"
-import { getFirestore } from "firebase-admin/firestore"
+import { Firestore, getFirestore } from "firebase-admin/firestore"
+import { isKeyless, keylessAuthClient, keylessCredential, keylessProjectId, SCOPES } from "./gcp-keyless"
 
 // Initialize Firebase Admin SDK
 let app: admin.app.App | undefined
@@ -29,7 +30,8 @@ function parseKey(raw: string): Record<string, string> {
 
 function getCredentials(): ServiceAccountCredentials {
   // GOOGLE_SERVICE_ACCOUNT_KEY is the single source of truth for the 434 Media
-  // service account — Firestore Admin, GA4, and Search Console all use this key.
+  // service account — Firestore Admin, GA4, and Search Console all use this key,
+  // until the keyless path (lib/gcp-keyless.ts) is configured and replaces it.
   // (Mention notification emails go through Resend, so no other Google
   // credential is needed.)
   const serviceAccountKey = process.env.GOOGLE_SERVICE_ACCOUNT_KEY
@@ -74,6 +76,13 @@ function getFirebaseApp(): admin.app.App {
     return app
   }
 
+  if (isKeyless()) {
+    // No key: sign-in verification needs only the project id, and the credential is the keyless exchange.
+    app = admin.initializeApp({ credential: keylessCredential, projectId: keylessProjectId() })
+    console.log("[Firestore] Firebase Admin initialized (keyless)")
+    return app
+  }
+
   const credentials = getCredentials()
 
   // Initialize new app
@@ -89,8 +98,26 @@ function getFirebaseApp(): admin.app.App {
   return app
 }
 
+/**
+ * Firestore on the keyless exchange. firebase-admin cannot hand a custom credential to Firestore (it takes a key or
+ * Application Default Credentials only), so the client is built directly with the authClient, as lib/techday-db.ts.
+ */
+function keylessFirestore(databaseId?: string): admin.firestore.Firestore {
+  return new Firestore({
+    projectId: keylessProjectId(),
+    ...(databaseId ? { databaseId } : {}),
+    authClient: keylessAuthClient(SCOPES.cloud),
+    ignoreUndefinedProperties: true,
+  }) as unknown as admin.firestore.Firestore
+}
+
 export function getDb(): admin.firestore.Firestore {
   if (db) return db
+  if (isKeyless()) {
+    db = keylessFirestore()
+    console.log("[Firestore] Default database initialized (keyless)")
+    return db
+  }
   
   getFirebaseApp()
   db = admin.firestore()
@@ -108,6 +135,8 @@ export function getDb(): admin.firestore.Firestore {
 
 /** A Cloud Storage bucket, read with the same service account as Firestore. */
 export function getBucket(name: string) {
+  // firebase-admin's Storage refuses a custom credential; keyless reads go through lib/brand-asset-store.ts's REST path.
+  if (isKeyless()) throw new Error("getBucket needs GOOGLE_SERVICE_ACCOUNT_KEY; on the keyless path use the REST reader")
   return admin.storage(getFirebaseApp()).bucket(name)
 }
 
@@ -130,6 +159,12 @@ const namedDbs: Record<string, admin.firestore.Firestore> = {}
  */
 export function getNamedDb(databaseId: string): admin.firestore.Firestore {
   if (namedDbs[databaseId]) return namedDbs[databaseId]
+
+  if (isKeyless()) {
+    namedDbs[databaseId] = keylessFirestore(databaseId)
+    console.log(`[Firestore] Named database '${databaseId}' initialized (keyless)`)
+    return namedDbs[databaseId]
+  }
 
   // One app for the whole project; getFirestore(app, databaseId) gives a
   // distinct, correctly-bound instance per database — no settings() hack.
