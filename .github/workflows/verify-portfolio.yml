@@ -124,7 +124,7 @@ jobs:
       # are stamped.
       - run: tsx --test lib/__tests__/brand-profile.test.ts lib/__tests__/brand-profile-store.test.ts
       # The Create table (plan v11 Step 2): templates from the profile, Human+ on the writer, media, Run job.
-      - run: tsx --test lib/__tests__/create-table.test.ts lib/__tests__/brands.test.ts
+      - run: tsx --test lib/__tests__/create-table.test.ts lib/__tests__/brands.test.ts lib/__tests__/template-check.test.ts
       # Share with vendor (plan v11.2.1 Step 4 items 4–5): the token is stored as a hash only, jurisdiction and
       # suppression refuse before anything is stored, the daily cap and repeats, a failed mail never opens.
       - run: tsx --test lib/__tests__/brand-share.test.ts
