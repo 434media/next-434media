@@ -135,13 +135,20 @@ export async function keylessAccessToken(scope: string): Promise<AccessToken> {
 
 /**
  * The surface google-gax uses on a supplied authClient (as lib/techday-db.ts and cos-crm-pilot's wifAuthClient).
- * Headers come back as a plain record, which both gax 4 (Firestore) and gax 5 (GA4 Data) read.
+ * gax 4 (Firestore) hands the headers to grpc-js, which reads them with Object.keys; gax 5 (GA4 Data) first
+ * iterates them with forEach, as it would google-auth-library 10's Headers. A plain record with a
+ * non-enumerable forEach serves both: without it GA4 fails with "t.forEach is not a function".
  */
 export function keylessAuthClient(scope: string) {
   return {
     universeDomain: "googleapis.com",
     async getRequestHeaders(): Promise<Record<string, string>> {
-      return { Authorization: `Bearer ${(await keylessAccessToken(scope)).token}` }
+      const headers: Record<string, string> = { Authorization: `Bearer ${(await keylessAccessToken(scope)).token}` }
+      Object.defineProperty(headers, "forEach", {
+        value: (cb: (value: string, key: string) => void) => Object.entries(headers).forEach(([k, v]) => cb(v, k)),
+        enumerable: false,
+      })
+      return headers
     },
     async getAccessToken(): Promise<{ token: string; res: null }> {
       return { token: (await keylessAccessToken(scope)).token, res: null }
