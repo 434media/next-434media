@@ -120,7 +120,7 @@ test("ticking two files returns a zip holding exactly those two, byte-identical 
   for (const [n, b] of Object.entries(bytes)) await writeFile(path.join(root, "brand-assets/fixture", n), b)
   await writeFile(path.join(root, "brand-assets/fixture/fx-logo-white-v1.png.json"), JSON.stringify({ tile: "dark" }))
   const store = localStore(root)
-  assert.deepEqual(await store.info("fixture", "fx-logo-white-v1.png"), { bytes: 8, dark: true })
+  assert.deepEqual(await store.info("fixture", "fx-logo-white-v1.png"), { bytes: 8, dark: true, sha256: null })
   assert.equal(await store.info("fixture", "missing-v1.png"), null)
   assert.equal(await store.read("fixture", "../fixture/fx-banner-v1.png"), null)
 
