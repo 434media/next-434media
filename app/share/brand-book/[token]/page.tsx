@@ -57,7 +57,7 @@ export default async function SharedBrandBook({ params }: { params: Promise<{ to
         <p className="mb-4 border-b border-neutral-200 pb-3 text-xs text-neutral-500 print:hidden">Shared by 434 MEDIA · this link works until {new Date(expiresAt).toLocaleDateString("en-US", { timeZone: "America/Chicago", month: "long", day: "numeric", year: "numeric" })}</p>
         <form id={FORM} method="get" action={`${base}/download`} />
         <BrandBook book={book} brand={label} versionId={versionId} view="designer" collapsible open picks={picks} />
-        {total > 0 && <p className="mt-4 text-xs text-neutral-500 print:hidden">Tick the logo and font files you need, then Download selected. Fonts come as a note with the link to their free source and their licence.</p>}
+        {total > 0 && <p className="mt-4 text-xs text-neutral-500 print:hidden">Tick the logo and font files you need, then Download selected. Fonts come as their font files, with their free licence.</p>}
         <VendorFilesBar formId={FORM} total={total} />
       </div>
     </main>

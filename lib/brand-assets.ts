@@ -7,8 +7,9 @@ import type { BookBlock, BrandBook } from "./content-pipeline/brand-book"
  *  - **Logos**: each file the Marks section's tables name in their first column (`MCU-flag-white-v1.png`). The names are
  *    versioned, as delivered media's are (Display and Design Standard §3.0), so a corrected file is a new name in a new
  *    version of the standard, and an old share keeps the files it was sent.
- *  - **Fonts**: one per face in the Typography section's tables. A face under an open licence is given as a link to its
- *    source with its licence named (plan v11.3), never as a font file copied by 434.
+ *  - **Fonts**: one per face in the Typography section's tables, under an open licence only. A face 434 carries
+ *    (lib/vendor-fonts.ts) goes in as its font files with its licence text; any other is a link to its source with its
+ *    licence named (plan v11.3).
  *
  * A logo is downloadable only once its delivered copy is in storage (lib/brand-asset-store.ts); until then the page
  * lists it without a tick box. The download route accepts only ids this function offers for the share's own book, so a
@@ -70,14 +71,17 @@ export function pickedFiles(files: VendorFiles, ids: string[], available: (file:
   return { logos: files.logos.filter(l => want.has(l.id) && available(l.file)), fonts: files.fonts.filter(f => want.has(f.id)) }
 }
 
-/** What a ticked font puts in the zip: where to get it and its licence, as text. */
-export function fontNote(f: FontFace, brand: string): string {
+/** A ticked font's note: what the brand uses it for, its licence, and either its files beside it or where to get it. */
+export function fontNote(f: FontFace, brand: string, bundled: string[] = []): string {
+  const ofl = /\bOFL\b/i.test(f.licence)
   return [
     `${f.face}`, "",
     `Used in the ${brand} brand book${f.weights.length ? ` at: ${f.weights.join("; ")}` : ""}.`, "",
     `Licence: ${f.licence || "see the source"}. It is free to use, including commercially.`,
-    `Get it from the source: ${f.sourceUrl}`,
-    ...(/\bOFL\b/i.test(f.licence) ? [`Licence text (SIL Open Font License 1.1): ${OFL_URL}`] : []),
+    ...(bundled.length
+      ? [`The font files are in this folder: ${bundled.filter(n => n !== "OFL.txt").join(", ")}. Their licence is OFL.txt beside them; keep it with the files if you pass them on.`, `Source: ${f.sourceUrl}`]
+      : [`Get it from the source: ${f.sourceUrl}`]),
+    ...(ofl ? [`Licence text (SIL Open Font License 1.1): ${OFL_URL}`] : []),
     "",
   ].join("\n")
 }

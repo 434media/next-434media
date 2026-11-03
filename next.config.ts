@@ -18,6 +18,8 @@ const nextConfig: NextConfig = {
     // (scripts/fonts/fetch-private-fonts.mjs), so name it rather than rely on the tracer finding it.
     '/opengraph-image': ['./fonts/Menda-Black.otf'],
     '/api/og': ['./fonts/Menda-Black.otf'],
+    // A vendor's zip carries the open-licence font files (lib/vendor-fonts.ts), read at runtime.
+    '/share/brand-book/[token]/download': ['./fonts/open/**/*'],
     '/deck/[shareId]/opengraph-image': ['./fonts/Menda-Black.otf'],
   },
   experimental: {

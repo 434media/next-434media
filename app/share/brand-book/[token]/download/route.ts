@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import { openShare } from "@/lib/brand-share-open"
 import { fontNote, pickedFiles, vendorFiles, zipName, zipStore } from "@/lib/brand-assets"
 import { brandAssetStore } from "@/lib/brand-asset-store"
+import { bundledBytes, readBundledFont } from "@/lib/vendor-fonts"
 
 export const dynamic = "force-dynamic"
 
@@ -15,7 +16,8 @@ const plain = (status: number, text: string) =>
  * Download selected on a vendor's brand page (plan v11.3 Step 4 item 6): one zip of the ticked files, through the same
  * expiring link. `?f=<id>` names each file: a logo's file name or `font:<face>`, and only what the share's own book
  * offers is accepted, so a request can never name a path. Logos go in byte-identical to their delivered copies under
- * `logos/`; a font is a note with its source and licence under `fonts/`. Nothing else is added.
+ * `logos/`. A font 434 carries goes in as `fonts/<face>/`: its files, its OFL.txt and a README note; any other font is
+ * a note with its source and licence. Nothing else is added.
  *
  * A link that no longer opens (expired, revoked, unknown), or a request with nothing to download, is sent back to the
  * page, which refuses or shows the book as it would. A selection over the cap is refused (413) from the files' stored
@@ -40,13 +42,19 @@ export async function GET(req: Request, { params }: { params: Promise<{ token: s
     }
     const picked = pickedFiles(files, ids, f => sizes.has(f))
     if (!picked.logos.length && !picked.fonts.length) return NextResponse.redirect(page, 303)
-    if (picked.logos.reduce((n, l) => n + sizes.get(l.file)!, 0) > MAX_ZIP_BYTES) return plain(413, "Those files are too large for one download. Choose fewer and download them in two goes.")
+    const total = picked.logos.reduce((n, l) => n + sizes.get(l.file)!, 0) + picked.fonts.reduce((n, f) => n + bundledBytes(f.face), 0)
+    if (total > MAX_ZIP_BYTES) return plain(413, "Those files are too large for one download. Choose fewer and download them in two goes.")
     for (const l of picked.logos) {
       const data = await assets.read(share.brand_id, l.file)
       if (!data) return NextResponse.redirect(page, 303)
       entries.push({ name: `logos/${l.file}`, data })
     }
-    for (const f of picked.fonts) entries.push({ name: `fonts/${f.face}.txt`, data: Buffer.from(fontNote(f, label), "utf8") })
+    for (const f of picked.fonts) {
+      const files = await readBundledFont(f.face)
+      if (!files.length) { entries.push({ name: `fonts/${f.face}.txt`, data: Buffer.from(fontNote(f, label), "utf8") }); continue }
+      for (const file of files) entries.push({ name: `fonts/${f.face}/${file.file}`, data: file.data })
+      entries.push({ name: `fonts/${f.face}/README.txt`, data: Buffer.from(fontNote(f, label, files.map(x => x.file)), "utf8") })
+    }
   } catch (err) {
     // Storage refused or failed: say so plainly, record nothing.
     console.error("[share/brand-book] files unreadable", share.id, err)

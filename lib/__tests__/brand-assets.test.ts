@@ -11,6 +11,7 @@ import path from "node:path"
 import { crc32, fontNote, pickedFiles, vendorFiles, zipName, zipStore } from "../brand-assets"
 import { localStore } from "../brand-asset-store"
 import { designerBook, parseVisualStandard } from "../content-pipeline/brand-book"
+import { BUNDLED_FONTS, bundledBytes, bundledFont, readBundledFont } from "../vendor-fonts"
 
 const STANDARD = [
   "# Fixture Brand — Visual Standard", "", "**Version 1.0.0 — October 1, 2026**", "",
@@ -61,6 +62,34 @@ test("a font's note gives its source and licence, not a file", () => {
   assert.match(note, /https:\/\/fonts\.google\.com\/specimen\/Fixture\+Sans/)
   assert.match(note, /SIL Open Font License 1\.1/)
   assert.match(note, /Black 900; Medium 500/)
+})
+
+test("a bundled font's note points to its files and the OFL beside them", () => {
+  const note = fontNote(vendorFiles(book).fonts[0], "Fixture Brand", ["Fixture[wght].ttf", "OFL.txt"])
+  assert.match(note, /The font files are in this folder: Fixture\[wght\]\.ttf\./)
+  assert.match(note, /Their licence is OFL\.txt beside them/)
+  assert.doesNotMatch(note, /Get it from the source/)
+})
+
+test("every bundled font file is in the repository, unchanged, with its family's OFL text", async () => {
+  for (const face of Object.keys(BUNDLED_FONTS)) {
+    const files = await readBundledFont(face)
+    assert.deepEqual(files.map(f => f.file), BUNDLED_FONTS[face].map(f => f.file))
+    const ofl = files.find(f => f.file === "OFL.txt")
+    assert.ok(ofl, `${face} has no OFL.txt`)
+    assert.match(ofl.data.toString("utf8"), /SIL Open Font License, Version 1\.1/)
+    assert.ok(files.some(f => f.file.endsWith(".ttf")), `${face} has no font file`)
+  }
+  assert.equal(bundledFont("Fixture Sans"), null)
+  assert.equal(bundledBytes("Fixture Sans"), 0)
+  assert.deepEqual(await readBundledFont("constructor"), [])
+})
+
+test("a changed bundled file is refused, not sent", async () => {
+  const dir = await mkdtemp(path.join(os.tmpdir(), "fonts-"))
+  await mkdir(path.join(dir, "Montserrat"))
+  for (const f of BUNDLED_FONTS["Montserrat"]) await writeFile(path.join(dir, "Montserrat", f.file), "not the font")
+  await assert.rejects(readBundledFont("Montserrat", dir), /Bundled font file changed/)
 })
 
 test("crc32 matches the standard check value", () => {
