@@ -8,6 +8,7 @@ import { AdminRoleGuard } from "@/components/AdminRoleGuard"
 import { BrandStateBadge } from "@/components/admin/brands/BrandStateBadge"
 import { BrandBook } from "@/components/admin/brands/BrandBook"
 import { BrandShares } from "@/components/admin/brands/BrandShares"
+import { TemplateCheck } from "@/components/admin/brands/TemplateCheck"
 import type { BrandBook as Book } from "@/lib/content-pipeline/brand-book"
 import type { BrandState, CheckItem } from "@/lib/content-pipeline/brand-status"
 import type { McuSeeds } from "@/lib/content-pipeline/seeds"
@@ -133,6 +134,10 @@ export default function BrandPage() {
                 ? <ul className="space-y-1">{view.missing.map(m => <li key={m} className="text-sm text-amber-800">{m}</li>)}</ul>
                 : <p className="text-sm text-neutral-500">Nothing missing.</p>}
             </Section>
+
+            {b.versionId && <Section title="Template check" note="Reads every template this brand's profile uses from Canva and lists any whose photo frame or card fields are missing, so a broken template is caught here before a run fails in Canva.">
+              <TemplateCheck brandId={b.id} />
+            </Section>}
 
             {view.canEdit && <Section title="Internal" note="Super-admins only: template specs, setup, sources, the profile and its history. Nothing here is sent to a designer.">
               <div className="space-y-3">
