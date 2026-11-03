@@ -130,6 +130,8 @@ jobs:
       - run: tsx --test lib/__tests__/brand-share.test.ts
       # The vendor's downloads (Step 4 item 6): what a shared book offers, and a zip of exactly the ticked files.
       - run: tsx --test lib/__tests__/brand-assets.test.ts
+      # Publish brand book: the SOURCES.md check, the dry run's refusals and token, and SVG tiles and previews.
+      - run: tsx --test lib/__tests__/brand-book-publish.test.ts
       # The approval drawer (plan v11.1 Step 3): a row's variations approved together, bound to the files shown.
       - run: tsx --test lib/__tests__/row-approval.test.ts
       # Event roles and travel routes from Firestore, the create-or-skip import, and the personal-data check itself.

@@ -109,6 +109,9 @@
 /scripts/personal-data/                      @434media/founder
 /scripts/sor/load.ts                         @434media/founder
 /scripts/brand-profiles/assets.ts            @434media/founder
+/lib/brand-book-publish.ts                    @434media/founder
+/lib/brand-asset-prep.ts                      @434media/founder
+/app/api/admin/brand-profiles/*/book/        @434media/founder
 
 # Sends email
 /lib/resend.ts                               @434media/founder

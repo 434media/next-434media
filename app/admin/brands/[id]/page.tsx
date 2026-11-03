@@ -8,6 +8,7 @@ import { AdminRoleGuard } from "@/components/AdminRoleGuard"
 import { BrandStateBadge } from "@/components/admin/brands/BrandStateBadge"
 import { BrandBook } from "@/components/admin/brands/BrandBook"
 import { BrandShares } from "@/components/admin/brands/BrandShares"
+import { PublishBrandBook } from "@/components/admin/brands/PublishBrandBook"
 import type { BrandBook as Book } from "@/lib/content-pipeline/brand-book"
 import type { BrandState, CheckItem } from "@/lib/content-pipeline/brand-status"
 import type { McuSeeds } from "@/lib/content-pipeline/seeds"
@@ -136,6 +137,10 @@ export default function BrandPage() {
 
             {view.canEdit && <Section title="Internal" note="Super-admins only: template specs, setup, sources, the profile and its history. Nothing here is sent to a designer.">
               <div className="space-y-3">
+                <Section nested title="Publish brand book" note="Regenerates the brand book from the newest visual standard 434-context published to storage, after checking every logo file it names is there unchanged. Check shows what would change; nothing is written until Publish brand book.">
+                  <PublishBrandBook brandId={b.id} onPublished={load} />
+                </Section>
+
                 {view.book && <Section nested title="Full visual standard and template specs" note="The whole standard the brand book is drawn from, as the pipeline uses it. Parts kept out of the designer's copy are marked.">
                   <BrandBook book={view.book.book} brand={b.label} versionId={view.book.versionId} view="full" collapsible />
                 </Section>}

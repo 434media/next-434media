@@ -156,3 +156,12 @@ export async function readProfileVersion(id: string, n: number, db: FirebaseFire
   const snap = await db.collection(COLLECTION).doc(id).collection(VERSIONS).doc(versionDocId(n)).get()
   return snap.exists ? snap.data() as ProfileVersion : null
 }
+
+/**
+ * An entry in a brand's activity trail (`brand_profiles/<id>/activity`), for an action a person would want a record
+ * of beyond the version it publishes: who ran it, when, and what it did. Append-only.
+ */
+export async function appendBrandActivity(id: string, event: { type: string; actor: string; at: string; detail: Record<string, unknown> }, db: FirebaseFirestore.Firestore = getDb()) {
+  if (!BRAND_ID.test(id)) throw new Error(`no brand profile document for ${id}`)
+  await db.collection(COLLECTION).doc(id).collection("activity").add(clean(event))
+}

@@ -1,4 +1,4 @@
-import { readFile, stat } from "node:fs/promises"
+import { readdir, readFile, stat } from "node:fs/promises"
 import path from "node:path"
 import { isKeyless, keylessAccessToken, SCOPES } from "./gcp-keyless"
 
@@ -19,15 +19,24 @@ import { isKeyless, keylessAccessToken, SCOPES } from "./gcp-keyless"
 export const BRAND_ASSETS_BUCKET = process.env.BRAND_ASSETS_BUCKET || "434-media-sources"
 export const assetPath = (brandId: string, file: string) => `brand-assets/${brandId}/${file}`
 export const thumbPath = (brandId: string, file: string) => `brand-assets/${brandId}/thumbs/${file}.webp`
+/** Where the brand-assets workflow keeps each copy of a brand's standard (lib/brand-book-publish.ts). */
+export const standardPrefix = (brandId: string) => `brand-assets/${brandId}/standards/`
 
-/** A delivered file's size, and whether its mark reads on a dark tile (a white mark) or a light one. */
-export interface AssetInfo { bytes: number; dark: boolean }
+/** A delivered file's size, whether its mark reads on a dark tile (a white mark) or a light one, and the sha256 its
+ * publisher recorded (null when none was). */
+export interface AssetInfo { bytes: number; dark: boolean; sha256: string | null }
+/** The newest copy of a brand's visual standard the brand-assets workflow put in storage (lib/brand-book-publish.ts). */
+export interface StoredStandard { object: string; generation: string; md: string; sourcePath: string }
 export interface BrandAssetStore {
   info(brandId: string, file: string): Promise<AssetInfo | null>
   read(brandId: string, file: string): Promise<Buffer | null>
   /** The preview, when one was made. */
   thumb(brandId: string, file: string): Promise<Buffer | null>
+  /** The newest standard copy, by creation time; null when there is none. */
+  latestStandard(brandId: string): Promise<StoredStandard | null>
 }
+
+const recorded = (m: { sha256?: unknown } | undefined) => typeof m?.sha256 === "string" && /^[0-9a-f]{64}$/.test(m.sha256) ? m.sha256 : null
 
 const SAFE = /^[A-Za-z0-9][A-Za-z0-9._-]*$/
 const safe = (brandId: string, file: string) => SAFE.test(brandId) && SAFE.test(file) && !file.includes("..")
@@ -64,11 +73,23 @@ function restStore(): BrandAssetStore {
       if (!safe(brandId, file)) return null
       const res = await object(assetPath(brandId, file), false)
       if (!res) return null
-      const m = (await res.json()) as { size?: string; metadata?: { tile?: string } }
-      return { bytes: Number(m.size) || 0, dark: m.metadata?.tile === "dark" }
+      const m = (await res.json()) as { size?: string; metadata?: { tile?: string; sha256?: string } }
+      return { bytes: Number(m.size) || 0, dark: m.metadata?.tile === "dark", sha256: recorded(m.metadata) }
     },
     read: async (brandId, file) => safe(brandId, file) ? get(assetPath(brandId, file)) : null,
     thumb: async (brandId, file) => safe(brandId, file) ? get(thumbPath(brandId, file)) : null,
+    async latestStandard(brandId) {
+      if (!SAFE.test(brandId)) return null
+      const auth = { authorization: `Bearer ${(await keylessAccessToken(SCOPES.cloud)).token}` }
+      const list = await fetch(`https://storage.googleapis.com/storage/v1/b/${encodeURIComponent(BRAND_ASSETS_BUCKET)}/o?prefix=${encodeURIComponent(standardPrefix(brandId))}&fields=items(name,generation,timeCreated,metadata)`, { headers: auth })
+      if (!list.ok) throw new Error(`Brand standard list failed (HTTP ${list.status})`)
+      const items = ((await list.json()) as { items?: { name: string; generation: string; timeCreated: string; metadata?: { source_path?: string } }[] }).items ?? []
+      const top = items.filter(i => i.name.endsWith(".md")).sort((a, b) => b.timeCreated.localeCompare(a.timeCreated))[0]
+      if (!top) return null
+      const res = await fetch(`https://storage.googleapis.com/storage/v1/b/${encodeURIComponent(BRAND_ASSETS_BUCKET)}/o/${encodeURIComponent(top.name)}?alt=media&generation=${top.generation}`, { headers: auth })
+      if (!res.ok) throw new Error(`Brand standard read failed (HTTP ${res.status})`)
+      return { object: top.name, generation: top.generation, md: await res.text(), sourcePath: top.metadata?.source_path ?? top.name }
+    },
   }
 }
 
@@ -83,11 +104,19 @@ function bucketStore(): BrandAssetStore {
       if (!safe(brandId, file)) return null
       try {
         const [m] = await (await bucket()).file(assetPath(brandId, file)).getMetadata()
-        return { bytes: Number(m.size) || 0, dark: m.metadata?.tile === "dark" }
+        return { bytes: Number(m.size) || 0, dark: m.metadata?.tile === "dark", sha256: recorded(m.metadata as { sha256?: unknown } | undefined) }
       } catch (err) { if ((err as { code?: number }).code === 404) return null; throw err }
     },
     read: async (brandId, file) => safe(brandId, file) ? get(assetPath(brandId, file)) : null,
     thumb: async (brandId, file) => safe(brandId, file) ? get(thumbPath(brandId, file)) : null,
+    async latestStandard(brandId) {
+      if (!SAFE.test(brandId)) return null
+      const [files] = await (await bucket()).getFiles({ prefix: standardPrefix(brandId) })
+      const top = files.filter(f => f.name.endsWith(".md")).sort((a, b) => String(b.metadata.timeCreated).localeCompare(String(a.metadata.timeCreated)))[0]
+      if (!top) return null
+      const [data] = await top.download()
+      return { object: top.name, generation: String(top.metadata.generation), md: data.toString("utf8"), sourcePath: String(top.metadata.metadata?.source_path ?? top.name) }
+    },
   }
 }
 
@@ -100,11 +129,21 @@ export function localStore(root: string): BrandAssetStore {
       if (!safe(brandId, file)) return null
       try {
         const s = await stat(at(assetPath(brandId, file)))
-        const meta = JSON.parse((await get(`${assetPath(brandId, file)}.json`))?.toString("utf8") ?? "{}") as { tile?: string }
-        return { bytes: s.size, dark: meta.tile === "dark" }
+        const meta = JSON.parse((await get(`${assetPath(brandId, file)}.json`))?.toString("utf8") ?? "{}") as { tile?: string; sha256?: string }
+        return { bytes: s.size, dark: meta.tile === "dark", sha256: recorded(meta) }
       } catch { return null }
     },
     read: async (brandId, file) => safe(brandId, file) ? get(assetPath(brandId, file)) : null,
     thumb: async (brandId, file) => safe(brandId, file) ? get(thumbPath(brandId, file)) : null,
+    async latestStandard(brandId) {
+      if (!SAFE.test(brandId)) return null
+      const dir = at(standardPrefix(brandId))
+      const names = (await readdir(dir).catch(() => [] as string[])).filter(n => n.endsWith(".md"))
+      const dated = await Promise.all(names.map(async n => ({ n, t: (await stat(path.join(dir, n))).mtimeMs })))
+      const top = dated.sort((a, b) => b.t - a.t)[0]
+      if (!top) return null
+      const meta = JSON.parse((await get(`${standardPrefix(brandId)}${top.n}.json`))?.toString("utf8") ?? "{}") as { source_path?: string }
+      return { object: `${standardPrefix(brandId)}${top.n}`, generation: String(Math.floor(top.t)), md: (await readFile(path.join(dir, top.n))).toString("utf8"), sourcePath: meta.source_path ?? top.n }
+    },
   }
 }
