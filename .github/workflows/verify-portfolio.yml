@@ -104,6 +104,9 @@ jobs:
       - run: tsx --test lib/__tests__/owned-meta-service.test.ts
       # Canva brand-template fill for the Slack app, including the photo crop (sharp runs for real here).
       - run: tsx --test lib/__tests__/canva-create.test.ts
+      # A clip's video export fitted to the clip's length, or held for review (content-pipeline/video-timing.ts). The
+      # ffmpeg cases cut synthetic clips with the ffmpeg-static binary the install above fetched.
+      - run: tsx --test lib/__tests__/video-timing.test.ts
       # Brand profiles live in Firestore, not in this public repository (plan v11 Step 1): the generated copies
       # under lib/brand-profiles/ must not come back.
       - run: test ! -e lib/brand-profiles

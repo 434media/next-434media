@@ -8,12 +8,15 @@ const nextConfig: NextConfig = {
   },
   // Increase body size limit for file uploads (App Router uses route config, not this)
   // The Create table's video conversion (lib/content-pipeline/transcode.ts) runs the ffmpeg-static binary: kept out of
-  // the bundle and traced into that one route.
+  // the bundle and traced into the routes that run it.
   serverExternalPackages: ['ffmpeg-static'],
   outputFileTracingIncludes: {
     // The binary's real path under pnpm's store: node_modules/ffmpeg-static is a symlink, and a traced path through a
     // symlinked directory makes Vercel refuse the function ("files in symlinked directories").
     '/api/admin/content/media-optimize': ['./node_modules/.pnpm/ffmpeg-static@*/node_modules/ffmpeg-static/ffmpeg'],
+    // A clip's video export is cut to the clip's length there too (lib/content-pipeline/video-timing.ts trimTail).
+    '/api/admin/content/create-run': ['./node_modules/.pnpm/ffmpeg-static@*/node_modules/ffmpeg-static/ffmpeg'],
+    '/api/admin/content/rows/[rowId]': ['./node_modules/.pnpm/ffmpeg-static@*/node_modules/ffmpeg-static/ffmpeg'],
     // The social-image routes read Menda's OTF at runtime. It's fetched at build time and gitignored
     // (scripts/fonts/fetch-private-fonts.mjs), so name it rather than rely on the tracer finding it.
     '/opengraph-image': ['./fonts/Menda-Black.otf'],
