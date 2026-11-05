@@ -400,6 +400,11 @@ export interface ContentPost {
   // What the row's media was when the design was filled (Step 3 part 5): a photo goes to Instagram and Facebook at 4:5
   // only. Optional; posts made before it have none, and then nothing is ruled out by it.
   create_media?: "photo" | "video"
+  // A Create-table video checked against its clip (lib/content-pipeline/video-timing.ts): lengths, what was done (used
+  // as it is, blank end cut, or held) and the SHA-256 of the file it describes. Approval needs it to name the post's
+  // current video and carry no hold. Optional; posts made before it have none, and a video one then can't be approved
+  // until it is made again.
+  video_timing?: VideoTiming
   // A roundup's published cards, in order, after its cover (Step 4: ICYMI from the Create table). Refresh from Canva and
   // Replace media re-export the cover and put these after it again. Optional; only a roundup has them.
   roundup_slides?: RoundupSlide[]
@@ -472,6 +477,17 @@ export interface PipelineMedia {
 }
 
 /** A Create row's card text and template, as the Run job filled them (ContentPost.create_text). */
+/** See ContentPost.video_timing. */
+export interface VideoTiming {
+  clip_sec: number | null
+  clip_audio: boolean | null
+  export_sec: number | null
+  final_sec: number | null
+  action: "matched" | "trimmed" | "held"
+  hold?: string
+  sha256: string
+  checked_at: string
+}
 export interface CreateText { brand: string; kind: string; headline: string; subHeadline: string; fields: Record<string, string>; /** A roundup's chosen published posts, in order. */ roundup?: string[] }
 /** A published post's card that a roundup (ICYMI) carries after its cover, as it was posted (ContentPost.roundup_slides). */
 export interface RoundupSlide {

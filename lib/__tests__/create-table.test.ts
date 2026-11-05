@@ -12,7 +12,8 @@ import { cardSubject } from "../content-pipeline/series"
 import { humanPlus, humanPlusRoundup, HumanPlusError, withoutMediaLines, type HumanPlusDeps } from "../content-pipeline/human-plus"
 import { roundupChoices } from "../content-pipeline/roundup"
 import { DOD_NOTICE } from "../content-pipeline/worker"
-import { CreateRowError, createRequestId, shortExportHolds, replaceRowMedia, runCreateRow, serverRowProblems, type CreateRunDeps } from "../content-pipeline/create-run"
+import { CreateRowError, createRequestId, timingHolds, replaceRowMedia, runCreateRow, serverRowProblems, type CreateRunDeps } from "../content-pipeline/create-run"
+import type { VideoTiming } from "../../components/crm/types"
 import type { McuAi } from "../content-pipeline/model"
 import { guardedContentUpdate, sendBackPlan } from "../owned-meta-publisher"
 import { approvalCovers, isApproved } from "../content-pipeline/row-approval"
@@ -160,9 +161,14 @@ test("Human+ refuses an unreadable link with a reason the person can act on", as
 // ── Run job ──
 function runDeps(live: RoundupStory[] = []) {
   const running = new Set<string>()
-  const bases: string[] = [], attachCalls: { items: string[]; canvaItems?: number }[] = []
+  const bases: string[] = [], attachCalls: { items: string[]; canvaItems?: number; bytes: (string | null)[] }[] = []
   const posts = new Map<string, ContentPost>(), made: { requestId: string; templateId: string; text: Record<string, string>; video?: unknown; image?: unknown }[] = [], exports: string[] = []
+  // The template's revision (Canva's updated_at), and each video export's fitting: a 60 s export of a clip, cut.
+  const revision = { value: "1793746486" }, fits: { exportUrl: string; clip: unknown }[] = []
+  let fit = (exportUrl: string): { bytes: Uint8Array; timing: VideoTiming } => ({ bytes: new TextEncoder().encode(`cut:${exportUrl}`), timing: { clip_sec: 21.4, clip_audio: true, export_sec: 60, final_sec: 21.4, action: "trimmed", sha256: `sha-of-cut:${exportUrl}`, checked_at: "t" } })
   const deps: CreateRunDeps = {
+    templateRevision: async () => revision.value,
+    fitVideo: async (exportUrl, clip) => { fits.push({ exportUrl, clip }); return fit(exportUrl) },
     templateFields: async () => ({ ...ICYMI_COVER, headline: "text", deck: "text", date: "text", source: "text", media: "image", counter: "text" }),
     createDesign: async i => { made.push(i); return { designId: `D${made.length}abcdefgh`, title: i.title, editUrl: "https://canva/e", viewUrl: "https://canva/v", templateId: i.templateId, fields: Object.keys(i.text), previewUrls: [`https://export/${made.length}.jpg`], createdAt: "t" } },
     exportDesign: async (id, as) => { exports.push(`${id}:${as}`); return [`https://export/${id}.${as}`] },
@@ -170,14 +176,14 @@ function runDeps(live: RoundupStory[] = []) {
     createPost: async p => { const post = { ...p, id: `post${posts.size + 1}`, created_at: "t", updated_at: "t" } as ContentPost; posts.set(post.id, post); return post },
     updatePost: async (id, u) => { const post = { ...posts.get(id)!, ...u } as ContentPost; posts.set(id, post); return post },
     roundupStories: async () => live,
-    attachExports: async ({ postId, items, canva, canvaItems, fileBase, rebind }) => { attachCalls.push({ items: items.map(i => i.url), canvaItems }); const p = posts.get(postId)!; if (p.canva_design_id && p.canva_design_id !== canva.designId && !rebind) throw new Error("bound"); bases.push(fileBase); posts.set(postId, { ...p, assets: items.map(i => ({ url: i.url, kind: i.url.endsWith(".mp4") ? "video" : "image" })), export_fingerprint: "fp", canva_design_id: canva.designId } as ContentPost); return { holds: [] } },
+    attachExports: async ({ postId, items, canva, canvaItems, fileBase, rebind }) => { attachCalls.push({ items: items.map(i => i.url), canvaItems, bytes: items.map(i => i.bytes ? new TextDecoder().decode(i.bytes) : null) }); const p = posts.get(postId)!; if (p.canva_design_id && p.canva_design_id !== canva.designId && !rebind) throw new Error("bound"); bases.push(fileBase); posts.set(postId, { ...p, assets: items.map(i => ({ url: i.url, kind: i.url.endsWith(".mp4") ? "video" : "image" })), export_fingerprint: "fp", canva_design_id: canva.designId } as ContentPost); return { holds: [] } },
     claimRow: async id => { if (running.has(id)) return false; running.add(id); return true },
     releaseRow: async id => { running.delete(id) },
     // The real send-back plan (owned-meta-publisher sendBackPlan), as firestore-crm sendBackToReview applies it.
     sendBack: async (id, actor) => { const p = posts.get(id)!; posts.set(id, { ...p, ...sendBackPlan(p as unknown as Record<string, unknown>, undefined, actor, "t", "Media replaced").post } as ContentPost) },
     now: () => "2026-10-19T15:00:00.000Z",
   }
-  return { deps, posts, made, exports, running, bases, attachCalls }
+  return { deps, posts, made, exports, running, bases, attachCalls, revision, fits, setFit: (f: typeof fit) => { fit = f } }
 }
 
 test("Run job: one design and one Review post per format, stamped, keyed by the row, with video exported as MP4", async () => {
@@ -468,11 +474,53 @@ test("Replace media: a photo can't replace the video of a 9:16 size that goes to
   assert.equal(s.made.length, made, "nothing is made")
 })
 
-test("a video export at Canva's default 5 s page timing is flagged in Review; a full-length one or a photo isn't", () => {
-  assert.match(shortExportHolds("feed", VIDEO, [{ duration: 5 }])[0], /Feed 4:5 video is only 0:05 long: the template's page timing/)
-  assert.deepEqual(shortExportHolds("feed", VIDEO, [{ duration: 42.4 }]), [])
-  assert.deepEqual(shortExportHolds("feed", { kind: "image" }, [{ duration: 5 }]), [], "a photo card exported as MP4 is meant to be short")
-  assert.deepEqual(shortExportHolds("reels", VIDEO, []), [], "a reused export isn't measured again")
+test("Run job: a clip's video export is fitted to the clip before it is attached, and the check is kept on the post", async () => {
+  const s = runDeps()
+  const r = await runCreateRow(s.deps, row({ media: VIDEO, platforms: ["instagram_feed", "facebook_feed"] }), { email: "a@x.co", name: "A" })
+  assert.deepEqual(s.fits.map(f => f.clip), [{ url: VIDEO.url }], "measured against the row's own clip")
+  assert.equal(s.attachCalls[0].bytes[0], `cut:${s.fits[0].exportUrl}`, "the cut file is attached, not Canva's 60 s export")
+  const post = s.posts.get(r.posts[0].postId)!
+  assert.equal(post.video_timing?.action, "trimmed"); assert.equal(post.video_timing?.final_sec, 21.4)
+  assert.deepEqual(r.posts[0].holds, [])
+  // A photo row's design isn't fitted (a photo card exported as video has no clip).
+  const p = runDeps()
+  await runCreateRow(p.deps, row({ platforms: ["instagram_feed", "facebook_feed"] }), { email: "a@x.co", name: "A" })
+  assert.equal(p.fits.length, 0)
+})
+
+test("Run job: a held video is attached for review, named on the row, and kept on the post", async () => {
+  const s = runDeps()
+  s.setFit(url => ({ bytes: new TextEncoder().encode(`as-is:${url}`), timing: { clip_sec: 21.4, clip_audio: true, export_sec: 5, final_sec: 5, action: "held", hold: "Canva cut the clip: the video runs 0:05.0, the clip 0:21.4.", sha256: "x", checked_at: "t" } }))
+  const r = await runCreateRow(s.deps, row({ media: VIDEO, platforms: ["instagram_feed", "facebook_feed"] }), { email: "a@x.co", name: "A" })
+  assert.deepEqual(r.posts[0].holds, ["Feed 4:5: Canva cut the clip: the video runs 0:05.0, the clip 0:21.4."])
+  assert.equal(s.posts.get(r.posts[0].postId)!.video_timing?.action, "held")
+  assert.deepEqual(timingHolds("feed"), [])
+})
+
+test("Run job: a template fixed in place (same id, new revision) makes a new design; the same revision reuses it", async () => {
+  const s = runDeps()
+  const first = await runCreateRow(s.deps, row({ media: VIDEO, platforms: ["instagram_feed", "facebook_feed"] }), { email: "a@x.co", name: "A" })
+  const same = await runCreateRow(s.deps, row({ media: VIDEO, platforms: ["instagram_feed", "facebook_feed"] }), { email: "a@x.co", name: "A" })
+  assert.ok(same.posts.every(p => p.reused)); assert.equal(s.made.length, 1); assert.equal(s.fits.length, 1, "a reused design isn't exported again")
+  s.revision.value = "1793900000"
+  const fixed = await runCreateRow(s.deps, row({ media: VIDEO, platforms: ["instagram_feed", "facebook_feed"] }), { email: "a@x.co", name: "A" })
+  assert.equal(fixed.posts[0].reused, false); assert.equal(fixed.posts[0].postId, first.posts[0].postId, "on the same post")
+  assert.notEqual(s.made[1].requestId, s.made[0].requestId, "a new Canva ledger key, so the old design isn't served")
+  assert.equal(s.fits.length, 2, "and the new export is checked again")
+  // Changed media also makes a new design and a new check.
+  await runCreateRow(s.deps, row({ media: { ...VIDEO, url: "https://abc.public.blob.vercel-storage.com/content-create/other.mp4" }, platforms: ["instagram_feed", "facebook_feed"] }), { email: "a@x.co", name: "A" })
+  assert.deepEqual(s.fits.at(-1)!.clip, { url: "https://abc.public.blob.vercel-storage.com/content-create/other.mp4" })
+})
+
+test("Replace media with a clip: every size is fitted to the new clip before any post changes", async () => {
+  const s = runDeps()
+  const first = await runCreateRow(s.deps, row({ platforms: ["instagram_feed", "facebook_feed"] }), { email: "a@x.co", name: "A" })
+  const text = s.posts.get(first.posts[0].postId)!.create_text!
+  const video = { url: "https://abc.public.blob.vercel-storage.com/content-create/new.mp4", kind: "video" as const, name: "new.mp4", bytes: 2e7, optimized: "done" }
+  const r = await replaceRowMedia(s.deps, "row-0001-abcd", text, video, { email: "a@x.co", name: "A" })
+  assert.deepEqual(s.fits.map(f => f.clip), r.posts.map(() => ({ url: video.url })))
+  for (const p of r.posts) assert.equal(s.posts.get(p.postId)!.video_timing?.action, "trimmed")
+  assert.ok(s.attachCalls.at(-1)!.bytes[0]?.startsWith("cut:"))
 })
 
 // ── ICYMI (Step 4 item 1) ──

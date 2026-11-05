@@ -2,7 +2,7 @@
 import { test } from "node:test"
 import assert from "node:assert/strict"
 import { seal, CanvaError, shownCanvaCode, type CanvaDeps, type CanvaTokenRecord, type CanvaTokenStore } from "../canva-export"
-import { createFromTemplate, failedJobReason, templateFields, profileTemplateIds, canvaEditUrl, type CreateDeps, type CreatedDesign, type WorkingFolder } from "../canva-create"
+import { createFromTemplate, failedJobReason, templateFields, templateRevision, profileTemplateIds, canvaEditUrl, type CreateDeps, type CreatedDesign, type WorkingFolder } from "../canva-create"
 import { TOOL_SCOPE } from "../owned-meta-connector"
 import { SERVICE_TOOL_SCOPE } from "../owned-meta-service"
 
@@ -223,4 +223,12 @@ test("a code that isn't a plain snake_case code never reaches the screen", () =>
   }
   assert.equal(shownCanvaCode("design_update_error"), "design_update_error")
   assert.equal(shownCanvaCode(42), "unrecognised")
+})
+
+test("a template's revision is Canva's updated_at, read only for an allowed template", async () => {
+  const s = setup(url => url.endsWith(`/brand-templates/${DT101}`) ? Response.json({ brand_template: { id: DT101, title: "T", created_at: 1791396234, updated_at: 1793746486 } }) : Response.json({ code: "unexpected" }, { status: 500 }))
+  assert.equal(await templateRevision(s.deps, DT101), "1793746486")
+  await assert.rejects(templateRevision(s.deps, "EAHotherXXX"), /not on the allowed list/)
+  const none = setup(() => Response.json({ brand_template: { id: DT101 } }))
+  await assert.rejects(templateRevision(none.deps, DT101), (e: unknown) => e instanceof CanvaError && e.code === "template_revision")
 })

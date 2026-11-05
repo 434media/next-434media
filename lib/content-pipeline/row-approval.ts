@@ -76,10 +76,26 @@ export function readiness(p: ContentPost): string | null {
   if (p.pipeline_outcome) return "This card is a notice, not a post"
   if (!p.canva_design_id) return "Attach a Canva design first (paste its link)"
   if (!p.assets?.length || !p.export_fingerprint) return "The design isn't exported yet; use Refresh from Canva"
+  const timing = timingProblem(p)
+  if (timing) return timing
   if (publisherPlatforms(p).length === 1) return "The publisher posts to Instagram and Facebook together; tick both, or neither and post by hand"
   if (!p.social_copy?.trim()) return "Write the caption"
   if (!/^\d{4}-\d{2}-\d{2}$/.test(p.date_to_post ?? "")) return "Pick a post date"
   return null
+}
+
+/**
+ * Whether a Create-table video's file was checked against its clip and passed (lib/content-pipeline/video-timing.ts);
+ * null when it was, or the post isn't one. The check must name the post's current video by SHA-256, so a file attached
+ * any other way is never taken as checked. A photo card exported as a video has no clip and isn't checked.
+ */
+export function timingProblem(p: Pick<ContentPost, "create_media" | "assets" | "video_timing">): string | null {
+  if (p.create_media !== "video") return null
+  const video = p.assets?.find(a => a.kind === "video")
+  if (!video) return null
+  const t = p.video_timing
+  if (!t || !video.sha256 || t.sha256 !== video.sha256) return "The video's length hasn't been checked against its clip. Run the row again from Create, or Replace media."
+  return t.hold ?? null
 }
 
 /** What the reviewer was shown of a variation; an approval binds all of it, not only the files. */

@@ -85,7 +85,8 @@ export async function assertAttachable(deps: IntakeDeps, postId: string): Promis
   if (excluded(post) || post.status === "posted" || post.published_url) throw new MetaBlocked("This post is already published or excluded from the publisher; its media cannot be replaced")
   return post
 }
-export interface ExportItem { url: string; label?: string }
+/** bytes: the export already fetched and prepared by the caller (a video fitted to its clip); url then only names it. */
+export interface ExportItem { url: string; label?: string; bytes?: Uint8Array }
 export interface AttachResult { post: PostSummary; assets: { url: string; mime: string; width: number; height: number; duration?: number; bytes: number }[]; holds: string[]; fingerprint: string; reused: boolean }
 /**
  * Fetches each export (SSRF-guarded by the injected fetcher), measures it from bytes,
@@ -102,7 +103,7 @@ export async function attachExports(deps: IntakeDeps, input: { postId: string; i
   const measured: { bytes: Uint8Array; sha256: string; mime: string; width: number; height: number; duration?: number; name: string }[] = []
   for (const [i, item] of input.items.entries()) {
     let fetched: { bytes: Uint8Array; contentType: string }
-    try { fetched = await deps.fetchExport(item.url) } catch { throw new MetaBlocked(`Export ${i + 1} could not be fetched from a public https URL`) }
+    try { fetched = item.bytes ? { bytes: item.bytes, contentType: "" } : await deps.fetchExport(item.url) } catch { throw new MetaBlocked(`Export ${i + 1} could not be fetched from a public https URL`) }
     const m = measureExport(fetched.bytes) // signature-based; rejects anything but JPEG/PNG/MP4
     const ext = m.mime === "image/jpeg" ? "jpg" : m.mime === "image/png" ? "png" : "mp4"
     const label = (item.label || `export-${i + 1}`).toLowerCase().replace(/[^a-z0-9-]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 40) || `export-${i + 1}`

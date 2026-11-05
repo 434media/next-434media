@@ -12,6 +12,7 @@ import { canvaAccessToken, CanvaError, exportDesignJpg, shownCanvaCode, CANVA_AP
  *
  * Contract (canva.dev, read 2026-10-16):
  *  - GET  /brand-templates/{id}/dataset            scope brandtemplate:content:read
+ *  - GET  /brand-templates/{id}                    scope brandtemplate:meta:read (updated_at: templateRevision)
  *  - POST /asset-uploads (octet-stream, Asset-Upload-Metadata {name_base64}); GET /asset-uploads/{job}  asset:write / asset:read
  *  - POST /autofills {brand_template_id, title, data}; GET /autofills/{job}   design:content:write / design:meta:read
  *    Available on Canva Pro, Teams and Enterprise; the new design's edit/view urls last 30 days.
@@ -152,6 +153,20 @@ export async function templateFields(deps: Pick<CreateDeps, "canva" | "allowedTe
   const data = await api(deps.canva, token, `/brand-templates/${encodeURIComponent(templateId)}/dataset`)
   const dataset = (data.dataset ?? {}) as Record<string, { type?: string }>
   return Object.fromEntries(Object.entries(dataset).map(([k, v]) => [k, String(v?.type ?? "unknown")]))
+}
+
+/**
+ * The template's revision: Canva's updated_at (GET /brand-templates/{id}, scope brandtemplate:meta:read), which moves
+ * when the template is republished from its master (read 2026-11-05: News Feed EAHXWo1LiF8 shows 2026-11-03T22:54Z, the
+ * timing fix). Part of a design's input hash, so a template fixed in place is never served from an older design.
+ */
+export async function templateRevision(deps: Pick<CreateDeps, "canva" | "allowedTemplates">, templateId: string): Promise<string> {
+  if (!ID.test(templateId) || !deps.allowedTemplates.has(templateId)) throw new CanvaError("This brand template is not on the allowed list", "template_not_allowed")
+  const token = await canvaAccessToken(deps.canva)
+  const data = await api(deps.canva, token, `/brand-templates/${encodeURIComponent(templateId)}`)
+  const t = (data.brand_template ?? {}) as { updated_at?: unknown }
+  if (typeof t.updated_at !== "number" || !Number.isFinite(t.updated_at)) throw new CanvaError("Canva did not say when the template last changed", "template_revision")
+  return String(t.updated_at)
 }
 
 export async function createFromTemplate(deps: CreateDeps, input: CreateInput, limits = { polls: 30, intervalMs: 2_000 }): Promise<{ design: CreatedDesign; reused: boolean }> {
