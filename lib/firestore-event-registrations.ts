@@ -332,7 +332,7 @@ function deduplicateRegistrations(registrations: EventRegistration[]): EventRegi
  * Get event registrations with optional filtering
  * Merges results from:
  *  1. Default DB (groovy-ego) — event_registrations collection
- *  2. Tech Day DB (groovy-ego/techday until the switch, then c434-techday/techday; see techday-db.ts) — registrations collection
+ *  2. Tech Day DB (c434-techday/techday; see techday-db.ts) — registrations collection
  *  3. Digital Canvas project (media-analytics-proxy) — event-registrations collection
  */
 export async function getEventRegistrations(filters?: {

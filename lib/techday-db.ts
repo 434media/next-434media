@@ -1,15 +1,12 @@
 import type admin from "firebase-admin"
 import { Firestore } from "firebase-admin/firestore"
 import { getVercelOidcTokenSync } from "@vercel/oidc"
-import { getNamedDb, NAMED_DATABASES } from "./firebase-admin"
 
 /**
  * Tech Day's registrations database, wherever it lives.
  *
- * Tech Day is moving out of 434's project into its own, `c434-techday`
- * (Security Policy 7.2). Until the switch, it is the `techday` named database
- * in 434's project, reached with 434's own key like every other named DB.
- * After the switch it is `c434-techday/techday`, reached WITHOUT a key:
+ * Tech Day lives in its own project, `c434-techday` (Security Policy 7.2), as
+ * `c434-techday/techday`, reached WITHOUT a key:
  *
  *   1. Vercel's OIDC token for this deployment (the `x-vercel-oidc-token`
  *      request header, else VERCEL_OIDC_TOKEN) is exchanged at Google STS
@@ -19,11 +16,12 @@ import { getNamedDb, NAMED_DATABASES } from "./firebase-admin"
  *   3. Firestore gets that token through a minimal authClient.
  *
  * Same exchange as cos-crm-pilot's lib/cos-pilot/google-wif.ts, which runs in
- * production on the same dependency set. Which path runs is decided by env,
- * so this merges with no effect: the keyless path turns on only when all four
- * TECHDAY_* variables below are set, and they are set on Production only.
- * A partial set is a configuration error and throws, rather than quietly
- * reading the old copy.
+ * production on the same dependency set. The reader is configured only when
+ * all four TECHDAY_* variables below are set, and they are set on Production
+ * only. With none set (Preview, Development, local) it throws "not
+ * configured", and the registrations list returns empty; the old copy in
+ * 434's project is no longer read. A partial set is a configuration error
+ * and throws too.
  *
  * The project and database are fixed here, not taken from env, so a wrong
  * variable cannot point this reader at another client's data.
@@ -136,7 +134,7 @@ let keylessDb: admin.firestore.Firestore | undefined
 /** The Firestore instance holding Tech Day's `registrations`. */
 export function getTechdayDb(): admin.firestore.Firestore {
   const cfg = keylessConfig()
-  if (!cfg) return getNamedDb(NAMED_DATABASES.TECHDAY)
+  if (!cfg) throw new Error(`Tech Day database is not configured; set ${KEYLESS_ENV.join(", ")}`)
   if (keylessDb) return keylessDb
 
   const getAccessToken = createTokenSource(cfg)
