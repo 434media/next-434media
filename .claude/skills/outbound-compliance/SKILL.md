@@ -30,7 +30,9 @@ countries in a new file. Every cold path gates on it, and all must stay:
   United States, and stamps it on the lead.
 - **send-outreach**, **sequence enrolment/resume** and **every sequence step**
   call `coldOutreachGateForLead`. Cold is the lead's `source`
-  (`COLD_LEAD_SOURCES`); warm and inbound leads pass ungated.
+  (`COLD_LEAD_SOURCES`: prospected, partner); warm and inbound leads pass
+  ungated. The lead PATCH route refuses edits that would get around the gate
+  (`coldGateEditRefusal`).
 
 `EXCLUDED_COUNTRIES` is not the cold gate; it serves only the brand-book share
 and the Meta Pixel.

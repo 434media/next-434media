@@ -967,7 +967,7 @@ export type OutreachSequenceStopReason =
   | "converted"
   | "archived"
   | "opted_out"
-  // A cold (prospected) lead that can't be confirmed as in the United States
+  // A cold (prospected or partner) lead that can't be confirmed as in the United States
   // (master 5.3; lib/prospecting/scorer.ts coldOutreachGateForLead).
   | "jurisdiction"
   | "manual"

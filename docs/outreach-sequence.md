@@ -52,7 +52,7 @@ interface OutreachSequence {
 
 A sequence ends (status → stopped/completed) when:
 - lead status becomes `engaged` / `converted` / `archived` (rep-driven — also how a reply registers in Phase 1)
-- jurisdiction gate trips — a cold (`source: "prospected"`) lead that can't be read as in the United States (master 5.3; `coldOutreachGateForLead` in `lib/prospecting/scorer.ts`, fails closed). Enrolment and resume refuse such a lead up front.
+- jurisdiction gate trips — a cold (`source` "prospected" or "partner") lead that can't be read as in the United States (master 5.3; `coldOutreachGateForLead` in `lib/prospecting/scorer.ts`, fails closed). Enrolment and resume refuse such a lead up front.
 - consent gate trips (opt-out / hard bounce) — reuses send-outreach logic
 - rep pauses/stops manually
 - all 3 steps sent → `completed`

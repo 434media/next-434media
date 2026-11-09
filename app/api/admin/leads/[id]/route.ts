@@ -1,6 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { getSession, isAuthorizedAdmin } from "@/lib/auth"
 import { deleteLead, getLeadById, updateLead, appendLeadActivity } from "@/lib/firestore-leads"
+import { coldGateEditRefusal } from "@/lib/prospecting/scorer"
 import { markPartnerListMemberPromoted } from "@/lib/firestore-partner-list-members"
 import { markEventRegistrationPromoted } from "@/lib/firestore-event-registrations"
 import { markEmailSignupPromoted } from "@/lib/firestore-email-signups"
@@ -166,6 +167,20 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
 
   if (Object.keys(patch).length === 0) {
     return NextResponse.json({ error: "No updatable fields supplied" }, { status: 400 })
+  }
+
+  // The cold-outreach gate's inputs are locked (master 5.3): no moving a lead
+  // onto or off a cold source, and no editing a cold lead's country or
+  // location. 403, like the send routes' jurisdiction refusals. Warm leads
+  // keep full editing.
+  if ("source" in patch || "location" in patch || "country" in patch) {
+    const current = await getLeadById(id)
+    if (!current) return NextResponse.json({ error: "Lead not found" }, { status: 404 })
+    const refusal = coldGateEditRefusal(current, patch)
+    if (refusal) {
+      console.warn(`[PATCH /api/admin/leads/${id}] refused: ${refusal}`)
+      return NextResponse.json({ error: refusal, code: "jurisdiction_locked" }, { status: 403 })
+    }
   }
 
   try {

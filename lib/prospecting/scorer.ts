@@ -56,12 +56,13 @@ export const DEFAULT_FIT_THRESHOLD = Number(process.env.PROSPECTING_FIT_THRESHOL
 export const COLD_OUTREACH_ALLOWED_COUNTRY = "US"
 
 /**
- * Lead sources that are cold: the rep went out and found the contact, with no
- * prior intent toward 434. Every other `LeadSource` is warm or inbound and is
- * not jurisdiction-gated. "prospected" is the only source set by the Apollo
- * prospecting path (captureLeadFromProspecting in lib/firestore-leads.ts).
+ * Lead sources that are cold: no prior intent toward 434. "prospected" is the
+ * Apollo prospecting path (captureLeadFromProspecting in lib/firestore-leads.ts);
+ * "partner" is a partner-shared roster or a purchased contact list (founder,
+ * 2026-11-09). Every other `LeadSource` is warm or inbound and is not
+ * jurisdiction-gated.
  */
-export const COLD_LEAD_SOURCES: ReadonlySet<string> = new Set(["prospected"])
+export const COLD_LEAD_SOURCES: ReadonlySet<string> = new Set(["prospected", "partner"])
 
 export interface JurisdictionCheck {
   allowed: boolean
@@ -261,6 +262,37 @@ export interface ColdGateLead {
   source?: string | null
   country?: string | null
   location?: string | null
+}
+
+const sameValue = (a: unknown, b: unknown) =>
+  (typeof a === "string" ? a.trim() : a ?? "") === (typeof b === "string" ? b.trim() : b ?? "")
+
+/**
+ * Whether an edit to a lead would get around the cold-outreach gate, and why.
+ * Locked: changing `source` onto or away from a cold source, and changing
+ * `country` or `location` on a lead whose source is cold. Re-sending a field's
+ * current value is not a change. Warm leads keep full editing. Null when the
+ * edit is allowed.
+ */
+export function coldGateEditRefusal(
+  current: ColdGateLead,
+  patch: { source?: unknown; country?: unknown; location?: unknown },
+): string | null {
+  const wasCold = COLD_LEAD_SOURCES.has(current.source ?? "")
+  if ("source" in patch && !sameValue(patch.source, current.source)) {
+    const toCold = typeof patch.source === "string" && COLD_LEAD_SOURCES.has(patch.source)
+    if (wasCold || toCold) {
+      return `A lead's source can't be changed ${wasCold ? `away from "${current.source}"` : `to "${String(patch.source)}"`}: cold sources are locked because cold outbound is sent only to prospects in the United States.`
+    }
+  }
+  if (wasCold) {
+    for (const field of ["country", "location"] as const) {
+      if (field in patch && !sameValue(patch[field], current[field])) {
+        return `The ${field} of a cold ("${current.source}") lead is locked: it decides whether cold outbound may reach the contact, which is only in the United States.`
+      }
+    }
+  }
+  return null
 }
 
 /**

@@ -1,7 +1,8 @@
 /**
  * Offline. Cold outbound is sent only to prospects in the United States (master 5.3): one US allow-list in
- * lib/prospecting/scorer.ts, failing closed, gates every cold path (security log Entry 40, JUR-1 and JUR-2). Warm
- * and inbound leads are not gated. The routes and the sequence engine import Firestore, so their wiring is checked
+ * lib/prospecting/scorer.ts, failing closed, gates every cold path (security log Entry 40, JUR-1 and JUR-2). Cold
+ * leads are "prospected" and "partner"; warm and inbound leads are not gated. A cold lead's gate inputs (source,
+ * country, location) are locked against edits. The routes and the sequence engine import Firestore, so their wiring is checked
  * from source: each calls the gate before it sends or enrols.
  *
  * Run: tsx --test lib/__tests__/cold-outreach-jurisdiction.test.ts
@@ -11,6 +12,8 @@ import assert from "node:assert/strict"
 import { readFileSync } from "node:fs"
 import { join } from "node:path"
 import {
+  COLD_LEAD_SOURCES,
+  coldGateEditRefusal,
   coldOutreachGateForLead,
   coldOutreachJurisdiction,
   isColdLocationAllowed,
@@ -110,7 +113,7 @@ test("candidate: at scoring, a blank country is unconfirmed (not excluded); a no
 // ── CRM leads: cold vs warm ───────────────────────────────────────────────────────────────────────────────────────
 
 test("lead: a warm or inbound lead with no country still passes", () => {
-  for (const source of ["web", "event", "manual", "newsletter", "referral", "partner", "social", undefined]) {
+  for (const source of ["web", "event", "manual", "newsletter", "referral", "social", undefined]) {
     const r = coldOutreachGateForLead({ source, country: undefined, location: undefined })
     assert.equal(r.allowed, true, String(source))
     assert.equal(r.cold, false, String(source))
@@ -129,6 +132,53 @@ test("lead: a prospected (cold) lead must read as the United States", () => {
   }
   // The stamped country wins over the location.
   assert.equal(cold("DE", "San Antonio, Texas").allowed, false)
+})
+
+test("lead: partner (a partner roster or bought list) is cold", () => {
+  assert.deepEqual([...COLD_LEAD_SOURCES].sort(), ["partner", "prospected"])
+  const partner = (country?: string, location?: string) => coldOutreachGateForLead({ source: "partner", country, location })
+  assert.equal(partner("US").allowed, true)
+  assert.equal(partner(undefined, "Austin, Texas").allowed, true)
+  for (const [country, location] of [["DE"], ["Canada"], ["Unknown"], [undefined, undefined], [undefined, "Toronto, Ontario"]] as Array<[string?, string?]>) {
+    const r = partner(country, location)
+    assert.equal(r.allowed, false, `${country} / ${location}`)
+    assert.equal(r.cold, true)
+  }
+})
+
+// ── The gate's inputs are locked on cold leads ────────────────────────────────────────────────────────────────────
+
+test("edit lock: source can't move onto or off a cold source", () => {
+  assert.ok(coldGateEditRefusal({ source: "prospected" }, { source: "manual" }))
+  assert.ok(coldGateEditRefusal({ source: "partner" }, { source: "web" }))
+  assert.ok(coldGateEditRefusal({ source: "prospected" }, { source: "partner" }))
+  assert.ok(coldGateEditRefusal({ source: "web" }, { source: "prospected" }))
+  assert.ok(coldGateEditRefusal({ source: "manual" }, { source: "partner" }))
+  assert.equal(coldGateEditRefusal({ source: "web" }, { source: "event" }), null)
+  assert.equal(coldGateEditRefusal({ source: "prospected" }, { source: "prospected" }), null)
+})
+
+test("edit lock: a cold lead's country and location are locked; a warm lead's are not", () => {
+  const cold = { source: "prospected", country: "US", location: "San Antonio, Texas" }
+  assert.ok(coldGateEditRefusal(cold, { location: "Berlin, Germany" }))
+  assert.ok(coldGateEditRefusal(cold, { location: "" }))
+  assert.ok(coldGateEditRefusal(cold, { country: "DE" }))
+  assert.ok(coldGateEditRefusal({ source: "partner" }, { location: "Texas" }))
+  // Re-sending current values (the drawer saves the whole form) is not a change.
+  assert.equal(coldGateEditRefusal(cold, { source: "prospected", location: "San Antonio, Texas " }), null)
+  assert.equal(coldGateEditRefusal({ source: "partner", location: undefined }, { source: "partner", location: undefined }), null)
+  const warm = { source: "web", location: "Austin, Texas" }
+  assert.equal(coldGateEditRefusal(warm, { location: "Berlin, Germany" }), null)
+  assert.equal(coldGateEditRefusal(warm, { country: "DE", location: "" }), null)
+})
+
+test("the lead PATCH route refuses a locked edit with a 403 before it writes", () => {
+  const src = read("app/api/admin/leads/[id]/route.ts")
+  const patchFn = src.indexOf("export async function PATCH")
+  const lock = src.indexOf("coldGateEditRefusal(current, patch)", patchFn)
+  assert.ok(lock > patchFn)
+  assert.ok(lock < src.indexOf("updateLead(id, patch)", patchFn))
+  assert.match(src.slice(lock, lock + 400), /status: 403/)
 })
 
 // ── Wiring: every cold send path calls the gate before it sends ───────────────────────────────────────────────────

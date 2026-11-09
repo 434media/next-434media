@@ -134,8 +134,9 @@ allow-list in [lib/prospecting/scorer.ts](lib/prospecting/scorer.ts)
 for CRM leads). It fails closed: a blank, unknown or unreadable country is
 blocked. Every cold surface must gate on it rather than re-listing countries:
 today the prospecting search, scoring and approval, the 1:1 send-outreach and
-every outreach-sequence step. Cold is the lead's `source` (`COLD_LEAD_SOURCES`,
-today `"prospected"`); warm and inbound contacts, broadcasts (consent-gated),
+every outreach-sequence step. Cold is the lead's `source` (`COLD_LEAD_SOURCES`:
+`"prospected"` and `"partner"`), and on a cold lead the gate's inputs (`source`,
+`country`, `location`) are locked against edits; warm and inbound contacts, broadcasts (consent-gated),
 contact-form replies and the brand-book share are not jurisdiction-gated by it.
 `EXCLUDED_COUNTRIES` / `EXCLUDED_COUNTRY_CODES` stay only for the brand-book
 share and the Meta Pixel; they are not the cold gate. Documentation points here
