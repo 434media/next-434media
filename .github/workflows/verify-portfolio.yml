@@ -95,6 +95,9 @@ jobs:
       # prompt states a figure, the floor stays out of the prompt, and the
       # cohort matcher behaves. Invented cohort rows; the real ones are internal.
       - run: tsx --test lib/__tests__/icp-cohorts.test.ts
+      # Cold outbound is US-only (master 5.3): one US allow-list, failing closed, gates prospecting scoring and
+      # approval, send-outreach and every outreach-sequence step; warm and inbound leads are not gated (JUR-1, JUR-2).
+      - run: tsx --test lib/__tests__/cold-outreach-jurisdiction.test.ts
 
       # Owned Meta: offline state machine and fake-transport regression tests.
       - run: tsx --test lib/__tests__/owned-meta-publisher.test.ts

@@ -5,6 +5,7 @@ import { buildLeadOutreachPrompt, buildTemplateFillPrompt } from "@/lib/lead-pro
 import { getSequenceTemplates } from "@/lib/outreach-templates"
 import { getLeadById, updateLead, appendLeadActivity } from "@/lib/firestore-leads"
 import { runSequenceStep } from "@/lib/outreach-sequence"
+import { coldOutreachGateForLead } from "@/lib/prospecting/scorer"
 import type { Lead, OutreachSequence, OutreachSequenceStep } from "@/types/crm-types"
 
 export const runtime = "nodejs"
@@ -121,6 +122,16 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
     if (!lead.email) {
       return NextResponse.json({ error: "Lead has no email address" }, { status: 400 })
     }
+    // Cold outbound is US-only (master 5.3): a cold lead that can't be read as
+    // the United States is not enrolled. Warm and inbound leads pass ungated.
+    const jurisdiction = coldOutreachGateForLead(lead)
+    if (!jurisdiction.allowed) {
+      console.warn(`[sequence enroll ${id}] blocked cold enrolment: ${jurisdiction.reason}`)
+      return NextResponse.json(
+        { error: `Not enrolled. ${jurisdiction.reason}`, code: "jurisdiction" },
+        { status: 403 },
+      )
+    }
     const input = Array.isArray(body.steps) ? body.steps : []
     if (input.length !== 3) {
       return NextResponse.json({ error: "Exactly 3 steps are required" }, { status: 400 })
@@ -169,6 +180,18 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
   if (action === "pause" || action === "resume" || action === "stop") {
     const seq = lead.outreach_sequence
     if (!seq) return NextResponse.json({ error: "Lead has no sequence" }, { status: 400 })
+    if (action === "resume") {
+      // Same gate as enrolment, so a sequence started before it can't resume
+      // to a cold lead outside the United States.
+      const jurisdiction = coldOutreachGateForLead(lead)
+      if (!jurisdiction.allowed) {
+        console.warn(`[sequence resume ${id}] blocked cold resume: ${jurisdiction.reason}`)
+        return NextResponse.json(
+          { error: `Not resumed. ${jurisdiction.reason}`, code: "jurisdiction" },
+          { status: 403 },
+        )
+      }
+    }
     const next: OutreachSequence =
       action === "pause"
         ? { ...seq, status: "paused" }

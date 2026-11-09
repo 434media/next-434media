@@ -5,12 +5,13 @@ import { getMailchimpMemberProfile } from "@/lib/mailchimp-analytics"
 import { updateLead, appendLeadActivity, recordResendEmailId, updateLeadSequenceTx } from "@/lib/firestore-leads"
 import { sendStepOnce, type StepClaim } from "@/lib/outreach-claim"
 import { stepGapMinutes } from "@/lib/outreach-step-gap"
+import { coldOutreachGateForLead } from "@/lib/prospecting/scorer"
 import type { Lead, OutreachSequence, OutreachSequenceStopReason } from "@/types/crm-types"
 
 /**
  * Outreach sequence engine — the single send path for the 3-email cadence,
  * used by both enroll (step 1, immediate) and the cron (steps due). Re-checks
- * stop conditions + consent before every send, so an auto-send never goes to a
+ * stop conditions, jurisdiction and consent before every send, so an auto-send never goes to a
  * lead who opted out or was moved out of the active funnel. See
  * docs/outreach-sequence.md.
  */
@@ -82,6 +83,16 @@ export function sequenceStopByStatus(lead: Lead): OutreachSequenceStopReason | n
   return null
 }
 
+// Jurisdiction gate, before every step: cold outbound is sent only to
+// prospects in the United States (master 5.3). A cold lead that can't be read
+// as the US stops the sequence; warm and inbound leads pass ungated.
+export function jurisdictionStop(lead: Lead): OutreachSequenceStopReason | null {
+  const check = coldOutreachGateForLead(lead)
+  if (check.allowed) return null
+  console.warn(`[outreach-sequence] stopping lead ${lead.id}: ${check.reason}`)
+  return "jurisdiction"
+}
+
 // Consent gate (cron context — no rep override). Mirrors send-outreach: hard
 // bounce or opt-out → stop the sequence. A lookup hiccup doesn't stop a
 // legitimate sequence (logged, proceed).
@@ -144,8 +155,8 @@ export async function runSequenceStep(lead: Lead): Promise<SequenceStepResult> {
     return { action: "skipped" }
   }
 
-  // Stop conditions first — status, then consent.
-  const stop = sequenceStopByStatus(lead) ?? (await consentStop(lead.email))
+  // Stop conditions first — status, then jurisdiction, then consent.
+  const stop = sequenceStopByStatus(lead) ?? jurisdictionStop(lead) ?? (await consentStop(lead.email))
   if (stop) return stopSequence(lead, seq, stop)
 
   const step = seq.steps.find((s) => s.n === seq.next_step)

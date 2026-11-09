@@ -127,13 +127,21 @@ applies to proposing the change as well as making it. It mirrors 434-context's
 Put the evidence in the proposal and the run log. **If any consumer is
 unverified, the proposal says so, and nothing changes until it is resolved.**
 
-**Jurisdiction policy is one constant.** Which jurisdictions 434 Media does not
-cold-outreach is master 5.3; in code the single source of truth is
-`EXCLUDED_COUNTRIES` in [lib/prospecting/scorer.ts](lib/prospecting/scorer.ts).
-Any new outbound surface must gate on it rather than re-listing countries, and
-documentation points here instead of listing them. The only lists are inputs the
-code runs on: the constant itself, the translator's prompt and
-`lib/prospecting/icp-base.md`, which the model reads.
+**Jurisdiction policy is one allow-list.** Where 434 Media may cold-outreach is
+master 5.3: the United States only. In code the single source of truth is the US
+allow-list in [lib/prospecting/scorer.ts](lib/prospecting/scorer.ts)
+(`isColdOutreachAllowed`, `isColdLocationAllowed`, and `coldOutreachGateForLead`
+for CRM leads). It fails closed: a blank, unknown or unreadable country is
+blocked. Every cold surface must gate on it rather than re-listing countries:
+today the prospecting search, scoring and approval, the 1:1 send-outreach and
+every outreach-sequence step. Cold is the lead's `source` (`COLD_LEAD_SOURCES`:
+`"prospected"` and `"partner"`), and on a cold lead the gate's inputs (`source`,
+`country`, `location`) are locked against edits; warm and inbound contacts, broadcasts (consent-gated),
+contact-form replies and the brand-book share are not jurisdiction-gated by it.
+`EXCLUDED_COUNTRIES` / `EXCLUDED_COUNTRY_CODES` stay only for the brand-book
+share and the Meta Pixel; they are not the cold gate. Documentation points here
+instead of listing countries. The only other lists are inputs the code runs on:
+the translator's prompt and `lib/prospecting/icp-base.md`, which the model reads.
 
 **Mailchimp tags are code-owned.** Exactly one live audience (`434 Media`,
 `7fa6fbcb82`) segmented by the taxonomy in

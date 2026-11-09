@@ -243,9 +243,9 @@ timeline (`lib/firestore-leads.ts` `appendLeadActivity`).
   query into Apollo filters via forced tool-use.
 
 > **Compliance:** which jurisdictions 434media does not cold-outreach is master
-> 5.3. The single source of truth in code is `EXCLUDED_COUNTRIES` in
-> `lib/prospecting/scorer.ts`, enforced in the translator, scorer, and approval
-> boundary.
+> 5.3 (the United States only). The single source of truth in code is the US
+> allow-list in `lib/prospecting/scorer.ts` (fails closed), enforced in the
+> translator, scorer, approval boundary, send-outreach and outreach sequence.
 
 ### Content & AI Studio
 
