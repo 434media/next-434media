@@ -53,6 +53,7 @@ function normalize(id: string, raw: FirebaseFirestore.DocumentData): Lead {
     source: (raw.source || "manual") as Lead["source"],
     industry: raw.industry || undefined,
     location: raw.location || undefined,
+    country: typeof raw.country === "string" && raw.country ? raw.country : undefined,
     platform: raw.platform || undefined,
     score: typeof raw.score === "number" ? raw.score : 0,
     priority: (raw.priority || "low") as Lead["priority"],
@@ -170,6 +171,7 @@ export async function createLead(input: LeadCreateInput): Promise<Lead> {
     source: input.source,
     industry: input.industry ?? null,
     location: input.location ?? null,
+    country: input.country ?? null,
     platform: input.platform ?? null,
     score: scored.score,
     priority: scored.priority,
@@ -699,6 +701,8 @@ interface ProspectingCapture {
   /** Optional location parts — combined into the lead's `location` field if present. */
   city?: string
   state?: string
+  /** ISO 3166-1 alpha-2, as confirmed by the cold-outreach gate at approval. */
+  country?: string
   industry?: string
   /** Apollo estimated_num_employees — feeds the Company Size fit dimension. */
   employeeCount?: number
@@ -769,6 +773,7 @@ export async function captureLeadFromProspecting(
       if (!existing.company && input.company) patch.company = input.company
       if (!existing.linkedin && input.linkedin) patch.linkedin = input.linkedin
       if (!existing.location && location) patch.location = location
+      if (!existing.country && input.country) patch.country = input.country
       if (!existing.industry && input.industry) patch.industry = input.industry
       if (!existing.employee_count && input.employeeCount) patch.employee_count = input.employeeCount
       if (!existing.annual_revenue && input.annualRevenue) patch.annual_revenue = input.annualRevenue
@@ -785,6 +790,7 @@ export async function captureLeadFromProspecting(
       linkedin: input.linkedin,
       industry: input.industry,
       location,
+      country: input.country,
       employee_count: input.employeeCount,
       annual_revenue: input.annualRevenue,
       source: "prospected",

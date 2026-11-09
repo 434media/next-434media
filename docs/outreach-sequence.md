@@ -44,7 +44,7 @@ interface OutreachSequence {
   next_send_at?: string              // ISO date the cron acts on
   enrolled_at: string
   enrolled_by: string
-  stopped_reason?: "replied" | "engaged" | "converted" | "archived" | "opted_out" | "manual" | "completed"
+  stopped_reason?: "replied" | "engaged" | "converted" | "archived" | "opted_out" | "jurisdiction" | "manual" | "completed"
 }
 ```
 
@@ -52,6 +52,7 @@ interface OutreachSequence {
 
 A sequence ends (status → stopped/completed) when:
 - lead status becomes `engaged` / `converted` / `archived` (rep-driven — also how a reply registers in Phase 1)
+- jurisdiction gate trips — a cold (`source: "prospected"`) lead that can't be read as in the United States (master 5.3; `coldOutreachGateForLead` in `lib/prospecting/scorer.ts`, fails closed). Enrolment and resume refuse such a lead up front.
 - consent gate trips (opt-out / hard bounce) — reuses send-outreach logic
 - rep pauses/stops manually
 - all 3 steps sent → `completed`
@@ -62,7 +63,7 @@ A sequence ends (status → stopped/completed) when:
 Runs once each weekday at 15:00 UTC — `0 15 * * 1-5` in [`vercel.json`](../vercel.json), which is 10:00 Central during daylight time and 09:00 Central after the November change. Vercel crons run in UTC only, so the one-hour seasonal shift is accepted. The every-minute schedule used during QA does not return: sequence testing (`SEQUENCE_STEP_GAP_MINUTES`) happens in a preview deployment, by triggering the route by hand with `Authorization: Bearer <CRON_SECRET>`. `SEQUENCE_STEP_GAP_MINUTES` is ignored in production whatever its value ([`lib/outreach-step-gap.ts`](../lib/outreach-step-gap.ts)).
 
 It queries only leads with `outreach_sequence.status == "active"`, and for each with `next_send_at ≤ now`:
-1. Re-check stop conditions (status, consent). If tripped → stop, skip.
+1. Re-check stop conditions (status, jurisdiction, consent). If tripped → stop, skip.
 2. **Claim** the step in a Firestore transaction ([`lib/outreach-claim.ts`](../lib/outreach-claim.ts)). Another run holding the claim → skip.
 3. Send `steps[next_step-1]` via Resend with an idempotency key per lead, enrolment and step.
 4. In a second transaction, stamp `sent_at` + `resend_email_id`, advance `next_step`, set `next_send_at` (+4 or +5 biz days) or mark `completed`, and release the claim. A Resend error releases the claim instead, and the next run retries with the same key.

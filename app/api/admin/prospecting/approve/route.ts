@@ -2,7 +2,7 @@ import { type NextRequest, NextResponse } from "next/server"
 import { getSession, isAuthorizedAdmin } from "@/lib/auth"
 import { captureLeadFromProspecting } from "@/lib/firestore-leads"
 import type { ScoredPerson } from "@/lib/prospecting/scorer"
-import { isExcludedJurisdiction } from "@/lib/prospecting/scorer"
+import { coldOutreachJurisdiction } from "@/lib/prospecting/scorer"
 import { ApolloError, enrichPersonById } from "@/lib/prospecting/apollo"
 import type { ApolloPerson } from "@/lib/prospecting/apollo"
 
@@ -19,6 +19,9 @@ import type { ApolloPerson } from "@/lib/prospecting/apollo"
 //     id (Basic+ plan). Email is the lead dedup key, so without it we can't
 //     create a lead.
 //   - Skip if still no email after reveal (Apollo had no match)
+//   - Skip unless the person's or organization's country reads as the United
+//     States (cold outbound is US-only, master 5.3; fails closed on a blank or
+//     unknown country). The confirmed country is stamped on the lead.
 //   - Otherwise, capture via captureLeadFromProspecting() — handles dedup,
 //     backfills missing fields on existing leads, tags with the prompt for
 //     traceability
@@ -105,19 +108,20 @@ export async function POST(req: NextRequest) {
       continue
     }
 
-    // Defense-in-depth — even if the scorer let this through (e.g. country
-    // field was empty when the candidate was scored but is populated now,
-    // or the request bypassed the UI), block EU/CA contacts at the
-    // approval boundary. Single source of truth for the jurisdiction list
-    // is `EXCLUDED_COUNTRIES` in `lib/prospecting/scorer.ts`.
-    const jurisdiction = isExcludedJurisdiction(person)
-    if (jurisdiction.excluded) {
+    // Defense-in-depth — even if the scorer let this through (the country
+    // changed since scoring, or the request bypassed the UI), block any non-US
+    // or unreadable country before spending a reveal credit. A blank country is
+    // let through to the reveal, which usually fills it; the strict gate below
+    // runs before capture either way. The allow-list is the single source:
+    // `isColdOutreachAllowed` in `lib/prospecting/scorer.ts`.
+    const jurisdiction = coldOutreachJurisdiction(person, { blank: "pending" })
+    if (!jurisdiction.allowed) {
       results.push({
         apolloPersonId: personId,
         email,
         leadId: null,
         status: "skipped",
-        reason: `Excluded: contact in ${jurisdiction.country} — 434media does not pursue EU/Canadian contacts (GDPR / CASL).`,
+        reason: `Excluded: ${jurisdiction.reason}`,
       })
       continue
     }
@@ -145,19 +149,8 @@ export async function POST(req: NextRequest) {
           }
           email = (person.email ?? "").trim().toLowerCase() || null
 
-          // Revealed data may carry a country the search response lacked —
-          // re-run the jurisdiction gate before capture.
-          const post = isExcludedJurisdiction(person)
-          if (post.excluded) {
-            results.push({
-              apolloPersonId: personId,
-              email,
-              leadId: null,
-              status: "skipped",
-              reason: `Excluded: contact in ${post.country} — 434media does not pursue EU/Canadian contacts (GDPR / CASL).`,
-            })
-            continue
-          }
+          // Revealed data may carry a country the search response lacked;
+          // the strict gate before capture below reads it.
         }
       } catch (err) {
         const reason =
@@ -191,6 +184,21 @@ export async function POST(req: NextRequest) {
       continue
     }
 
+    // Strict jurisdiction gate before capture (fails closed): the person's or
+    // organization's country must read as the United States. A contact whose
+    // country is still unknown after the reveal is not captured.
+    const confirmed = coldOutreachJurisdiction(person)
+    if (!confirmed.allowed) {
+      results.push({
+        apolloPersonId: personId,
+        email,
+        leadId: null,
+        status: "skipped",
+        reason: `Excluded: ${confirmed.reason}`,
+      })
+      continue
+    }
+
     const result = await captureLeadFromProspecting({
       email,
       firstName: person.first_name || "",
@@ -200,6 +208,7 @@ export async function POST(req: NextRequest) {
       linkedin: person.linkedin_url || undefined,
       city: person.city || person.organization?.city || undefined,
       state: person.state || person.organization?.state || undefined,
+      country: confirmed.country,
       industry: person.organization?.industry || undefined,
       employeeCount: person.organization?.estimated_num_employees ?? undefined,
       annualRevenue: person.organization?.annual_revenue ?? undefined,

@@ -69,8 +69,9 @@ test("a multi-industry search with no tag IDs sends one keyword, never a joined 
 
 // ── Cold outbound is US-only (master 5.3) ──────────────────────────────────
 test("a search location outside the United States is recognised", () => {
-  for (const l of ["Mexico", "Monterrey, Mexico", "Germany", "Toronto, Canada", "United Kingdom"]) assert.ok(isOutsideUnitedStates(l), l)
-  for (const l of ["Texas, US", "San Antonio, Texas, US", "New Mexico", "Georgia", "United States", "Puerto Rico"]) assert.ok(!isOutsideUnitedStates(l), l)
+  // Fails closed: an unreadable location ("San Antonio" alone) counts as outside.
+  for (const l of ["Mexico", "Monterrey, Mexico", "Germany", "Toronto, Canada", "United Kingdom", "San Antonio", "Puerto Rico"]) assert.ok(isOutsideUnitedStates(l), l)
+  for (const l of ["Texas, US", "San Antonio, Texas, US", "New Mexico", "Georgia", "United States"]) assert.ok(!isOutsideUnitedStates(l), l)
 })
 
 test("the translator drops non-US locations, and never searches worldwide", () => {

@@ -967,6 +967,9 @@ export type OutreachSequenceStopReason =
   | "converted"
   | "archived"
   | "opted_out"
+  // A cold (prospected) lead that can't be confirmed as in the United States
+  // (master 5.3; lib/prospecting/scorer.ts coldOutreachGateForLead).
+  | "jurisdiction"
   | "manual"
   | "completed"
 
@@ -1001,6 +1004,13 @@ export interface Lead extends BaseRecord {
   source: LeadSource
   industry?: string
   location?: string
+  /**
+   * ISO 3166-1 alpha-2, set when a prospected lead is approved (Apollo's
+   * country, confirmed as the United States by the cold-outreach gate in
+   * lib/prospecting/scorer.ts). Absent on inbound leads and on leads prospected
+   * before it existed; the gate then reads `location`.
+   */
+  country?: string
   platform?: LeadPlatform
 
   // Scoring (computed inline on every write)
