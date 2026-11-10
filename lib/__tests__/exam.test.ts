@@ -13,7 +13,7 @@ import { MockLanguageModelV4 } from "ai/test"
 import { check, looksLikeDate } from "../exam/assertions"
 import { engineExecutor, modelJudge, recordedExecutor, renderCase, type Recordings } from "../exam/executors"
 import { inScope, mockTools, scopeProblem, type ToolCallRecord } from "../exam/mock-tools"
-import { reportMarkdown, runSuite } from "../exam/runner"
+import { cell, reportMarkdown, runSuite } from "../exam/runner"
 import { loadSuite, parseSuite, readSuiteFolder, type Suite } from "../exam/suite"
 import { readSkillFolder } from "../skills/loader"
 
@@ -237,6 +237,19 @@ test("the completion rule as scoped on 2026-11-10: every new full task, not a br
     const bad = parseSuite({ "suite.json": files["suite.json"], "cases/c.json": JSON.stringify({ ...c, expect: [{ type: "completion" }] }) })
     assert.equal(bad.ok, false)
     if (!bad.ok) assert.match(bad.problems.join("; "), /completion rule does not apply to it \((a one-line brief item|set on 2026-10-01, before the rule \(2026-11-10\))\)/)
+  }
+})
+
+test("a table cell escapes backslashes before pipes, so no input can close a cell early", () => {
+  assert.equal(cell("a|b"), "a\\|b")
+  assert.equal(cell("a\\b"), "a\\\\b")
+  // A backslash right before a pipe: without escaping the backslash first, "\\|" would read as an escaped backslash
+  // followed by a bare pipe that ends the cell.
+  assert.equal(cell("x\\|y"), "x\\\\\\|y")
+  assert.equal(cell("one\r\ntwo\nthree\rfour"), "one two three four")
+  // After escaping, a cell holds no bare pipe: every pipe is preceded by an odd number of backslashes.
+  for (const input of ["\\|", "\\\\|", "|\\", "a\\\\\\|b|c"]) {
+    for (const m of cell(input).matchAll(/(\\*)\|/g)) assert.equal(m[1].length % 2, 1, `${JSON.stringify(input)} -> ${cell(input)}`)
   }
 })
 

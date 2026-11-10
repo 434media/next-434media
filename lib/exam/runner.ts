@@ -131,7 +131,11 @@ function totals(rs: CaseResult[]): ExamReport["totals"] {
   }
 }
 
-const cell = (s: string) => s.replace(/\|/g, "\\|").replace(/\n/g, " ")
+/**
+ * Text made safe for one Markdown table cell. Backslashes are escaped first, so an input's own backslash cannot
+ * combine with the escape added for a pipe; then pipes; then line breaks become spaces.
+ */
+export const cell = (s: string) => s.replace(/\\/g, "\\\\").replace(/\|/g, "\\|").replace(/\r?\n|\r/g, " ")
 
 /**
  * The report as Markdown: a summary, one row per case with its reason, and the run log of tokens and cost. Outputs are
