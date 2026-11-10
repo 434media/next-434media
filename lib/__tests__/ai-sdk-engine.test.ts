@@ -9,7 +9,7 @@ import { test } from "node:test"
 import assert from "node:assert/strict"
 import { generateText, type ModelMessage } from "ai"
 import { MockLanguageModelV4 } from "ai/test"
-import { generateGatewayText, generateGatewayToolCall, withInstructions, type GatewayUsage } from "../ai-gateway-text"
+import { GATEWAY_TEXT_MODELS, RESEARCH_MAX_TOKENS, generateGatewayResearch, generateGatewayText, generateGatewayToolCall, withInstructions, type GatewayUsage } from "../ai-gateway-text"
 import { tool } from "ai"
 import { z } from "zod"
 import { callOptions, PIPELINE_MODELS } from "../content-pipeline/models"
@@ -155,4 +155,35 @@ test("content pipeline research on AI SDK 7: the search loop runs, carries autom
   assert.equal(seen[0].inputTokens, 10_200)
   assert.equal(seen[0].cacheReadTokens, 4_800)
   assert.equal(seen[0].cacheWriteTokens, 4_800)
+})
+
+test("lead research: a model the Gateway lists, structured output, cited sources de-duplicated, the token trap guarded", async () => {
+  // perplexity/sonar was the one built-in web-search model on /v1/models on 2026-11-10; the old slug was gone.
+  assert.equal(process.env.RESEARCH_MODEL ? "override" : GATEWAY_TEXT_MODELS.research, process.env.RESEARCH_MODEL ? "override" : "perplexity/sonar")
+  const answer = { summary: "Example Corp makes widgets.", fitRationale: "Weak fit.", suggestedCountry: " United States " }
+  const source = (n: number, url: string) => ({ type: "source" as const, sourceType: "url" as const, id: `s${n}`, url, title: `Page ${n}` })
+  const asked: string[] = []
+  const calls: Parameters<MockLanguageModelV4["doGenerate"]>[0][] = []
+  const model = new MockLanguageModelV4({
+    doGenerate: async (o) => {
+      calls.push(o)
+      return {
+        content: [{ type: "text", text: JSON.stringify(answer) }, source(1, "https://example.com/a"), source(2, "https://example.com/a"), ...[3, 4, 5, 6, 7, 8, 9, 10].map((n) => source(n, `https://example.com/${n}`))],
+        finishReason: stop, usage: usage(500, 120), warnings: [],
+      }
+    },
+  })
+  ;(globalThis as { AI_SDK_DEFAULT_PROVIDER?: unknown }).AI_SDK_DEFAULT_PROVIDER = { specificationVersion: "v4", languageModel: (id: string) => { asked.push(id); return model } }
+  const r = await generateGatewayResearch({ system: "Be factual.", prompt: "Company: Example Corp" })
+  assert.deepEqual(asked, [GATEWAY_TEXT_MODELS.research])
+  assert.equal(calls[0].maxOutputTokens, RESEARCH_MAX_TOKENS)
+  assert.equal(calls[0].responseFormat?.type, "json")
+  assert.equal(r.summary, answer.summary)
+  assert.equal(r.suggestedCountry, "United States")
+  assert.equal(r.sources.length, 8, "de-duplicated by url, capped at 8")
+  assert.deepEqual(r.sources[0], { url: "https://example.com/a", title: "Page 1" })
+  // A reasoning model can spend the cap thinking: a truncated answer throws instead of storing half a JSON object.
+  const cut = new MockLanguageModelV4({ doGenerate: async () => ({ content: [{ type: "text", text: '{"summary":"Exa' }], finishReason: { unified: "length" as const, raw: undefined }, usage: { inputTokens: usage(500, 0).inputTokens, outputTokens: { total: 4000, text: 10, reasoning: 3990 } }, warnings: [] }) })
+  ;(globalThis as { AI_SDK_DEFAULT_PROVIDER?: unknown }).AI_SDK_DEFAULT_PROVIDER = { specificationVersion: "v4", languageModel: () => cut }
+  await assert.rejects(() => generateGatewayResearch({ system: "s", prompt: "p" }), /Gateway research: output truncated at the 4000-token cap \(3990 tokens went to reasoning\)/)
 })

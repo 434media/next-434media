@@ -8,7 +8,7 @@
 // use case is kept identical to the previous direct-Anthropic setup so output
 // quality is unchanged; env overrides still win.
 
-import { generateText, APICallError, Output } from "ai"
+import { generateText, APICallError, NoObjectGeneratedError, Output } from "ai"
 import type { LanguageModelUsage, ModelMessage, SystemModelMessage, Tool } from "ai"
 import { z } from "zod"
 
@@ -22,10 +22,15 @@ export const GATEWAY_TEXT_MODELS = {
   // Prospecting prompt→filters — Sonnet, a structured extraction task that
   // doesn't need Opus.
   translator: process.env.TRANSLATOR_MODEL || "anthropic/claude-sonnet-5",
-  // Lead research — OpenAI's web-search-grounded model. Returns live cited
-  // company context. Verified to support structured Output + a `sources[]`
-  // array through the gateway. `web_search` priced per call — guard usage.
-  research: process.env.RESEARCH_MODEL || "openai/gpt-4o-mini-search-preview",
+  // Lead research — Perplexity Sonar, which searches the web itself on every
+  // call (no tool to pass) and supports structured output. It is the only
+  // model with built-in browsing on https://ai-gateway.vercel.sh/v1/models
+  // (read 2026-11-10: tags web-search, structured-output; $0.25 / $2.50 per M
+  // tokens plus $2.50 per 1,000 searches). It replaces
+  // openai/gpt-4o-mini-search-preview, which the Gateway no longer lists
+  // ("Model … not found", production smoke check, 2026-11-10). Searches are
+  // priced per call — guard usage.
+  research: process.env.RESEARCH_MODEL || "perplexity/sonar",
 } as const
 
 /**
@@ -45,7 +50,7 @@ export const GATEWAY_TEXT_MODELS = {
 export type GatewayEffort = "low" | "medium" | "high" | "xhigh" | "max"
 
 // Anthropic-specific knobs, passed through the Gateway verbatim. Non-Anthropic
-// models (e.g. the OpenAI research model) ignore an unknown `anthropic` key.
+// models (e.g. the research model) ignore an unknown `anthropic` key.
 function effortOptions(effort?: GatewayEffort) {
   return effort ? { anthropic: { output_config: { effort } } } : undefined
 }
@@ -226,16 +231,37 @@ const researchSchema = z.object({
 // Run web-grounded research on a real company/person already in our system.
 // Returns a structured result + the cited sources the model used. Throws on
 // failure (route maps to 502). NOT for discovery — only enriching known leads.
+/**
+ * The research answer is a short JSON object (a few hundred tokens). The cap
+ * leaves wide headroom because Sonar is a reasoning model and, as on Claude 5,
+ * reasoning counts against it (THE TOKEN TRAP above); unused headroom is free.
+ */
+export const RESEARCH_MAX_TOKENS = 4000
+
 export async function generateGatewayResearch(params: {
   system: string
   prompt: string
 }): Promise<GatewayResearchResult> {
-  const result = await generateText({
-    model: GATEWAY_TEXT_MODELS.research,
-    instructions: params.system,
-    prompt: params.prompt,
-    output: Output.object({ schema: researchSchema }),
-  })
+  // A cut-off answer is half a JSON object. AI SDK 7 refuses it itself
+  // (NoObjectGeneratedError); name the cause, as the other wrappers do.
+  let result
+  try {
+    result = await generateText({
+      model: GATEWAY_TEXT_MODELS.research,
+      instructions: params.system,
+      prompt: params.prompt,
+      maxOutputTokens: RESEARCH_MAX_TOKENS,
+      output: Output.object({ schema: researchSchema }),
+    })
+  } catch (err) {
+    if (NoObjectGeneratedError.isInstance(err) && err.finishReason === "length") {
+      throw truncated("Gateway research", RESEARCH_MAX_TOKENS, err.usage?.outputTokenDetails.reasoningTokens)
+    }
+    throw err
+  }
+  if (result.finishReason === "length") {
+    throw truncated("Gateway research", RESEARCH_MAX_TOKENS, result.usage.outputTokenDetails.reasoningTokens)
+  }
 
   const out = result.output
   const sources = (result.sources ?? [])
