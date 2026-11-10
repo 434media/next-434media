@@ -151,13 +151,13 @@ test("token: invalid_grant asks for a reconnect and logs the code and intuit_tid
 
 test("read: a 401 refreshes once and retries; only GET is ever sent to the API", async () => {
   const h = harness(
-    [() => json({}, 401), () => json(tokenBody(2)), (url) => json({ ok: url.includes("/v3/company/42/reports/ProfitAndLoss") && url.includes("minorversion=75") })],
+    [() => json({}, 401), () => json(tokenBody(2)), (url) => json({ ok: new URL(url).pathname === "/v3/company/42/reports/ProfitAndLoss" && new URL(url).searchParams.get("minorversion") === "75" })],
     { accessToken: "a", refreshToken: "r", expiresAt: 1_000_000 + 3_600_000, realmId: "42" },
   )
   assert.deepEqual(await qbGet(h.deps, "reports/ProfitAndLoss", { start_date: "2026-01-01" }), { ok: true })
-  const api = h.calls.filter((c) => c.url.includes("quickbooks.api.intuit.com"))
+  const api = h.calls.filter((c) => new URL(c.url).hostname === "sandbox-quickbooks.api.intuit.com")
+  assert.equal(api.length, 2)
   assert.ok(api.every((c) => c.method === "GET"))
-  assert.ok(api[0].url.startsWith("https://sandbox-quickbooks.api.intuit.com/"))
 })
 
 test("read: only report, company-info and query paths are allowed", async () => {
