@@ -1,10 +1,11 @@
 import type { Metadata } from "next"
 import { forbidden } from "next/navigation"
 import RefreshWhenSignedIn from "@/components/admin/RefreshWhenSignedIn"
+import FinanceSnapshot from "@/components/admin/finance/FinanceSnapshot"
 import { founderPageAccess } from "@/lib/founder-guard"
 
-// The founder-only finance page (V1 item 1). Phase 0 is the lock and nothing behind it: no money data is read or shown
-// until Phase 1 connects QuickBooks.
+// The founder-only finance page (V1 item 1). Phase 1: the QuickBooks snapshot, read only. The figures load in the
+// browser from GET /api/admin/finance, which runs the same guard; nothing about the books is in this server render.
 //
 // The admin layout's sign-in gate runs in the browser, and a server component passed to it is still sent to the
 // browser, so the guard runs here, on the server, before anything renders (lib/founder-guard.ts).
@@ -13,20 +14,27 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 }
 
-export default async function FinancePage() {
+const NOTICES: Record<string, string> = {
+  connected: "QuickBooks is connected.",
+  disconnected: "QuickBooks is disconnected. Nothing from the books is kept here.",
+  declined: "QuickBooks was not connected: the consent screen was declined.",
+  expired: "That connection attempt expired or was started elsewhere. Connect again.",
+  failed: "QuickBooks did not accept the connection. Connect again.",
+  not_configured: "QuickBooks keys are not set for this deployment.",
+}
+
+export default async function FinancePage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const access = await founderPageAccess("/admin/finance")
   if (access === "signed_out") return <RefreshWhenSignedIn />
   if (access === "forbidden") forbidden()
 
+  const q = (await searchParams).quickbooks
+  const notice = typeof q === "string" ? NOTICES[q] ?? null : null
+
   return (
     <div className="min-h-full bg-neutral-50 px-4 sm:px-6 py-6">
-      <div className="max-w-5xl mx-auto">
-        <h1 className="text-lg font-semibold text-neutral-900">Finance</h1>
-        <p className="mt-1 text-sm text-neutral-500">Visible to the founder only.</p>
-        <div className="mt-4 rounded-lg border border-neutral-200 bg-white px-4 py-3">
-          <p className="text-sm font-medium text-neutral-900">QuickBooks is not connected yet</p>
-          <p className="mt-0.5 text-sm text-neutral-500">Cash, money owed, profit and the forecast appear here once the connection is made.</p>
-        </div>
+      <div className="max-w-[1240px] mx-auto">
+        <FinanceSnapshot notice={notice} subtitle="Visible to the founder only" />
       </div>
     </div>
   )

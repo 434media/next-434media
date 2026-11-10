@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { canRunContent, getSession } from '@/lib/auth'
+import { founderDecision, founderEmails } from '@/lib/founder-guard'
 
 export async function GET() {
   const session = await getSession()
@@ -10,7 +11,8 @@ export async function GET() {
   
   return NextResponse.json({
     authenticated: true,
-    user: session,
+    // `founder` is the founder-only guard's answer (lib/founder-guard.ts), for the sidebar's Finance link only.
+    user: { ...session, founder: founderDecision(session, founderEmails()).allowed },
     // Whether the content permission is held (lib/auth.ts canRunContent): the board shows Create and review actions.
     contentRunner: await canRunContent(session.email),
   })
