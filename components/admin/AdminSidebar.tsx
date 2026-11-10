@@ -28,6 +28,7 @@ import {
   Globe,
   LayoutDashboard,
   Palette,
+  Landmark,
 } from "lucide-react"
 import type { LucideIcon } from "lucide-react"
 import type { SquadKey } from "@/components/crm/types"
@@ -68,6 +69,19 @@ export interface SidebarUser {
   email: string
   name: string
   role?: AdminRole
+  /** The founder-only guard's answer for this session (/api/auth/session): shows the Finance link. Not a role. */
+  founder?: boolean
+}
+
+// Finance is the founder's alone (lib/founder-guard.ts), so its link follows the guard, not a role. The page and its API
+// refuse everyone else on the server whatever the sidebar shows.
+const FINANCE_ITEM: SidebarLink = {
+  id: "finance",
+  label: "Finance",
+  icon: Landmark,
+  href: "/admin/finance",
+  matchPrefix: "/admin/finance",
+  roles: [],
 }
 
 interface SidebarItemBase {
@@ -383,7 +397,7 @@ export function AdminSidebar({
     ...s,
     items: s.items.filter(canSee),
   })).filter((s) => s.items.length > 0)
-  const footerItems = FOOTER_ITEMS.filter(canSee)
+  const footerItems = [...(user.founder ? [FINANCE_ITEM] : []), ...FOOTER_ITEMS.filter(canSee)]
 
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>(() => {
     const out: Record<string, boolean> = {}

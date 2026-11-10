@@ -81,6 +81,7 @@
 /lib/finance/                                @434media/founder
 /lib/quickbooks*                             @434media/founder
 /app/admin/finance/                          @434media/founder
+/components/admin/finance/                   @434media/founder
 /app/api/admin/finance/                      @434media/founder
 /scripts/finance/                            @434media/founder
 

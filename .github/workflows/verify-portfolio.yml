@@ -146,6 +146,8 @@ jobs:
       - run: tsx --test lib/__tests__/founder-guard.test.ts
       # Every finance API handler calls requireFounder first: the proxy guards the page only.
       - run: tsx --test lib/__tests__/finance-routes-guarded.test.ts
+      # Finance Phase 1: the QuickBooks client reads only, keeps the newest refresh token, and parses the reports.
+      - run: tsx --test lib/__tests__/quickbooks.test.ts
       # Admin email sign-in (security log ADM-1): verified email required; workspace addresses use Google in production.
       - run: tsx --test lib/__tests__/firebase-signin.test.ts
       # Owners come only from ADMIN_OWNER_EMAILS: no address in code, and none is a super admin by default.
