@@ -30,20 +30,17 @@ export const metadata: Metadata = {
     title: socialTitle,
     description,
     url: `${siteUrl}/contact`,
-    images: [
-      {
-        url: `${siteUrl}/opengraph-image`,
-        width: 1200,
-        height: 630,
-        alt: `Start a production with ${BRAND.name}`,
-      },
-    ],
+    type: "website",
+    // The image is this segment's own opengraph-image.tsx, which Next wires in
+    // with a hashed URL (/<route>/opengraph-image-<hash>), so it is not named
+    // here. A colocated card is not suppressed by this `openGraph` object; the
+    // suppression 3.8 records is of a card inherited from a parent segment.
   },
   twitter: {
     card: "summary_large_image",
     title: socialTitle,
     description,
-    images: [`${siteUrl}/twitter-image`],
+    // Likewise twitter-image.tsx in this segment.
     creator: "@434media",
     site: "@434media",
   },
