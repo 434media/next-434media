@@ -10,7 +10,7 @@ import { isAlreadyExists } from "./firestore-event-role-overlays"
  * and not in the public repository (they used to be lib/travel/projects.ts).
  * Who reads what:
  * - the itinerary page and its API: the whole record, behind getTravelAccess
- *   (an admin session, or a provisioned travel_access viewer for that page);
+ *   (a super-admin or full-admin session, or a provisioned travel_access viewer for that page; PSM-2);
  * - the sign-in page and sign-in route: only whether the page exists;
  * - the public link card: client, purpose and year, never the traveller or dates.
  */

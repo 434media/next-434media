@@ -64,6 +64,8 @@
 /app/api/admin/content-pipeline/auth.ts      @434media/founder
 /lib/travel/auth.ts                          @434media/founder
 /lib/travel/access-id.ts                     @434media/founder
+/lib/travel/staff-access.ts                  @434media/founder
+/lib/__tests__/travel-staff-access.test.ts   @434media/founder
 /app/api/travel/auth/                        @434media/founder
 /scripts/add-team-member.ts                  @434media/founder
 /scripts/backfill-team-roles.ts              @434media/founder
@@ -74,6 +76,8 @@
 /app/api/sor/mcp/                            @434media/founder
 /app/api/owned-meta/mcp/                     @434media/founder
 /app/api/owned-meta/oauth-protected-resource/ @434media/founder
+/app/api/parse-event/                        @434media/founder
+/lib/__tests__/parse-event-gated.test.ts     @434media/founder
 
 # Money
 /lib/shopify/                                @434media/founder
@@ -81,12 +85,14 @@
 /lib/finance/                                @434media/founder
 /lib/quickbooks*                             @434media/founder
 /app/admin/finance/                          @434media/founder
+/components/admin/finance/                   @434media/founder
 /app/api/admin/finance/                      @434media/founder
 /scripts/finance/                            @434media/founder
 
 # Secrets: where a credential is loaded, minted, verified or stored
 /.github/                                    @434media/founder
 /vercel.json                                 @434media/founder
+/app/api/cron/cron-watchdog/                 @434media/founder
 /next.config.ts                              @434media/founder
 /lib/firebase-admin.ts                       @434media/founder
 /lib/cron-auth.ts                            @434media/founder

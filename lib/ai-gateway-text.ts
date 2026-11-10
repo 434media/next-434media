@@ -8,9 +8,8 @@
 // use case is kept identical to the previous direct-Anthropic setup so output
 // quality is unchanged; env overrides still win.
 
-import { generateText, APICallError, Output } from "ai"
+import { generateText, APICallError } from "ai"
 import type { LanguageModelUsage, ModelMessage, SystemModelMessage, Tool } from "ai"
-import { z } from "zod"
 
 // Curated model slugs for pipeline text generation. Confirmed present on
 // https://ai-gateway.vercel.sh/v1/models. Env overrides preserve the prior
@@ -22,10 +21,14 @@ export const GATEWAY_TEXT_MODELS = {
   // Prospecting prompt→filters — Sonnet, a structured extraction task that
   // doesn't need Opus.
   translator: process.env.TRANSLATOR_MODEL || "anthropic/claude-sonnet-5",
-  // Lead research — OpenAI's web-search-grounded model. Returns live cited
-  // company context. Verified to support structured Output + a `sources[]`
-  // array through the gateway. `web_search` priced per call — guard usage.
-  research: process.env.RESEARCH_MODEL || "openai/gpt-4o-mini-search-preview",
+  // Lead research (lib/lead-research.ts) — Sonnet 5.5 searching through the
+  // Gateway's Parallel search tool, then extracting, the content pipeline's
+  // pattern (founder, 2026-11-10, "approve b"). Its routing entry in
+  // content-pipeline/models.ts holds it to zero-retention, no-training
+  // providers, since the prompt names a contact. It replaces
+  // openai/gpt-4o-mini-search-preview, which the Gateway no longer lists
+  // ("Model … not found", production smoke check, 2026-11-10).
+  research: process.env.RESEARCH_MODEL || "anthropic/claude-sonnet-5.5",
 } as const
 
 /**
@@ -45,7 +48,7 @@ export const GATEWAY_TEXT_MODELS = {
 export type GatewayEffort = "low" | "medium" | "high" | "xhigh" | "max"
 
 // Anthropic-specific knobs, passed through the Gateway verbatim. Non-Anthropic
-// models (e.g. the OpenAI research model) ignore an unknown `anthropic` key.
+// models (e.g. the research model) ignore an unknown `anthropic` key.
 function effortOptions(effort?: GatewayEffort) {
   return effort ? { anthropic: { output_config: { effort } } } : undefined
 }
@@ -107,7 +110,7 @@ function systemInstructions(system: string | undefined, cache: boolean | undefin
 }
 
 /** A finishReason of "length" means the cap cut the answer off; see THE TOKEN TRAP above. */
-function truncated(what: string, maxTokens: number | undefined, reasoningTokens: number | undefined): Error {
+export function truncated(what: string, maxTokens: number | undefined, reasoningTokens: number | undefined): Error {
   return new Error(
     `${what}: output truncated at the ${maxTokens ?? "default"}-token cap ` +
       `(${reasoningTokens ?? 0} tokens went to reasoning). Raise maxTokens or lower effort.`,
@@ -198,60 +201,8 @@ export async function generateGatewayToolCall<TInput = unknown>(
   return call.input as TInput
 }
 
-// ── Lead research (web-grounded) ───────────────────────────────────────────
-
-export interface GatewayResearchResult {
-  summary: string
-  fitRationale: string
-  suggestedCountry?: string
-  sources: { url: string; title?: string }[]
-}
-
-// The structured shape the research model returns. Web-grounded, so values are
-// drawn from live sources — but the caller MUST treat this as review-only
-// (never auto-apply suggestedCountry to a lead; compliance depends on it).
-const researchSchema = z.object({
-  summary: z
-    .string()
-    .describe("3–4 sentence factual overview of the company: what they do, size/scale, and one recent development."),
-  fitRationale: z
-    .string()
-    .describe("2–3 sentences on why this company might (or might not) fit a Texas/LATAM-focused media company's audiences. Be honest if it's a weak fit."),
-  suggestedCountry: z
-    .string()
-    .optional()
-    .describe("Best-guess HQ country name from the research (e.g. 'United States'). A suggestion only."),
-})
-
-// Run web-grounded research on a real company/person already in our system.
-// Returns a structured result + the cited sources the model used. Throws on
-// failure (route maps to 502). NOT for discovery — only enriching known leads.
-export async function generateGatewayResearch(params: {
-  system: string
-  prompt: string
-}): Promise<GatewayResearchResult> {
-  const result = await generateText({
-    model: GATEWAY_TEXT_MODELS.research,
-    instructions: params.system,
-    prompt: params.prompt,
-    output: Output.object({ schema: researchSchema }),
-  })
-
-  const out = result.output
-  const sources = (result.sources ?? [])
-    .filter((s): s is Extract<typeof s, { url: string }> => "url" in s && typeof s.url === "string")
-    .map((s) => ({ url: s.url, title: "title" in s && typeof s.title === "string" ? s.title : undefined }))
-    // De-dupe by url; cap to keep the stored record lean.
-    .filter((s, i, arr) => arr.findIndex((x) => x.url === s.url) === i)
-    .slice(0, 8)
-
-  return {
-    summary: out.summary,
-    fitRationale: out.fitRationale,
-    suggestedCountry: out.suggestedCountry?.trim() || undefined,
-    sources,
-  }
-}
+// Lead research (web-grounded) lives in lib/lead-research.ts: a search loop and
+// a separate extraction, the content pipeline's pattern.
 
 // Re-exported so callers can classify gateway/provider HTTP errors (e.g. 402
 // billing) without importing from "ai" directly.

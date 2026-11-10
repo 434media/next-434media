@@ -1,5 +1,8 @@
 /**
- * Fails when tracked files carry email addresses or phone numbers that are not on the allowlist.
+ * Fails when tracked files carry email addresses, phone numbers, keys or operational identifiers that are not on the
+ * allowlist. It runs in `verify` on every pull request (434 build sequence V1 item 2: "a scan … for email addresses,
+ * keys and identifiers written into code, with an allow list for approved addresses"; GitHub's secret scanning catches
+ * keys, not email addresses).
  *
  *   tsx scripts/personal-data/check.ts            scan every tracked file; exit 1 on a finding
  *   tsx scripts/personal-data/check.ts --pending  also print a pending entry for each finding (sha256, no address)
@@ -16,6 +19,12 @@
  *
  * A name and a route have no pattern to match, so the files that held them are forbidden by path (forbiddenPaths):
  * the data lives in Firestore now, and a file at that path is the old data coming back.
+ *
+ * Keys: the formats below are each specific enough that a match is a credential, not a coincidence. A key in a public
+ * repository is compromised the moment it is pushed, so the fix is to rotate it (Security Policy), not to allowlist it.
+ * Identifiers: the account, page, portfolio, ad-account and asset ids the Skill Building Standard §2 keeps out of this
+ * repository, which map the company's operations. A non-secret id that has to be in code (an approved public value)
+ * goes on `values`; an id already in the tree that someone must decide about goes on `pending`, as for addresses.
  */
 import { createHash } from "node:crypto"
 import { execFileSync } from "node:child_process"
@@ -31,8 +40,34 @@ export interface Allowlist {
   /** A tracked file at, or under, one of these paths fails the check whatever it contains. */
   forbiddenPaths: string[]
   pending: PendingEntry[]
+  /** Approved identifiers that are public by design, matched exactly. Never a key. */
+  values?: string[]
 }
-export interface Finding { path: string; line: number; kind: "email" | "phone" | "forbidden-path"; value: string; sha256: string }
+export interface Finding { path: string; line: number; kind: "email" | "phone" | "key" | "identifier" | "forbidden-path"; value: string; sha256: string; rule?: string }
+
+/** Credential formats, each specific to its issuer. */
+export const KEY_RULES: { rule: string; re: RegExp }[] = [
+  { rule: "private key", re: /-----BEGIN (?:[A-Z]+ )?PRIVATE KEY-----/g },
+  { rule: "AWS access key", re: /\b(?:AKIA|ASIA)[0-9A-Z]{16}\b/g },
+  { rule: "Google API key", re: /\bAIza[0-9A-Za-z_-]{35}\b/g },
+  { rule: "Google OAuth client secret", re: /\bGOCSPX-[A-Za-z0-9_-]{20,}/g },
+  { rule: "Stripe key", re: /\b(?:sk|rk)_(?:live|test)_[0-9a-zA-Z]{16,}|\bwhsec_[A-Za-z0-9]{20,}/g },
+  { rule: "Slack token or webhook", re: /\bxox[abposr]-[0-9A-Za-z-]{10,}|hooks\.slack\.com\/services\/T[A-Z0-9]+\/B[A-Z0-9]+\/[A-Za-z0-9]+/g },
+  { rule: "GitHub token", re: /\b(?:ghp|gho|ghu|ghs|ghr)_[A-Za-z0-9]{36}\b|\bgithub_pat_[A-Za-z0-9_]{40,}/g },
+  { rule: "Anthropic key", re: /\bsk-ant-[A-Za-z0-9_-]{20,}/g },
+  { rule: "OpenAI key", re: /\bsk-(?!ant-)(?:proj-)?[A-Za-z0-9_-]{32,}/g },
+  { rule: "Resend key", re: /\bre_[A-Za-z0-9]{8,}_[A-Za-z0-9]{16,}/g },
+  { rule: "Mailchimp key", re: /\b[0-9a-f]{32}-us\d{1,2}\b/g },
+  { rule: "JSON Web Token", re: /\beyJ[A-Za-z0-9_-]{10,}\.eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}/g },
+  { rule: "secret assigned in code", re: /\b(?:secret|token|api[_-]?key|password|passwd|private[_-]?key)["']?\s*[:=]\s*["'][A-Za-z0-9_\-/+=.]{24,}["']/gi },
+]
+/** Operational identifiers (Skill Building Standard §2): Meta accounts and assets, and long numeric ids in quotes or URLs. */
+export const IDENTIFIER_RULES: { rule: string; re: RegExp }[] = [
+  { rule: "Meta ad account", re: /\bact_\d{6,}\b/g },
+  { rule: "account or asset id", re: /\b(?:page|business|portfolio|pixel|ad_?account|instagram|ig_?user|ig_?business|waba|catalog|app|dataset)[_-]?id["']?\s*[:=]\s*["']?\d{9,}/gi },
+  // 15–17 digits is the shape of Meta's object ids; a run of one digit is a placeholder, not an id.
+  { rule: "long numeric id", re: /(?<=["'\/])(?!(\d)\1+(?!\d))\d{15,17}(?=["'\/?])/g },
+]
 
 const EMAIL = /[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,}/g
 // A NANP number with separators: (210) 555-0100, 210-555-0100, +1 210.555.0100. Bare digit runs are ids, not phones.
@@ -49,6 +84,7 @@ function domainAllowed(domain: string, allow: Allowlist): boolean {
 }
 
 export function findPersonalData(path: string, text: string, allow: Allowlist): Finding[] {
+  const values = new Set(allow.values ?? [])
   const addresses = new Set(allow.addresses.map((a) => a.toLowerCase()))
   const pending = new Set(allow.pending.filter((p) => p.path === path).map((p) => p.sha256))
   const out: Finding[] = []
@@ -68,6 +104,17 @@ export function findPersonalData(path: string, text: string, allow: Allowlist): 
       const hash = sha256(value)
       if (!pending.has(hash)) out.push({ path, line: i + 1, kind: "phone", value, sha256: hash })
     }
+    for (const [kind, rules] of [["key", KEY_RULES], ["identifier", IDENTIFIER_RULES]] as const) {
+      for (const { rule, re } of rules) {
+        for (const m of lineText.matchAll(re)) {
+          const value = m[0]
+          if (kind === "identifier" && values.has(value.replace(/^.*?(\d+)$/, "$1"))) continue
+          if (kind === "identifier" && values.has(value)) continue
+          const hash = sha256(value)
+          if (!pending.has(hash)) out.push({ path, line: i + 1, kind, rule, value, sha256: hash })
+        }
+      }
+    }
   })
   return out
 }
@@ -76,6 +123,8 @@ export function findPersonalData(path: string, text: string, allow: Allowlist): 
 export function redact(f: Finding): string {
   if (f.kind === "forbidden-path") return "this path held personal data that now lives in Firestore"
   if (f.kind === "phone") return `***-***-**${f.value.slice(-2)}`
+  if (f.kind === "key") return `${f.rule}: ${f.value.slice(0, 4)}…`
+  if (f.kind === "identifier") return `${f.rule}: …${f.value.slice(-3)}`
   const at = f.value.indexOf("@")
   return `${f.value[0]}***${f.value.slice(at)}`
 }
@@ -118,7 +167,7 @@ function main() {
   const allow = loadAllowlist(root)
   const findings = scanRepository(root, allow)
   if (!findings.length) {
-    console.log(`personal-data check: no email addresses or phone numbers outside the allowlist (${allow.pending.length} pending entries).`)
+    console.log(`personal-data check: no email addresses, phone numbers, keys or identifiers outside the allowlist (${allow.pending.length} pending entries).`)
     return
   }
   console.error(`personal-data check: ${findings.length} finding(s) in tracked files.\n`)
@@ -126,7 +175,9 @@ function main() {
   console.error(
     "\nPeople's contact details and movements belong in Firestore behind a server-side gate, not in this public\n" +
       "repository. Move the data, or use a placeholder on a reserved domain (example.com, *.test) or a 555 number.\n" +
-      "Only an address that is genuinely not personal goes on scripts/personal-data/allowlist.json.",
+      "Only an address that is genuinely not personal goes on scripts/personal-data/allowlist.json.\n" +
+      "A key found here is exposed: rotate it, then remove it. An account or asset id belongs in Firestore or an\n" +
+      "environment variable; only an id that is public by design goes on the allowlist's `values`.",
   )
   if (process.argv.includes("--pending")) {
     const seen = new Set<string>()

@@ -30,5 +30,12 @@
     "lib/event-roles/",
     "lib/travel/projects.ts"
   ],
-  "pending": []
+  "pending": [
+    {
+      "path": "lib/__tests__/owned-meta-publisher.test.ts",
+      "sha256": "b7efaee48c66139ff52a91270dd6dc508c7bdea5f64b2fa740779ce291266dd5",
+      "reason": "A 16-digit Meta video id from the stuck FB Reel job of 2026-10-22, apparently a real asset id (Skill Building Standard §2). Found by the identifier scan on 2026-11-10; the founder decides whether the test keeps it or takes an invented id."
+    }
+  ],
+  "values": []
 }

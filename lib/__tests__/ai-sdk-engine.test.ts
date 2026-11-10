@@ -9,7 +9,8 @@ import { test } from "node:test"
 import assert from "node:assert/strict"
 import { generateText, type ModelMessage } from "ai"
 import { MockLanguageModelV4 } from "ai/test"
-import { generateGatewayText, generateGatewayToolCall, withInstructions, type GatewayUsage } from "../ai-gateway-text"
+import { GATEWAY_TEXT_MODELS, generateGatewayText, generateGatewayToolCall, withInstructions, type GatewayUsage } from "../ai-gateway-text"
+import { EXTRACT_MAX_TOKENS, MAX_SEARCHES, SEARCH_MAX_TOKENS, generateLeadResearch } from "../lead-research"
 import { tool } from "ai"
 import { z } from "zod"
 import { callOptions, PIPELINE_MODELS } from "../content-pipeline/models"
@@ -155,4 +156,84 @@ test("content pipeline research on AI SDK 7: the search loop runs, carries autom
   assert.equal(seen[0].inputTokens, 10_200)
   assert.equal(seen[0].cacheReadTokens, 4_800)
   assert.equal(seen[0].cacheWriteTokens, 4_800)
+})
+
+// ── Lead research: a search loop, then a separate extraction (lib/lead-research.ts) ──
+const RESULTS = [
+  { url: "https://example.com/about", title: "About Example Corp", excerpts: ["Example Corp makes widgets in Austin."] },
+  { url: "https://example.org/news/widget", title: "Example Corp opens a plant", excerpts: ["The plant opened in October."] },
+]
+/** A search tool run locally, as the Gateway runs Parallel's: counts calls, returns the invented results. */
+function fakeSearch() {
+  const queries: string[] = []
+  return { queries, tool: tool({ description: "Search the web.", inputSchema: z.object({ objective: z.string() }), execute: async ({ objective }) => { queries.push(objective); return { search_id: "s", results: RESULTS } } }) }
+}
+const searchCall = (n: number) => ({ content: [{ type: "tool-call" as const, toolCallId: `q${n}`, toolName: "web_search", input: JSON.stringify({ objective: `query ${n}` }) }], finishReason: toolCalls, usage: usage(1_000 * n, 50), warnings: [] })
+const notes = { content: [{ type: "text" as const, text: "Example Corp makes widgets in Austin (https://example.com/about)." }], finishReason: stop, usage: usage(4_000, 200, { read: 3_000 }), warnings: [] }
+const extractAnswer = (sourceUrls: string[]) => ({
+  content: [{ type: "text" as const, text: JSON.stringify({ summary: "Example Corp makes widgets.", fitRationale: "Weak fit.", suggestedCountry: " United States ", sourceUrls }) }],
+  finishReason: stop, usage: usage(900, 150), warnings: [],
+})
+
+test("lead research: the search loop then the extraction, on the research model, effort low, zero retention", async () => {
+  const search = fakeSearch()
+  const { calls } = scripted([searchCall(1), notes, extractAnswer(["https://example.org/news/widget", "https://invented.example.net/made-up"])], GATEWAY_TEXT_MODELS.research)
+  const r = await generateLeadResearch({ system: "Be factual.", prompt: "Company: Example Corp", searchTool: search.tool })
+  assert.equal(calls.length, 3, "two loop steps, one extraction")
+  // 1. Search: the tool required on the first step, Gateway caching on the loop, the routing's zero retention, effort low.
+  assert.deepEqual(calls[0].toolChoice, { type: "required" })
+  assert.deepEqual(calls[0].tools?.map((t) => t.name), ["web_search"])
+  assert.equal(calls[0].maxOutputTokens, SEARCH_MAX_TOKENS)
+  const loopGateway = calls[0].providerOptions?.gateway as Record<string, unknown>
+  assert.equal(loopGateway.caching, "auto")
+  assert.equal(loopGateway.zeroDataRetention, true)
+  assert.equal(loopGateway.disallowPromptTraining, true)
+  assert.deepEqual(calls[0].providerOptions?.anthropic, { output_config: { effort: "low" } })
+  // 2. Extract: no tools, JSON output, the notes and the URLs the search returned, no automatic caching (one-shot).
+  assert.equal(calls[2].tools, undefined)
+  assert.equal(calls[2].responseFormat?.type, "json")
+  assert.equal(calls[2].maxOutputTokens, EXTRACT_MAX_TOKENS)
+  assert.equal((calls[2].providerOptions?.gateway as Record<string, unknown>).caching, undefined)
+  assert.equal((calls[2].providerOptions?.gateway as Record<string, unknown>).zeroDataRetention, true)
+  const extractPrompt = JSON.stringify(calls[2].prompt)
+  assert.match(extractPrompt, /makes widgets in Austin/)
+  assert.match(extractPrompt, /https:\/\/example\.org\/news\/widget/)
+  // Sources: only URLs the search returned, the model's pick first, with the results' titles; the invented one is dropped.
+  assert.deepEqual(r.sources, [
+    { url: "https://example.org/news/widget", title: "Example Corp opens a plant" },
+    { url: "https://example.com/about", title: "About Example Corp" },
+  ])
+  assert.equal(r.searches, 1)
+  assert.deepEqual(search.queries, ["query 1"])
+  assert.equal(r.suggestedCountry, "United States")
+  assert.equal(r.usage.search.cacheReadTokens, 3_000)
+  assert.equal(r.usage.extract.inputTokens, 900)
+})
+
+test("lead research: billed searches stop at the cap, and a fourth is refused before it runs", async () => {
+  assert.equal(MAX_SEARCHES, 3)
+  const search = fakeSearch()
+  // A model that searches on every step it may: three searches, then notes once the tool is withdrawn.
+  const { calls } = scripted([searchCall(1), searchCall(2), searchCall(3), notes, extractAnswer([])], GATEWAY_TEXT_MODELS.research)
+  const r = await generateLeadResearch({ system: "s", prompt: "p", searchTool: search.tool })
+  assert.equal(r.searches, MAX_SEARCHES)
+  assert.equal(search.queries.length, MAX_SEARCHES)
+  assert.deepEqual(calls[MAX_SEARCHES].toolChoice, { type: "none" }, "the tool is withdrawn once the searches are spent")
+  // With no pick from the model, the sources are what the search returned: at least one, never invented.
+  assert.ok(r.sources.length >= 1)
+  assert.ok(r.sources.every((s) => RESULTS.some((x) => x.url === s.url)))
+  // A model that asks for a fourth anyway: AI SDK 7 refuses the call under toolChoice "none", and it never runs.
+  const greedy = fakeSearch()
+  scripted([searchCall(1), searchCall(2), searchCall(3), searchCall(4)], GATEWAY_TEXT_MODELS.research)
+  await assert.rejects(() => generateLeadResearch({ system: "s", prompt: "p", searchTool: greedy.tool }), /tool choice was none/)
+  assert.equal(greedy.queries.length, MAX_SEARCHES)
+})
+
+test("lead research: a cut-off answer throws the token-trap message, in either call", async () => {
+  const length = { unified: "length" as const, raw: undefined }
+  const cutUsage = { inputTokens: usage(500, 0).inputTokens, outputTokens: { total: 4000, text: 10, reasoning: 3990 } }
+  scripted([searchCall(1), notes, { content: [{ type: "text", text: '{"summary":"Exa' }], finishReason: length, usage: cutUsage, warnings: [] }], GATEWAY_TEXT_MODELS.research)
+  await assert.rejects(() => generateLeadResearch({ system: "s", prompt: "p", searchTool: fakeSearch().tool }), /Lead research \(extract\): output truncated at the 4000-token cap \(3990 tokens went to reasoning\)/)
+  scripted([searchCall(1), { content: [{ type: "text", text: "Example Corp ma" }], finishReason: length, usage: cutUsage, warnings: [] }], GATEWAY_TEXT_MODELS.research)
+  await assert.rejects(() => generateLeadResearch({ system: "s", prompt: "p", searchTool: fakeSearch().tool }), /Lead research \(search\): output truncated at the 8000-token cap/)
 })

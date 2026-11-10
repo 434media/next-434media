@@ -325,12 +325,14 @@ BRAND_PROFILE_BACKUP_READ_TOKEN=random-48+   # read-only; gates GET /api/brand-p
 ADMIN_OWNER_EMAILS=owner@example.com          # owners: super admin on every check, roster or not (lib/auth.ts); unset = no owner, roles from crm_team_members only
 ADMIN_FOUNDER_EMAIL=founder@example.com      # the founder's own address(es), comma-separated; the founder-only guard (lib/founder-guard.ts): /admin/finance and /api/admin/finance; unset = everyone refused
 
-# FINANCE: QUICKBOOKS ONLINE (Phase 1 reads these; set once Intuit issues the production keys)
+# FINANCE: QUICKBOOKS ONLINE (Phase 1, read only: lib/quickbooks.ts, lib/quickbooks-server.ts)
 # QUICKBOOKS_CLIENT_ID=...                   # Intuit app keys: Production keys in Production only, sandbox keys in Preview
 # QUICKBOOKS_CLIENT_SECRET=...
-# QUICKBOOKS_ENVIRONMENT=production          # or sandbox: which Intuit API base the code calls
+# QUICKBOOKS_ENVIRONMENT=production          # or sandbox; production keys are refused outside VERCEL_ENV=production
 # QUICKBOOKS_TOKEN_KEY=base64-32-bytes       # AES-256-GCM key sealing the stored OAuth tokens, as CANVA_TOKEN_KEY
-# QUICKBOOKS_REDIRECT_URI=...                # optional; defaults to https://www.434media.com/api/admin/finance/quickbooks/callback
+# QUICKBOOKS_REDIRECT_URI=...                # optional; default: the www callback on production, else <served origin>/api/admin/finance/quickbooks/callback
+#   Tokens: production → Firestore crm_meta/quickbooks_connection; sandbox (Intuit's test company) → a sealed
+#   HttpOnly cookie on /api/admin/finance, because previews have no Firestore.
 
 # AI GATEWAY (image/video generation, lead drafting + research)
 AI_GATEWAY_API_KEY=your-vercel-ai-gateway-key
@@ -338,7 +340,7 @@ BLOB_READ_WRITE_TOKEN=your-vercel-blob-token   # uploads + generated assets
 # Optional model overrides (default to curated gateway slugs):
 # ANTHROPIC_MODEL=anthropic/claude-opus-4.8        # outreach drafts
 # TRANSLATOR_MODEL=anthropic/claude-sonnet-4.6     # prospecting query → filters
-# RESEARCH_MODEL=openai/gpt-4o-mini-search-preview # web-grounded lead research
+# RESEARCH_MODEL=anthropic/claude-sonnet-5.5      # lead research: Parallel search loop (max 3 searches) + extraction
 
 # PROSPECTING (Apollo)
 APOLLO_API_KEY=your-apollo-key

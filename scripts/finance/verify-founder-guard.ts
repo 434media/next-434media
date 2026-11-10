@@ -33,7 +33,8 @@ const cases: Array<{ who: string; cookie?: string; page: number; api: number }> 
   { who: "founder", cookie: as(founder, "crm_super_admin"), page: 200, api: 200 },
 ]
 
-const MARKER = "QuickBooks is not connected yet"
+// Server-rendered on the finance page above the snapshot, which loads in the browser from the guarded API.
+const MARKER = "Visible to the founder only"
 
 async function main() {
   let failed = 0
