@@ -16,23 +16,11 @@
   /* The public header is fixed, so the page has to clear it or the first
      thing a visitor reads sits underneath it.
 
-     Measured on the deployed preview rather than derived from the Tailwind
-     classes, because the header's height depends on which of its two mounted
-     states is showing:
-
-       375px wide   64px at rest, 56px scrolled
-       1280px wide  58px at rest, 42px scrolled
-
-     The at-rest height is the one that matters: it is the state at load and
-     the state an anchor jump lands in. This couples the Work page to
-     components/combined-navbar.tsx — if that header's padding changes, this
-     number is wrong and nothing will look broken until someone reads the top
-     of the page. */
-  --work-header-h: 64px;
-}
-
-@media (min-width: 680px) {
-  :root { --work-header-h: 58px; }
+     It used to be a measured copy of the header's height, 64px and 58px from
+     680px. That went stale when the header's padding grew: at 1440 the header
+     was 72px and this page cleared 58. The header now has one height,
+     --site-header-h in globals.css, and this reads it. */
+  --work-header-h: var(--site-header-h);
 }
 
 .page {
