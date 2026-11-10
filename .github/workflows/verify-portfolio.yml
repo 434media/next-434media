@@ -53,6 +53,14 @@ jobs:
       # phone number in a tracked file that is not on the small allowlist in scripts/personal-data/allowlist.json,
       # and on the two paths that used to hold such data. Node built-ins and git only.
       - run: tsx scripts/personal-data/check.ts
+      # The scan above also fails on keys (each issuer's format) and on the account and asset identifiers the Skill
+      # Building Standard §2 keeps out of this repository (V1 item 2).
+
+      # Canon (V1 item 2): a single-source value outside the file that owns it fails: the jurisdiction lists
+      # (lib/prospecting/scorer.ts), the Mailchimp tags (lib/mailchimp-tags.ts) and the brand roster
+      # (components/crm/types.ts). Values are read from the owners; findings already in the tree are in
+      # scripts/canon/baseline.json with a reason, and a new one fails.
+      - run: tsx scripts/canon/check.ts
 
       # The system-of-record JSON Schemas are canonical in the private context
       # repository and are deliberately not copied here: they carry no figures,
@@ -140,6 +148,10 @@ jobs:
       - run: tsx --test lib/__tests__/brand-book-publish.test.ts
       # The approval drawer (plan v11.1 Step 3): a row's variations approved together, bound to the files shown.
       - run: tsx --test lib/__tests__/row-approval.test.ts
+      # The canon check's rules, and that it can still read every owner.
+      - run: tsx --test lib/__tests__/canon-check.test.ts
+      # The cron watchdog's decision: every vercel.json schedule parses, grace, and which jobs never fired (V1 item 2).
+      - run: tsx --test lib/__tests__/cron-watchdog.test.ts
       # Event roles and travel routes from Firestore, the create-or-skip import, and the personal-data check itself.
       - run: tsx --test lib/__tests__/personal-data.test.ts
       # The founder-only guard (V1 item 1, finance Phase 0): deny by default, one configured identity, a verified email.

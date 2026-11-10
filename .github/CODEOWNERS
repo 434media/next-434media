@@ -87,6 +87,7 @@
 # Secrets: where a credential is loaded, minted, verified or stored
 /.github/                                    @434media/founder
 /vercel.json                                 @434media/founder
+/app/api/cron/cron-watchdog/                 @434media/founder
 /next.config.ts                              @434media/founder
 /lib/firebase-admin.ts                       @434media/founder
 /lib/cron-auth.ts                            @434media/founder

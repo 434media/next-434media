@@ -43,6 +43,10 @@
     {
       "path": "/api/cron/content-pipeline",
       "schedule": "* * * * *"
+    },
+    {
+      "path": "/api/cron/cron-watchdog",
+      "schedule": "30 * * * *"
     }
   ]
 }
