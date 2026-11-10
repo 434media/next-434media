@@ -111,6 +111,9 @@ jobs:
       # `instructions` (v7 rejects system messages inside `messages`), the cache markers and Gateway automatic caching
       # reach the provider, the token trap still throws, and a pipeline tool loop reports its cache tokens.
       - run: tsx --test lib/__tests__/ai-sdk-engine.test.ts
+      # The SKILL.md loader on an invented skill: the specification and size checks, the fingerprint pin, the tool
+      # allow-list, the folder-confined reader, and a full agent run on the mock model.
+      - run: tsx --test lib/__tests__/skill-loader.test.ts
 
       # Owned Meta: offline state machine and fake-transport regression tests.
       - run: tsx --test lib/__tests__/owned-meta-publisher.test.ts
