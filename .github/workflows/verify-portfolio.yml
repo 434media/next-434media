@@ -168,6 +168,8 @@ jobs:
       # the Mailchimp analytics route behind requireAdmin, the roster re-checked on every session read, and every
       # BotID-guarded route in the client protect list with the guard failing closed.
       - run: tsx --test lib/__tests__/security-sweep-2026-10-29.test.ts
+      # /api/parse-event behind the admin gate (security log PSM-1): requireAdmin first, no wildcard CORS, one caller.
+      - run: tsx --test lib/__tests__/parse-event-gated.test.ts
 
       # Optional: the same suites again on MilCityUSA's real published profile, when the BRAND_PROFILE_FIXTURE Actions
       # secret holds a published version's 434-context backup record. Secrets are not given to pull requests from

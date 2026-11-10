@@ -74,6 +74,8 @@
 /app/api/sor/mcp/                            @434media/founder
 /app/api/owned-meta/mcp/                     @434media/founder
 /app/api/owned-meta/oauth-protected-resource/ @434media/founder
+/app/api/parse-event/                        @434media/founder
+/lib/__tests__/parse-event-gated.test.ts     @434media/founder
 
 # Money
 /lib/shopify/                                @434media/founder
