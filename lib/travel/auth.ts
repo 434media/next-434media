@@ -3,6 +3,7 @@ import { createHmac, timingSafeEqual } from "node:crypto"
 import { getSession } from "@/lib/auth"
 import { getDb } from "@/lib/firebase-admin"
 import { travelAccessId } from "./access-id"
+import { staffReadsItineraries } from "./staff-access"
 
 const TRAVEL_SESSION_COOKIE = "travel-auth-session"
 const TRAVEL_ACCESS_COLLECTION = "travel_access"
@@ -105,8 +106,10 @@ async function getViewerSession(): Promise<TravelViewer | null> {
 }
 
 export async function getTravelAccess(projectSlug: string, travelerSlug: string) {
+  // Only super admins and full admins read every itinerary as staff (staff-access.ts, PSM-2). Any other admin session
+  // falls through to the travel portal's own session, so it needs a travel_access record for this page.
   const staff = await getSession()
-  if (staff) {
+  if (staff && staffReadsItineraries(staff.role)) {
     return {
       email: staff.email,
       name: staff.name,
