@@ -1,3 +1,4 @@
+import { jsonLdScript } from "@/lib/json-ld"
 import type { Metadata } from "next"
 // Approved design Revision 12, and now the only Work page. WorkClient is gone:
 // the redesign is the approved replacement, so keeping a second implementation
@@ -10,6 +11,7 @@ import type { Metadata } from "next"
 import WorkRedesign from "./redesign/WorkRedesign"
 import { getWorkPageRecords } from "@/lib/sor/work-page-data"
 import { buildServicesItemListLd } from "@/lib/seo/services"
+import { buildWorkCollectionLd } from "@/lib/seo/work"
 import { BRAND_RECORDS } from "@/lib/brand-records"
 
 const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://www.434media.com"
@@ -85,22 +87,13 @@ export default async function WorkPage() {
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{
-          __html: JSON.stringify(buildServicesItemListLd(siteUrl, `${siteUrl}/work`)),
+          __html: jsonLdScript(buildServicesItemListLd(siteUrl, `${siteUrl}/work`)),
         }}
       />
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{
-          __html: JSON.stringify({
-            "@context": "https://schema.org",
-            "@type": "CollectionPage",
-            name: "Our Work | 434 MEDIA",
-            url: `${siteUrl}/work`,
-            description:
-              "Selected 434 MEDIA work organized by commercial model: original IP, platforms for brands, and productions for brands.",
-            isPartOf: { "@id": `${siteUrl}/#localbusiness` },
-            about: { "@id": `${siteUrl}/#localbusiness` },
-          }),
+          __html: jsonLdScript(buildWorkCollectionLd(records, siteUrl)),
         }}
       />
       <WorkRedesign records={records} />

@@ -1,10 +1,11 @@
 /**
  * Routes no third-party tracker loads on: internal tooling (/admin), travellers'
- * private itineraries (/travel) and the full-screen deck (/squads). Read by
+ * private itineraries (/travel), the full-screen deck (/squads) and the brand
+ * books shared with vendors (/share, whose link carries its access token). Read by
  * components/MetaPixel.tsx and components/PublicTrackers.tsx, so the list is
  * kept in one place.
  */
-export const UNTRACKED_PREFIXES = ["/admin", "/travel", "/squads"] as const
+export const UNTRACKED_PREFIXES = ["/admin", "/travel", "/squads", "/share"] as const
 
 export function isTrackedPath(pathname: string | null): boolean {
   if (!pathname) return true

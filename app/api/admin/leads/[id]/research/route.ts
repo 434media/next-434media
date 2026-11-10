@@ -2,14 +2,16 @@ import { type NextRequest, NextResponse } from "next/server"
 import { getSession, isAuthorizedAdmin } from "@/lib/auth"
 import { getLeadById } from "@/lib/firestore-leads"
 import { getDb } from "@/lib/firebase-admin"
-import { generateGatewayResearch, GATEWAY_TEXT_MODELS, APICallError } from "@/lib/ai-gateway-text"
+import { GATEWAY_TEXT_MODELS, APICallError } from "@/lib/ai-gateway-text"
+import { generateLeadResearch } from "@/lib/lead-research"
 import { BRAND_CONTEXT } from "@/lib/lead-prompt"
 import { CRM_COLLECTIONS, type LeadResearch } from "@/types/crm-types"
 import { FieldValue } from "firebase-admin/firestore"
 import crypto from "crypto"
 
 export const runtime = "nodejs"
-export const maxDuration = 60
+// A search loop (up to 3 searches) and an extraction call (lib/lead-research.ts).
+export const maxDuration = 120
 
 // POST /api/admin/leads/[id]/research
 //
@@ -68,7 +70,7 @@ Provide:
 
   let research: LeadResearch
   try {
-    const result = await generateGatewayResearch({ system, prompt })
+    const result = await generateLeadResearch({ system, prompt })
     research = {
       summary: result.summary,
       fitRationale: result.fitRationale,

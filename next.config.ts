@@ -8,19 +8,26 @@ const nextConfig: NextConfig = {
   },
   // Increase body size limit for file uploads (App Router uses route config, not this)
   // The Create table's video conversion (lib/content-pipeline/transcode.ts) runs the ffmpeg-static binary: kept out of
-  // the bundle and traced into that one route.
+  // the bundle and traced into the routes that run it.
   serverExternalPackages: ['ffmpeg-static'],
   outputFileTracingIncludes: {
     // The binary's real path under pnpm's store: node_modules/ffmpeg-static is a symlink, and a traced path through a
     // symlinked directory makes Vercel refuse the function ("files in symlinked directories").
     '/api/admin/content/media-optimize': ['./node_modules/.pnpm/ffmpeg-static@*/node_modules/ffmpeg-static/ffmpeg'],
+    // A clip's video export is cut to the clip's length there too (lib/content-pipeline/video-timing.ts trimTail).
+    '/api/admin/content/create-run': ['./node_modules/.pnpm/ffmpeg-static@*/node_modules/ffmpeg-static/ffmpeg'],
+    '/api/admin/content/rows/[rowId]': ['./node_modules/.pnpm/ffmpeg-static@*/node_modules/ffmpeg-static/ffmpeg'],
     // The social-image routes read Menda's OTF at runtime. It's fetched at build time and gitignored
     // (scripts/fonts/fetch-private-fonts.mjs), so name it rather than rely on the tracer finding it.
     '/opengraph-image': ['./fonts/Menda-Black.otf'],
     '/api/og': ['./fonts/Menda-Black.otf'],
+    // A vendor's zip carries the open-licence font files (lib/vendor-fonts.ts), read at runtime.
+    '/share/brand-book/[token]/download': ['./fonts/open/**/*'],
     '/deck/[shareId]/opengraph-image': ['./fonts/Menda-Black.otf'],
   },
   experimental: {
+    // forbidden() for the founder-only finance page, so a non-founder gets a real 403 (lib/founder-guard.ts).
+    authInterrupts: true,
     serverActions: {
       bodySizeLimit: '50mb',
     },
@@ -45,6 +52,21 @@ const nextConfig: NextConfig = {
         },
       ],
     }
+  },
+
+  // A brand book shared with a vendor (plan v11.2.1 Step 4 item 4): the link carries its access token, so the page is
+  // never indexed and no referrer leaves it, as response headers as well as the page's own meta tags.
+  async headers() {
+    return [
+      {
+        source: '/share/:path*',
+        headers: [
+          { key: 'X-Robots-Tag', value: 'noindex, nofollow' },
+          { key: 'Referrer-Policy', value: 'no-referrer' },
+          { key: 'Cache-Control', value: 'private, no-store' },
+        ],
+      },
+    ]
   },
 
   // The CRM section was renamed to Opportunities and moved to /admin/opportunities.

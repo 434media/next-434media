@@ -5,7 +5,7 @@ import { getContentPostsByCreateRow, updateContentPost, ownedMetaStore, decideOw
 import { MetaBlocked } from "@/lib/owned-meta-publisher"
 import { exportFileBase, isHandPosted, FORMAT_LABEL, type CreateFormat } from "@/lib/content-pipeline/create-table"
 import { addedConflicts, allowedPlatforms, approveRow, exportAs, formatOf, frozen, futureDated, isApproved, platformConflicts, platformsFor, resolveCanvaDesignLink, RowApprovalError } from "@/lib/content-pipeline/row-approval"
-import { CreateRowError, createRequestId } from "@/lib/content-pipeline/create-run"
+import { CreateRowError, createRequestId, createRunDeps, type CreateRunDeps } from "@/lib/content-pipeline/create-run"
 import { isCreateUpload } from "@/lib/content-pipeline/create-media"
 import { createProfile } from "../../profile"
 import { pipelineMarked } from "@/lib/content-pipeline/ownership"
@@ -194,6 +194,7 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ rowId: str
       }
       const holds: string[] = []
       let unchanged = true
+      let fit: CreateRunDeps["fitVideo"] | undefined
       for (const { target, urls, as } of exported) {
         let post = target.post
         const format = target.format
@@ -212,20 +213,30 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ rowId: str
             social_platforms: platforms, date_to_post: base.date_to_post,
             ...(base.profile_version_id ? { profile_version_id: base.profile_version_id } : {}),
             create_row_id: rowId, create_format: format, ...(target.pages ? { canva_pages: target.pages } : {}),
+            // A clip's row: the new variation's video is checked against the clip like the others.
+            ...(posts.some(p => p.create_media === "video") ? { create_media: "video" as const } : {}),
             intake: { requestId: `${createRequestId(rowId, format)}:link:${designId}${target.pages ? `:p${target.pages.join("-")}` : ""}`, metaBrand: base.intake?.metaBrand ?? "", requestedBy: email, at: now },
           } as Omit<ContentPost, "id" | "created_at" | "updated_at">))
           posts.push(post)
         }
-        const pages = as === "mp4" ? [{ url: urls[0], label: `${format}-video` }] : urls.map((url, n) => ({ url, label: `${format}-page-${target.pages?.[n] ?? n + 1}` }))
+        // A clip's video is fitted to the clip's length (video-timing.ts), known from the row's last check; unknown, it holds.
+        const known = [post, ...posts].find(p => p.video_timing?.clip_sec)?.video_timing
+        const fitted = as === "mp4" && post.create_media === "video"
+          ? await (fit ??= (await createRunDeps()).fitVideo)(urls[0], known?.clip_sec ? { sec: known.clip_sec, audio: !!known.clip_audio } : null)
+          : undefined
+        if (fitted?.timing.hold) holds.push(`${FORMAT_LABEL[format]}: ${fitted.timing.hold}`)
+        const pages = as === "mp4" ? [{ url: urls[0], label: `${format}-video`, ...(fitted ? { bytes: fitted.bytes } : {}) }] : urls.map((url, n) => ({ url, label: `${format}-page-${target.pages?.[n] ?? n + 1}` }))
         // An ICYMI roundup's published cards follow its cover again, as the Run job put them (never re-chosen here).
         const slides = post.roundup_slides ?? [], items = [...pages, ...slides.map((x, n) => ({ url: x.url, label: `story-${n + 1}` }))]
         // New files void an approval: the publisher's guarded update resets its own; a hand-post approval is reset in
         // the same write as the files, so the post is never "approved" with files nobody saw.
         const resetHand = isApproved(post) && !post.owned_meta
         const pagesChange = body.action === "attach" ? { canva_pages: target.pages ?? [] } : {}
-        const intake = { ...tools.intake, setAssets: (id: string, assets: ContentPost["assets"], record: { export_fingerprint: string; export_staged_at: string; canva_design_id?: string }) => updateContentPost(id, { assets, ...record, ...pagesChange, ...(resetHand ? { status: "needs_approval" as const } : {}) }) }
+        const intake = { ...tools.intake, setAssets: (id: string, assets: ContentPost["assets"], record: { export_fingerprint: string; export_staged_at: string; canva_design_id?: string }) => updateContentPost(id, { assets, ...record, ...pagesChange, ...(fitted ? { video_timing: fitted.timing } : {}), ...(resetHand ? { status: "needs_approval" as const } : {}) }) }
         const attached = await attachExports(intake, { postId: post.id, items, randomId: tools.randomId, canva: { designId, ...(target.pages ? { pages: target.pages } : {}) }, ...(slides.length ? { canvaItems: pages.length } : {}), fileBase: fileBaseOf(post), ...(body.action === "attach" && post.canva_design_id !== designId ? { rebind: true } : {}) })
         holds.push(...attached.holds)
+        // The same files as before (nothing was written): the check is still recorded against them.
+        if (fitted && attached.reused) await updateContentPost(post.id, { video_timing: fitted.timing })
         unchanged &&= attached.reused
         console.info("[content/rows]", JSON.stringify({ by: email, row: rowId, action: body.action, post: post.id, design: designId, pages: target.pages ?? null, reused: attached.reused }))
       }

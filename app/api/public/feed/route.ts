@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { getFeedItems, getFeedItemBySlug } from "@/lib/firestore-feed"
+import { requireSecret } from "@/lib/require-secret"
 
 /**
  * Public Feed API Endpoint
@@ -14,7 +15,7 @@ import { getFeedItems, getFeedItemBySlug } from "@/lib/firestore-feed"
  *   fetch('https://434media.com/api/public/feed?table=THEFEED&slug=my-article')
  * 
  * Security:
- *   - API key required when PUBLIC_FEED_REQUIRE_KEY=true
+ *   - API key (header only) required when FEED_API_REQUIRE_KEY=true; fails closed if FEED_API_SECRET is unset
  *   - Origin restriction when PUBLIC_FEED_ALLOWED_ORIGINS is set
  *   - Rate limiting via Vercel's built-in protection
  */
@@ -28,8 +29,9 @@ const ALLOWED_ORIGINS = process.env.FEED_API_ALLOWED_ORIGINS
   ? process.env.FEED_API_ALLOWED_ORIGINS.split(',').map(o => o.trim())
   : ['*'] // Default to all origins if not configured
 
-// API key for protected access
-const API_KEY = process.env.FEED_API_SECRET
+// API key for protected access. With FEED_API_REQUIRE_KEY=true every request must carry FEED_API_SECRET in a header
+// (x-api-key or Authorization: Bearer); if the secret is then unset in production, every request is refused rather than
+// let through. Without the flag the feed is a public read of published items.
 const REQUIRE_API_KEY = process.env.FEED_API_REQUIRE_KEY === 'true'
 
 // Validate origin against allow-list
@@ -58,16 +60,6 @@ function getCorsOrigin(request: NextRequest): string {
   return ALLOWED_ORIGINS[0] || '*'
 }
 
-// Validate API key
-function isValidApiKey(request: NextRequest): boolean {
-  if (!REQUIRE_API_KEY || !API_KEY) return true
-  
-  const providedKey = request.headers.get('x-api-key') || 
-                      request.headers.get('authorization')?.replace('Bearer ', '')
-  
-  return providedKey === API_KEY
-}
-
 export async function GET(request: NextRequest) {
   try {
     // Check origin restriction
@@ -80,17 +72,14 @@ export async function GET(request: NextRequest) {
     }
 
     // Check API key if required
-    if (!isValidApiKey(request)) {
-      return NextResponse.json(
-        { success: false, error: "Invalid or missing API key" },
-        { status: 401, headers: { 'WWW-Authenticate': 'Bearer' } }
-      )
+    if (REQUIRE_API_KEY) {
+      const denied = requireSecret(request, "FEED_API_SECRET", { where: "Public Feed API", headers: { 'WWW-Authenticate': 'Bearer' } })
+      if (denied) return denied
     }
 
     const { searchParams } = new URL(request.url)
     const tableName = searchParams.get("table") || "THEFEED"
     const slug = searchParams.get("slug")
-    const status = searchParams.get("status") || "published" // Default to published only
     const limit = searchParams.get("limit")
     const fresh = searchParams.get("fresh") === "true" // Bypass cache when ?fresh=true
 
@@ -136,7 +125,8 @@ export async function GET(request: NextRequest) {
     // Get all feed items with filters
     const items = await getFeedItems({
       tableName,
-      status: status === "all" ? undefined : status,
+      // Published only: this is a public read, so `?status=` (which used to reach drafts) is ignored.
+      status: "published",
     })
 
     // Apply limit if specified

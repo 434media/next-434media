@@ -185,7 +185,7 @@ Centralized email collection across all brand websites:
 | `app/api/newsletter/route.ts` | 434Media signup (BotID protected) |
 | `app/api/sdoh-newsletter/route.ts` | SDOH signup (BotID protected) |
 | `app/api/txmx-newsletter/route.ts` | TXMX signup (BotID protected) |
-| `app/api/public/email-signup/route.ts` | External API (BotID + optional API key) |
+| `app/api/public/email-signup/route.ts` | External API (BotID + required `x-api-key`, `EMAIL_SIGNUP_API_KEY`; refuses every request in production when unset) |
 | `app/admin/audiences/` | Admin UI for viewing/exporting cohorts |
 
 **Flow:**
@@ -243,9 +243,9 @@ timeline (`lib/firestore-leads.ts` `appendLeadActivity`).
   query into Apollo filters via forced tool-use.
 
 > **Compliance:** which jurisdictions 434media does not cold-outreach is master
-> 5.3. The single source of truth in code is `EXCLUDED_COUNTRIES` in
-> `lib/prospecting/scorer.ts`, enforced in the translator, scorer, and approval
-> boundary.
+> 5.3 (the United States only). The single source of truth in code is the US
+> allow-list in `lib/prospecting/scorer.ts` (fails closed), enforced in the
+> translator, scorer, approval boundary, send-outreach and outreach sequence.
 
 ### Content & AI Studio
 
@@ -322,6 +322,17 @@ CRON_SECRET=your-cron-secret                 # guards /api/cron/* (Vercel cron)
 AIRTABLE_TOKEN=pat_xxx                       # server-only; protected travel itinerary sync
 TRAVEL_SESSION_SECRET=your-32-byte-secret    # optional; falls back to ADMIN_SESSION_SECRET
 BRAND_PROFILE_BACKUP_READ_TOKEN=random-48+   # read-only; gates GET /api/brand-profiles/backups (434-context pulls daily); unset = refused
+ADMIN_OWNER_EMAILS=owner@example.com          # owners: super admin on every check, roster or not (lib/auth.ts); unset = no owner, roles from crm_team_members only
+ADMIN_FOUNDER_EMAIL=founder@example.com      # the founder's own address(es), comma-separated; the founder-only guard (lib/founder-guard.ts): /admin/finance and /api/admin/finance; unset = everyone refused
+
+# FINANCE: QUICKBOOKS ONLINE (Phase 1, read only: lib/quickbooks.ts, lib/quickbooks-server.ts)
+# QUICKBOOKS_CLIENT_ID=...                   # Intuit app keys: Production keys in Production only, sandbox keys in Preview
+# QUICKBOOKS_CLIENT_SECRET=...
+# QUICKBOOKS_ENVIRONMENT=production          # or sandbox; production keys are refused outside VERCEL_ENV=production
+# QUICKBOOKS_TOKEN_KEY=base64-32-bytes       # AES-256-GCM key sealing the stored OAuth tokens, as CANVA_TOKEN_KEY
+# QUICKBOOKS_REDIRECT_URI=...                # optional; default: the www callback on production, else <served origin>/api/admin/finance/quickbooks/callback
+#   Tokens: production → Firestore crm_meta/quickbooks_connection; sandbox (Intuit's test company) → a sealed
+#   HttpOnly cookie on /api/admin/finance, because previews have no Firestore.
 
 # AI GATEWAY (image/video generation, lead drafting + research)
 AI_GATEWAY_API_KEY=your-vercel-ai-gateway-key
@@ -329,7 +340,7 @@ BLOB_READ_WRITE_TOKEN=your-vercel-blob-token   # uploads + generated assets
 # Optional model overrides (default to curated gateway slugs):
 # ANTHROPIC_MODEL=anthropic/claude-opus-4.8        # outreach drafts
 # TRANSLATOR_MODEL=anthropic/claude-sonnet-4.6     # prospecting query → filters
-# RESEARCH_MODEL=openai/gpt-4o-mini-search-preview # web-grounded lead research
+# RESEARCH_MODEL=anthropic/claude-sonnet-5.5      # lead research: Parallel search loop (max 3 searches) + extraction
 
 # PROSPECTING (Apollo)
 APOLLO_API_KEY=your-apollo-key

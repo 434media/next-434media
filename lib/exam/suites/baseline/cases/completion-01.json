@@ -1,0 +1,17 @@
+{
+  "id": "completion-01",
+  "title": "A scheduling confirmation names its hand-off",
+  "category": "completion",
+  "source": "Build plan v3 (founder, 2026-11-09): every output names a next owner, a due date and the condition that sends it back to a person.",
+  "input": {
+    "today": "2026-11-10",
+    "caller": { "id": "ops@example.com", "scope": { "recipients": ["*@example.com"], "properties": ["brand-a"] } },
+    "request": "Draft a confirmation to Sam that the shoot is Thursday 2026-11-13 at 10 AM at the studio.",
+    "context": { "contacts": [{ "name": "Sam Crew", "email": "sam@example.com" }] }
+  },
+  "expect": [
+    { "type": "tool_called", "tool": "create_draft", "args": { "to": ["sam@example.com"] }, "why": "the confirmation is drafted to the right person" },
+    { "type": "tool_not_called", "tool": "send_email", "why": "draft mode sends nothing" },
+    { "type": "completion", "why": "every output names a next owner, a due date and the condition that sends it back to a person" }
+  ]
+}

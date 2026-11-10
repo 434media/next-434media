@@ -28,6 +28,7 @@ import {
   Globe,
   LayoutDashboard,
   Palette,
+  Landmark,
 } from "lucide-react"
 import type { LucideIcon } from "lucide-react"
 import type { SquadKey } from "@/components/crm/types"
@@ -64,14 +65,23 @@ const SIGNPOST_COMMON: SignpostLink[] = [
   { label: "SOPs", href: "/admin/sops", icon: FileText },
 ]
 
-// Hardcoded super-admin fallback — kept in sync with lib/auth.ts CRM_SUPER_ADMIN_FALLBACK.
-// Used so the sidebar can render the Settings entry without an async Firestore lookup.
-const SUPER_ADMIN_EMAILS = ["marcos@434media.com", "jesse@434media.com"]
-
 export interface SidebarUser {
   email: string
   name: string
   role?: AdminRole
+  /** The founder-only guard's answer for this session (/api/auth/session): shows the Finance link. Not a role. */
+  founder?: boolean
+}
+
+// Finance is the founder's alone (lib/founder-guard.ts), so its link follows the guard, not a role. The page and its API
+// refuse everyone else on the server whatever the sidebar shows.
+const FINANCE_ITEM: SidebarLink = {
+  id: "finance",
+  label: "Finance",
+  icon: Landmark,
+  href: "/admin/finance",
+  matchPrefix: "/admin/finance",
+  roles: [],
 }
 
 interface SidebarItemBase {
@@ -353,12 +363,8 @@ export function AdminSidebar({
   onNavigate,
 }: AdminSidebarProps) {
   const pathname = usePathname() ?? ""
-  // Effective role: session role takes precedence; super-admin fallback ensures
-  // Marcos and Jesse always see Settings even before their session role is upgraded.
-  const baseRole: AdminRole = user.role ?? "crm_only"
-  const effectiveRole: AdminRole =
-    SUPER_ADMIN_EMAILS.includes(user.email.toLowerCase()) ? "crm_super_admin" : baseRole
-  const role = effectiveRole
+  // The session's role, which the server sets from the owners setting and the roster (lib/auth.ts).
+  const role: AdminRole = user.role ?? "crm_only"
   // Super-admins see everything full_admins see, plus super-admin-only items.
   const grantedRoles: AdminRole[] =
     role === "crm_super_admin" ? ["crm_super_admin", "full_admin", "crm_only"] : [role]
@@ -391,7 +397,7 @@ export function AdminSidebar({
     ...s,
     items: s.items.filter(canSee),
   })).filter((s) => s.items.length > 0)
-  const footerItems = FOOTER_ITEMS.filter(canSee)
+  const footerItems = [...(user.founder ? [FINANCE_ITEM] : []), ...FOOTER_ITEMS.filter(canSee)]
 
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>(() => {
     const out: Record<string, boolean> = {}

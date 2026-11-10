@@ -142,7 +142,24 @@ export function HeroSection() {
   }
 
   // Handle video load error
-  const handleVideoError = () => {
+  const handleVideoError = (event: React.SyntheticEvent<HTMLVideoElement>) => {
+    // A <source> whose `media` does not match is skipped with an `error`
+    // event fired at that <source> (HTML resource selection, "failed with
+    // elements"), and React bubbles it here. On a desktop that is the 720p
+    // source, every load: not a failure, the browser simply moves on to the
+    // 1080p one. Treating it as one restarted the video and, by the third
+    // load, hid it behind "Failed to load video". A real failure either sets
+    // video.error or leaves no source to try.
+    const video = videoRef.current
+    if (
+      event.target !== event.currentTarget &&
+      video &&
+      !video.error &&
+      video.networkState !== HTMLMediaElement.NETWORK_NO_SOURCE
+    ) {
+      return
+    }
+
     console.error("Error loading video")
     setIsLoading(false)
 

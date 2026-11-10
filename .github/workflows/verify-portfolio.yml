@@ -35,11 +35,11 @@ jobs:
   verify:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4.3.0
         with:
           version: 10.4.1
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: 22
           cache: pnpm
@@ -53,6 +53,14 @@ jobs:
       # phone number in a tracked file that is not on the small allowlist in scripts/personal-data/allowlist.json,
       # and on the two paths that used to hold such data. Node built-ins and git only.
       - run: tsx scripts/personal-data/check.ts
+      # The scan above also fails on keys (each issuer's format) and on the account and asset identifiers the Skill
+      # Building Standard §2 keeps out of this repository (V1 item 2).
+
+      # Canon (V1 item 2): a single-source value outside the file that owns it fails: the jurisdiction lists
+      # (lib/prospecting/scorer.ts), the Mailchimp tags (lib/mailchimp-tags.ts) and the brand roster
+      # (components/crm/types.ts). Values are read from the owners; findings already in the tree are in
+      # scripts/canon/baseline.json with a reason, and a new one fails.
+      - run: tsx scripts/canon/check.ts
 
       # The system-of-record JSON Schemas are canonical in the private context
       # repository and are deliberately not copied here: they carry no figures,
@@ -82,6 +90,10 @@ jobs:
       # (2b fix 11). In-memory store with Firestore-style transaction retries.
       - run: tsx --test lib/__tests__/outreach-claim.test.ts
 
+      # Unsubscribe links signed before an UNSUBSCRIBE_SECRET rotation keep working while the old value is
+      # UNSUBSCRIBE_SECRET_PREVIOUS (VC-1); new links use the new secret only.
+      - run: tsx --test lib/__tests__/unsubscribe-token.test.ts
+
       # Lead with Ops feedback: a call request emails Carroll once (cc the founder, Reply-To the submitter),
       # the other answers send nothing, and a failed send still returns 200. BotID, Firestore and Resend faked.
       - run: tsx --test lib/__tests__/lead-with-ops-feedback.test.ts
@@ -91,6 +103,22 @@ jobs:
       # prompt states a figure, the floor stays out of the prompt, and the
       # cohort matcher behaves. Invented cohort rows; the real ones are internal.
       - run: tsx --test lib/__tests__/icp-cohorts.test.ts
+      # Cold outbound is US-only (master 5.3): one US allow-list, failing closed, gates prospecting scoring and
+      # approval, send-outreach and every outreach-sequence step; warm and inbound leads are not gated (JUR-1, JUR-2).
+      - run: tsx --test lib/__tests__/cold-outreach-jurisdiction.test.ts
+
+      # The engine on AI SDK 7 (V1 item 2): the real generateText against the SDK's mock model. System text goes through
+      # `instructions` (v7 rejects system messages inside `messages`), the cache markers and Gateway automatic caching
+      # reach the provider, the token trap still throws, and a pipeline tool loop reports its cache tokens.
+      - run: tsx --test lib/__tests__/ai-sdk-engine.test.ts
+      # The SKILL.md loader on an invented skill: the specification and size checks, the fingerprint pin, the tool
+      # allow-list, the folder-confined reader, and a full agent run on the mock model.
+      - run: tsx --test lib/__tests__/skill-loader.test.ts
+      # The exam (V1 item 3, IMP-27) on invented data: the suite format, a case added as a file, the mock tools' scope
+      # checks, the four build plan v3 cases on good and bad recorded outputs, the engine on the mock model, the judge,
+      # the report, and that lib/exam imports nothing that can send or write. No secret; no model is called.
+      - run: tsx --test lib/__tests__/exam.test.ts
+      - run: tsx scripts/exam/run.ts --suite lib/exam/suites/baseline --recordings lib/__tests__/fixtures/exam/baseline-good.json --check
 
       # Owned Meta: offline state machine and fake-transport regression tests.
       - run: tsx --test lib/__tests__/owned-meta-publisher.test.ts
@@ -100,6 +128,9 @@ jobs:
       - run: tsx --test lib/__tests__/owned-meta-service.test.ts
       # Canva brand-template fill for the Slack app, including the photo crop (sharp runs for real here).
       - run: tsx --test lib/__tests__/canva-create.test.ts
+      # A clip's video export fitted to the clip's length, or held for review (content-pipeline/video-timing.ts). The
+      # ffmpeg cases cut synthetic clips with the ffmpeg-static binary the install above fetched.
+      - run: tsx --test lib/__tests__/video-timing.test.ts
       # Brand profiles live in Firestore, not in this public repository (plan v11 Step 1): the generated copies
       # under lib/brand-profiles/ must not come back.
       - run: test ! -e lib/brand-profiles
@@ -121,10 +152,47 @@ jobs:
       - run: tsx --test lib/__tests__/brand-profile.test.ts lib/__tests__/brand-profile-store.test.ts
       # The Create table (plan v11 Step 2): templates from the profile, Human+ on the writer, media, Run job.
       - run: tsx --test lib/__tests__/create-table.test.ts lib/__tests__/brands.test.ts
+      # Share with vendor (plan v11.2.1 Step 4 items 4–5): the token is stored as a hash only, jurisdiction and
+      # suppression refuse before anything is stored, the daily cap and repeats, a failed mail never opens.
+      - run: tsx --test lib/__tests__/brand-share.test.ts
+      # The vendor's downloads (Step 4 item 6): what a shared book offers, and a zip of exactly the ticked files.
+      - run: tsx --test lib/__tests__/brand-assets.test.ts
+      # Publish brand book: the SOURCES.md check, the dry run's refusals and token, and SVG tiles and previews.
+      - run: tsx --test lib/__tests__/brand-book-publish.test.ts
       # The approval drawer (plan v11.1 Step 3): a row's variations approved together, bound to the files shown.
       - run: tsx --test lib/__tests__/row-approval.test.ts
+      # The canon check's rules, and that it can still read every owner.
+      - run: tsx --test lib/__tests__/canon-check.test.ts
+      # The cron watchdog's decision: every vercel.json schedule parses, grace, and which jobs never fired (V1 item 2).
+      - run: tsx --test lib/__tests__/cron-watchdog.test.ts
       # Event roles and travel routes from Firestore, the create-or-skip import, and the personal-data check itself.
       - run: tsx --test lib/__tests__/personal-data.test.ts
+      # The founder-only guard (V1 item 1, finance Phase 0): deny by default, one configured identity, a verified email.
+      - run: tsx --test lib/__tests__/founder-guard.test.ts
+      # Every finance API handler calls requireFounder first: the proxy guards the page only.
+      - run: tsx --test lib/__tests__/finance-routes-guarded.test.ts
+      # Finance Phase 1: the QuickBooks client reads only, keeps the newest refresh token, and parses the reports.
+      - run: tsx --test lib/__tests__/quickbooks.test.ts
+      # Admin email sign-in (security log ADM-1): verified email required; workspace addresses use Google in production.
+      - run: tsx --test lib/__tests__/firebase-signin.test.ts
+      # Travel itineraries: only super admins and full admins read them as staff; crm_only and intern need a
+      # travel_access record for the page (security log PSM-2).
+      - run: tsx --test lib/__tests__/travel-staff-access.test.ts
+      # Owners come only from ADMIN_OWNER_EMAILS: no address in code, and none is a super admin by default.
+      - run: tsx --test lib/__tests__/admin-owners.test.ts
+      # Every admin sign-in, Google included, needs one active roster record with a valid role (security log ADM-2):
+      # no record, a deactivation, no role or a failed lookup is refused, never defaulted to full_admin.
+      - run: tsx --test lib/__tests__/admin-signin-roster.test.ts
+      # Small admin findings (security log ADM-7 to ADM-11, ADM-13): published-only public blog reads, isActive on
+      # super-admin and content checks, verified Google workspace accounts, header-only constant-time cron secrets,
+      # workspace-domain member addresses on edit, and a profile edit that keeps the session's role.
+      - run: tsx --test lib/__tests__/admin-small-findings.test.ts
+      # Security sweep 2026-10-29: escaped JSON-LD, header-only constant-time API keys that fail closed when unset,
+      # the Mailchimp analytics route behind requireAdmin, the roster re-checked on every session read, and every
+      # BotID-guarded route in the client protect list with the guard failing closed.
+      - run: tsx --test lib/__tests__/security-sweep-2026-10-29.test.ts
+      # /api/parse-event behind the admin gate (security log PSM-1): requireAdmin first, no wildcard CORS, one caller.
+      - run: tsx --test lib/__tests__/parse-event-gated.test.ts
 
       # Optional: the same suites again on MilCityUSA's real published profile, when the BRAND_PROFILE_FIXTURE Actions
       # secret holds a published version's 434-context backup record. Secrets are not given to pull requests from

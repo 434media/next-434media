@@ -10,10 +10,6 @@ import { RowApprovalDrawer } from "@/components/crm/RowApprovalDrawer"
 import type { Toast as ToastType } from "@/components/crm/types"
 import { useContentPostHandlers } from "@/hooks/useContentPostHandlers"
 
-// Same fallback list as lib/auth.ts CRM_SUPER_ADMIN_FALLBACK — lets the review
-// action bar render before a session role lookup, for the two known super-admins.
-const SUPER_ADMIN_EMAILS = ["marcos@434media.com", "jesse@434media.com"]
-
 // /admin/content — the Social Calendar lifted out of the CRM tab into its own
 // route, ahead of the approve/reject + posting pipeline. Data still lives in
 // crm_content_posts; this is purely the surface relocation. Mirrors the
@@ -120,9 +116,7 @@ export default function ContentPage() {
       .then((r) => (r.ok ? r.json() : null))
       .then((data) => {
         if (cancelled || !data?.authenticated || !data.user) return
-        const email = (data.user.email || "").toLowerCase()
-        const isSuper =
-          SUPER_ADMIN_EMAILS.includes(email) || data.user.role === "crm_super_admin"
+        const isSuper = data.user.role === "crm_super_admin"
         // The content permission (lib/auth.ts canRunContent) opens Create and the review actions too.
         setCanReview(isSuper || data.contentRunner === true)
         setIsSuperAdmin(isSuper)

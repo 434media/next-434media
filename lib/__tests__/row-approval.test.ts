@@ -5,7 +5,7 @@
  */
 import { test } from "node:test"
 import assert from "node:assert/strict"
-import { addedConflicts, allowedPlatforms, platformConflicts, approvalCovers, approveRow, awaitingApproval, canvaDesignIdFromLink, futureDated, parsePages, resolveCanvaDesignLink, todayIn, exportAs, frozen, platformsFor, prepareChoices, readiness, RowApprovalError, shownOf, type ApproveRowDeps } from "../content-pipeline/row-approval"
+import { addedConflicts, allowedPlatforms, platformConflicts, approvalCovers, approveRow, awaitingApproval, canvaDesignIdFromLink, futureDated, parsePages, resolveCanvaDesignLink, todayIn, exportAs, frozen, platformsFor, prepareChoices, readiness, RowApprovalError, shownOf, timingProblem, type ApproveRowDeps } from "../content-pipeline/row-approval"
 import type { ContentPost } from "../../components/crm/types"
 import type { MetaBatch } from "../owned-meta-publisher"
 
@@ -189,4 +189,16 @@ test("a drawer edit is refused only for a conflict it adds: a row made before th
   assert.deepEqual(addedConflicts([feed, reels], { reels: ["tiktok"] }), [], "unticking the conflict")
   assert.equal(addedConflicts([feed, reelsHand], { reels: ["instagram", "tiktok"] }).length, 1, "ticking Instagram on a second size")
   assert.equal(addedConflicts([feed, { ...reels, social_platforms: ["instagram", "tiktok"] }], { reels: ["instagram", "facebook", "tiktok"] }).length, 1, "a new conflict beside an old one")
+})
+
+test("a clip's video can't be approved until its length was checked against the clip, on these exact files, without a hold", () => {
+  const timing = { clip_sec: 21.4, clip_audio: true, export_sec: 60, final_sec: 21.4, action: "trimmed" as const, sha256: "v1", checked_at: "t" }
+  const video = (over: Partial<ContentPost>) => post({ create_media: "video", assets: [{ url: "https://x.public.blob.vercel-storage.com/content-posts/v.mp4", kind: "video", sha256: "v1" }], ...over })
+  assert.equal(readiness(video({ video_timing: timing })), null, "checked and cut: ready")
+  assert.equal(readiness(video({ video_timing: { ...timing, action: "matched" } })), null)
+  assert.match(readiness(video({}))!, /length hasn't been checked against its clip/, "a post made before the check (the 21.4 s VION post)")
+  assert.match(readiness(video({ video_timing: { ...timing, sha256: "older-file" } }))!, /hasn't been checked/, "a file attached since, by any other way")
+  assert.match(readiness(video({ video_timing: { ...timing, action: "held", hold: "Canva cut the clip: the video runs 0:05.0, the clip 0:21.4." } }))!, /Canva cut the clip/)
+  assert.equal(timingProblem(post({ create_media: "photo", assets: [{ url: "https://x/v.mp4", kind: "video", sha256: "p" }] })), null, "a photo card exported as video has no clip")
+  assert.equal(timingProblem(post({})), null, "a post from elsewhere isn't a clip's")
 })

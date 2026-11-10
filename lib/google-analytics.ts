@@ -1,4 +1,5 @@
 import { BetaAnalyticsDataClient } from "@google-analytics/data"
+import { isKeyless, keylessAuthClient, keylessProjectId, SCOPES } from "./gcp-keyless"
 import { pctChange } from "../types/analytics"
 import type {
   AnalyticsSummary,
@@ -71,6 +72,14 @@ const ANALYTICS_PROPERTIES: AnalyticsProperty[] = [
 ]
 
 function getAnalyticsClient(): BetaAnalyticsDataClient {
+  if (!analyticsDataClient && isKeyless()) {
+    // The google-gax surface only (lib/gcp-keyless.ts), not a google-auth-library class, hence the cast.
+    analyticsDataClient = new BetaAnalyticsDataClient({
+      authClient: keylessAuthClient(SCOPES.analytics) as unknown as NonNullable<NonNullable<ConstructorParameters<typeof BetaAnalyticsDataClient>[0]>["authClient"]>,
+      projectId: keylessProjectId(),
+    })
+    console.log("[GA4] Analytics client initialized (keyless)")
+  }
   if (!analyticsDataClient) {
     try {
       const serviceAccountKey = process.env.GOOGLE_SERVICE_ACCOUNT_KEY
@@ -148,6 +157,7 @@ function getAnalyticsClient(): BetaAnalyticsDataClient {
 // Derive the GCP project id from the service-account key — single source of
 // truth (replaces the former standalone GCP_PROJECT_ID env var).
 function getServiceAccountProjectId(): string | undefined {
+  if (isKeyless()) return keylessProjectId()
   const raw = process.env.GOOGLE_SERVICE_ACCOUNT_KEY
   if (!raw) return undefined
   try {

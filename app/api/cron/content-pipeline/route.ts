@@ -14,6 +14,10 @@ const RUN_BUDGET_MS = 240_000
 export async function GET(request: NextRequest) {
   const unauthorized = authorizeCronRequest(request)
   if (unauthorized) return unauthorized
+  // It fired, whether or not anything is due (a run record is written only when there was work): the cron watchdog's
+  // heartbeat.
+  const { markCronFired } = await import("@/lib/cron-heartbeat")
+  await markCronFired("content-pipeline")
   const { firestorePipelineStore } = await import("@/lib/firestore-content-pipeline")
   const due = await firestorePipelineStore().due(Date.now(), 5)
   console.info("[cron:content-pipeline]", JSON.stringify({ due: due.length, items: due.map(d => `${d.kind}:${d.id}`) }))

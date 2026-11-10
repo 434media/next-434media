@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import { saveEmailSignup } from "@/lib/firestore-email-signups"
 import { captureLeadFromEmailSignup } from "@/lib/firestore-leads"
 import { requireHumanRequest } from "@/lib/botid-guard"
+import { requireSecret } from "@/lib/require-secret"
 import { headers } from "next/headers"
 
 // Valid sources that can submit emails
@@ -18,16 +19,6 @@ const VALID_SOURCES = [
   // Add more sources as needed
 ]
 
-// Simple API key validation for external sites
-function validateApiKey(apiKey: string | null): boolean {
-  const validKey = process.env.EMAIL_SIGNUP_API_KEY
-  if (!validKey) {
-    console.warn("[Email Signup] No API key configured, allowing all requests")
-    return true
-  }
-  return apiKey === validKey
-}
-
 /**
  * POST /api/public/email-signup
  * 
@@ -42,24 +33,20 @@ function validateApiKey(apiKey: string | null): boolean {
  * }
  * 
  * Headers:
- * - x-api-key: Your API key (optional if EMAIL_SIGNUP_API_KEY not set)
+ * - x-api-key: Your API key (EMAIL_SIGNUP_API_KEY). Required: with the setting unset in production every request is
+ *   refused (503), never let through. `Authorization: Bearer <key>` is accepted too.
  */
 export async function POST(request: Request) {
   try {
+    // Shared API key, header only, constant-time; fails closed when unset in production.
+    const denied = requireSecret(request, "EMAIL_SIGNUP_API_KEY", { where: "Email Signup" })
+    if (denied) return denied
+
     // BotID guard — block automated submissions before doing any work
     const human = await requireHumanRequest()
     if (!human.ok) return human.response
 
     const headersList = await headers()
-    const apiKey = headersList.get("x-api-key")
-
-    // Validate API key if configured
-    if (!validateApiKey(apiKey)) {
-      return NextResponse.json(
-        { error: "Invalid API key" },
-        { status: 401 }
-      )
-    }
 
     const body = await request.json()
     const { email, source, tags, pageUrl } = body

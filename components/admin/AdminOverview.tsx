@@ -32,10 +32,6 @@ interface SessionUser {
   role?: string
 }
 
-// Same fallback list as lib/auth.ts / AdminSidebar — keeps the funnel's
-// role-aware rendering correct before any session role rehydration runs.
-const SUPER_ADMIN_EMAILS = ["marcos@434media.com", "jesse@434media.com"]
-
 const WEEK_MS = 7 * 24 * 60 * 60 * 1000
 
 interface OverviewCounts {
@@ -102,9 +98,7 @@ export function AdminOverview() {
       if (cancelled) return
       setUser(resolved)
 
-      const email = (resolved?.email || "").toLowerCase()
       const isFull =
-        SUPER_ADMIN_EMAILS.includes(email) ||
         resolved?.role === "full_admin" ||
         resolved?.role === "crm_super_admin"
 
@@ -198,8 +192,6 @@ export function AdminOverview() {
   const roleResolved = user !== undefined
   const isFullAdmin = (() => {
     if (!user) return false
-    const email = (user.email || "").toLowerCase()
-    if (SUPER_ADMIN_EMAILS.includes(email)) return true
     return user.role === "full_admin" || user.role === "crm_super_admin"
   })()
   const showLoading = !roleResolved || loading

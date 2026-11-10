@@ -34,6 +34,7 @@ const ROUTE_LABELS: Array<{ match: string | RegExp; label: string }> = [
   { match: "/admin/project-management", label: "Project Management" },
   { match: "/admin/sops", label: "SOPs" },
   { match: "/admin/events", label: "Events" },
+  { match: "/admin/finance", label: "Finance" },
   { match: "/admin/more-human-than-human", label: "MHTH 2026" },
   { match: "/admin", label: "Admin" },
 ]

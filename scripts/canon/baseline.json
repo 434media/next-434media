@@ -1,0 +1,110 @@
+[
+  {
+    "path": "app/admin/cohorts/page.tsx",
+    "rule": "brand roster re-listed",
+    "value": "5 roster brands",
+    "reason": "In the tree when the check arrived (2026-11-10). Not yet reviewed: import from the owner, or keep with a reason."
+  },
+  {
+    "path": "app/api/admin/crm/cohorts/route.ts",
+    "rule": "brand roster re-listed",
+    "value": "3 roster brands",
+    "reason": "In the tree when the check arrived (2026-11-10). Not yet reviewed: import from the owner, or keep with a reason."
+  },
+  {
+    "path": "app/api/admin/leads/promote-from-audience/route.ts",
+    "rule": "Mailchimp tag written by hand",
+    "value": "source:partner",
+    "reason": "In the tree when the check arrived (2026-11-10). Not yet reviewed: import from the owner, or keep with a reason."
+  },
+  {
+    "path": "app/api/admin/migrate-partner-leads-to-audience/route.ts",
+    "rule": "Mailchimp tag written by hand",
+    "value": "source:partner",
+    "reason": "In the tree when the check arrived (2026-11-10). Not yet reviewed: import from the owner, or keep with a reason."
+  },
+  {
+    "path": "components/crm/Customer360Panel.tsx",
+    "rule": "brand roster re-listed",
+    "value": "3 roster brands",
+    "reason": "In the tree when the check arrived (2026-11-10). Not yet reviewed: import from the owner, or keep with a reason."
+  },
+  {
+    "path": "components/crm/DashboardView.tsx",
+    "rule": "brand roster re-listed",
+    "value": "5 roster brands",
+    "reason": "In the tree when the check arrived (2026-11-10). Not yet reviewed: import from the owner, or keep with a reason."
+  },
+  {
+    "path": "components/instagram/InstagramAnalyticsHeader.tsx",
+    "rule": "brand roster re-listed",
+    "value": "3 roster brands",
+    "reason": "In the tree when the check arrived (2026-11-10). Not yet reviewed: import from the owner, or keep with a reason."
+  },
+  {
+    "path": "lib/broadcast-audiences.ts",
+    "rule": "Mailchimp tag written by hand",
+    "value": "brand:aim",
+    "reason": "In the tree when the check arrived (2026-11-10). Not yet reviewed: import from the owner, or keep with a reason."
+  },
+  {
+    "path": "lib/broadcast-audiences.ts",
+    "rule": "Mailchimp tag written by hand",
+    "value": "source:newsletter",
+    "reason": "In the tree when the check arrived (2026-11-10). Not yet reviewed: import from the owner, or keep with a reason."
+  },
+  {
+    "path": "lib/content-pipeline/properties.ts",
+    "rule": "brand roster re-listed",
+    "value": "3 roster brands",
+    "reason": "In the tree when the check arrived (2026-11-10). Not yet reviewed: import from the owner, or keep with a reason."
+  },
+  {
+    "path": "lib/firestore-crm.ts",
+    "rule": "brand roster re-listed",
+    "value": "3 roster brands",
+    "reason": "In the tree when the check arrived (2026-11-10). Not yet reviewed: import from the owner, or keep with a reason."
+  },
+  {
+    "path": "lib/firestore-leads.ts",
+    "rule": "Mailchimp tag written by hand",
+    "value": "source:newsletter",
+    "reason": "In the tree when the check arrived (2026-11-10). Not yet reviewed: import from the owner, or keep with a reason."
+  },
+  {
+    "path": "lib/firestore-leads.ts",
+    "rule": "Mailchimp tag written by hand",
+    "value": "source:event",
+    "reason": "In the tree when the check arrived (2026-11-10). Not yet reviewed: import from the owner, or keep with a reason."
+  },
+  {
+    "path": "lib/firestore-leads.ts",
+    "rule": "Mailchimp tag written by hand",
+    "value": "source:partner",
+    "reason": "In the tree when the check arrived (2026-11-10). Not yet reviewed: import from the owner, or keep with a reason."
+  },
+  {
+    "path": "lib/firestore-partner-list-members.ts",
+    "rule": "Mailchimp tag written by hand",
+    "value": "source:partner",
+    "reason": "In the tree when the check arrived (2026-11-10). Not yet reviewed: import from the owner, or keep with a reason."
+  },
+  {
+    "path": "lib/tag-taxonomy.ts",
+    "rule": "Mailchimp tag written by hand",
+    "value": "source:newsletter",
+    "reason": "In the tree when the check arrived (2026-11-10). Not yet reviewed: import from the owner, or keep with a reason."
+  },
+  {
+    "path": "scripts/evals/icp/e2-synthetic.json",
+    "rule": "excluded countries re-listed",
+    "value": "6 names, 0 codes",
+    "reason": "Synthetic leads for the ICP eval: input data with countries, not a policy list."
+  },
+  {
+    "path": "types/crm-types.ts",
+    "rule": "brand roster re-listed",
+    "value": "5 roster brands",
+    "reason": "In the tree when the check arrived (2026-11-10). Not yet reviewed: import from the owner, or keep with a reason."
+  }
+]

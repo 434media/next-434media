@@ -1,7 +1,29 @@
 import { type NextRequest, NextResponse } from "next/server"
+import { getSession, isAuthorizedAdmin } from "@/lib/auth"
 import { parseEventUrl } from "@/lib/event-parser"
 
+/**
+ * Admin tooling: the events page (/admin/events) pastes a Meetup, Eventbrite or Luma link and gets the event's fields
+ * back. Its only caller is that page, same-origin, so the route is behind the admin gate and sends no CORS headers
+ * (security log PSM-1). The fetch itself is limited to those three hosts in lib/event-parser.
+ */
+export const runtime = "nodejs"
+
+async function requireAdmin() {
+  const session = await getSession()
+  if (!session) return { error: "Unauthorized", status: 401 as const }
+  if (!isAuthorizedAdmin(session.email)) {
+    return { error: "Forbidden: Admin access required", status: 403 as const }
+  }
+  return { session }
+}
+
 export async function POST(request: NextRequest) {
+  const auth = await requireAdmin()
+  if ("error" in auth) {
+    return NextResponse.json({ error: auth.error }, { status: auth.status })
+  }
+
   try {
     const { url } = await request.json()
 
@@ -16,19 +38,15 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Invalid URL format" }, { status: 400 })
     }
 
-    console.log(`🚀 Starting to parse event URL: ${url}`)
-
     const result = await parseEventUrl(url)
 
     if (!result.success) {
       return NextResponse.json({ error: result.error }, { status: 400 })
     }
 
-    console.log(`✅ Successfully parsed event: ${result.data?.title}`)
-
     return NextResponse.json(result.data)
   } catch (error) {
-    console.error("❌ API Error parsing event:", error)
+    console.error("[POST /api/parse-event]", error)
 
     return NextResponse.json(
       {
@@ -37,16 +55,4 @@ export async function POST(request: NextRequest) {
       { status: 500 },
     )
   }
-}
-
-// Add CORS headers for better compatibility
-export async function OPTIONS() {
-  return new NextResponse(null, {
-    status: 200,
-    headers: {
-      "Access-Control-Allow-Origin": "*",
-      "Access-Control-Allow-Methods": "POST, OPTIONS",
-      "Access-Control-Allow-Headers": "Content-Type",
-    },
-  })
 }

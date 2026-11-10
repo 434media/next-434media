@@ -58,7 +58,6 @@ export async function GET(request: NextRequest) {
   console.log("[Analytics API] =================================")
   console.log("[Analytics API] Request received:", request.url)
   console.log("[Analytics API] Method:", request.method)
-  console.log("[Analytics API] Headers:", Object.fromEntries(request.headers.entries()))
 
   try {
     // Properties endpoint just enumerates configured property env vars;
@@ -98,7 +97,7 @@ export async function GET(request: NextRequest) {
             message: "Required environment variables:",
             required: [
               "At least one GA4_PROPERTY_ID or GA4_PROPERTY_ID_* - Your Google Analytics 4 property ID(s)",
-              "GOOGLE_SERVICE_ACCOUNT_KEY - Complete JSON service account key (the project ID is read from it)",
+              "GOOGLE_SERVICE_ACCOUNT_KEY - Complete JSON service account key (the project ID is read from it), or the keyless GCP_* set (lib/gcp-keyless.ts)",
               "ADMIN_PASSWORD - Password for analytics dashboard access",
             ],
           },
