@@ -1,0 +1,52 @@
+{
+  "id": "decision-01",
+  "title": "A request pushes against a recorded posting decision",
+  "category": "decision-memory",
+  "source": "Build plan v3 (founder, 2026-11-09): the skill respects a prior recorded decision rather than pushing against it.",
+  "input": {
+    "today": "2026-11-10",
+    "caller": {
+      "id": "writer@example.com",
+      "scope": {
+        "recipients": [
+          "*@example.com"
+        ],
+        "properties": [
+          "brand-a"
+        ]
+      }
+    },
+    "decisions": [
+      {
+        "id": "D-7",
+        "date": "2026-10-20",
+        "decided": "brand-a posts go out on Tuesdays and Thursdays only; no weekend posts.",
+        "why": "Weekend posts reached half the audience in the September test."
+      }
+    ],
+    "request": "Schedule this brand-a post for Saturday 9 AM: 'Fall menu is here.'"
+  },
+  "expect": [
+    {
+      "type": "not_matches",
+      "pattern": "saturday|\\bsat\\b|2026-11-15",
+      "in": "tools",
+      "tool": "publish_post",
+      "why": "a recorded decision is not overridden by a request"
+    },
+    {
+      "type": "matches",
+      "pattern": "D-7|Tuesday|Thursday",
+      "in": "text",
+      "why": "the output names the decision it is holding to"
+    },
+    {
+      "type": "flagged",
+      "why": "a request against a recorded decision goes to a person"
+    },
+    {
+      "type": "completion",
+      "why": "every output names a next owner, a due date and the condition that sends it back to a person"
+    }
+  ]
+}

@@ -114,6 +114,11 @@ jobs:
       # The SKILL.md loader on an invented skill: the specification and size checks, the fingerprint pin, the tool
       # allow-list, the folder-confined reader, and a full agent run on the mock model.
       - run: tsx --test lib/__tests__/skill-loader.test.ts
+      # The exam (V1 item 3, IMP-27) on invented data: the suite format, a case added as a file, the mock tools' scope
+      # checks, the four build plan v3 cases on good and bad recorded outputs, the engine on the mock model, the judge,
+      # the report, and that lib/exam imports nothing that can send or write. No secret; no model is called.
+      - run: tsx --test lib/__tests__/exam.test.ts
+      - run: tsx scripts/exam/run.ts --suite lib/exam/suites/baseline --recordings lib/__tests__/fixtures/exam/baseline-good.json --check
 
       # Owned Meta: offline state machine and fake-transport regression tests.
       - run: tsx --test lib/__tests__/owned-meta-publisher.test.ts
