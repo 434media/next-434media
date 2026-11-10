@@ -14,9 +14,9 @@
  */
 
 .page {
-  /* Clears the fixed public header; same measured heights as the Work page
-     (work-redesign.module.css), which documents how they were taken. */
-  --pm-header-h: 64px;
+  /* Clears the fixed public header, whose one height is --site-header-h
+     (globals.css). */
+  --pm-header-h: var(--site-header-h);
 
   /* Soft surface: lit from the upper left, white highlight, palette green-grey shadow. */
   --pm-ink: var(--434-color-02-black);
@@ -39,10 +39,6 @@
     radial-gradient(60% 420px at 50% -120px, var(--pm-glow), transparent 70%),
     radial-gradient(70% 520px at 50% calc(100% + 200px), var(--pm-glow), transparent 70%);
   color: var(--pm-ink);
-}
-
-@media (min-width: 680px) {
-  .page { --pm-header-h: 58px; }
 }
 
 .wrap {

@@ -1,6 +1,7 @@
 import type { Metadata } from "next"
 import { getBlogPostsFromFirestore } from "@/lib/firestore-blog"
 import BlogClientPage from "./BlogClientPage"
+import { BRAND } from "@/lib/seo/brand"
 
 // Posts are read from Firestore on every request, so a published or edited post
 // appears immediately. The root layout used to force that for every page; it no
@@ -12,13 +13,14 @@ export const metadata: Metadata = {
   // previous absolute title also carried "Creative Media & Smart Marketing",
   // which the master retires from titles and metadata.
   title: "Blog",
-  description:
-    "Discover the latest insights, trends, and strategies in creative media, digital marketing, and business growth from the 434 MEDIA team.",
-  keywords: ["blog", "marketing", "creative media", "digital strategy", "business insights", "434 media"],
+  // The description used to sell "creative media, digital marketing, and
+  // business growth", agency positioning the master retires (Section 2). It
+  // now leads with the 1.1 definition, as /contact's does.
+  description: `${BRAND.description} News, stories and field notes from the studio.`,
+  keywords: ["434 MEDIA blog", "production studio", "original IP", "San Antonio", "434 media"],
   openGraph: {
-    title: "434 MEDIA Blog - Creative Media & Marketing Insights",
-    description:
-      "Discover the latest insights, trends, and strategies in creative media, digital marketing, and business growth.",
+    title: "434 MEDIA Blog",
+    description: `${BRAND.description} News, stories and field notes from the studio.`,
     url: `${process.env.NEXT_PUBLIC_SITE_URL || "https://www.434media.com"}/blog`,
     siteName: "434 MEDIA",
     images: [
@@ -35,9 +37,8 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "434 MEDIA Blog - Creative Media & Marketing Insights",
-    description:
-      "Discover the latest insights, trends, and strategies in creative media, digital marketing, and business growth.",
+    title: "434 MEDIA Blog",
+    description: `${BRAND.description} News, stories and field notes from the studio.`,
     images: [`${process.env.NEXT_PUBLIC_SITE_URL || "https://www.434media.com"}/api/og/blog-index`],
     creator: "@434media",
     site: "@434media",

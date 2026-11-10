@@ -1,6 +1,6 @@
 import { z } from "zod"
 import { NextResponse, type NextRequest } from "next/server"
-import { getSession, isAuthorizedAdmin, canSend, canRunContent, isCrmSuperAdmin } from "@/lib/auth"
+import { getSession, isAuthorizedAdmin, canSend, canRunContent, isCrmSuperAdmin, isOwnerEmail } from "@/lib/auth"
 import { ownedMetaStore, ownedMetaPermissionBlocked, getContentPostById } from "@/lib/firestore-crm"
 import { futureDated } from "@/lib/content-pipeline/row-approval"
 import { resetUnpublishedPreparation, assertOperatorSettlement, confirmStoppedRun, MetaBlocked, META_BRANDS, type MetaBrand } from "@/lib/owned-meta-publisher"
@@ -54,7 +54,7 @@ export async function GET(req:NextRequest,ctx:{params:Promise<{id:string}>}) {
       const stream=new ReadableStream<Uint8Array>({pull(controller){if(offset>=bytes.length){controller.close();return}controller.enqueue(bytes.subarray(offset,offset+64*1024));offset+=64*1024}})
       return new Response(stream,{headers:{"content-type":a.mime,"cache-control":"private, no-store","x-content-type-options":"nosniff"}})
     }
-    return NextResponse.json({enabled:await deploymentEnabled(),batch:r.batch,archived:r.archived,canRecover:auth.session.email.toLowerCase()==="marcos@434media.com"})
+    return NextResponse.json({enabled:await deploymentEnabled(),batch:r.batch,archived:r.archived,canRecover:isOwnerEmail(auth.session.email)})
   }
   catch {
     if(connection) return NextResponse.json({error:"Connection check unavailable; configuration or saved state could not be read"},{status:503,headers:{"cache-control":"private, no-store"}})
@@ -67,7 +67,8 @@ export async function POST(req:NextRequest,ctx:{params:Promise<{id:string}>}) {
   const {id}=await ctx.params
   let body:z.infer<typeof actionBody>
   try { body=actionBody.parse(await req.json()) } catch { return NextResponse.json({error:"Invalid JSON"},{status:400}) }
-  if(body.action==="recover-facebook" && auth.session.email.toLowerCase()!=="marcos@434media.com") return NextResponse.json({error:"Founder recovery required"},{status:403})
+  // Facebook recovery is the owners' alone (ADMIN_OWNER_EMAILS, lib/auth.ts), not every super admin.
+  if(body.action==="recover-facebook" && !isOwnerEmail(auth.session.email)) return NextResponse.json({error:"Founder recovery required"},{status:403})
   if (!await deploymentEnabled() && !["reconcile","manual-confirm","confirm-stopped-run"].includes(body.action)) return NextResponse.json({error:"Publisher disabled"},{status:423})
   const startedAt=new Date().toISOString(),runId=crypto.randomUUID()
   let brand:MetaBrand|undefined

@@ -9,6 +9,8 @@
  * - The Menda Black WOFF2 subset served to browsers (licensed for
  *   self-hosting on 434media.com; Corporate License 9653).
  * - Geist and Geist Pixel, which are under the SIL Open Font License.
+ * - The OFL faces a vendor's brand-book zip carries, in fonts/open/<face>/ beside
+ *   their OFL.txt (lib/vendor-fonts.ts records each file's size and sha256).
  *
  * The full Menda OTF is fetched at build time from a private repository
  * (scripts/fonts/fetch-private-fonts.mjs) and is gitignored.
@@ -23,6 +25,11 @@ const ALLOWED = new Set([
   "fonts/Geist-SemiBold.otf",
   "fonts/Geist-ExtraBold.otf",
   "public/fonts/GeistPixel-Square.ttf",
+  "fonts/open/Montserrat/Montserrat[wght].ttf",
+  "fonts/open/IBM Plex Mono/IBMPlexMono-Medium.ttf",
+  "fonts/open/IBM Plex Mono/IBMPlexMono-SemiBold.ttf",
+  "fonts/open/Cormorant Garamond/CormorantGaramond[wght].ttf",
+  "fonts/open/Cormorant Garamond/CormorantGaramond-Italic[wght].ttf",
 ])
 
 const FONT = /\.(otf|ttf|ttc|woff2?|eot|pfb|pfm|dfont)$/i

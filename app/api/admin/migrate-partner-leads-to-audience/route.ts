@@ -1,5 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { getSession, isAuthorizedAdmin } from "@/lib/auth"
+import { bearerSecretMatches } from "@/lib/secret-compare"
 import { getDb } from "@/lib/firebase-admin"
 import { CRM_COLLECTIONS } from "@/types/crm-types"
 import {
@@ -39,7 +40,7 @@ interface MigrationOutcome {
 }
 
 // Two auth paths so the migration is runnable from either an authenticated
-// browser session OR a curl invocation with the cron secret (matches the
+// browser session OR a curl invocation with the cron secret in the Authorization header (matches the
 // pattern used for the Instagram snapshot cron). One-shot ops on the boundary
 // of admin-tooling and ops-tooling benefit from both entry points.
 async function requireAuth(request: NextRequest) {
@@ -51,13 +52,10 @@ async function requireAuth(request: NextRequest) {
     return { session, actor: session.email }
   }
 
-  const expected = process.env.CRON_SECRET
-  if (expected) {
-    const querySecret = request.nextUrl.searchParams.get("secret")
-    const headerSecret = request.headers.get("authorization")?.replace(/^Bearer\s+/i, "") ?? ""
-    if (querySecret === expected || headerSecret === expected) {
-      return { actor: "cron-secret" }
-    }
+  // Header only, compared in constant time (security log ADM-10). The `?secret=` form put CRON_SECRET in URLs and
+  // request logs; a curl run sends `Authorization: Bearer <CRON_SECRET>`.
+  if (bearerSecretMatches(request.headers.get("authorization"), process.env.CRON_SECRET)) {
+    return { actor: "cron-secret" }
   }
 
   return { error: "Unauthorized", status: 401 as const }

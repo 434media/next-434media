@@ -33,5 +33,17 @@ initBotId({
       path: '/api/sdoh-impact-report',
       method: 'POST',
     },
+    {
+      path: '/api/public/contact-form',
+      method: 'POST',
+    },
+    {
+      path: '/api/public/email-signup',
+      method: 'POST',
+    },
+    {
+      path: '/api/public/painpoint-intake',
+      method: 'POST',
+    },
   ],
 });

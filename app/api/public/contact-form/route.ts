@@ -3,7 +3,7 @@ import { saveContactForm } from "@/lib/firestore-contact-forms"
 import { captureLeadFromContactForm } from "@/lib/firestore-leads"
 import { notifyNewContactForm } from "@/lib/contact-form-notification"
 import { requireHumanRequest } from "@/lib/botid-guard"
-import { headers } from "next/headers"
+import { requireSecret } from "@/lib/require-secret"
 
 // Valid sources that can submit contact forms
 const VALID_SOURCES = [
@@ -18,16 +18,6 @@ const VALID_SOURCES = [
   "TXMX",
   // Add more sources as needed
 ]
-
-// Simple API key validation for external sites
-function validateApiKey(apiKey: string | null): boolean {
-  const validKey = process.env.EMAIL_SIGNUP_API_KEY
-  if (!validKey) {
-    console.warn("[Contact Form Public] No API key configured, allowing all requests")
-    return true
-  }
-  return apiKey === validKey
-}
 
 /**
  * POST /api/public/contact-form
@@ -46,24 +36,18 @@ function validateApiKey(apiKey: string | null): boolean {
  * }
  *
  * Headers:
- * - x-api-key: Your API key (optional if EMAIL_SIGNUP_API_KEY not set)
+ * - x-api-key: Your API key (EMAIL_SIGNUP_API_KEY). Required: with the setting unset in production every request is
+ *   refused (503), never let through. `Authorization: Bearer <key>` is accepted too.
  */
 export async function POST(request: Request) {
   try {
+    // Shared API key, header only, constant-time; fails closed when unset in production.
+    const denied = requireSecret(request, "EMAIL_SIGNUP_API_KEY", { where: "Contact Form Public" })
+    if (denied) return denied
+
     // BotID guard — block automated submissions before doing any work
     const human = await requireHumanRequest()
     if (!human.ok) return human.response
-
-    const headersList = await headers()
-    const apiKey = headersList.get("x-api-key")
-
-    // Validate API key if configured
-    if (!validateApiKey(apiKey)) {
-      return NextResponse.json(
-        { error: "Invalid API key" },
-        { status: 401 }
-      )
-    }
 
     const body = await request.json()
     const { firstName, lastName, company, email, phone, message, source } = body

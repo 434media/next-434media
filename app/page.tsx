@@ -1,3 +1,4 @@
+import { jsonLdScript } from "@/lib/json-ld"
 import type { Metadata } from "next"
 import HomeClient from "./HomeClient"
 import { buildServicesItemListLd } from "@/lib/seo/services"
@@ -58,13 +59,13 @@ export default function HomePage() {
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{
-          __html: JSON.stringify(buildServicesItemListLd(siteUrl, `${siteUrl}/`)),
+          __html: jsonLdScript(buildServicesItemListLd(siteUrl, `${siteUrl}/`)),
         }}
       />
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{
-          __html: JSON.stringify(buildFaqPageLd()),
+          __html: jsonLdScript(buildFaqPageLd()),
         }}
       />
       <HomeClient />

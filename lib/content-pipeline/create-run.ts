@@ -5,7 +5,8 @@ import { pipelineMarked, adoptablePost, PIPELINE_KEY_PREFIX } from "./ownership"
 import { FORMAT_LABEL, createTemplates, storySlotUsed, ddmmmyy, designText, exportFileBase, formatsOf, mediaShapeOf, rowProblems, SOCIAL_LABEL, type CreateSocial, type CreateFormat, type CreateRow, type CreateTemplate, type RoundupStory, type StoryCard, type StoryCardTemplate } from "./create-table"
 import { allowedPlatforms, frozen, isApproved } from "./row-approval"
 import { createHash } from "node:crypto"
-import type { ContentPost, CreateText, RoundupSlide } from "@/components/crm/types"
+import type { ContentPost, CreateText, RoundupSlide, VideoTiming } from "@/components/crm/types"
+import type { ClipSource } from "./video-timing"
 import { canvaEditUrl, type CreateInput, type CreatedDesign } from "../canva-create"
 
 /**
@@ -22,6 +23,10 @@ export interface CreateRunDeps {
   createDesign(input: CreateInput): Promise<CreatedDesign>
   /** JPG pages (feed with a photo) or one MP4 (a video, and every Reels design), as download URLs. */
   exportDesign(designId: string, as: "jpg" | "mp4"): Promise<string[]>
+  /** The brand template's revision (Canva's updated_at): a template edited in place makes new designs on the next run. */
+  templateRevision(templateId: string): Promise<string>
+  /** A video export fitted to its clip (video-timing.ts fitVideoExport): the file to attach and the timing to keep. */
+  fitVideo(exportUrl: string, clip: ClipSource): Promise<{ bytes: Uint8Array; timing: VideoTiming }>
   findByRequestId(requestId: string): Promise<ContentPost | null>
   createPost(post: Omit<ContentPost, "id" | "created_at" | "updated_at">): Promise<ContentPost>
   /** The guarded update: a changed caption, date or platforms sends an approved post back for approval. */
@@ -30,7 +35,7 @@ export interface CreateRunDeps {
    * `rebind`: the post takes a new design in place of its old one (a re-run after the row changed). `canvaItems`: how
    * many of the items, from the first, are the design's pages (a roundup's published cards follow them as they are).
    */
-  attachExports(input: { postId: string; items: { url: string; label: string }[]; canva: { designId: string }; canvaItems?: number; fileBase: string; rebind?: boolean }): Promise<{ holds: string[]; assets?: { url?: string; duration?: number }[] }>
+  attachExports(input: { postId: string; items: { url: string; label: string; bytes?: Uint8Array }[]; canva: { designId: string }; canvaItems?: number; fileBase: string; rebind?: boolean }): Promise<{ holds: string[]; assets?: { url?: string; duration?: number }[] }>
   /** The published posts a roundup may recap now (last week's live News and Breaking posts with their cards), newest first. */
   roundupStories(): Promise<RoundupStory[]>
   /**
@@ -49,25 +54,20 @@ export class CreateRowError extends Error {
   constructor(readonly problems: string[], readonly status: 400 | 409 | 502 = 400) { super(problems.join("; ")) }
 }
 
-/**
- * A video design exported at Canva's default page timing (5 s) most likely cut the clip: the MCU MASTER video templates'
- * pages were timed at 5 s, not to the video (Step 3 part 5). Our export asks only for MP4 at 1080p; Canva takes the
- * length from the design's page timing. The Review card says so, so nobody approves a cut clip by mistake.
- */
-export const SHORT_EXPORT_SEC = 5.05
-export function shortExportHolds(format: CreateFormat, media: Pick<NonNullable<CreateRow["media"]>, "kind"> | null, assets: { duration?: number }[] = []): string[] {
-  const d = assets.find(a => a.duration !== undefined)?.duration
-  return media?.kind === "video" && d !== undefined && d <= SHORT_EXPORT_SEC
-    ? [`The ${FORMAT_LABEL[format]} video is only 0:0${Math.round(d)} long: the template's page timing may have cut the clip. Check it before approving; if it's cut, fix the template's timing in Canva, then Replace media.`]
-    : []
-}
+/** A held video, said on the Create table's row as it is on the Review card. */
+export const timingHolds = (format: CreateFormat, fitted?: { timing: VideoTiming }): string[] =>
+  fitted?.timing.hold ? [`${FORMAT_LABEL[format]}: ${fitted.timing.hold}`] : []
 
 export const createRequestId = (rowId: string, format: CreateFormat) => `${PIPELINE_KEY_PREFIX}create:${rowId}:${format}`
 
-/** What a design is made from: its template, card text and media (and a roundup's cards after it). A change makes a new design. */
-export function designInputHash(input: { templateId: string; text: Record<string, string>; media?: { kind: string; url: string; bytes?: number } | null; slides?: readonly RoundupSlide[] }): string {
+/**
+ * What a design is made from: its template and the template's revision, card text and media (and a roundup's cards
+ * after it). A change makes a new design. The revision matters because templates are fixed in place, keeping their id
+ * (2026-11-03: the News and DT101 timing fixes): without it a re-run would reuse a design made from the old template.
+ */
+export function designInputHash(input: { templateId: string; templateRevision: string; text: Record<string, string>; media?: { kind: string; url: string; bytes?: number } | null; slides?: readonly RoundupSlide[] }): string {
   const text = Object.fromEntries(Object.entries(input.text).sort(([a], [b]) => a.localeCompare(b)))
-  return createHash("sha256").update(JSON.stringify({ t: input.templateId, text, m: input.media ? { k: input.media.kind, u: input.media.url, b: input.media.bytes ?? 0 } : null, ...(input.slides?.length ? { s: input.slides.map(x => x.card ? `card:${x.card.key}` : x.url) } : {}) })).digest("hex").slice(0, 16)
+  return createHash("sha256").update(JSON.stringify({ t: input.templateId, r: input.templateRevision, text, m: input.media ? { k: input.media.kind, u: input.media.url, b: input.media.bytes ?? 0 } : null, ...(input.slides?.length ? { s: input.slides.map(x => x.card ? `card:${x.card.key}` : x.url) } : {}) })).digest("hex").slice(0, 16)
 }
 
 /** What a made story card is made from: its headline, deck and photo. A change makes a new card. */
@@ -138,8 +138,8 @@ async function makeStoryCards(deps: Pick<CreateRunDeps, "templateFields" | "crea
   return out
 }
 /** The export items for a design's pages, then a roundup's published cards as they are. */
-function exportItems(format: CreateFormat, urls: string[], asVideo: boolean, slides: readonly RoundupSlide[] = []) {
-  const pages = asVideo ? [{ url: urls[0], label: `${format}-video` }] : urls.map((url, n) => ({ url, label: `${format}-page-${n + 1}` }))
+function exportItems(format: CreateFormat, urls: string[], asVideo: boolean, slides: readonly RoundupSlide[] = [], fitted?: { bytes: Uint8Array }) {
+  const pages = asVideo ? [{ url: urls[0], label: `${format}-video`, ...(fitted ? { bytes: fitted.bytes } : {}) }] : urls.map((url, n) => ({ url, label: `${format}-page-${n + 1}` }))
   return { items: [...pages, ...slides.map((x, n) => ({ url: x.url, label: `story-${n + 1}` }))], canvaItems: pages.length }
 }
 
@@ -185,7 +185,9 @@ async function runClaimedRow(deps: CreateRunDeps, row: CreateRow, template: Crea
     const filled = await fillFormat(deps, template, row, format, slides)
     const { inputHash } = filled
     if (existing?.assets.length && existing.export_fingerprint && existing.canva_design_id && existing.create_input_hash === inputHash) {
-      posts.push({ format, postId: existing.id, designId: existing.canva_design_id, editUrl: canvaEditUrl(existing.canva_design_id), previewUrl: existing.assets[0]?.url, holds: [], reused: true })
+      // Reused as it is; a video held when it was made is still held, and says so again.
+      const held = existing.video_timing?.hold ? [`${FORMAT_LABEL[format]}: ${existing.video_timing.hold}`] : []
+      posts.push({ format, postId: existing.id, designId: existing.canva_design_id, editUrl: canvaEditUrl(existing.canva_design_id), previewUrl: existing.assets[0]?.url, holds: held, reused: true })
       continue
     }
     // A post made before designs were hashed that is already out stays as it is: the run reuses it, as it did then.
@@ -197,7 +199,7 @@ async function runClaimedRow(deps: CreateRunDeps, row: CreateRow, template: Crea
     // The board title leaves the format out (the card shows it); the files carry brand, date and headline.
     const headline = template.roundup ? `${slides.length} stories, ${ddmmmyy(row.date)}` : row.headline
     const title = `${BRAND.shortName} ${template.label} — ${headline.replace(/\s+/g, " ").trim()}`.slice(0, 200)
-    const { design, urls, asVideo } = await filled.make(`${postKey}:${inputHash}`, title)
+    const { design, urls, asVideo, fitted } = await filled.make(`${postKey}:${inputHash}`, title)
     if (template.roundup) slides = await makeStoryCards(deps, template.roundup.storyCard, slides, row, postKey)
     const now = deps.now()
     const notes = [`Made in the Create table (${template.label}, ${FORMAT_LABEL[format]}).`, row.referenceLink ? `Reference: ${row.referenceLink}` : "", ...slides.map((x, i) => `Story ${i + 1}: ${x.title} (${x.postId})`), row.notes.trim() ? `Notes: ${row.notes.trim()}` : ""].filter(Boolean).join("\n").slice(0, 4000)
@@ -213,12 +215,12 @@ async function runClaimedRow(deps: CreateRunDeps, row: CreateRow, template: Crea
         create_row_id: row.id, create_format: format, ...roundup,
         intake: { requestId: postKey, metaBrand: BRAND.posts.metaBrand, requestedBy: actor.email, at: now },
       } as Omit<ContentPost, "id" | "created_at" | "updated_at">))
-    const { items, canvaItems } = exportItems(format, urls, asVideo, slides)
+    const { items, canvaItems } = exportItems(format, urls, asVideo, slides, fitted)
     const attached = await deps.attachExports({ postId: post.id, items, canva: { designId: design.designId }, ...(slides.length ? { canvaItems } : {}), fileBase: exportFileBase(BRAND.id, row.date, template.roundup ? template.label : row.headline), ...(existing ? { rebind: true } : {}) })
     // A made card is kept as its stored copy (Canva's export links expire), so Refresh and Replace media can put it back.
     if (slides.some(s => s.card)) slides = slides.map((s, i) => s.card ? { ...s, url: attached.assets?.[canvaItems + i]?.url ?? s.url } : s)
-    await deps.updatePost(post.id, { create_input_hash: inputHash, create_text: createTextOf(row), create_media: mediaShapeOf(row.media), ...(template.roundup ? { roundup_slides: slides } : {}) })
-    posts.push({ format, postId: post.id, designId: design.designId, editUrl: canvaEditUrl(design.designId), previewUrl: design.previewUrls[0], holds: [...attached.holds, ...shortExportHolds(format, row.media, attached.assets), ...(design.folderProblem ? [design.folderProblem] : [])], reused: false })
+    await deps.updatePost(post.id, { create_input_hash: inputHash, create_text: createTextOf(row), create_media: mediaShapeOf(row.media), ...(template.roundup ? { roundup_slides: slides } : {}), ...(fitted ? { video_timing: fitted.timing } : {}) })
+    posts.push({ format, postId: post.id, designId: design.designId, editUrl: canvaEditUrl(design.designId), previewUrl: design.previewUrls[0], holds: [...attached.holds, ...timingHolds(format, fitted), ...(design.folderProblem ? [design.folderProblem] : [])], reused: false })
   }
   return posts
 }
@@ -235,7 +237,7 @@ export const createTextOf = (row: Pick<CreateRow, "brand" | "kind" | "headline" 
  * Run job and Replace media share it, so both hash a design the same way (designInputHash) and an approval is voided
  * by the same new files.
  */
-async function fillFormat(deps: Pick<CreateRunDeps, "templateFields" | "createDesign" | "exportDesign">, template: CreateTemplate, row: Pick<CreateRow, "headline" | "subHeadline" | "fields" | "date" | "media" | "roundup">, format: CreateFormat, slides: readonly RoundupSlide[] = []) {
+async function fillFormat(deps: Pick<CreateRunDeps, "templateFields" | "templateRevision" | "createDesign" | "exportDesign" | "fitVideo">, template: CreateTemplate, row: Pick<CreateRow, "headline" | "subHeadline" | "fields" | "date" | "media" | "roundup">, format: CreateFormat, slides: readonly RoundupSlide[] = []) {
   const templateId = template.templates[format]!
   const dataset = await deps.templateFields(templateId)
   const { text, unfilled } = designText(template, row, dataset)
@@ -243,7 +245,7 @@ async function fillFormat(deps: Pick<CreateRunDeps, "templateFields" | "createDe
   const mediaField = template.media[format]
   if (mediaField && dataset[mediaField] !== "image") throw new CreateRowError([`The ${FORMAT_LABEL[format]} template has no media field "${mediaField}"`])
   const media = row.media && mediaField ? row.media : null
-  const inputHash = designInputHash({ templateId, text, media, slides })
+  const inputHash = designInputHash({ templateId, templateRevision: await deps.templateRevision(templateId), text, media, slides })
   const make = async (requestId: string, title: string) => {
     const design = await deps.createDesign({
       requestId, templateId, title, text,
@@ -253,7 +255,9 @@ async function fillFormat(deps: Pick<CreateRunDeps, "templateFields" | "createDe
     const asVideo = media?.kind === "video" || format === "reels"
     const urls = asVideo ? await deps.exportDesign(design.designId, "mp4") : design.previewUrls.length ? design.previewUrls : await deps.exportDesign(design.designId, "jpg")
     if (!urls.length) throw new CreateRowError([`Canva returned no export for the ${FORMAT_LABEL[format]} design`], 502)
-    return { design, urls, asVideo }
+    // A clip's design runs as long as Canva's page timing, not the clip: the export is fitted to the clip, or held.
+    const fitted = media?.kind === "video" ? await deps.fitVideo(urls[0], { url: media.url }) : undefined
+    return { design, urls, asVideo, fitted }
   }
   return { inputHash, hasMedia: !!mediaField, make }
 }
@@ -310,12 +314,12 @@ export async function replaceRowMedia(deps: CreateRunDeps, rowId: string, text: 
     // 2. Every approved size that will change goes back to Review first.
     for (const { post } of ready) if (isApproved(post)) await deps.sendBack(post.id, actor)
     // 3. The new files.
-    for (const { format, post, filled, design, urls, asVideo } of ready) {
+    for (const { format, post, filled, design, urls, asVideo, fitted } of ready) {
       const slides = post.roundup_slides ?? []
-      const { items, canvaItems } = exportItems(format, urls, asVideo, slides)
+      const { items, canvaItems } = exportItems(format, urls, asVideo, slides, fitted)
       const attached = await deps.attachExports({ postId: post.id, items, canva: { designId: design.designId }, ...(slides.length ? { canvaItems } : {}), fileBase: exportFileBase(BRAND.id, post.date_to_post ?? "", template.roundup ? template.label : text.headline), rebind: true })
-      await deps.updatePost(post.id, { create_input_hash: filled.inputHash, create_text: { ...text, fields: { ...text.fields } }, create_media: shape, canva_pages: [], profile_version_id: versionId })
-      posts.push({ format, postId: post.id, designId: design.designId, reused: false, holds: [...attached.holds, ...shortExportHolds(format, media, attached.assets), ...(design.folderProblem ? [design.folderProblem] : [])] })
+      await deps.updatePost(post.id, { create_input_hash: filled.inputHash, create_text: { ...text, fields: { ...text.fields } }, create_media: shape, canva_pages: [], profile_version_id: versionId, ...(fitted ? { video_timing: fitted.timing } : {}) })
+      posts.push({ format, postId: post.id, designId: design.designId, reused: false, holds: [...attached.holds, ...timingHolds(format, fitted), ...(design.folderProblem ? [design.folderProblem] : [])] })
     }
     return { posts, profileVersionId: versionId }
   } finally { await deps.releaseRow(rowId).catch(err => console.error("[create-run] release failed:", rowId, err)) }
@@ -335,6 +339,22 @@ export async function createRunDeps(): Promise<CreateRunDeps> {
       const { deps } = await canvaDeps()
       if (!deps) throw new CanvaError("Canva integration is not configured")
       return exportDesignMp4(deps, { designId })
+    },
+    templateRevision: async templateId => {
+      const [{ templateRevision }, { publishedTemplateIds }] = await Promise.all([import("@/lib/canva-create"), import("@/lib/firestore-brand-profiles")])
+      const { deps } = await canvaDeps()
+      if (!deps) throw new CanvaError("Canva integration is not configured")
+      return templateRevision({ canva: deps, allowedTemplates: await publishedTemplateIds() }, templateId)
+    },
+    fitVideo: async (exportUrl, clip) => {
+      const [{ fitVideoExport, probeMp4Timing, fetchRangeReader, trimTail }, { isCreateUpload }] = await Promise.all([import("./video-timing"), import("./create-media")])
+      return fitVideoExport({
+        fetchExport: async url => (await tools.intake.fetchExport(url)).bytes,
+        // Only the table's own stored clip is read (content-create/ in this store); anything else reads as unknown and holds.
+        probeClip: async url => { if (!isCreateUpload(url)) throw new Error("not the table's own upload"); return probeMp4Timing(fetchRangeReader(fetch), url) },
+        trim: (bytes, sec) => trimTail(bytes, sec),
+        now: () => new Date().toISOString(),
+      }, exportUrl, clip)
     },
     findByRequestId: id => tools.intake.findByRequestId(id),
     createPost: post => crm.createContentPost(post),

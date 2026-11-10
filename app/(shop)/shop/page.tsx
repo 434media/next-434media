@@ -6,7 +6,7 @@ const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://www.434media.com"
 export const metadata: Metadata = {
   title: "TXMX Boxing | Shop Premium Boxing Merchandise",
   description:
-    "Shop the TXMX Boxing collection — premium boxing-inspired apparel and merchandise rooted in Texas-Mexico culture. Founder's tees, fight gear, and limited drops from 434 MEDIA.",
+    "Shop TXMX Boxing: premium apparel rooted in Texas-Mexico boxing culture. Founder's tees, fight gear and limited drops from 434 MEDIA.",
   keywords: [
     "TXMX Boxing",
     "boxing merchandise",

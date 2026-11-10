@@ -14,19 +14,28 @@ primitive. Wire them all before the first send.
 
 ## 1. Jurisdiction
 
-Which jurisdictions cold outreach excludes is master 5.3. In code, its single
-source is `EXCLUDED_COUNTRIES`:
+Where cold outreach may go is master 5.3. In code, its single source is the US
+allow-list, which fails closed (blank or unknown country is blocked):
 
 ```ts
-import { EXCLUDED_COUNTRIES } from "@/lib/prospecting/scorer"
+import { isColdOutreachAllowed, isColdLocationAllowed, coldOutreachGateForLead } from "@/lib/prospecting/scorer"
 ```
 
 `lib/prospecting/scorer.ts` is the single source of truth. Never re-list
-countries in a new file. Two places enforce it and both must stay:
+countries in a new file. Every cold path gates on it, and all must stay:
 
-- The **prospecting translator** refuses to put excluded regions in Apollo
-  filters, so we don't burn credits discovering unusable contacts.
-- The **scorer** hard-excludes any that slip through anyway.
+- The **prospecting translator** drops non-US locations from Apollo filters.
+- The **scorer** excludes a candidate with any non-US or unreadable country.
+- The **approval** boundary captures a lead only once its country reads as the
+  United States, and stamps it on the lead.
+- **send-outreach**, **sequence enrolment/resume** and **every sequence step**
+  call `coldOutreachGateForLead`. Cold is the lead's `source`
+  (`COLD_LEAD_SOURCES`: prospected, partner); warm and inbound leads pass
+  ungated. The lead PATCH route refuses edits that would get around the gate
+  (`coldGateEditRefusal`).
+
+`EXCLUDED_COUNTRIES` is not the cold gate; it serves only the brand-book share
+and the Meta Pixel.
 
 A model-suggested country (e.g. from lead research) is review-only. Never
 auto-apply it to a lead record — the compliance gate depends on that field
@@ -78,7 +87,7 @@ elsewhere shows up as drift in reconciliation.
 
 ## Before shipping
 
-- [ ] Excluded jurisdictions filtered via `EXCLUDED_COUNTRIES`
+- [ ] Cold sends gated on the US allow-list (`coldOutreachGateForLead` / `isColdOutreachAllowed`)
 - [ ] Suppression checked
 - [ ] Unsubscribe link present and verified end-to-end
 - [ ] Ledger dedupe on both read and write

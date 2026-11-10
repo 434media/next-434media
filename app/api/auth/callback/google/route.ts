@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
-import { setSession, isWorkspaceEmail, authorizeAdminSignIn } from '@/lib/auth'
+import { setSession, isVerifiedWorkspaceGoogleAccount, authorizeAdminSignIn, workspaceDomain } from '@/lib/auth'
 
 interface GoogleTokenResponse {
   access_token: string
@@ -10,10 +10,11 @@ interface GoogleTokenResponse {
   id_token: string
 }
 
+// The v2 userinfo endpoint's shape: `id` and `verified_email`, not the OpenID Connect `sub` and `email_verified`.
 interface GoogleUserInfo {
-  sub: string
+  id: string
   email: string
-  email_verified: boolean
+  verified_email?: boolean
   name: string
   picture?: string
   hd?: string // Hosted domain
@@ -95,18 +96,17 @@ export async function GET(request: NextRequest) {
 
     const userInfo: GoogleUserInfo = await userInfoResponse.json()
 
-    // Verify email is from workspace domain
-    if (!isWorkspaceEmail(userInfo.email)) {
+    // A verified account of the workspace itself (security log ADM-9): Google's `verified_email`, the hosted domain
+    // `hd`, and the address on the domain. A suffix alone admitted any Google account whose address merely ends in it.
+    if (!isVerifiedWorkspaceGoogleAccount(userInfo)) {
       return NextResponse.redirect(
         `${request.nextUrl.origin}/admin?error=unauthorized_domain`
       )
     }
 
-    // Note: Google Workspace accounts with 'hd' parameter are always verified,
-    // so we don't need to check email_verified for workspace accounts
-
-    // Same authorization gate the Firebase path uses. Workspace staff pass on
-    // the domain check above; this keeps one decision point for both providers.
+    // Same authorization gate the Firebase path uses (security log ADM-2): the
+    // domain check above proves identity only. Membership, active status and
+    // role come from the roster; no record, a deactivated one or no role is refused.
     const decision = await authorizeAdminSignIn(userInfo.email, 'google')
     if (!decision.authorized) {
       console.warn(`[auth] denied admin sign-in for ${userInfo.email} (${decision.reason})`)
@@ -121,6 +121,9 @@ export async function GET(request: NextRequest) {
       picture: userInfo.picture,
       authProvider: 'google',
       role: decision.role,
+      // Admission above already required `verified_email` and `hd`; kept explicit because the founder-only guard
+      // reads it (lib/founder-guard.ts).
+      emailVerified: userInfo.verified_email === true && userInfo.hd === workspaceDomain(),
     })
 
     // Clear OAuth state cookie

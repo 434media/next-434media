@@ -9,6 +9,7 @@ import {
 } from "@/lib/firestore-leads"
 import { isSuppressed } from "@/lib/firestore-suppression"
 import { getMailchimpMemberProfile } from "@/lib/mailchimp-analytics"
+import { coldOutreachGateForLead } from "@/lib/prospecting/scorer"
 
 export const runtime = "nodejs"
 export const maxDuration = 30
@@ -71,6 +72,19 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
     return NextResponse.json(
       { error: `Cannot send to a ${lead.status} lead` },
       { status: 400 },
+    )
+  }
+
+  // Jurisdiction gate: cold outbound is sent only to prospects in the United
+  // States (master 5.3). A cold lead (source "prospected" or "partner") must read as the US
+  // by its country, else its location; blank or unknown is blocked. Warm and
+  // inbound leads pass ungated. No override: this is policy, not consent.
+  const jurisdiction = coldOutreachGateForLead(lead)
+  if (!jurisdiction.allowed) {
+    console.warn(`[send-outreach] blocked cold send to lead ${id}: ${jurisdiction.reason}`)
+    return NextResponse.json(
+      { error: `Not sent. ${jurisdiction.reason}`, code: "jurisdiction" },
+      { status: 403 },
     )
   }
 

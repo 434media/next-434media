@@ -79,13 +79,11 @@ export const metadata: Metadata = {
     address: false,
     telephone: false,
   },
-  alternates: {
-    canonical: "/",
-    languages: {
-      "en-US": `${siteUrl}/`,
-      "es-ES": `${siteUrl}/es`,
-    },
-  },
+  // No site-wide alternates. This used to set canonical "/" and an es-ES
+  // alternate at /es for every route that did not override them. /es is a
+  // 404, and a page that inherits canonical "/" tells search engines it is a
+  // copy of the home page. Each page sets its own canonical; the one page with
+  // a Spanish version, /sdoh, sets its own languages.
   openGraph: {
     type: "website",
     locale: "en_US",
@@ -138,7 +136,8 @@ export const viewport = {
 
 /**
  * The root layout carries only what every route shares: the document, the
- * stylesheet, the fonts, the metadata defaults and the hreflang links.
+ * stylesheet, the fonts and the metadata defaults. It used to add hreflang
+ * links to every page, naming /es (a 404) as each page's Spanish version.
  *
  * It reads no cookies or headers and fetches nothing, so it never makes a page
  * dynamic. Public pages get their structured data, trackers and chrome from
@@ -155,10 +154,6 @@ export default function RootLayout({
       <head>
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        {/* Basic hreflang links for primary locales */}
-        <link rel="alternate" hrefLang="en" href={`${siteUrl}/`} />
-        <link rel="alternate" hrefLang="es" href={`${siteUrl}/es`} />
-        <link rel="alternate" hrefLang="x-default" href={`${siteUrl}/`} />
       </head>
       <body
         className={`${geistSans.variable} ${geistMono.variable} ${mendaBlack.variable} antialiased min-h-screen flex flex-col`}

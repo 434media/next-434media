@@ -58,7 +58,9 @@ export async function POST(req: NextRequest) {
   } catch (err) {
     if (err instanceof CreateRowError) return NextResponse.json({ error: err.message, problems: err.problems }, { status: err.status })
     const name = err instanceof Error ? err.name : ""
-    console.error("[POST /api/admin/content/create-run] failed:", r.id, err)
+    // Canva's own reason (code and message) goes to the log so a failed fill can be diagnosed; the screen gets ours.
+    const canva = name === "CanvaError" ? { code: (err as { code?: string }).code, detail: (err as { detail?: string }).detail } : {}
+    console.error("[POST /api/admin/content/create-run] failed:", r.id, JSON.stringify({ brand: r.brand, kind: r.kind, media: r.media ? { kind: r.media.kind, bytes: r.media.bytes, durationSec: r.media.durationSec } : null, ...canva }), err)
     // Canva and the export staging are upstream; their messages are safe to show (they never carry Canva's own text).
     if (name === "CanvaError" || name === "MetaBlocked") return NextResponse.json({ error: (err as Error).message }, { status: 502 })
     return NextResponse.json({ error: "The run could not finish this row; run it again (it resumes)" }, { status: 500 })

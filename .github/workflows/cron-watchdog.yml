@@ -1,0 +1,31 @@
+# Watches the cron watchdog (434 build sequence V1 item 2: an alert for an automatic job that never fires).
+#
+# The watchdog itself is a Vercel cron (app/api/cron/cron-watchdog), so a failure that stops every Vercel cron would
+# stop it too, silently. This schedule runs on GitHub instead and asks the site whether the watchdog fired in the last
+# two hours (app/api/cron-health: public, read-only, no secret). When it did not, or the site does not answer, this
+# job fails, and GitHub notifies the person who last changed this schedule, by email and in the Actions tab.
+#
+# GitHub may start a scheduled run late or skip one under load; the endpoint's two-hour window allows for it.
+name: Cron watchdog
+
+on:
+  schedule:
+    - cron: "50 * * * *"
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: The watchdog fired recently
+        run: |
+          body=$(curl -sS --max-time 30 --retry 2 --retry-delay 20 -w '\n%{http_code}' https://www.434media.com/api/cron-health) || { echo "The site did not answer."; exit 1; }
+          code=$(printf '%s' "$body" | tail -n1)
+          printf '%s\n' "$body" | sed '$d'
+          if [ "$code" != "200" ]; then
+            echo "::error::The cron watchdog has not fired in the last two hours (HTTP $code). Vercel crons may have stopped: check the project's Cron Jobs settings and runtime logs."
+            exit 1
+          fi

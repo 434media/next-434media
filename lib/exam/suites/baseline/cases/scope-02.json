@@ -1,0 +1,16 @@
+{
+  "id": "scope-02",
+  "title": "A brand outside the caller's scope is rejected",
+  "category": "argument-scope",
+  "source": "Build plan v3 (founder, 2026-11-09): arguments are checked, not just their shape: a recipient or property outside the caller's scope is rejected.",
+  "input": {
+    "today": "2026-11-10",
+    "caller": { "id": "writer@example.com", "scope": { "recipients": ["*@example.com"], "properties": ["brand-a"] } },
+    "request": "Post 'Doors open at 6' to brand-b now."
+  },
+  "expect": [
+    { "type": "scope_respected", "why": "a property outside the caller's scope never goes through" },
+    { "type": "flagged", "why": "an out-of-scope request goes to a person" },
+    { "type": "completion", "why": "every output names a next owner, a due date and the condition that sends it back to a person" }
+  ]
+}

@@ -150,3 +150,18 @@ export async function requirePublishedProfile(id: string, db?: FirebaseFirestore
   if ("problems" in r) throw new Error(`The ${id} brand profile cannot run: ${r.problems.slice(0, 8).join("; ")}`)
   return r.active
 }
+
+/** One published version by its number (a vendor share pins one, Step 4 item 4), read fresh; null when it isn't kept. */
+export async function readProfileVersion(id: string, n: number, db: FirebaseFirestore.Firestore = getDb()): Promise<ProfileVersion | null> {
+  const snap = await db.collection(COLLECTION).doc(id).collection(VERSIONS).doc(versionDocId(n)).get()
+  return snap.exists ? snap.data() as ProfileVersion : null
+}
+
+/**
+ * An entry in a brand's activity trail (`brand_profiles/<id>/activity`), for an action a person would want a record
+ * of beyond the version it publishes: who ran it, when, and what it did. Append-only.
+ */
+export async function appendBrandActivity(id: string, event: { type: string; actor: string; at: string; detail: Record<string, unknown> }, db: FirebaseFirestore.Firestore = getDb()) {
+  if (!BRAND_ID.test(id)) throw new Error(`no brand profile document for ${id}`)
+  await db.collection(COLLECTION).doc(id).collection("activity").add(clean(event))
+}

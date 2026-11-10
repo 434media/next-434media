@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, type FormEvent } from "react"
-import { signInWithEmailAndPassword, sendPasswordResetEmail } from "firebase/auth"
+import { signInWithEmailAndPassword, sendPasswordResetEmail, sendEmailVerification, signOut } from "firebase/auth"
 import { Mail, Lock, Loader2 } from "lucide-react"
 import { auth } from "@/lib/firebase"
 
@@ -34,6 +34,12 @@ export default function TravelSignIn({
       })
       if (!response.ok) {
         const result = await response.json().catch(() => ({}))
+        await signOut(auth).catch(() => {})
+        if (result.error === "email_not_verified") {
+          // Send the account its own verification link, so its holder can prove the inbox and try again.
+          await sendEmailVerification(credential.user).catch(() => {})
+          throw new Error(`Verify your email first: we sent a link to ${credential.user.email}. Open it, then sign in again.`)
+        }
         throw new Error(result.error === "not_authorized" ? "This email is not authorized for this itinerary." : "Sign-in failed.")
       }
       window.location.assign(nextPath)

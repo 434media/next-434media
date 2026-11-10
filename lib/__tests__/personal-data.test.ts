@@ -138,6 +138,46 @@ test("the check flags a real-looking address and phone, and passes placeholders"
   assert.equal(redact(found[1]), "***-***-**11")
 })
 
+test("keys: each issuer's format is caught and redacted to its rule and first characters", () => {
+  // Built at run time so this file carries no key-shaped string of its own.
+  const k = (...parts: string[]) => parts.join("")
+  const keys: [string, string][] = [
+    [k("-----BEGIN ", "PRIVATE KEY-----"), "private key"],
+    [k("AKIA", "ABCDEFGHIJKLMNOP"), "AWS access key"],
+    [k("AIza", "x".repeat(35)), "Google API key"],
+    [k("GOCSPX-", "a".repeat(24)), "Google OAuth client secret"],
+    [k("sk_", "live_", "a".repeat(24)), "Stripe key"],
+    [k("xox", "b-", "1234567890-abc"), "Slack token or webhook"],
+    [k("ghp_", "a".repeat(36)), "GitHub token"],
+    [k("sk-", "ant-", "a".repeat(30)), "Anthropic key"],
+    [k("re_", "abcdefgh_", "a".repeat(20)), "Resend key"],
+    [k("a".repeat(32), "-us", "21"), "Mailchimp key"],
+    [k("eyJ", "a".repeat(12), ".eyJ", "b".repeat(12), ".", "c".repeat(12)), "JSON Web Token"],
+    [k('apiKey: "', "Z".repeat(30), '"'), "secret assigned in code"],
+  ]
+  for (const [text, rule] of keys) {
+    const found = findPersonalData("lib/x.ts", text, allow)
+    assert.equal(found.length, 1, rule)
+    assert.equal(found[0].kind, "key")
+    assert.equal(found[0].rule, rule)
+    assert.ok(!redact(found[0]).includes(text.slice(6)), `${rule} is redacted`)
+  }
+  // Env lookups and short or placeholder strings are not keys.
+  for (const ok of ["process.env.RESEND_API_KEY", 'token: "abc"', 'password: process.env.X', "sk-test"]) assert.deepEqual(findPersonalData("lib/x.ts", ok, allow), [], ok)
+})
+
+test("identifiers: Meta accounts and long numeric ids, unless approved; placeholders pass", () => {
+  const id = ["1234", "5678", "9012", "3456"].join("")
+  const found = (t: string, a: Allowlist = allow) => findPersonalData("lib/x.ts", t, a).map((f) => f.rule)
+  assert.deepEqual(found(`ad: "act_${id}"`), ["Meta ad account"])
+  assert.deepEqual(found(`page_id: ${id}`), ["account or asset id"])
+  assert.deepEqual(found(`{ video: "${id}" }`), ["long numeric id"])
+  assert.deepEqual(found(`https://graph.facebook.com/${id}/videos`), ["long numeric id"])
+  assert.deepEqual(found(`{ id: "${"0".repeat(16)}" }`), [], "a placeholder of one digit")
+  assert.deepEqual(found(`ts ${id} unquoted`), [], "a bare number in prose")
+  assert.deepEqual(found(`page_id: ${id}`, { ...allow, values: [id] }), [], "an approved value")
+})
+
 test("a pending entry clears one address in one file and nowhere else", () => {
   const real = at("someone", "gmail.com")
   const [f] = findPersonalData("lib/a.ts", real, allow)

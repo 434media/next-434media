@@ -1,6 +1,9 @@
+import { isKeyless, keylessProjectId } from "./gcp-keyless"
+
 // Derive the GCP project id from the service-account key — single source of
 // truth (replaces the former standalone GCP_PROJECT_ID env var).
 function deriveGcpProjectId(): string | undefined {
+  if (isKeyless()) return keylessProjectId()
   const raw = process.env.GOOGLE_SERVICE_ACCOUNT_KEY
   if (!raw) return undefined
   try {
@@ -67,8 +70,8 @@ export function getPropertyIdByKey(envKey: string): string | undefined {
 export function getMissingEnvironmentVariables(): string[] {
   const missing = []
 
-  // Core required variable — the project id is derived from this key.
-  if (!analyticsConfig.googleServiceAccountKey) missing.push("GOOGLE_SERVICE_ACCOUNT_KEY")
+  // Core required variable — the project id is derived from this key. The keyless path (lib/gcp-keyless.ts) replaces it.
+  if (!analyticsConfig.googleServiceAccountKey && !isKeyless()) missing.push("GOOGLE_SERVICE_ACCOUNT_KEY")
 
   // Property IDs (at least main property should be configured)
   if (!analyticsConfig.ga4PropertyId) missing.push("GA4_PROPERTY_ID")
@@ -109,7 +112,7 @@ export function validateAnalyticsConfig(): boolean {
   // Validate JSON key format. Sanitize literal control chars first
   // (matches lib/google-analytics.ts and lib/firebase-admin.ts behavior),
   // since pasted JSON keys often contain literal newlines inside private_key.
-  if (analyticsConfig.googleServiceAccountKey) {
+  if (analyticsConfig.googleServiceAccountKey && !isKeyless()) {
     try {
       const sanitized = analyticsConfig.googleServiceAccountKey
         .replace(/\n/g, "\\n")
@@ -148,6 +151,7 @@ export function getConfigurationStatus() {
     propertyId: analyticsConfig.ga4PropertyId,
     projectId: analyticsConfig.gcpProjectId,
     hasServiceAccountKey: !!analyticsConfig.googleServiceAccountKey,
+    keyless: isKeyless(),
     environmentVariables: {
       GA4_PROPERTY_ID: !!process.env.GA4_PROPERTY_ID,
       GA4_PROPERTY_ID_TXMX: !!process.env.GA4_PROPERTY_ID_TXMX,

@@ -20,6 +20,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 import { gateway } from "@ai-sdk/gateway"
 import { generateText, tool } from "ai"
+import { withInstructions } from "../../lib/ai-gateway-text"
 import { z } from "zod4"
 import { BRAND } from "../../lib/content-pipeline/brand"
 import { createMcuAi, servedCall, type ModelCall } from "../../lib/content-pipeline/model"
@@ -83,8 +84,8 @@ async function factCheck(input: { story: Story; frames: StoryRun["frames"]; capt
   const out = await servedCall("write", FACT_MODEL, undefined, input.onCall, model => generateText({
     model, maxOutputTokens: outputBudget(model, 8_000), providerOptions: callOptions(model, "low"),
     tools: { report: tool({ description: "Report the factual errors, or an empty list.", inputSchema: z.object({ errors: z.array(z.object({ claim: z.string(), why: z.string().describe("one sentence: what the source says instead, or that it says nothing about this") })) }) }) }, toolChoice: { type: "tool", toolName: "report" },
-    messages: [{ role: "system", content: "You fact-check a social card and its caption against the source text they were written from. Report every statement of fact that the source does not support or that contradicts it: a wrong or invented figure, name, date, place, capability, customer, status or claim (\"fielded\" when the source says \"tested\", a company's own claim presented as fact without attribution). A reasonable paraphrase or summary of what the source says is not an error. Do not report style, tone, length, punctuation, word choice, headline quality or what is left out. Dates may be written as DDMMMYY. A ticker or headquarters the source states is fine. Answer an empty list when every statement is supported." },
-      { role: "user", content: `SOURCE (${input.story.publisher}, ${input.story.publishedAt ?? "undated"}): ${input.story.sourceTitle}\n${input.story.sourceText.slice(0, 24_000)}${input.story.roundup ? `\n\nROUNDUP STORIES:\n${input.story.roundup.map((p, i) => `${i + 1}. ${p.title}\n${p.caption}`).join("\n\n")}` : ""}\n\nCARD:\n${card}\n\nCAPTION:\n${caption}` }],
+    ...withInstructions([{ role: "system", content: "You fact-check a social card and its caption against the source text they were written from. Report every statement of fact that the source does not support or that contradicts it: a wrong or invented figure, name, date, place, capability, customer, status or claim (\"fielded\" when the source says \"tested\", a company's own claim presented as fact without attribution). A reasonable paraphrase or summary of what the source says is not an error. Do not report style, tone, length, punctuation, word choice, headline quality or what is left out. Dates may be written as DDMMMYY. A ticker or headquarters the source states is fine. Answer an empty list when every statement is supported." },
+      { role: "user", content: `SOURCE (${input.story.publisher}, ${input.story.publishedAt ?? "undated"}): ${input.story.sourceTitle}\n${input.story.sourceText.slice(0, 24_000)}${input.story.roundup ? `\n\nROUNDUP STORIES:\n${input.story.roundup.map((p, i) => `${i + 1}. ${p.title}\n${p.caption}`).join("\n\n")}` : ""}\n\nCARD:\n${card}\n\nCAPTION:\n${caption}` }]),
   }), async r => { const c = r.toolCalls.find(x => x.toolName === "report"); if (!c) throw new Error("fact check did not report")
     // The list sometimes comes back as a JSON string (review run, 2026-10-19: "out.map is not a function").
     const raw = (c.input as { errors: unknown }).errors, errors = typeof raw === "string" ? JSON.parse(raw) as unknown : raw

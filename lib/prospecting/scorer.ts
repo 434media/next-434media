@@ -10,7 +10,8 @@ import type { CohortHit, CohortLike } from "./cohort-match"
  * prospect's score is the SAME 0–100 fit + grade the lead carries downstream
  * (Step 2 — one score everywhere). This file owns the prospecting-only
  * concerns:
- *   - the hard jurisdiction exclusion (EU/UK/EEA/CH/CA) → score -1
+ *   - the hard jurisdiction exclusion: cold outbound is US-only (master 5.3),
+ *     so a candidate with any non-US or unreadable country → score -1
  *   (Agencies are no longer excluded: they are an outbound cohort — founder
  *   ruling 2026-10-08, the master over the old ICP doc.)
  *   - the contact qualifier (title) — a person-level signal, NOT company fit,
@@ -40,13 +41,283 @@ export const DEFAULT_FIT_THRESHOLD = Number(process.env.PROSPECTING_FIT_THRESHOL
 // clients, so the founder ruled on 2026-10-08 that the master wins and the
 // agency exclusion is removed (next-434media#63, cohort E).
 
+// ─── Jurisdiction: cold outbound is US-only (master 5.3) ────────────────
+//
+// "Cold outbound is sent only to prospects in the United States." The
+// United States allow-list below is the single source of truth for that rule
+// in code, and it fails closed: a blank, unknown or unreadable country is
+// blocked, never assumed to be American. Every cold surface (prospecting
+// search, scoring, approval, 1:1 send-outreach, the outreach sequence) gates on
+// `isColdOutreachAllowed` / `isColdLocationAllowed` / `coldOutreachGateForLead`
+// rather than re-listing countries. Inbound and warm contacts are handled
+// normally and are not gated (master 5.3); see `COLD_LEAD_SOURCES`.
+
+/** The only jurisdiction cold outbound may reach (ISO 3166-1 alpha-2). */
+export const COLD_OUTREACH_ALLOWED_COUNTRY = "US"
+
 /**
- * Jurisdictions where 434media does NOT pursue cold outbound. Per the ICP
- * doc, EU member states (incl. UK + EEA + Switzerland) and Canada are
- * hard-excluded due to strict consent laws (GDPR / CASL).
+ * Lead sources that are cold: no prior intent toward 434. "prospected" is the
+ * Apollo prospecting path (captureLeadFromProspecting in lib/firestore-leads.ts);
+ * "partner" is a partner-shared roster or a purchased contact list (founder,
+ * 2026-11-09). Every other `LeadSource` is warm or inbound and is not
+ * jurisdiction-gated.
+ */
+export const COLD_LEAD_SOURCES: ReadonlySet<string> = new Set(["prospected", "partner"])
+
+export interface JurisdictionCheck {
+  allowed: boolean
+  /** ISO 3166-1 alpha-2 of the jurisdiction the value resolved to, when it resolved. */
+  country?: string
+  /** Why it was allowed or blocked, in words a rep can act on. */
+  reason: string
+}
+
+/** Lowercase, strip accents, dots and extra whitespace: " U.S.A. " → "usa", "España" → "espana". */
+function normalizePlace(value: string): string {
+  return value
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .toLowerCase()
+    .replace(/\./g, "")
+    .replace(/\s+/g, " ")
+    .trim()
+}
+
+/** Ways of writing the United States that the runtime's region names don't cover. */
+const US_ALIASES = [
+  "us", "usa", "u s", "u s a", "united states", "united states of america",
+  "the united states", "the united states of america", "america", "ee uu", "eeuu",
+]
+
+/** UK names that aren't ISO region names. All resolve to GB (blocked, like every non-US value). */
+const GB_ALIASES = ["uk", "great britain", "britain", "england", "scotland", "wales", "northern ireland"]
+
+/** Locales whose region names are recognised, so a native name ("Deutschland") resolves like an English one. */
+const REGION_NAME_LOCALES = [
+  "en", "de", "fr", "es", "it", "pt", "nl", "pl", "sv", "da", "nb", "fi", "cs", "sk", "hu", "ro",
+  "bg", "el", "hr", "sl", "et", "lv", "lt", "ga", "mt", "is",
+]
+
+/** Not countries: "unknown" and supranational pseudo-regions. Region codes the runtime knows, less these and retired codes, are recognised. */
+const PSEUDO_REGIONS = new Set(["ZZ", "EU", "EZ", "UN", "QO"])
+
+const { REGION_CODES, PLACE_TO_CODE } = (() => {
+  const codes = new Set<string>()
+  const byName = new Map<string, string>()
+  const en = new Intl.DisplayNames(["en"], { type: "region" })
+  for (let a = 65; a <= 90; a++) {
+    for (let b = 65; b <= 90; b++) {
+      const code = String.fromCharCode(a, b)
+      if (PSEUDO_REGIONS.has(code)) continue
+      try {
+        // Skip retired codes ("DD" East Germany, "YU"): they canonicalize to a live one.
+        if (Intl.getCanonicalLocales(`und-${code}`)[0] !== `und-${code}`) continue
+        const name = en.of(code)
+        if (name && name !== code) codes.add(code)
+      } catch {
+        // not a region code
+      }
+    }
+  }
+  for (const locale of REGION_NAME_LOCALES) {
+    const dn = new Intl.DisplayNames([locale], { type: "region" })
+    for (const code of codes) {
+      const name = dn.of(code)
+      if (name && name !== code) {
+        const key = normalizePlace(name)
+        if (!byName.has(key)) byName.set(key, code)
+      }
+    }
+  }
+  for (const a of US_ALIASES) byName.set(a, "US")
+  for (const a of GB_ALIASES) byName.set(a, "GB")
+  return { REGION_CODES: codes, PLACE_TO_CODE: byName }
+})()
+
+/**
+ * Resolve a country value to ISO 3166-1 alpha-2: an alpha-2 code ("DE"), the
+ * United States' alpha-3 ("USA"), or an English or native name ("Germany",
+ * "Deutschland"), in any case and spacing. Null when it can't be read.
+ */
+export function resolveCountryCode(value: string | null | undefined): string | null {
+  if (typeof value !== "string") return null
+  const key = normalizePlace(value)
+  if (!key) return null
+  const byName = PLACE_TO_CODE.get(key)
+  if (byName) return byName
+  const upper = key.toUpperCase()
+  if (upper.length === 2 && REGION_CODES.has(upper)) return upper
+  return null
+}
+
+function displayCountry(code: string): string {
+  return new Intl.DisplayNames(["en"], { type: "region" }).of(code) ?? code
+}
+
+/**
+ * The cold-outreach gate for a country value (a lead's or a contact's
+ * country). Allowed only when it resolves to the United States; blank, unknown
+ * and every other country are blocked.
+ */
+export function isColdOutreachAllowed(country: string | null | undefined): JurisdictionCheck {
+  const raw = typeof country === "string" ? country.trim() : ""
+  if (!raw) {
+    return { allowed: false, reason: "No country on record, so the contact can't be confirmed as in the United States. Cold outbound is sent only to prospects in the United States." }
+  }
+  const code = resolveCountryCode(raw)
+  if (!code) {
+    return { allowed: false, reason: `Country "${raw}" can't be read as the United States. Cold outbound is sent only to prospects in the United States.` }
+  }
+  if (code !== COLD_OUTREACH_ALLOWED_COUNTRY) {
+    return { allowed: false, country: code, reason: `Contact is in ${displayCountry(code)}. Cold outbound is sent only to prospects in the United States.` }
+  }
+  return { allowed: true, country: code, reason: "United States" }
+}
+
+/** The fifty states and DC, by name, for reading a free-text location such as "San Antonio, Texas". */
+const US_STATES: Record<string, string> = {
+  alabama: "AL", alaska: "AK", arizona: "AZ", arkansas: "AR", california: "CA", colorado: "CO",
+  connecticut: "CT", delaware: "DE", "district of columbia": "DC", "washington dc": "DC", florida: "FL",
+  georgia: "GA", hawaii: "HI", idaho: "ID", illinois: "IL", indiana: "IN", iowa: "IA", kansas: "KS",
+  kentucky: "KY", louisiana: "LA", maine: "ME", maryland: "MD", massachusetts: "MA", michigan: "MI",
+  minnesota: "MN", mississippi: "MS", missouri: "MO", montana: "MT", nebraska: "NE", nevada: "NV",
+  "new hampshire": "NH", "new jersey": "NJ", "new mexico": "NM", "new york": "NY", "north carolina": "NC",
+  "north dakota": "ND", ohio: "OH", oklahoma: "OK", oregon: "OR", pennsylvania: "PA", "rhode island": "RI",
+  "south carolina": "SC", "south dakota": "SD", tennessee: "TN", texas: "TX", utah: "UT", vermont: "VT",
+  virginia: "VA", washington: "WA", "west virginia": "WV", wisconsin: "WI", wyoming: "WY",
+}
+
+/**
+ * State postal codes that can stand for the United States in a location. A
+ * code that is also a country code ("CA" California / Canada, "DE" Delaware /
+ * Germany) is left out: it can't be read either way, so it fails closed.
+ */
+const US_STATE_POSTAL = new Set(Object.values(US_STATES).filter((c) => !REGION_CODES.has(c)))
+
+/**
+ * The cold-outreach gate for a free-text location ("San Antonio, Texas, US",
+ * "Texas", "Monterrey, Mexico"), read by its last comma-separated part. Allowed
+ * when that part is the United States, a US state by name, or a state postal
+ * code that isn't also a country code. Anything else, blank included, is
+ * blocked. A state name wins over a country of the same name ("Georgia",
+ * "New Mexico"), because a location's last part names a state far more often.
+ */
+export function isColdLocationAllowed(location: string | null | undefined): JurisdictionCheck {
+  const raw = typeof location === "string" ? location.trim() : ""
+  const parts = raw.split(",").map((p) => p.trim()).filter(Boolean)
+  const last = parts[parts.length - 1]
+  if (!last) {
+    return { allowed: false, reason: "No location on record, so the contact can't be confirmed as in the United States. Cold outbound is sent only to prospects in the United States." }
+  }
+  const key = normalizePlace(last)
+  if (US_STATES[key] || US_STATE_POSTAL.has(key.toUpperCase())) {
+    return { allowed: true, country: COLD_OUTREACH_ALLOWED_COUNTRY, reason: "United States" }
+  }
+  const check = isColdOutreachAllowed(last)
+  if (!check.allowed && !check.country) {
+    return { allowed: false, reason: `Location "${raw}" can't be read as the United States. Cold outbound is sent only to prospects in the United States.` }
+  }
+  return check
+}
+
+/**
+ * Whether a search location falls outside what cold outbound may reach. The
+ * translator drops such locations from Apollo filters, and searches the United
+ * States when none remain. Fails closed: an unreadable location is outside.
+ */
+export function isOutsideUnitedStates(location: string): boolean {
+  return !isColdLocationAllowed(location).allowed
+}
+
+/**
+ * The cold-outreach gate for an Apollo candidate. Apollo fills the person's
+ * country, the organization's, or both; any non-US value blocks. With
+ * `blank: "pending"`, a candidate with no country at all is let through as
+ * unconfirmed: Apollo's search results often withhold the country until the
+ * contact is revealed, and the approval gate runs strict after the reveal.
+ * Strict (the default) blocks it.
+ */
+export function coldOutreachJurisdiction(
+  person: ApolloPerson,
+  opts: { blank?: "block" | "pending" } = {},
+): JurisdictionCheck & { pending?: boolean } {
+  const values = [person.country, person.organization?.country]
+    .map((v) => (typeof v === "string" ? v.trim() : ""))
+    .filter(Boolean)
+  if (values.length === 0) {
+    if (opts.blank === "pending") {
+      return { allowed: true, pending: true, reason: "Country not yet known; confirmed as the United States at approval." }
+    }
+    return isColdOutreachAllowed(null)
+  }
+  for (const v of values) {
+    const check = isColdOutreachAllowed(v)
+    if (!check.allowed) return check
+  }
+  return { allowed: true, country: COLD_OUTREACH_ALLOWED_COUNTRY, reason: "United States" }
+}
+
+/** The fields of a lead the cold-outreach gate reads. */
+export interface ColdGateLead {
+  source?: string | null
+  country?: string | null
+  location?: string | null
+}
+
+const sameValue = (a: unknown, b: unknown) =>
+  (typeof a === "string" ? a.trim() : a ?? "") === (typeof b === "string" ? b.trim() : b ?? "")
+
+/**
+ * Whether an edit to a lead would get around the cold-outreach gate, and why.
+ * Locked: changing `source` onto or away from a cold source, and changing
+ * `country` or `location` on a lead whose source is cold. Re-sending a field's
+ * current value is not a change. Warm leads keep full editing. Null when the
+ * edit is allowed.
+ */
+export function coldGateEditRefusal(
+  current: ColdGateLead,
+  patch: { source?: unknown; country?: unknown; location?: unknown },
+): string | null {
+  const wasCold = COLD_LEAD_SOURCES.has(current.source ?? "")
+  if ("source" in patch && !sameValue(patch.source, current.source)) {
+    const toCold = typeof patch.source === "string" && COLD_LEAD_SOURCES.has(patch.source)
+    if (wasCold || toCold) {
+      return `A lead's source can't be changed ${wasCold ? `away from "${current.source}"` : `to "${String(patch.source)}"`}: cold sources are locked because cold outbound is sent only to prospects in the United States.`
+    }
+  }
+  if (wasCold) {
+    for (const field of ["country", "location"] as const) {
+      if (field in patch && !sameValue(patch[field], current[field])) {
+        return `The ${field} of a cold ("${current.source}") lead is locked: it decides whether cold outbound may reach the contact, which is only in the United States.`
+      }
+    }
+  }
+  return null
+}
+
+/**
+ * The cold-outreach gate for a CRM lead, for every send path. A lead whose
+ * `source` is not cold (`COLD_LEAD_SOURCES`) is warm or inbound and passes
+ * ungated. A cold lead must be in the United States: by its `country` (ISO
+ * alpha-2, stamped at prospecting approval) when present, otherwise by its
+ * `location` ("City, State", as captured from Apollo). Fails closed.
+ */
+export function coldOutreachGateForLead(lead: ColdGateLead): JurisdictionCheck & { cold: boolean } {
+  const cold = COLD_LEAD_SOURCES.has(lead.source ?? "")
+  if (!cold) return { allowed: true, cold, reason: "Warm or inbound lead; not jurisdiction-gated." }
+  const check = (lead.country ?? "").trim() ? isColdOutreachAllowed(lead.country) : isColdLocationAllowed(lead.location)
+  return { ...check, cold }
+}
+
+/**
+ * The GDPR / CASL jurisdictions (EU, UK, EEA, Switzerland, Canada), by name.
  *
- * Exported so the approval endpoint can apply a defense-in-depth check
- * (single source of truth for the jurisdiction list).
+ * NOT the cold-outreach gate: cold outbound is US-only and gates on the
+ * allow-list above, which already blocks every one of these. This list is kept
+ * only for two non-cold surfaces that refuse these jurisdictions specifically:
+ * the brand-book share (lib/brand-share.ts, a recipient-requested send) and,
+ * through EXCLUDED_COUNTRY_CODES, the Meta Pixel gate (lib/meta-pixel-gate.ts,
+ * visitor tracking). Don't use it for a cold path.
  */
 export const EXCLUDED_COUNTRIES: Set<string> = new Set([
   // EU member states
@@ -74,9 +345,8 @@ export const EXCLUDED_COUNTRIES: Set<string> = new Set([
  * `EXCLUDED_COUNTRIES` above is keyed on human-readable names because that is
  * what Apollo returns. Edge/CDN geo headers (Vercel's `x-vercel-ip-country`)
  * speak ISO codes instead, so surfaces that gate on visitor geography — the
- * Meta Pixel, for one — need this projection of the same policy. Keep the two
- * lists in step: this file remains the single source of truth for where 434
- * does not track or cold-outreach.
+ * Meta Pixel, for one — need this projection of the same list. Keep the two
+ * lists in step. Like EXCLUDED_COUNTRIES, this is not the cold-outreach gate.
  */
 export const EXCLUDED_COUNTRY_CODES: Set<string> = new Set([
   // EU member states
@@ -92,67 +362,6 @@ export const EXCLUDED_COUNTRY_CODES: Set<string> = new Set([
   // Canada (CASL / PIPEDA)
   "CA",
 ])
-
-/**
- * Every country name except the United States, from the runtime's own region
- * names (ISO 3166-1 alpha-2, English). US territories stay in, and "Georgia" is
- * left out because a bare "Georgia" is far more often the US state.
- */
-const NON_US_COUNTRY_NAMES: Set<string> = (() => {
-  const keep = new Set(["US", "PR", "GU", "VI", "AS", "MP", "UM", "GE"])
-  const names = new Set<string>()
-  const dn = new Intl.DisplayNames(["en"], { type: "region" })
-  for (let a = 65; a <= 90; a++) {
-    for (let b = 65; b <= 90; b++) {
-      const code = String.fromCharCode(a, b)
-      if (keep.has(code)) continue
-      try {
-        const name = dn.of(code)
-        if (name && name !== code) names.add(name.toLowerCase())
-      } catch {
-        // not a region code
-      }
-    }
-  }
-  return names
-})()
-
-/**
- * Whether a search location names a country other than the United States, by
- * its last comma-separated part ("Monterrey, Mexico", "Mexico", "Germany").
- * "New Mexico" and "Texas, US" are not.
- *
- * Cold outbound is sent only to prospects in the United States (master 5.3),
- * so the translator never searches outside it. EXCLUDED_COUNTRIES above is the
- * narrower GDPR/CASL list the scorer and approve gate enforce on candidates;
- * this is the search-side rule.
- */
-export function isOutsideUnitedStates(location: string): boolean {
-  const parts = location.split(",").map((p) => p.trim().toLowerCase()).filter(Boolean)
-  const last = parts[parts.length - 1] ?? ""
-  return NON_US_COUNTRY_NAMES.has(last) || EXCLUDED_COUNTRIES.has(last)
-}
-
-/**
- * Returns whether a candidate is in an excluded jurisdiction. Checks both
- * the person's country and their organization's country — Apollo populates
- * one or the other depending on the data source.
- */
-export function isExcludedJurisdiction(person: ApolloPerson): {
-  excluded: boolean
-  country?: string
-} {
-  const personCountry = (person.country || "").trim().toLowerCase()
-  const orgCountry = (person.organization?.country || "").trim().toLowerCase()
-
-  if (personCountry && EXCLUDED_COUNTRIES.has(personCountry)) {
-    return { excluded: true, country: person.country }
-  }
-  if (orgCountry && EXCLUDED_COUNTRIES.has(orgCountry)) {
-    return { excluded: true, country: person.organization?.country }
-  }
-  return { excluded: false }
-}
 
 // ─── Contact qualifier — title (max 20) ─────────────────────────────────
 // A person-level signal (is this the right contact?), NOT company fit. Kept
@@ -306,14 +515,13 @@ export function scoreCandidate(
 ): ScoredPerson {
   const orgName = person.organization?.name ?? ""
 
-  // Hard exclusion — EU/CA jurisdictions (strict cold-outreach consent laws).
-  const jurisdiction = isExcludedJurisdiction(person)
-  if (jurisdiction.excluded) {
-    return excludedResult(
-      person,
-      `Outside reachable geography: ${jurisdiction.country}. 434media does not pursue cold outbound to EU/Canadian contacts due to strict consent laws (GDPR / CASL).`,
-      `Excluded: contact in ${jurisdiction.country} — 434media does not reach out to EU/Canadian contacts (GDPR / CASL).`,
-    )
+  // Hard exclusion — cold outbound is US-only (master 5.3). A non-US or
+  // unreadable country excludes. No country at all is common in Apollo search
+  // results (withheld until reveal), so it is marked unconfirmed here and the
+  // approval gate blocks it if the reveal doesn't show the United States.
+  const jurisdiction = coldOutreachJurisdiction(person, { blank: "pending" })
+  if (!jurisdiction.allowed) {
+    return excludedResult(person, jurisdiction.reason, `Excluded: ${jurisdiction.reason}`)
   }
 
   // Company FIT — canonical rubric (same scorer the lead uses), with filter
@@ -338,6 +546,7 @@ export function scoreCandidate(
   ]
   if (fit.breakdown.fundingStage !== undefined) reasons.push(`Funding +${fit.breakdown.fundingStage}`)
   reasons.push(`Contact +${title.score}: ${title.reason}`, `Fit ${fit.fit}/100 → grade ${fit.grade}`)
+  if (jurisdiction.pending) reasons.push(`Jurisdiction: ${jurisdiction.reason}`)
 
   return {
     person,

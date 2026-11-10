@@ -10,7 +10,7 @@ export const dynamic = "force-dynamic"
 // is 434's own surface: palette tokens and the visual system's type roles.
 
 const description =
-  "Field notes from the work — cohort builds, demo days, workshops, and the San Antonio builder ecosystem. Articles, videos, newsletters and podcasts from 434 MEDIA and Digital Canvas."
+  "Field notes from the work: cohort builds, demo days, workshops and the San Antonio builder ecosystem, from 434 MEDIA and Digital Canvas."
 
 const ogImage = `/api/og?${new URLSearchParams({ title: "The Feed", subtitle: "Field notes from the work", path: "/thefeed" })}`
 

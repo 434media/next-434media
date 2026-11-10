@@ -54,6 +54,9 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
       // headroom is free (output bills per token generated), so keep it wide.
       maxTokens: 2000,
       effort: "low",
+      // buildLeadOutreachPrompt's system text is constants only (brand context and voice
+      // exemplars), byte-identical across leads, so drafting a run of leads reads it from cache.
+      cacheSystem: true,
       system,
       prompt,
     })
