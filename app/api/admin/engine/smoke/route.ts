@@ -76,15 +76,15 @@ async function outreachDraft(): Promise<Check[]> {
   return [await run(1), await run(2, 1)]
 }
 
-/** Lead research: the web-grounded model with structured output (AI SDK 7 `output`). */
+/** Lead research: the search loop, then the structured extraction (lib/lead-research.ts). Up to 3 billed searches. */
 async function leadResearch(): Promise<Check[]> {
-  const { generateGatewayResearch } = await import("@/lib/ai-gateway-text")
+  const { generateLeadResearch } = await import("@/lib/lead-research")
   return [await timed("lead research", async () => {
-    const r = await generateGatewayResearch({
+    const r = await generateLeadResearch({
       system: "You research a company for a media company's sales team. Be factual and brief.",
       prompt: "Company: Vercel Inc. (vercel.com). Summarize what they do.",
     })
-    return { summaryChars: r.summary.length, sources: r.sources.length, suggestedCountry: r.suggestedCountry ?? null }
+    return { summaryChars: r.summary.length, sources: r.sources.length, searches: r.searches, suggestedCountry: r.suggestedCountry ?? null, usage: r.usage }
   })]
 }
 
