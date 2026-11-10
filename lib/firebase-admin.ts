@@ -189,7 +189,6 @@ export function getNamedDb(databaseId: string): admin.firestore.Firestore {
 
 // Named database IDs (separate databases within the 434 Media GCP project)
 export const NAMED_DATABASES = {
-  TECHDAY: "techday",
   AIMSATX: "aimsatx",
   // Digital Canvas workshops (e.g. "Lead with Ops. Layer in AI.") — a NAMED
   // database in the 434 Media project. (Historical MHTH registrations once lived
