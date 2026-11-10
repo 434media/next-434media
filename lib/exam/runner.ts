@@ -5,7 +5,7 @@
  */
 import { annotateScope, check, type CheckResult, type ExamOutput, type ExamUsage, type Judge } from "./assertions"
 import type { Executor } from "./executors"
-import type { CaseSpec, Suite } from "./suite"
+import { completionApplies, type CaseSpec, type Suite } from "./suite"
 
 /**
  * pass: every assertion passed. fail: at least one failed. partial: none failed but some were skipped (a judged
@@ -83,7 +83,11 @@ async function runCase(suite: Suite, c: CaseSpec, executor: Executor, judge?: Ju
     return { ...base, status: "no-output", reason: out.error, checks: [], costUsd, usage, ms: Date.now() - t, ...review(c, "no-output") }
   }
   const checks: CheckResult[] = []
-  for (const a of c.expect) {
+  // The completion rule covers every full task, whether or not the case lists it (founder, 2026-11-10).
+  const expect = completionApplies(c, suite.spec).applies && !c.expect.some(a => a.type === "completion")
+    ? [...c.expect, { type: "completion" as const, why: "every task output names a next owner, a due date and the condition that sends it back to a person" }]
+    : c.expect
+  for (const a of expect) {
     if (a.type === "judged" && judge) {
       try {
         const j = await judge.judge({ criteria: a.criteria, reference: a.reference ?? c.reference, output: out, caseSpec: c })

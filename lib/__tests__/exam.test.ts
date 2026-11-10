@@ -209,6 +209,37 @@ test("the report: pass or fail with the reason per case, and the run log of toke
   assert.doesNotMatch(md, /attached/)
 })
 
+test("the completion rule as scoped on 2026-11-10: every new full task, not a brief item, not a run from before the rule", async () => {
+  const files = await readSuiteFolder(BASELINE)
+  const base = { title: "t", input: { request: "r", today: "2026-11-12" }, expect: [{ type: "tool_not_called", tool: "send_email" }] }
+  const cases = [
+    { ...base, id: "task-new" }, // lists no completion check: it is added
+    { ...base, id: "task-undated", input: { request: "r" } }, // no date: a new output
+    { ...base, id: "brief-line", kind: "brief-item" },
+    { ...base, id: "old-run", input: { request: "r", today: "2026-10-01" }, reviewed: { label: "approved unedited" } },
+  ]
+  const parsed = parseSuite({ "suite.json": files["suite.json"], "cases/c.json": JSON.stringify({ cases }) })
+  assert.ok(parsed.ok, !parsed.ok ? parsed.problems.join("; ") : "")
+  const recs: Recordings = { executor: "x", source: "invented", recordings: Object.fromEntries(cases.map(c => [c.id, { text: "FYI: noted.", toolCalls: [] }])) }
+  const r = await runSuite(parsed.suite, recordedExecutor(recs))
+  const by = Object.fromEntries(r.cases.map(c => [c.id, c]))
+  for (const id of ["task-new", "task-undated"]) {
+    assert.equal(by[id].status, "fail", id)
+    assert.match(by[id].reason, /missing a next owner.*\(rule: every task output names/)
+  }
+  for (const id of ["brief-line", "old-run"]) {
+    assert.equal(by[id].status, "pass", `${id}: ${by[id].reason}`)
+    assert.ok(!by[id].checks.some(k => k.type === "completion"), id)
+  }
+  assert.equal(by["old-run"].agreesWithReview, true)
+  // A completion check written onto a case the rule does not cover is refused, not silently scored.
+  for (const c of [{ ...base, id: "b", kind: "brief-item" }, { ...base, id: "o", input: { request: "r", today: "2026-10-01" } }]) {
+    const bad = parseSuite({ "suite.json": files["suite.json"], "cases/c.json": JSON.stringify({ ...c, expect: [{ type: "completion" }] }) })
+    assert.equal(bad.ok, false)
+    if (!bad.ok) assert.match(bad.problems.join("; "), /completion rule does not apply to it \((a one-line brief item|set on 2026-10-01, before the rule \(2026-11-10\))\)/)
+  }
+})
+
 test("dates, as the completion check reads them", () => {
   for (const s of ["2026-11-14", "Nov 14", "14 November 2026", "Thursday, Nov. 13"]) assert.equal(looksLikeDate(s), true, s)
   for (const s of ["soon", "next week", "ASAP", ""]) assert.equal(looksLikeDate(s), false, s)

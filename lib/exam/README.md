@@ -59,6 +59,12 @@ which. Checks:
 | `scope_respected` | no call with a recipient or property outside the caller's scope went through |
 | `flagged` | the output flags the case for a person (the suite's flag tool or wording) |
 | `completion` | the output names a next owner, a due date that is a date, and the condition that sends it back to a person |
+
+**The completion rule's scope** (founder, 2026-11-10): it applies to new outputs only, meaning a full task, not each
+one-line daily-brief item, and runs from before the rule are not scored on it. So the runner adds the completion check
+to every case that is a full task (`"kind": "task"`, the default) dated on or after the suite's `completion.since`
+(default 2026-11-10; a case with no `today` is new), whether or not the case lists it. A case marked
+`"kind": "brief-item"`, or dated before `since`, is not checked, and listing the check on one is refused.
 | `field` | a field of the executor's structured output equals a value (a routing outcome, a record status) |
 | `judged` | a judge model finds the written `criteria` met, against the `reference` where there is one |
 

@@ -44,16 +44,23 @@ export const SuiteSpec = z.object({
   /**
    * How an output names its hand-off: a call to `tool` with the three fields, or a line per label in the text
    * ("Next owner: …", "Due: …", "Back to a person if: …"). Labels are matched case-insensitively at a line start.
+   *
+   * The completion rule (build plan v3) as the founder scoped it on 2026-11-10: it applies to new outputs only, meaning
+   * a full task, not each one-line daily-brief item, and runs from before `since` are not scored on it. Every case it
+   * applies to is checked for it, whether or not the case lists the check (see completionApplies).
    */
   completion: z
     .object({
       tool: z.string().optional(),
+      /** The first case date (`input.today`) the rule applies to. A case with no date is a new output. */
+      since: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).default("2026-11-10"),
       fields: z.object({ owner: z.string(), due: z.string(), returnCondition: z.string() }).default({ owner: "next_owner", due: "due", returnCondition: "return_condition" }),
       labels: z
         .object({ owner: z.array(z.string()), due: z.array(z.string()), returnCondition: z.array(z.string()) })
         .default({ owner: ["Next owner", "Owner"], due: ["Due", "Due date"], returnCondition: ["Back to a person if", "Returns to a person if", "Escalate if"] }),
     })
     .default({
+      since: "2026-11-10",
       fields: { owner: "next_owner", due: "due", returnCondition: "return_condition" },
       labels: { owner: ["Next owner", "Owner"], due: ["Due", "Due date"], returnCondition: ["Back to a person if", "Returns to a person if", "Escalate if"] },
     }),
@@ -99,6 +106,8 @@ export const CaseSpec = z.object({
   title: z.string(),
   /** A free tag: scheduling, confirmation, content, prompt-injection, … Reports group by it. */
   category: z.string().default("general"),
+  /** A full task (the default), or one line of the daily brief, which the completion rule does not cover. */
+  kind: z.enum(["task", "brief-item"]).default("task"),
   /** Who wrote the case. */
   author: z.string().optional(),
   /** Where it came from: a run, a log line, a founder ruling. */
@@ -124,6 +133,16 @@ export const CaseSpec = z.object({
   reviewed: z.object({ label: z.enum(["approved unedited", "approved with edits", "rejected"]), by: z.string().optional(), words: z.string().optional() }).optional(),
 })
 export type CaseSpec = z.infer<typeof CaseSpec>
+
+/**
+ * Whether the completion rule covers a case (founder, 2026-11-10: new outputs only, a full task, not each one-line
+ * daily-brief item; the 2026-10-01 runs are not scored on it).
+ */
+export function completionApplies(c: Pick<CaseSpec, "kind" | "input">, suite: Pick<SuiteSpec, "completion">): { applies: boolean; reason: string } {
+  if (c.kind === "brief-item") return { applies: false, reason: "a one-line brief item" }
+  if (c.input.today && c.input.today < suite.completion.since) return { applies: false, reason: `set on ${c.input.today}, before the rule (${suite.completion.since})` }
+  return { applies: true, reason: "a full task" }
+}
 
 export interface Suite {
   spec: SuiteSpec
@@ -168,6 +187,10 @@ export function parseSuite(files: SuiteFiles): { ok: true; suite: Suite } | { ok
         if ("tool" in a && a.tool !== undefined && !tools.has(a.tool)) problems.push(`case ${c.id}: assertion names unknown tool "${a.tool}"`)
         if (a.type === "matches" || a.type === "not_matches") try { new RegExp(a.pattern, a.flags) } catch { problems.push(`case ${c.id}: bad pattern ${a.pattern}`) }
         if (a.type === "field" && a.equals === undefined && a.oneOf === undefined) problems.push(`case ${c.id}: field assertion on ${a.path} needs equals or oneOf`)
+        if (a.type === "completion") {
+          const ca = completionApplies(c, s.data)
+          if (!ca.applies) problems.push(`case ${c.id}: the completion rule does not apply to it (${ca.reason}); remove the completion check`)
+        }
       }
     }
     if (!cases.length) problems.push("the suite has no cases")
