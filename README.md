@@ -340,7 +340,7 @@ BLOB_READ_WRITE_TOKEN=your-vercel-blob-token   # uploads + generated assets
 # Optional model overrides (default to curated gateway slugs):
 # ANTHROPIC_MODEL=anthropic/claude-opus-4.8        # outreach drafts
 # TRANSLATOR_MODEL=anthropic/claude-sonnet-4.6     # prospecting query → filters
-# RESEARCH_MODEL=openai/gpt-4o-mini-search-preview # web-grounded lead research
+# RESEARCH_MODEL=anthropic/claude-sonnet-5.5      # lead research: Parallel search loop (max 3 searches) + extraction
 
 # PROSPECTING (Apollo)
 APOLLO_API_KEY=your-apollo-key
