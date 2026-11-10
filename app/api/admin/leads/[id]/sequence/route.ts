@@ -93,6 +93,8 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
             model: GATEWAY_TEXT_MODELS.outreachDraft,
             maxTokens: 2000,
             effort: "low",
+            // Constants only, the same for every lead and step (the step guidance is in `prompt`).
+            cacheSystem: true,
             system,
             prompt,
           })

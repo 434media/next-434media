@@ -99,6 +99,11 @@ jobs:
       # approval, send-outreach and every outreach-sequence step; warm and inbound leads are not gated (JUR-1, JUR-2).
       - run: tsx --test lib/__tests__/cold-outreach-jurisdiction.test.ts
 
+      # The engine on AI SDK 7 (V1 item 2): the real generateText against the SDK's mock model. System text goes through
+      # `instructions` (v7 rejects system messages inside `messages`), the cache markers and Gateway automatic caching
+      # reach the provider, the token trap still throws, and a pipeline tool loop reports its cache tokens.
+      - run: tsx --test lib/__tests__/ai-sdk-engine.test.ts
+
       # Owned Meta: offline state machine and fake-transport regression tests.
       - run: tsx --test lib/__tests__/owned-meta-publisher.test.ts
       # Owned Meta tool route, Slack approval binding and processing continuation (all transports faked).

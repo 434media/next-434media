@@ -69,8 +69,14 @@ const MAX_OUTPUT: Record<string, number> = { "meta/llama-4-scout": 8_192, "meta/
  * (CLAUDE.md, "The token trap"), so Anthropic calls set effort rather than disabling thinking; other models ignore the
  * `anthropic` key. Models without an entry (a step moved to another model) keep the Gateway's default routing.
  */
-export function callOptions(model: string, effort: "low" | "medium" | "high") {
-  const gateway = ROUTING[model]
+export function callOptions(model: string, effort: "low" | "medium" | "high", opts: { loop?: boolean } = {}) {
+  const routing = ROUTING[model]
+  // A tool loop resends everything the step before it sent, so it caches well: the Gateway's automatic caching marks the
+  // prompt's tail on every step and the next step reads it back at a tenth of the input rate. One-shot calls leave it
+  // off, since a write nobody reads costs 1.25x and they already cache the editorial prefix explicitly (model.ts
+  // system()). Gateway docs, "Automatic Prompt Caching", read 2026-11-10: Anthropic needs `caching: 'auto'` or explicit
+  // markers, and the default passes the request through uncached.
+  const gateway = routing || opts.loop ? { ...(routing ?? {}), ...(opts.loop ? { caching: "auto" as const } : {}) } : undefined
   return {
     ...(model.startsWith("anthropic/") ? { anthropic: { output_config: { effort } } } : {}),
     ...(gateway ? { gateway } : {}),
