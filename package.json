@@ -4,7 +4,7 @@
   "private": true,
   "packageManager": "pnpm@10.4.1",
   "engines": {
-    "node": ">=20",
+    "node": ">=22",
     "pnpm": ">=10"
   },
   "scripts": {
@@ -14,7 +14,7 @@
     "lint": "next lint"
   },
   "dependencies": {
-    "@ai-sdk/gateway": "^3.0.121",
+    "@ai-sdk/gateway": "^4.0.134",
     "@google-analytics/data": "^5.1.0",
     "@headlessui/react": "^2.2.2",
     "@modelcontextprotocol/server": "2",
@@ -22,7 +22,7 @@
     "@types/sanitize-html": "^2.16.0",
     "@vercel/blob": "^2.0.0",
     "@vercel/oidc": "3.2.0",
-    "ai": "^6.0.193",
+    "ai": "^7.0.161",
     "botid": "^1.5.10",
     "cheerio": "^1.0.0",
     "class-variance-authority": "^0.7.1",

@@ -1,6 +1,6 @@
 import { tool } from "ai"
 import { z } from "zod"
-import { generateGatewayToolCall, GATEWAY_TEXT_MODELS } from "@/lib/ai-gateway-text"
+import { generateGatewayToolCall, GATEWAY_TEXT_MODELS, type GatewayUsage } from "@/lib/ai-gateway-text"
 import type {
   ApolloEmailStatus,
   ApolloSearchFilters,
@@ -255,6 +255,8 @@ ${COHORT_RULE}
 export interface TranslateOptions {
   /** Cohort rows to use instead of reading `icp_cohorts` (evals, tests). */
   cohorts?: OutboundCohort[]
+  /** Told what the model call cost, cache reads and writes included (the engine smoke check). */
+  onUsage?: (usage: GatewayUsage) => void
 }
 
 /**
@@ -292,10 +294,10 @@ export async function translatePromptToFilters(
     throw new Error("Translator: prompt is empty")
   }
   const cohorts = options.cohorts ?? (await listIcpCohorts())
-  return translateWith(trimmed, buildSystemPrompt(await cohortsContext(cohorts)))
+  return translateWith(trimmed, buildSystemPrompt(await cohortsContext(cohorts)), options.onUsage)
 }
 
-async function translateWith(trimmed: string, system: string): Promise<TranslateResult> {
+async function translateWith(trimmed: string, system: string, onUsage?: TranslateOptions["onUsage"]): Promise<TranslateResult> {
   // Forced single-tool extraction through the AI Gateway — equivalent to the
   // prior Anthropic `tool_choice: { type: "tool" }`. Returns the validated
   // tool input (schema-checked against filtersSchema).
@@ -317,6 +319,7 @@ async function translateWith(trimmed: string, system: string): Promise<Translate
     prompt: trimmed,
     toolName: FILTERS_TOOL_NAME,
     tool: filtersTool,
+    onUsage,
   })
   return mapTranslatorOutput(raw, trimmed)
 }
