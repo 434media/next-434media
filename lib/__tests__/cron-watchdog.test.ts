@@ -6,7 +6,7 @@
 import { test } from "node:test"
 import assert from "node:assert/strict"
 import vercelConfig from "../../vercel.json"
-import { graceMs, jobOf, lastDue, missedCrons, parseCron, type CronEntry, type Heartbeat } from "../cron-watchdog"
+import { ALERT_SUBJECT_PREFIX, alertRecipients, alertSubject, graceMs, jobOf, lastDue, missedCrons, parseCron, type CronEntry, type Heartbeat } from "../cron-watchdog"
 
 const at = (iso: string) => new Date(iso)
 const beats = (...b: [string, string, string?][]) => new Map<string, Heartbeat>(b.map(([job, last, first]) => [job, { job, lastFiredAt: last, ...(first ? { firstFiredAt: first } : {}) }]))
@@ -76,4 +76,27 @@ test("a job with no heartbeat is missed only once the watchdog was watching befo
 test("the watchdog does not report itself", () => {
   const crons = [{ path: "/api/cron/cron-watchdog", schedule: "30 * * * *" }]
   assert.deepEqual(missedCrons(crons, beats(), at("2026-01-01T00:00:00Z"), at("2026-11-10T12:00:00Z")), [])
+})
+
+test("alerts go to ADMIN_ALERT_EMAIL when it holds an address, and to the founder channel otherwise", () => {
+  const founder = () => ["founder@example.com"]
+  assert.deepEqual(alertRecipients({ ADMIN_ALERT_EMAIL: "Alerts@Example.com, ops@example.com" }, founder), ["alerts@example.com", "ops@example.com"])
+  assert.deepEqual(alertRecipients({ ADMIN_ALERT_EMAIL: "alerts@example.com, not-an-address" }, founder), ["alerts@example.com"])
+  assert.deepEqual(alertRecipients({}, founder), ["founder@example.com"])
+  assert.deepEqual(alertRecipients({ ADMIN_ALERT_EMAIL: "  " }, founder), ["founder@example.com"])
+  assert.deepEqual(alertRecipients({ ADMIN_ALERT_EMAIL: "nobody, still-nobody@" }, founder), ["founder@example.com"])
+  assert.deepEqual(alertRecipients({}, () => []), [])
+})
+
+test("the alert address never changes who signs in as the founder", () => {
+  // ADMIN_ALERT_EMAIL is read only for the watchdog's recipients; the founder list is the fallback, untouched.
+  let asked = 0
+  alertRecipients({ ADMIN_ALERT_EMAIL: "alerts@example.com" }, () => { asked++; return ["founder@example.com"] })
+  assert.equal(asked, 0)
+})
+
+test("every watchdog subject starts with the alert prefix", () => {
+  assert.equal(ALERT_SUBJECT_PREFIX, "[434 alert]")
+  assert.equal(alertSubject("Watchdog: all clear (daily heartbeat)"), "[434 alert] Watchdog: all clear (daily heartbeat)")
+  assert.ok(alertSubject("Watchdog: feed-publish did not fire").startsWith("[434 alert] "))
 })

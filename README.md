@@ -324,6 +324,7 @@ TRAVEL_SESSION_SECRET=your-32-byte-secret    # optional; falls back to ADMIN_SES
 BRAND_PROFILE_BACKUP_READ_TOKEN=random-48+   # read-only; gates GET /api/brand-profiles/backups (434-context pulls daily); unset = refused
 ADMIN_OWNER_EMAILS=owner@example.com          # owners: super admin on every check, roster or not (lib/auth.ts); unset = no owner, roles from crm_team_members only
 ADMIN_FOUNDER_EMAIL=founder@example.com      # the founder's own address(es), comma-separated; the founder-only guard (lib/founder-guard.ts): /admin/finance and /api/admin/finance; unset = everyone refused
+ADMIN_ALERT_EMAIL=alerts@example.com         # optional; where the cron watchdog's alerts and daily all-clear go, comma-separated; subjects start "[434 alert]"; unset or no valid address = ADMIN_FOUNDER_EMAIL. Not sign-in
 
 # FINANCE: QUICKBOOKS ONLINE (Phase 1, read only: lib/quickbooks.ts, lib/quickbooks-server.ts)
 # QUICKBOOKS_CLIENT_ID=...                   # Intuit app keys: Production keys in Production only, sandbox keys in Preview

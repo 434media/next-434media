@@ -1,7 +1,7 @@
 import { type NextRequest } from "next/server"
 import { runCronJob } from "@/lib/cron-auth"
 import { CRON_HEARTBEATS_COLLECTION, readCronHeartbeats } from "@/lib/cron-heartbeat"
-import { missedCrons, type CronEntry, type Missed } from "@/lib/cron-watchdog"
+import { ALERT_EMAIL_ENV, alertRecipients, alertSubject, missedCrons, type CronEntry, type Missed } from "@/lib/cron-watchdog"
 import { getDb } from "@/lib/firebase-admin"
 import { founderEmails } from "@/lib/founder-guard"
 import { QUEUES, QUEUE_READ_LIMIT, heartbeatDue, overdueQueues, readQueue, type QueueAlert, type QueueReading } from "@/lib/queue-age"
@@ -19,8 +19,9 @@ const QUEUE_REPEAT_MS = 24 * 60 * 60_000
 const STATE_DOC = { collection: "watchdog_state", id: "founder-channel" }
 
 /**
- * GET /api/cron/cron-watchdog (hourly, vercel.json). Three checks, one founder-channel email (ADMIN_FOUNDER_EMAIL, the
- * Intake SOP's founder channel):
+ * GET /api/cron/cron-watchdog (hourly, vercel.json). Three checks, one alert email to ADMIN_ALERT_EMAIL, or, when that
+ * holds no address, to the founder channel (ADMIN_FOUNDER_EMAIL, the Intake SOP's founder channel). Every subject starts
+ * "[434 alert]" so the alerts can be filtered:
  *  - **never fired:** the crons that should have fired and did not (lib/cron-watchdog.ts);
  *  - **queue age:** work waiting past its queue's limit (lib/queue-age.ts), each queue reported at most once a day;
  *  - **heartbeat:** once a day, after 13:00 UTC, a short all-clear even when nothing is wrong, so a broken alert path
@@ -58,8 +59,8 @@ export async function GET(request: NextRequest) {
     const problem = missed.length || overdue.length || unreadable.length
     if (!problem && !sendHeartbeat) return { message: `All ${crons.length} crons fired on schedule; no queue overdue`, detail }
 
-    const to = founderEmails()
-    if (!to.length) return { status: "error" as const, message: "Something to report, and ADMIN_FOUNDER_EMAIL holds no address to tell", detail }
+    const to = alertRecipients(process.env, founderEmails)
+    if (!to.length) return { status: "error" as const, message: `Something to report, and neither ${ALERT_EMAIL_ENV} nor ADMIN_FOUNDER_EMAIL holds an address to tell`, detail }
     assertVerifiedSender(DEFAULT_FROM)
     const { error } = await getResend().emails.send({ from: DEFAULT_FROM, to, subject: subject(missed, overdue, unreadable), text: body(missed, overdue, unreadable, readings, crons.length) })
     if (error) throw new Error(`Resend send failed: ${error.message ?? JSON.stringify(error)}`)
@@ -75,7 +76,7 @@ function subject(missed: Missed[], overdue: QueueAlert[], unreadable: string[]):
   if (missed.length) parts.push(missed.length === 1 ? `${missed[0].job} did not fire` : `${missed.length} crons did not fire`)
   if (overdue.length) parts.push(overdue.length === 1 ? `${overdue[0].queue} waiting ${overdue[0].ageHours}h` : `${overdue.length} queues overdue`)
   if (unreadable.length) parts.push(`${unreadable.length} queue(s) unreadable`)
-  return parts.length ? `Watchdog: ${parts.join("; ")}` : "Watchdog: all clear (daily heartbeat)"
+  return alertSubject(parts.length ? `Watchdog: ${parts.join("; ")}` : "Watchdog: all clear (daily heartbeat)")
 }
 
 function body(missed: Missed[], overdue: QueueAlert[], unreadable: string[], readings: QueueReading[], cronCount: number): string {

@@ -13,6 +13,23 @@ export interface CronEntry { path: string; schedule: string }
 export interface Heartbeat { job: string; lastFiredAt: string; firstFiredAt?: string }
 export interface Missed { job: string; schedule: string; dueAt: string; lastFiredAt: string | null }
 
+/**
+ * Who the watchdog's emails go to. `ADMIN_ALERT_EMAIL` is the alert address, comma-separated, kept apart from sign-in
+ * identity so alerts can be filtered. When it is unset or holds no valid address, the founder channel (`founder`, the
+ * route passes founderEmails() from lib/founder-guard.ts, read-only) receives them as before.
+ */
+export const ALERT_EMAIL_ENV = "ADMIN_ALERT_EMAIL"
+const ALERT_ADDRESS = /^[^\s@,;"'<>]+@[^\s@,;"'<>]+\.[^\s@,;"'<>]+$/
+
+export function alertRecipients(env: Record<string, string | undefined>, founder: () => string[]): string[] {
+  const own = [...new Set((env[ALERT_EMAIL_ENV] ?? "").split(/[,;\s]+/).map((e) => e.trim().toLowerCase()).filter((e) => ALERT_ADDRESS.test(e)))]
+  return own.length ? own : founder()
+}
+
+/** Every watchdog email subject (cron missed, queue age, the daily all-clear) starts with this, so it can be filtered. */
+export const ALERT_SUBJECT_PREFIX = "[434 alert]"
+export const alertSubject = (subject: string) => `${ALERT_SUBJECT_PREFIX} ${subject}`
+
 /** `/api/cron/feed-publish` → `feed-publish`, the name runCronJob records under. */
 export const jobOf = (path: string) => path.replace(/^\/api\/cron\//, "").replace(/\/+$/, "")
 
