@@ -169,6 +169,8 @@ test("blank and template rule files are refused; merge tags and format placehold
   assert.match(blankOrTemplate("<!-- TEMPLATE -->\n# Rules\nSome text")!, /template/)
   assert.match(blankOrTemplate("# Rules\n- Owner: TODO\n")!, /TODO/)
   assert.equal(blankOrTemplate("Close with {{unsubscribe}} on <YYYY-MM-DD>.\n"), null)
+  assert.match(blankOrTemplate("# T\n<!-- a --> <!-- b <!-- c -->\n<!-- unclosed rule text")!, /blank/)
+  assert.equal(blankOrTemplate("<!-- a -->Real rule.\n"), null)
 })
 
 test("the run-start check: pinned, unchanged, all pinned, none blank; no pins is a refusal", () => {

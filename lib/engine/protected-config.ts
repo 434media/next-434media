@@ -53,11 +53,27 @@ const TEMPLATE_MARKS: { re: RegExp; what: string }[] = [
   { re: /^\s*(?:[-*]\s*)?[\w .-]{0,40}:\s*(?:TODO|TBD|FILL IN|REPLACE ME)\.?\s*$/im, what: "a TODO/TBD value" },
 ]
 
+/**
+ * The text outside `<!-- … -->` comments, found by scanning rather than by a replace, so nothing a comment hides is
+ * counted. An unclosed comment runs to the end. Only used to decide whether a file is blank; nothing is rendered.
+ */
+function outsideComments(text: string): string {
+  let out = "", i = 0
+  while (i < text.length) {
+    const open = text.indexOf("<!--", i)
+    if (open === -1) { out += text.slice(i); break }
+    out += text.slice(i, open)
+    const close = text.indexOf("-->", open + 4)
+    if (close === -1) break
+    i = close + 3
+  }
+  return out
+}
+
 /** Why a file's text is blank or a template, or null when it is neither. */
 export function blankOrTemplate(text: string): string | null {
   const body = text.replace(/^﻿/, "").replace(/^---\n[\s\S]*?\n---[ \t]*\n?/, "")
-  const words = body.replace(/^#.*$/gm, "").replace(/<!--[\s\S]*?-->/g, "").trim()
-  if (!words) return "blank (nothing beyond frontmatter, headings and comments)"
+  if (!outsideComments(body.replace(/^#.*$/gm, "")).trim()) return "blank (nothing beyond frontmatter, headings and comments)"
   for (const m of TEMPLATE_MARKS) if (m.re.test(body)) return `still a template (${m.what})`
   return null
 }
