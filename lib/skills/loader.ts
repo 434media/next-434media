@@ -20,6 +20,8 @@
 import { createHash } from "node:crypto"
 import { ToolLoopAgent, isStepCount, tool, type LanguageModel, type ToolSet } from "ai"
 import { z } from "zod"
+import { blankOrTemplate, isProtectedTarget } from "../engine/protected-config"
+import { admitTools, effectiveLevel, type AutonomyLevel, type ToolDeclarations } from "../engine/tool-policy"
 
 /** A skill folder as relative path → UTF-8 text. Binary files are left out by whoever builds the map. */
 export type SkillFiles = Record<string, string>
@@ -122,6 +124,11 @@ export function parseSkill(files: SkillFiles, opts: { folder?: string } = {}): P
   if (compatibility && compatibility.length > LIMITS.compatibility) problems.push(`"compatibility" is over ${LIMITS.compatibility} characters`)
 
   if (!body.trim()) problems.push("SKILL.md has no instructions after the frontmatter")
+  else {
+    // The blank-config block (Foundation A): a body that is only headings, or still a template, is refused too.
+    const blank = blankOrTemplate(body)
+    if (blank) problems.push(`SKILL.md body is ${blank}`)
+  }
   if (body.split("\n").length > LIMITS.bodyLines) problems.push(`SKILL.md body is over ${LIMITS.bodyLines} lines`)
   if (Buffer.byteLength(md, "utf8") > LIMITS.skillMdBytes) problems.push(`SKILL.md is over the ${LIMITS.skillMdBytes / 1024} KB cap`)
   for (const p of Object.keys(files)) if (!safePath(p)) problems.push(`unsafe file path in the folder: ${p}`)
@@ -234,6 +241,14 @@ export interface SkillAgentOptions {
   /** Output cap per step. Claude 5 thinks by default and this counts the thinking too (CLAUDE.md, "The token trap"). */
   maxOutputTokens?: number
   providerOptions?: Record<string, Record<string, unknown>>
+  /**
+   * The tool allow-list by autonomy level (Foundation A; lib/engine/tool-policy.ts). When set, the caller's tools that
+   * the skill names are further narrowed to those its declared class admits at the run's level (the lower of `level`
+   * and the skill's `ceiling`); a tool with no declaration is refused. The refused are left out of the run and listed
+   * in the result. Business runs always set it (lib/engine/run.ts); the exam's mock executor leaves it unset, because
+   * the exam offers mock side effects on purpose to see whether a skill misuses them.
+   */
+  autonomy?: { level: AutonomyLevel; ceiling?: AutonomyLevel; declarations: ToolDeclarations }
 }
 
 /**
@@ -241,13 +256,20 @@ export interface SkillAgentOptions {
  * fingerprint is not the pinned one, or it names a tool the caller did not offer. The Gateway's automatic caching is
  * on: an agent loop re-sends the skill's instructions every step, so each step after the first reads them from cache.
  */
-export function skillAgent(opts: SkillAgentOptions): { agent: ToolLoopAgent<never, ToolSet>; skill: Skill } {
+export function skillAgent(opts: SkillAgentOptions): { agent: ToolLoopAgent<never, ToolSet>; skill: Skill; level?: AutonomyLevel; refused: string[] } {
   const parsed = parseSkill(opts.files, { folder: opts.folder })
   if (!parsed.ok) throw new Error(`Skill refused: ${parsed.problems.join("; ")}`)
   const skill = parsed.skill
   if (opts.expectedSha256 && opts.expectedSha256 !== skill.sha256) throw new Error(`Skill refused: ${skill.name} is not the pinned version (fingerprint ${skill.sha256.slice(0, 12)}, expected ${opts.expectedSha256.slice(0, 12)})`)
-  const { tools, missing } = skillTools(skill, opts.files, opts.tools)
+  const { tools: named, missing } = skillTools(skill, opts.files, opts.tools)
   if (missing.length) throw new Error(`Skill refused: ${skill.name} needs tools this run does not offer: ${missing.join(", ")}`)
+  let tools = named, refused: string[] = [], level: AutonomyLevel | undefined
+  if (opts.autonomy) {
+    level = effectiveLevel(opts.autonomy.level, opts.autonomy.ceiling ?? opts.autonomy.level)
+    const admitted = admitTools(named, opts.autonomy.declarations, level, t => isProtectedTarget(t), ["read_skill_file"])
+    tools = admitted.admitted
+    refused = admitted.refused
+  }
   const gateway = { ...(opts.providerOptions?.gateway ?? {}), caching: "auto" }
   const agent = new ToolLoopAgent({
     model: opts.model,
@@ -257,5 +279,5 @@ export function skillAgent(opts: SkillAgentOptions): { agent: ToolLoopAgent<neve
     ...(opts.maxOutputTokens ? { maxOutputTokens: opts.maxOutputTokens } : {}),
     providerOptions: { ...(opts.providerOptions ?? {}), gateway } as never,
   })
-  return { agent, skill }
+  return { agent, skill, ...(level ? { level } : {}), refused }
 }

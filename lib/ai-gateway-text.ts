@@ -10,6 +10,7 @@
 
 import { generateText, APICallError } from "ai"
 import type { LanguageModelUsage, ModelMessage, SystemModelMessage, Tool } from "ai"
+import { withTask, type TaskContext } from "./engine/task-context"
 
 // Curated model slugs for pipeline text generation. Confirmed present on
 // https://ai-gateway.vercel.sh/v1/models. Env overrides preserve the prior
@@ -128,18 +129,23 @@ export interface GatewayTextParams {
   cacheSystem?: boolean
   /** Told what the call cost, cache reads and writes included. */
   onUsage?: (usage: GatewayUsage) => void
+  /** The business task the call is for; the engine guard records its cost against it (lib/engine/task-context.ts). */
+  task?: TaskContext
 }
+
+/** Runs `fn` inside the call's task when it names one; otherwise as is (the guard records it as untracked). */
+const inTask = <T>(task: TaskContext | undefined, fn: () => Promise<T>) => (task ? withTask(task, fn) : fn())
 
 // Plain text generation. Throws on failure (the route maps it to a 502) so the
 // behavior matches the previous try/catch around messages.create().
 export async function generateGatewayText(params: GatewayTextParams): Promise<string> {
-  const result = await generateText({
+  const result = await inTask(params.task, () => generateText({
     model: params.model,
     ...systemInstructions(params.system, params.cacheSystem),
     prompt: params.prompt,
     ...(params.maxTokens ? { maxOutputTokens: params.maxTokens } : {}),
     ...(effortOptions(params.effort) ? { providerOptions: effortOptions(params.effort)! } : {}),
-  })
+  }))
 
   // Thinking can consume the whole budget and leave the visible answer cut off
   // mid-sentence. Fail loudly instead of persisting half an email — the caller
@@ -166,6 +172,8 @@ export interface GatewayToolCallParams {
   cacheSystem?: boolean
   /** Told what the call cost, cache reads and writes included. */
   onUsage?: (usage: GatewayUsage) => void
+  /** The business task the call is for; the engine guard records its cost against it. */
+  task?: TaskContext
   /** The single tool the model is forced to call. */
   toolName: string
   tool: Tool
@@ -179,7 +187,7 @@ export interface GatewayToolCallParams {
 export async function generateGatewayToolCall<TInput = unknown>(
   params: GatewayToolCallParams,
 ): Promise<TInput> {
-  const result = await generateText({
+  const result = await inTask(params.task, () => generateText({
     model: params.model,
     ...systemInstructions(params.system, params.cacheSystem),
     prompt: params.prompt,
@@ -187,7 +195,7 @@ export async function generateGatewayToolCall<TInput = unknown>(
     ...(effortOptions(params.effort) ? { providerOptions: effortOptions(params.effort)! } : {}),
     tools: { [params.toolName]: params.tool },
     toolChoice: { type: "tool", toolName: params.toolName },
-  })
+  }))
 
   // A forced tool call that the cap cut off never gets here: AI SDK 7 throws a
   // ToolChoiceViolationError itself when the required tool was not called.

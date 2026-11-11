@@ -1,5 +1,6 @@
 import { SERIES, candidateFields, cardSubject, checkFields, clippedWords, cutOffWords, ddmmmyy, measure, normalizeFields, overLimits, type Placement, type RequestKind } from "./series"
-import { BRAND, live } from "./brand"
+import { BRAND, activeProfile, live } from "./brand"
+import { withTask } from "../engine/task-context"
 import { headlineProblems, originalityFindings, originalityProblems, type Copied } from "./copy-checks"
 import { framesFor, icymiCount, meaningful, normalizeUrl, unusedStorySlot, type Candidate, type McuAi, type ModelCall, type RankedPhoto, type SubjectBox } from "./model"
 import { contentPropertyOf } from "./properties"
@@ -137,8 +138,11 @@ export async function runDue(deps: WorkerDeps, budgetMs = 240_000): Promise<numb
       const attempt = await deps.store.claim(item.kind, item.id, deps.nowMs(), LEASE_MS)
       if (!attempt) continue
       ran = true; steps++
-      if (item.kind === "job") await jobStep(deps, item.id, attempt)
-      else await draftStep(deps, item.id, attempt)
+      // Cost per task (Foundation A): every model call in this step is recorded against the job or draft and its
+      // brand, by the profile's id ("milcity@v12" → "milcity").
+      const property = (() => { try { return activeProfile().versionId.split("@")[0] } catch { return undefined } })()
+      await withTask({ task: `${item.kind}:${item.id}`, kind: "content-pipeline", ...(property ? { property } : {}) }, () =>
+        item.kind === "job" ? jobStep(deps, item.id, attempt) : draftStep(deps, item.id, attempt))
       break // re-read due work after every step
     }
     if (!ran) break

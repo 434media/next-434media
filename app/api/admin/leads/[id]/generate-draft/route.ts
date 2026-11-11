@@ -49,6 +49,7 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
   try {
     draft = await generateGatewayText({
       model: GATEWAY_TEXT_MODELS.outreachDraft,
+      task: { task: `lead:${id}`, kind: "outreach-draft", property: "434" },
       // A 4–6 sentence email is ~200 visible tokens, but thinking shares this
       // budget on Claude 5 — 600 truncated mid-sentence in testing. Unused
       // headroom is free (output bills per token generated), so keep it wide.
