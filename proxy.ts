@@ -17,7 +17,7 @@ export const config = {
   // Meta Pixel cookie and the pixel would silently never load there —
   // lib/__tests__/proxy-matcher.test.mjs asserts both directions.
   matcher: [
-    "/((?!_next/static|_next/image|api/|favicon\\.ico|robots\\.txt|sitemap\\.xml|llms\\.txt|(?:.*/)?opengraph-image|(?:.*/)?twitter-image|apple-icon|apple-touch-icon|.*\\.[A-Za-z0-9]+$).*)",
+    "/((?!_next/static|_next/image|api/|\\.well-known/workflow/|favicon\\.ico|robots\\.txt|sitemap\\.xml|llms\\.txt|(?:.*/)?opengraph-image|(?:.*/)?twitter-image|apple-icon|apple-touch-icon|.*\\.[A-Za-z0-9]+$).*)",
   ],
 }
 

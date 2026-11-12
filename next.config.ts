@@ -1,5 +1,7 @@
 import type { NextConfig } from "next";
 import { withBotId } from 'botid/next/config';
+// D1 durability test (test branch only, never merged): Workflow SDK, founder approval D 2026-11-11.
+import { withWorkflow } from 'workflow/next';
 import { REMOTE_IMAGE_PATTERNS } from './lib/image-hosts';
 
 const nextConfig: NextConfig = {
@@ -84,4 +86,4 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default withBotId(nextConfig);
+export default withWorkflow(withBotId(nextConfig));
