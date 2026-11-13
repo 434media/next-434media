@@ -163,7 +163,7 @@ function contactForm(overrides: Partial<ContactFormSubmission> = {}): ContactFor
     firstName: "Ana",
     lastName: "Reyes",
     company: "Alamo Labs",
-    email: "  Ana@AlamoLabs.com ",
+    email: "  Ana@AlamoLabs.test ",
     phone: "210-555-0100",
     message: "We need a three-camera shoot for our summit in March.\n\nSecond paragraph with the detail.",
     source: "434Media",
@@ -177,7 +177,7 @@ function lead(overrides: Partial<Lead> = {}): Lead {
     id: "L1",
     name: "Ana Reyes",
     company: "Alamo Labs",
-    email: "ana@alamolabs.com",
+    email: "ana@alamolabs.test",
     source: "web",
     score: 0,
     priority: "low",
@@ -197,7 +197,7 @@ function googleContact(): Activity {
     type: "google_contact",
     source: "google_contacts",
     occurred_at: AT,
-    contact: { name: "Sam Ortiz", email: "sam@ortizfilms.com", company: "Ortiz Films" },
+    contact: { name: "Sam Ortiz", email: "sam@ortizfilms.test", company: "Ortiz Films" },
     summary: "New Google contact",
     triaged: false,
     read_only: true,
@@ -276,8 +276,8 @@ test("consent: a later arrival never overwrites a withdrawal, and granted consen
 
 test("consent: a prospected Person who later writes in through the form gains consent from that source", async () => {
   const store = new MemoryStore()
-  await ensurePerson(store, { contact: { email: "x@acme.com", name: "X" }, source: "prospected", at: AT })
-  const { person, created } = await ensurePerson(store, { contact: { email: "X@acme.com" }, source: "web", at: AT })
+  await ensurePerson(store, { contact: { email: "x@acme.test", name: "X" }, source: "prospected", at: AT })
+  const { person, created } = await ensurePerson(store, { contact: { email: "X@acme.test" }, source: "web", at: AT })
   assert.equal(created, false)
   assert.equal(person.source, "prospected", "first touch is kept, so the cold gate still applies")
   assert.equal(person.consent.email.status, "granted")
@@ -290,10 +290,10 @@ const emailInput = (over: Partial<ActivityInput> = {}): ActivityInput => ({
   type: "email",
   source: "manual",
   occurred_at: AT,
-  contact: { email: "ana@alamolabs.com" },
+  contact: { email: "ana@alamolabs.test" },
   summary: "Re: summit",
   body: "Full reply text, every line of it.",
-  email: { direction: "received", from: "ana@alamolabs.com", to: ["marcos@434media.com"], cc: [], subject: "Re: summit" },
+  email: { direction: "received", from: "ana@alamolabs.test", to: ["marcos@434media.com"], cc: [], subject: "Re: summit" },
   ...over,
 })
 
@@ -414,19 +414,19 @@ test("triage: the lead path is the existing one, reached from the Firestore stor
 
 test("duplicates: one Person per email, whatever the case or spacing", async () => {
   const store = new MemoryStore()
-  const a = await ensurePerson(store, { contact: { email: "Ana@AlamoLabs.com", name: "Ana" }, source: "web", at: AT })
-  const b = await ensurePerson(store, { contact: { email: "  ana@alamolabs.com " }, source: "manual", at: AT })
+  const a = await ensurePerson(store, { contact: { email: "Ana@AlamoLabs.test", name: "Ana" }, source: "web", at: AT })
+  const b = await ensurePerson(store, { contact: { email: "  ana@alamolabs.test " }, source: "manual", at: AT })
   assert.equal(a.person.id, b.person.id)
   assert.equal(store.people.size, 1)
 })
 
 test("duplicates: the store refuses a second Person on a held email", async () => {
   const store = new MemoryStore()
-  await ensurePerson(store, { contact: { email: "a@b.com", name: "A" }, source: "web", at: AT })
+  await ensurePerson(store, { contact: { email: "a@b.test", name: "A" }, source: "web", at: AT })
   await assert.rejects(
     store.createPerson({
       name: "B",
-      emails: ["a@b.com"],
+      emails: ["a@b.test"],
       phones: [],
       lifecycle_stage: "contact",
       roles: [],
@@ -441,32 +441,32 @@ test("duplicates: the store refuses a second Person on a held email", async () =
 
 test("duplicates: one Organization per domain; free mail makes none", async () => {
   const store = new MemoryStore()
-  const a = await ensureOrganization(store, { name: "Alamo Labs", email: "ana@alamolabs.com" }, COHORTS)
-  const b = await ensureOrganization(store, { name: "Alamo Labs Inc", website: "https://www.AlamoLabs.com/about" }, COHORTS)
+  const a = await ensureOrganization(store, { name: "Alamo Labs", email: "ana@alamolabs.test" }, COHORTS)
+  const b = await ensureOrganization(store, { name: "Alamo Labs Inc", website: "https://www.AlamoLabs.test/about" }, COHORTS)
   assert.equal(a?.id, b?.id)
-  assert.equal(await ensureOrganization(store, { name: "Gmail person", email: "me@gmail.com" }, COHORTS), null)
-  assert.equal(domainFromEmail("me@Gmail.com"), "")
+  assert.equal(await ensureOrganization(store, { name: "Gmail person", email: "x@gmail.com" }, COHORTS), null)
+  assert.equal(domainFromEmail("x@gmail.com"), "")
   assert.equal(normalizeDomain("https://www.example.com:443/x"), "example.com")
 })
 
 test("duplicates: nothing merges on its own; mergePeople is explicit, logged and keeps the absorbed record", async () => {
   const store = new MemoryStore()
-  const { person: keep } = await ensurePerson(store, { contact: { email: "ana@alamolabs.com", name: "Ana" }, source: "web", at: AT })
-  const { person: other } = await ensurePerson(store, { contact: { email: "ana.reyes@gmail.com", name: "Ana Reyes" }, source: "manual", at: AT })
+  const { person: keep } = await ensurePerson(store, { contact: { email: "ana@alamolabs.test", name: "Ana" }, source: "web", at: AT })
+  const { person: other } = await ensurePerson(store, { contact: { email: "x@gmail.com", name: "Ana Reyes" }, source: "manual", at: AT })
   assert.equal(store.people.size, 2, "different emails are different People until someone merges them")
   assert.equal(store.merges.length, 0)
   const merged = await mergePeople(store, keep.id, other.id, "founder@434media.com")
-  assert.deepEqual(merged.emails.sort(), ["ana.reyes@gmail.com", "ana@alamolabs.com"])
+  assert.deepEqual(merged.emails.sort(), ["x@gmail.com", "ana@alamolabs.test"])
   assert.equal(store.people.get(other.id)?.merged_into, keep.id)
   assert.equal(store.merges.length, 1)
   assert.equal(store.merges[0].by, "founder@434media.com")
-  assert.equal((await store.findPersonByEmail("ana.reyes@gmail.com"))?.id, keep.id)
+  assert.equal((await store.findPersonByEmail("x@gmail.com"))?.id, keep.id)
 })
 
 test("duplicates: a merge keeps a withdrawal from either side", async () => {
   const store = new MemoryStore()
-  const { person: a } = await ensurePerson(store, { contact: { email: "a@x.com", name: "A" }, source: "web", at: AT })
-  const { person: b } = await ensurePerson(store, { contact: { email: "b@x.com", name: "B" }, source: "manual", at: AT })
+  const { person: a } = await ensurePerson(store, { contact: { email: "a@x.test", name: "A" }, source: "web", at: AT })
+  const { person: b } = await ensurePerson(store, { contact: { email: "b@x.test", name: "B" }, source: "manual", at: AT })
   await store.updatePerson(b.id, { consent: { email: { status: "withdrawn", basis: "withdrawn", source: "web", at: AT } } })
   const kept = await mergePeople(store, a.id, b.id, "x")
   assert.equal(kept.consent.email.status, "withdrawn")
@@ -515,15 +515,15 @@ test("adapters: a client becomes an Organization with the client role and its co
     id: "C1",
     name: "Pat Lee",
     company_name: "River City Health",
-    email: "pat@rivercityhealth.org",
-    website: "https://rivercityhealth.org",
+    email: "pat@rivercityhealth.test",
+    website: "https://rivercityhealth.test",
     status: "active",
-    contacts: [{ id: "k1", first_name: "Jo", last_name: "Diaz", email: "jo@rivercityhealth.org", role: "Finance" }],
+    contacts: [{ id: "k1", first_name: "Jo", last_name: "Diaz", email: "jo@rivercityhealth.test", role: "Finance" }],
     created_at: AT,
     updated_at: AT,
   } as unknown as ClientRecord
   const b = adaptClient(client)
-  assert.equal(b.organizations[0].domain, "rivercityhealth.org")
+  assert.equal(b.organizations[0].domain, "rivercityhealth.test")
   assert.deepEqual(b.organizations[0].roles, ["client"])
   assert.equal(b.people.length, 2)
   assert.ok(b.affiliations.every((a) => a.role === "client" && a.organization_id === "client:C1"))
@@ -559,7 +559,7 @@ test("assemble: a stored Person wins over the old record it matches", () => {
   stored.people.push({
     id: "P1",
     name: "Ana R.",
-    emails: ["ana@alamolabs.com"],
+    emails: ["ana@alamolabs.test"],
     phones: [],
     lifecycle_stage: "contact",
     roles: [],
@@ -583,8 +583,8 @@ test("assemble: a triage record takes an item out of the inbox; merged-away Peop
   assert.equal(inboxOf(assembleCoreView(emptyBundle(), [form], new Set([id]))).length, 0)
   const stored = emptyBundle()
   const base = { phones: [], lifecycle_stage: "contact" as const, roles: [], consent: consentFromSource("web", AT), source: "web" as const, visibility: "business" as const, legacy_refs: [], created_at: AT, updated_at: AT }
-  stored.people.push({ ...base, id: "K", name: "Kept", emails: ["k@x.com", "old@x.com"] })
-  stored.people.push({ ...base, id: "M", name: "Merged", emails: ["old@x.com"], merged_into: "K" })
+  stored.people.push({ ...base, id: "K", name: "Kept", emails: ["k@x.test", "old@x.test"] })
+  stored.people.push({ ...base, id: "M", name: "Merged", emails: ["old@x.test"], merged_into: "K" })
   stored.activities.push({ id: "A1", type: "note", source: "manual", occurred_at: AT, contact: {}, person_id: "M", summary: "n", triaged: true, created_at: AT })
   const view = assembleCoreView(stored, [], new Set())
   assert.deepEqual(view.people.map((p) => p.id), ["K"])
@@ -592,8 +592,8 @@ test("assemble: a triage record takes an item out of the inbox; merged-away Peop
 })
 
 test("identity: matching ignores merged-away records", () => {
-  const people = [{ emails: ["a@x.com"], merged_into: "K" }, { emails: ["a@x.com"] }]
-  assert.equal(matchPerson(people, "A@x.com"), people[1])
+  const people = [{ emails: ["a@x.test"], merged_into: "K" }, { emails: ["a@x.test"] }]
+  assert.equal(matchPerson(people, "A@x.test"), people[1])
 })
 
 // ── 8. Scoring on arrival, one rubric ───────────────────────────────────────────────────────────────────────
@@ -605,7 +605,7 @@ test("scoring: an Organization is scored by the shared rubric on arrival", async
   assert.equal(scored.icp_fit_score, direct.fit)
   assert.equal(scored.icp_grade, direct.grade)
   const store = new MemoryStore()
-  const created = await ensureOrganization(store, { name: "Alamo Labs", email: "a@alamolabs.com", location: "San Antonio, TX" }, COHORTS)
+  const created = await ensureOrganization(store, { name: "Alamo Labs", email: "a@alamolabs.test", location: "San Antonio, TX" }, COHORTS)
   assert.equal(typeof created?.icp_fit_score, "number")
   assert.ok(created?.icp_grade)
 })
