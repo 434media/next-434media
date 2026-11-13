@@ -29,6 +29,7 @@ import {
   LayoutDashboard,
   Palette,
   Landmark,
+  Users,
 } from "lucide-react"
 import type { LucideIcon } from "lucide-react"
 import type { SquadKey } from "@/components/crm/types"
@@ -156,6 +157,15 @@ const SIDEBAR_SECTIONS: SidebarSection[] = [
         matchPrefix: "/admin/inbox",
         // QA: interns get the full Pipeline section to test the funnel end-to-end.
         roles: ["full_admin", "intern"],
+      },
+      {
+        id: "people",
+        label: "People",
+        icon: Users,
+        href: "/admin/people",
+        matchPrefix: "/admin/people",
+        description: "One record per person and company; the inbox of every arrival",
+        roles: ["full_admin", "crm_only", "intern"],
       },
       {
         id: "leads",

@@ -106,6 +106,11 @@ jobs:
       # Cold outbound is US-only (master 5.3): one US allow-list, failing closed, gates prospecting scoring and
       # approval, send-outreach and every outreach-sequence step; warm and inbound leads are not gated (JUR-1, JUR-2).
       - run: tsx --test lib/__tests__/cold-outreach-jurisdiction.test.ts
+      # The core data model (V1 item 4, first step): Person, Organization, Affiliation, Activity and the inbox view.
+      # The guardrails that must survive: the cold gate on a Person (US only, fails closed, keyed on source, inputs
+      # locked), consent per source with suppression winning, the full text of every email kept, a dismissed Google
+      # Contacts entry never stored, duplicates matched by email and domain and merged only explicitly, visibility.
+      - run: tsx --test lib/__tests__/core-model.test.ts
 
       # The engine on AI SDK 7 (V1 item 2): the real generateText against the SDK's mock model. System text goes through
       # `instructions` (v7 rejects system messages inside `messages`), the cache markers and Gateway automatic caching

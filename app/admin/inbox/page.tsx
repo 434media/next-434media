@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { useSearchParams } from "next/navigation"
+import Link from "next/link"
 import { Inbox, CheckCircle2, AlertCircle } from "lucide-react"
 import { AdminRoleGuard } from "@/components/AdminRoleGuard"
 import { ContactFormsTab } from "@/components/admin/submissions/ContactFormsTab"
@@ -97,6 +98,14 @@ export default function InboxPage() {
               waiting / replied today / avg response time across the contact
               forms surface. Tone shifts (amber → red) when oldest waiting
               crosses 24h. */}
+          <p className="mb-4 text-xs text-neutral-500">
+            Every arrival, matched to one person and company, is also in{" "}
+            <Link href="/admin/people" className="font-medium text-neutral-800 underline underline-offset-2">
+              People
+            </Link>
+            .
+          </p>
+
           <InboxResponseStrip refreshSignal={statsNonce} />
 
           <ContactFormsTab

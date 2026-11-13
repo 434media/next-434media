@@ -78,6 +78,10 @@
 /app/api/owned-meta/oauth-protected-resource/ @434media/founder
 /app/api/parse-event/                        @434media/founder
 /lib/__tests__/parse-event-gated.test.ts     @434media/founder
+# The core data model: who may see a record, and the routes that apply it (V1 item 4)
+/lib/core-model/visibility.ts                @434media/founder
+/lib/core-model/route-helpers.ts             @434media/founder
+/app/api/admin/core/                         @434media/founder
 
 # Money
 /lib/shopify/                                @434media/founder
@@ -138,6 +142,10 @@
 /lib/mailchimp-*.ts                          @434media/founder
 /lib/newsletter-subscribe.ts                 @434media/founder
 /lib/firestore-suppression.ts                @434media/founder
+/lib/core-model/consent.ts                   @434media/founder
+/lib/core-model/cold-gate.ts                 @434media/founder
+/lib/core-model/service.ts                   @434media/founder
+/lib/core-model/firestore-store.ts           @434media/founder
 /lib/prospecting/scorer.ts                   @434media/founder
 /lib/prospecting/icp-base.md                 @434media/founder
 /app/api/cron/                               @434media/founder

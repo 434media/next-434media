@@ -599,6 +599,19 @@ export const CRM_COLLECTIONS = {
   // One document per notification route id: {to, cc} mailboxes for an internal notification email
   // (lib/firestore-notification-routes.ts). The Lead with Ops call request reads "lead-with-ops-call-request".
   NOTIFICATION_ROUTES: "notification_routes",
+  // The core data model (V1 item 4, 434-context `04 Build/434_Core_Data_Model_Spec.md`; types in
+  // types/core-model.ts). One Person per email and one Organization per domain, each claimed through its index
+  // collection inside a transaction. Activities are written once and never edited; triage is its own record,
+  // keyed on the activity id, so activities read from old collections are triaged the same way. Merges are
+  // explicit and logged. Old collections are read in at read time (lib/core-model/read.ts), never written.
+  PEOPLE: "crm_people",
+  ORGANIZATIONS: "crm_organizations",
+  AFFILIATIONS: "crm_affiliations",
+  ACTIVITIES: "crm_activities",
+  ACTIVITY_TRIAGE: "crm_activity_triage",
+  PERSON_EMAILS: "crm_person_emails",
+  ORG_DOMAINS: "crm_org_domains",
+  MERGES: "crm_merges",
 } as const
 
 // ============================================
