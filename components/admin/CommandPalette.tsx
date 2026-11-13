@@ -23,6 +23,7 @@ import {
   CheckCircle2,
   Calendar,
   ArrowRight,
+  Users,
 } from "lucide-react"
 import type { LucideIcon } from "lucide-react"
 
@@ -124,6 +125,15 @@ const STATIC_ITEMS: CommandItem[] = [
     section: "Navigate",
     search: "inbox contact forms inquiries reply messages",
     run: (router) => router.push("/admin/inbox"),
+  },
+  {
+    id: "nav-people",
+    label: "People",
+    hint: "People, organizations and the inbox of every arrival",
+    icon: Users,
+    section: "Navigate",
+    search: "people contacts organizations companies inbox triage person",
+    run: (router) => router.push("/admin/people"),
   },
   {
     id: "nav-audiences",
