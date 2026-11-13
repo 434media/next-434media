@@ -71,6 +71,7 @@ export async function PATCH(request: NextRequest, ctx: Ctx) {
     if ("visibility" in body) {
       if (!canSetVisibility(viewer)) return NextResponse.json({ error: "Only a full admin can change visibility" }, { status: 403 })
       patch.visibility = normalizeVisibility(body.visibility)
+      if (patch.visibility === "private") return NextResponse.json({ error: "visibility must be business or restricted" }, { status: 400 })
     }
     const rescore = ["name", "industry", "location", "employee_count", "annual_revenue"].some((k) => k in body)
     if (rescore) Object.assign(patch, scoreOrganization({ ...current, ...patch }, await listIcpCohorts(), new Date().toISOString()))

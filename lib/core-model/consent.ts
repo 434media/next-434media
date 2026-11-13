@@ -38,7 +38,15 @@ export function mergeConsent(current: PersonConsent, incoming: PersonConsent): P
 }
 
 /** The one check every email send makes. Suppression wins over everything. */
-export function canEmail(person: Pick<Person, "consent">, suppressed: boolean): { allowed: boolean; reason: string } {
+export function canEmail(
+  person: Pick<Person, "consent"> & { relationship?: Person["relationship"] },
+  suppressed: boolean,
+): { allowed: boolean; reason: string } {
+  // A personal contact is never in a sequence, broadcast or any outbound path: only the founder, one to one, from his
+  // own mail (spec, "Personal or business"; contract 1.5 §2). Checked first, whatever consent says.
+  if (person.relationship === "personal") {
+    return { allowed: false, reason: "Personal contact: never in a sequence or broadcast." }
+  }
   if (suppressed) return { allowed: false, reason: "The address is suppressed (unsubscribed, bounced or complained)." }
   const c = person.consent.email
   if (c.status === "granted") return { allowed: true, reason: `Consent: ${c.basis} via ${c.source}.` }

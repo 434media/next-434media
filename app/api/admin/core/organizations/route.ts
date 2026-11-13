@@ -47,6 +47,8 @@ export async function POST(request: NextRequest) {
   const domain = domainRaw ? normalizeDomain(domainRaw) : ""
   if (domainRaw && !domain) return NextResponse.json({ error: "That domain is not valid" }, { status: 400 })
   const visibility = normalizeVisibility(body.visibility)
+  // `private` is the founder's personal tier and comes only from a personal contact, never set on a company by hand.
+  if (visibility === "private") return NextResponse.json({ error: "visibility must be business or restricted" }, { status: 400 })
   if (visibility === "restricted" && !canSetVisibility(await viewerOf(auth.session))) {
     return NextResponse.json({ error: "Only a full admin can restrict a record" }, { status: 403 })
   }

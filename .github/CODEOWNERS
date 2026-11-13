@@ -80,8 +80,19 @@
 /lib/__tests__/parse-event-gated.test.ts     @434media/founder
 # The core data model: who may see a record, and the routes that apply it (V1 item 4)
 /lib/core-model/visibility.ts                @434media/founder
+/lib/core-model/view-filter.ts               @434media/founder
+/lib/core-model/read.ts                      @434media/founder
 /lib/core-model/route-helpers.ts             @434media/founder
+/lib/core-model/lifecycle.ts                 @434media/founder
+/lib/core-model/address-book.ts              @434media/founder
+/lib/firestore-people.ts                     @434media/founder
+/lib/firestore-activities.ts                 @434media/founder
 /app/api/admin/core/                         @434media/founder
+# The founder's personal contacts and the Google Contacts sync: personal data, a secret, the founder-only gate
+# (interface contract 1.5 §2)
+/lib/google-contacts/                        @434media/founder
+/lib/__tests__/core-model-personal.test.ts   @434media/founder
+/lib/__tests__/google-contacts.test.ts       @434media/founder
 
 # Money
 /lib/shopify/                                @434media/founder

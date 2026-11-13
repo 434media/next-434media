@@ -326,6 +326,13 @@ ADMIN_OWNER_EMAILS=owner@example.com          # owners: super admin on every che
 ADMIN_FOUNDER_EMAIL=founder@example.com      # the founder's own address(es), comma-separated; the founder-only guard (lib/founder-guard.ts): /admin/finance and /api/admin/finance; unset = everyone refused
 ADMIN_ALERT_EMAIL=alerts@example.com         # optional; where the cron watchdog's alerts and daily all-clear go, comma-separated; subjects start "[434 alert]"; unset or no valid address = ADMIN_FOUNDER_EMAIL. Not sign-in
 
+# PEOPLE: GOOGLE CONTACTS SYNC (the founder's personal Gmail; lib/google-contacts/; Production only)
+# GOOGLE_CONTACTS_CLIENT_ID=...              # OAuth client on groovy-ego, External, "In production", contacts scope only
+# GOOGLE_CONTACTS_CLIENT_SECRET=...
+# GOOGLE_CONTACTS_TOKEN_KEY=base64-32-bytes  # AES-256-GCM key sealing the stored refresh token, as QUICKBOOKS_TOKEN_KEY
+# GOOGLE_CONTACTS_REDIRECT_URI=...           # optional; default https://www.434media.com/api/admin/core/google-contacts/callback
+# Only the founder (ADMIN_FOUNDER_EMAIL, and a super admin) can connect, see personal contacts or switch write-back on.
+
 # FINANCE: QUICKBOOKS ONLINE (Phase 1, read only: lib/quickbooks.ts, lib/quickbooks-server.ts)
 # QUICKBOOKS_CLIENT_ID=...                   # Intuit app keys: Production keys in Production only, sandbox keys in Preview
 # QUICKBOOKS_CLIENT_SECRET=...

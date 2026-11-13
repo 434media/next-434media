@@ -2,11 +2,20 @@
 
 import { NextResponse } from "next/server"
 import { isCrmSuperAdmin, type User } from "@/lib/auth"
+import { founderDecision, founderEmails } from "@/lib/founder-guard"
 import type { Viewer } from "./read"
 import { CoreRuleError, DuplicateError } from "./service"
 
+/**
+ * Who is viewing. `founder` comes from the founder guard (ADMIN_FOUNDER_EMAIL and a verified sign-in), never from a
+ * role, so no one can be granted the `private` tier from inside the admin.
+ */
 export async function viewerOf(session: User): Promise<Viewer> {
-  return { role: session.role ?? null, superAdmin: await isCrmSuperAdmin(session.email) }
+  return {
+    role: session.role ?? null,
+    superAdmin: await isCrmSuperAdmin(session.email),
+    founder: founderDecision(session, founderEmails()).allowed,
+  }
 }
 
 /** 400/404/409/502 for a broken rule, 409 with the existing id for a duplicate, 500 for anything else. */
