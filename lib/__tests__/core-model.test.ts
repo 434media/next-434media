@@ -456,7 +456,7 @@ test("duplicates: nothing merges on its own; mergePeople is explicit, logged and
   assert.equal(store.people.size, 2, "different emails are different People until someone merges them")
   assert.equal(store.merges.length, 0)
   const merged = await mergePeople(store, keep.id, other.id, "founder@434media.com")
-  assert.deepEqual(merged.emails.sort(), ["x@gmail.com", "ana@alamolabs.test"])
+  assert.deepEqual(merged.emails.sort(), ["ana@alamolabs.test", "x@gmail.com"])
   assert.equal(store.people.get(other.id)?.merged_into, keep.id)
   assert.equal(store.merges.length, 1)
   assert.equal(store.merges[0].by, "founder@434media.com")
