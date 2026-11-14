@@ -224,6 +224,7 @@
 /app/admin/review/                           @434media/founder
 /components/admin/review/                    @434media/founder
 /lib/__tests__/agent-review.test.ts          @434media/founder
+/lib/__tests__/exam-reports.test.ts          @434media/founder
 /app/api/admin/content/rows/*/               @434media/founder
 # The Instagram read routes hold each brand's Page access token, which can also publish.
 /app/api/instagram/                          @434media/founder
