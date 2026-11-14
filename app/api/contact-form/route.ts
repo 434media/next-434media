@@ -2,8 +2,12 @@ import { NextResponse, after } from "next/server"
 import { saveContactForm } from "@/lib/firestore-contact-forms"
 import { notifyNewContactForm } from "@/lib/contact-form-notification"
 import { lookupForArrival } from "@/lib/core-model/company-lookup-server"
+import { intakeOnArrival } from "@/lib/agent/intake-server"
 import { requireHumanRequest } from "@/lib/botid-guard"
 import { BUDGET_RANGES, ORGANIZATION_TYPES, REQUEST_OPTIONS, isOneOf } from "@/lib/start-a-production"
+
+// The intake run (V1 item 4, the proof slice) runs in `after()`, inside this function's time.
+export const maxDuration = 300
 
 const text = (v: unknown) => (typeof v === "string" ? v.trim() : "")
 
@@ -66,6 +70,16 @@ export async function POST(request: Request) {
           await lookupForArrival({ email, company, source: "web", activity_id: result.id ? `contact_forms:${result.id}` : undefined })
         } catch (err) {
           console.error("[contact-form] company lookup failed:", err)
+        }
+        // Intake on the engine, in draft (V1 item 4): only when the kill switch's intake mode admits this arrival
+        // (it ships "off"). Drafts a reply for the founder-review queue; sends nothing. A task left queued is picked
+        // up by the agent sweep.
+        if (result.id) {
+          try {
+            await intakeOnArrival({ formId: result.id, email })
+          } catch (err) {
+            console.error("[contact-form] intake run failed:", err)
+          }
         }
       })
     }

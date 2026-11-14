@@ -154,6 +154,7 @@ jobs:
       # V1 item 4, the proof slice: the shared approval core and the controls (ledger, kill switch, send, decisions).
       - run: tsx --test lib/__tests__/send-approval.test.ts
       - run: tsx --test lib/__tests__/agent-controls.test.ts
+      - run: tsx --test lib/__tests__/agent-intake.test.ts
       # Owned Meta tool route, Slack approval binding and processing continuation (all transports faked).
       - run: tsx --test lib/__tests__/owned-meta-tool.test.ts
       # Owned Meta service entry for the shared Slack app: pilot identity and acting-person checks.
