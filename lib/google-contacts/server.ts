@@ -119,7 +119,7 @@ export function peopleApi(deps: GcDeps): PeopleApi {
         deps,
         "GET",
         "/v1/people/me/connections",
-        { query: { personFields: PERSON_FIELDS, pageSize: "200", requestSyncToken: "true", pageToken, syncToken } },
+        { query: { personFields: PERSON_FIELDS, pageSize: "50", requestSyncToken: "true", pageToken, syncToken } },
       )
       return { connections: r.connections ?? [], nextPageToken: r.nextPageToken, nextSyncToken: r.nextSyncToken }
     },
@@ -301,7 +301,11 @@ export type RunOutcome =
   | { state: "error"; message: string }
   | { state: "ok"; result: SyncResult }
 
-export async function runSyncNow(): Promise<RunOutcome> {
+/**
+ * One run. `budgetMs` must leave headroom under the caller's maxDuration (both callers allow 300 s): the run checks
+ * it before every contact and saves its place, so a large page never outlives the function.
+ */
+export async function runSyncNow(budgetMs = 200_000): Promise<RunOutcome> {
   const setup = gcSetup()
   if (!setup.ok) return { state: "not_configured", missing: setup.missing }
   const deps = gcDeps(setup.client)
@@ -313,6 +317,7 @@ export async function runSyncNow(): Promise<RunOutcome> {
         store: firestoreCoreStore,
         people: {
           byResourceName: findPersonByResourceName,
+          all: async () => (await listPeople()).filter((p) => !p.merged_into),
           linked: async () => (await listPeople()).filter((p) => p.google && !p.merged_into),
           knownBusinessEmails: async () => {
             const view = await getCoreView()
@@ -324,7 +329,7 @@ export async function runSyncNow(): Promise<RunOutcome> {
         log: writeLog,
         cohorts: await listIcpCohorts(),
         now: () => new Date().toISOString(),
-        budgetMs: 240_000,
+        budgetMs,
       }),
     )
     invalidateCoreView()

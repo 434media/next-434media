@@ -25,6 +25,7 @@ import type {
   AddressBook,
   Affiliation,
   AffiliationRole,
+  GoogleLink,
   CoreRole,
   CoreSource,
   LifecycleStage,
@@ -116,6 +117,8 @@ export interface PersonArrival {
   allowPrivate?: boolean
   /** The whole Google record, for a Person created from the address book. */
   address_book?: AddressBook
+  /** The Google link, written with a new Person in the same write (the sync's import). */
+  google?: GoogleLink
 }
 
 /** The relationship and visibility a new record gets. Personal is always `private`. */
@@ -181,6 +184,7 @@ export async function ensurePerson(store: CoreStore, input: PersonArrival): Prom
     ...rv,
     notes: book?.notes || undefined,
     address_book: book,
+    google: input.google,
     added_by: input.actor,
     legacy_refs: [],
   })
@@ -262,10 +266,11 @@ export async function recordArrival(
     relationship?: Relationship
     allowPrivate?: boolean
     address_book?: AddressBook
+    google?: GoogleLink
   },
   cohorts: CohortLike[],
 ): Promise<{ person: Person; organization: Organization | null; activity: Activity; created: boolean }> {
-  const { stage, roles, visibility, relationship, allowPrivate, address_book, ...activityInput } = input
+  const { stage, roles, visibility, relationship, allowPrivate, address_book, google, ...activityInput } = input
   const problem = validateActivity({ ...activityInput })
   if (problem) throw new CoreRuleError(problem)
   const { person, created } = await ensurePerson(store, {
@@ -279,6 +284,7 @@ export async function recordArrival(
     relationship,
     allowPrivate,
     address_book,
+    google,
   })
   const fromAddressBook = Boolean(address_book) || input.source === "google_contacts"
   const organization = await ensureOrganization(

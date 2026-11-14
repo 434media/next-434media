@@ -92,8 +92,12 @@ export async function createOrganization(input: NewOrganization): Promise<Organi
     tx.set(ref, stripUndefined({ ...input, domain, created_at: now, updated_at: now }))
     if (claim) tx.set(claim, { domain, organization_id: ref.id, at: now })
   })
-  invalidateOrganizations()
-  return (await getOrganization(ref.id)) as Organization
+  const created = (await getOrganization(ref.id)) as Organization
+  // Add the new record to a warm list rather than dropping the list: a bulk import creating one company per contact
+  // would otherwise re-read the whole collection for every contact (findOrganizationByName reads the list).
+  if (listCache && created) listCache = { data: [...listCache.data, created], ts: listCache.ts }
+  else invalidateOrganizations()
+  return created
 }
 
 /** Update fields. A new domain is claimed (and refused if another Organization holds it). */

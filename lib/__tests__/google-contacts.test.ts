@@ -193,6 +193,9 @@ function harness(state: Partial<SyncState> = {}) {
       async byResourceName(rn: string) {
         return [...store.people.values()].find((p) => p.google?.resource_name === rn) ?? null
       },
+      async all() {
+        return [...store.people.values()].filter((p) => !p.merged_into)
+      },
       async linked() {
         return [...store.people.values()].filter((p) => p.google)
       },
@@ -200,7 +203,10 @@ function harness(state: Partial<SyncState> = {}) {
         return knownBusiness
       },
     },
+    // Every timestamp the sync takes moves the clock one second, so a budget can be measured in contacts.
     now: () => new Date((clock += 1000)).toISOString(),
+    nowMs: () => clock,
+    budgetMs: undefined as number | undefined,
   }
   return {
     store,
@@ -567,4 +573,79 @@ test("oauth: the token is sealed with its own key and kept in Firestore, never i
   assert.match(server, /google_contacts_connection/)
   assert.match(read("lib/google-contacts/client.ts"), /sealJson\(deps\.client\.tokenKey/)
   assert.match(read("lib/google-contacts/client.ts"), /GOOGLE_CONTACTS_TOKEN_KEY/)
+})
+
+// ── 8. The time budget (production, 2026-11-14: one 200-contact page outran the 300 s function) ─────────────────
+
+test("budget: a page larger than the budget stops mid-page, saves, and the next run continues without duplicates", async () => {
+  const h = harness()
+  // Ten contacts on one page; half have no email, which no address can de-duplicate.
+  const page = Array.from({ length: 10 }, (_, i) =>
+    gp(`9${i}`, i % 2 ? { emailAddresses: [{ value: `p${i}@example.com` }] } : { emailAddresses: [] }),
+  )
+  h.api.pages = [{ connections: page, nextSyncToken: "s-after-import" }]
+  h.deps.budgetMs = 4_000 // about four contacts on the harness clock (one second per contact)
+  const first = await runSync(h.deps)
+  assert.equal(first.stopped_on_budget, true)
+  assert.equal(first.done, false)
+  assert.ok(first.imported > 0 && first.imported < 10, `imported ${first.imported}`)
+  assert.equal(h.state().phase, "import", "still importing")
+  assert.equal(h.state().page_token, undefined, "the page token did not move past the unfinished page")
+  assert.equal(h.state().last_result?.stopped_on_budget, true, "the run saved its place before stopping")
+  // Every Person made so far is linked: a run cut off between contacts leaves no unlinked copy.
+  assert.ok([...h.store.people.values()].every((p) => p.google?.resource_name))
+
+  // The next run reads the same page again (the token did not move) and has time to finish.
+  h.api.pages = [{ connections: page, nextSyncToken: "s-after-import" }]
+  h.deps.budgetMs = 10_000_000
+  const second = await runSync(h.deps)
+  assert.equal(second.done, true)
+  assert.equal(first.imported + second.imported, 10)
+  assert.equal(h.store.people.size, 10, "no contact was imported twice")
+  const rns = [...h.store.people.values()].map((p) => p.google?.resource_name)
+  assert.equal(new Set(rns).size, 10)
+  assert.equal(h.state().phase, "sync")
+  assert.equal(h.state().sync_token, "s-after-import")
+  assert.deepEqual([...h.store.activities.keys()].filter((id) => !h.store.triage.has(id)), [], "nothing was left in the inbox")
+})
+
+test("budget: the budget is checked before every contact, and both callers leave headroom under 300 s", () => {
+  const sync = read("lib/google-contacts/sync.ts")
+  assert.match(sync, /for \(const raw of page\.connections \?\? \[\]\) \{\s*\/\/[^\n]*\n(\s*\/\/[^\n]*\n)*\s*if \(outOfTime\(\)\)/)
+  const server = read("lib/google-contacts/server.ts")
+  assert.match(server, /runSyncNow\(budgetMs = 200_000\)/)
+  assert.match(server, /pageSize: "50"/)
+  for (const f of ["app/api/cron/google-contacts-sync/route.ts", "app/api/admin/core/google-contacts/sync/route.ts"]) {
+    assert.match(read(f), /export const maxDuration = 300/, f)
+  }
+})
+
+test("budget: a Person an earlier cut-off run created without its link is linked, not copied", async () => {
+  const h = harness()
+  // What the first production run could leave: the Person written, the Google link not yet (no email to match on).
+  const { ensurePerson } = await import("../core-model/service")
+  const { person: orphan } = await ensurePerson(h.store, {
+    contact: { name: "Given95 Example" },
+    source: "google_contacts",
+    at: AT,
+    actor: "google-contacts-sync",
+    relationship: "personal",
+    allowPrivate: true,
+  })
+  h.api.pages = [{ connections: [gp("95", { emailAddresses: [] })], nextSyncToken: "s" }]
+  const r = await runSync(h.deps)
+  assert.equal(r.relinked, 1)
+  assert.equal(r.imported, 0)
+  assert.equal(h.store.people.size, 1)
+  assert.equal(h.store.people.get(orphan.id)?.google?.resource_name, "people/c95")
+})
+
+test("budget: a contact read again with the same etag is not written again", async () => {
+  const h = harness()
+  h.api.pages = [{ connections: [gp("96"), gp("97")], nextSyncToken: "s1" }]
+  await runSync(h.deps)
+  const writes = h.store.writes
+  h.api.syncPages = [{ connections: [gp("96"), gp("97")], nextSyncToken: "s2" }]
+  await runSync(h.deps)
+  assert.equal(h.store.writes, writes)
 })
