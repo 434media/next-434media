@@ -22,6 +22,9 @@ import { createHash } from "node:crypto"
  */
 export const PROTECTED_TARGETS = [
   "brand_profiles",
+  // The skill pins and the kill switch (V1 item 4): set by the founder, signed in, never by a run.
+  "agent_skills",
+  "crm_meta",
   "skills/",
   ".claude/",
   "03 Skills/",

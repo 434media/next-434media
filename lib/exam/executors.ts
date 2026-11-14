@@ -8,7 +8,7 @@
  *    it is never run by CI and never from a laptop key: a live run belongs behind a super-admin gate, as the engine's
  *    smoke route is.
  */
-import { generateText, type LanguageModel } from "ai"
+import { generateText, type LanguageModel, type ToolSet } from "ai"
 import { z } from "zod"
 import { skillAgent, type SkillFiles } from "../skills/loader"
 import type { ExamOutput, ExamUsage, Judge } from "./assertions"
@@ -98,6 +98,26 @@ export interface EngineExecutorOptions {
   /** Reasoning effort, passed to Anthropic models. Low by default; thinking is never switched off. */
   effort?: "low" | "medium" | "high"
   maxSteps?: number
+  /**
+   * Real tools offered beside the suite's mocks, one set per case, for tools that only read or compute: the skill's own
+   * scripts run in a sandbox (lib/agent/skill-scripts.ts), so the exam judges the skill as it runs. Each call is logged
+   * like a mock call. The caller is responsible for offering nothing that sends, posts or writes; `close` runs after the
+   * case. The exam itself still imports no client of its own.
+   */
+  liveTools?: () => { tools: ToolSet; close(): Promise<void> }
+}
+
+/** A real tool, logged as the exam logs a mock: the call and its arguments, accepted. */
+function logged(name: string, t: ToolSet[string], log: ToolCallRecord[]): ToolSet[string] {
+  const run = t.execute
+  if (!run) return t
+  return {
+    ...t,
+    execute: async (input: unknown, opts: unknown) => {
+      log.push({ tool: name, args: (input && typeof input === "object" ? input : {}) as Record<string, unknown>, accepted: true })
+      return (run as (i: unknown, o: unknown) => unknown)(input, opts)
+    },
+  } as ToolSet[string]
 }
 
 export function engineExecutor(o: EngineExecutorOptions): Executor {
@@ -108,21 +128,30 @@ export function engineExecutor(o: EngineExecutorOptions): Executor {
       const log: ToolCallRecord[] = []
       const offered = c.tools ? suite.tools.filter(t => c.tools!.includes(t.name)) : suite.tools
       let agent
+      const live = o.liveTools?.()
+      const tools: ToolSet = mockTools(offered, c.input.caller?.scope, log)
+      for (const [name, t] of Object.entries(live?.tools ?? {})) tools[name] = logged(name, t, log)
       try {
         agent = skillAgent({
           files: o.skill.files,
           folder: o.skill.folder,
           expectedSha256: o.skill.expectedSha256,
           model: o.model,
-          tools: mockTools(offered, c.input.caller?.scope, log),
+          tools,
           maxSteps: o.maxSteps ?? 12,
           maxOutputTokens: o.maxOutputTokens ?? 16_000,
           providerOptions: { anthropic: { output_config: { effort: o.effort ?? "low" } } },
         }).agent
       } catch (e) {
+        await live?.close()
         return { text: "", toolCalls: [], error: (e as Error).message, model: modelName }
       }
-      const r = await agent.generate({ prompt: renderCase(c) })
+      let r
+      try {
+        r = await agent.generate({ prompt: renderCase(c) })
+      } finally {
+        await live?.close()
+      }
       const u = r.totalUsage
       const usage: ExamUsage = {
         inputTokens: u.inputTokens,

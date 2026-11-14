@@ -213,6 +213,11 @@
 /lib/__tests__/send-approval.test.ts         @434media/founder
 /lib/__tests__/agent-controls.test.ts        @434media/founder
 /lib/__tests__/helpers/agent-db.ts           @434media/founder
+# Intake on the engine: the skill source (a GitHub App credential), the sandboxed scripts, the pin and the exam.
+/app/api/admin/agent/                        @434media/founder
+/app/api/admin/engine/                       @434media/founder
+/lib/exam/                                   @434media/founder
+/lib/__tests__/agent-intake.test.ts          @434media/founder
 /app/api/admin/content/rows/*/               @434media/founder
 # The Instagram read routes hold each brand's Page access token, which can also publish.
 /app/api/instagram/                          @434media/founder
