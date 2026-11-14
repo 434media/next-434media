@@ -9,6 +9,7 @@ import { LIFECYCLE_STAGES } from "@/types/core-model"
 import type { CoreBundle } from "./adapters"
 import { mergeConsent } from "./consent"
 import { normalizeEmail, organizationNameKey } from "./identity"
+import { affiliationRoleForDomain, asShown } from "./own-company"
 
 export interface CoreView {
   people: Person[]
@@ -142,8 +143,10 @@ export function assembleCoreView(stored: CoreBundle, adapted: CoreBundle[], tria
     const p = person(a.person_id) as string
     const o = org(a.organization_id) as string
     if (!people.has(p) || !orgs.has(o)) continue
-    const key = `${p}|${o}|${a.role}`
-    if (!affs.has(key)) affs.set(key, { ...a, person_id: p, organization_id: o })
+    // Nobody is a prospect or client of 434's own company: a link to it only records where someone works.
+    const role = affiliationRoleForDomain(orgs.get(o)?.domain, a.role)
+    const key = `${p}|${o}|${role}`
+    if (!affs.has(key)) affs.set(key, { ...a, role, person_id: p, organization_id: o })
   }
 
   // ── Activities ──
@@ -166,7 +169,7 @@ export function assembleCoreView(stored: CoreBundle, adapted: CoreBundle[], tria
 
   return {
     people: [...people.values()].sort((a, b) => a.name.localeCompare(b.name)),
-    organizations: [...orgs.values()].sort((a, b) => a.name.localeCompare(b.name)),
+    organizations: [...orgs.values()].map(asShown).sort((a, b) => a.name.localeCompare(b.name)),
     affiliations: [...affs.values()],
     activities,
   }

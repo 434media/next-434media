@@ -79,8 +79,9 @@ async function build(): Promise<BuiltCoreView> {
   // Scoring on arrival: a stored Organization was scored when it was created; one read in from an old collection
   // is scored here, once per build, with the same rubric.
   const at = new Date().toISOString()
+  // 434's own company (marked `own` by the assembly) is never scored.
   view.organizations = view.organizations.map((o) =>
-    typeof o.icp_fit_score === "number" ? o : { ...o, ...scoreOrganization(o, cohorts, at) },
+    o.own || typeof o.icp_fit_score === "number" ? o : { ...o, ...scoreOrganization(o, cohorts, at) },
   )
   return { ...view, warnings, built_at: at }
 }

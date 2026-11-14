@@ -1,7 +1,7 @@
 import { getDb } from "./firebase-admin"
 import { CRM_COLLECTIONS } from "../types/crm-types"
 import type { IcpFitBreakdown, IcpGrade } from "../types/crm-types"
-import type { CoreRole, LegacyRef, Organization } from "../types/core-model"
+import type { CompanyLookupMark, CoreRole, LegacyRef, Organization } from "../types/core-model"
 import { CORE_ROLES } from "../types/core-model"
 import { normalizeVisibility } from "./core-model/visibility"
 import { normalizeDomain, organizationNameKey } from "./core-model/identity"
@@ -41,11 +41,30 @@ function normalize(id: string, raw: FirebaseFirestore.DocumentData): Organizatio
     scored_at: toIsoString(raw.scored_at) || undefined,
     capabilities: str(raw.capabilities),
     rates: str(raw.rates),
+    company_lookup: normalizeLookupMark(raw.company_lookup),
     visibility: normalizeVisibility(raw.visibility),
     legacy_refs: Array.isArray(raw.legacy_refs) ? (raw.legacy_refs as LegacyRef[]) : [],
     merged_into: str(raw.merged_into),
     created_at: toIsoString(raw.created_at),
     updated_at: toIsoString(raw.updated_at),
+  }
+}
+
+const LOOKUP_STATUSES: ReadonlyArray<CompanyLookupMark["status"]> = ["pending", "matched", "no_match", "mismatch", "error"]
+
+function normalizeLookupMark(raw: unknown): CompanyLookupMark | undefined {
+  if (!raw || typeof raw !== "object") return undefined
+  const r = raw as Record<string, unknown>
+  const status = LOOKUP_STATUSES.includes(r.status as CompanyLookupMark["status"]) ? (r.status as CompanyLookupMark["status"]) : undefined
+  if (!status) return undefined
+  return {
+    status,
+    source: "apollo",
+    at: toIsoString(r.at),
+    credits: num(r.credits) ?? 0,
+    apollo_organization_id: str(r.apollo_organization_id),
+    filled: Array.isArray(r.filled) ? asStringArray(r.filled) : undefined,
+    error: str(r.error),
   }
 }
 
@@ -114,6 +133,11 @@ export async function updateOrganization(id: string, patch: Partial<NewOrganizat
     if ("domain" in patch) {
       const domain = normalizeDomain(patch.domain) || undefined
       update.domain = domain ?? null
+      // The domain it held before is released, so a corrected domain (two Organizations whose domains were swapped)
+      // can be claimed by the Organization it belongs to. Only a claim this Organization holds is released.
+      const previous = normalizeDomain(cur.data()?.domain) || undefined
+      const oldClaim = previous && previous !== domain ? db.collection(DOMAINS).doc(domainClaimId(previous)) : null
+      const oldSnap = oldClaim ? await tx.get(oldClaim) : null
       if (domain) {
         const claim = db.collection(DOMAINS).doc(domainClaimId(domain))
         const snap = await tx.get(claim)
@@ -121,6 +145,7 @@ export async function updateOrganization(id: string, patch: Partial<NewOrganizat
         if (snap.exists && holder !== id) throw new DuplicateError(`${domain} already belongs to an organization.`, holder as string)
         if (!snap.exists) tx.set(claim, { domain, organization_id: id, at: now })
       }
+      if (oldClaim && oldSnap?.exists && oldSnap.data()?.organization_id === id) tx.delete(oldClaim)
     }
     tx.update(ref, stripUndefined(update))
   })
