@@ -157,6 +157,9 @@
 /lib/core-model/cold-gate.ts                 @434media/founder
 /lib/core-model/service.ts                   @434media/founder
 /lib/core-model/firestore-store.ts           @434media/founder
+# People data and permissions: the one edit service and its tests.
+/lib/core-model/edit.ts                      @434media/founder
+/lib/__tests__/core-model-edit.test.ts       @434media/founder
 /lib/prospecting/scorer.ts                   @434media/founder
 # Money: the company lookup spends Apollo credits, and the Apollo client, its budget and credit log govern that spend.
 /lib/core-model/company-lookup.ts            @434media/founder

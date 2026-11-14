@@ -123,6 +123,14 @@ jobs:
       # credit logged; it writes only the Organization and the grade is rescored on the real company. 434's own company
       # is never a prospect or client, and a saved Organization's domain can be corrected.
       - run: tsx --test lib/__tests__/company-lookup.test.ts
+      # Editing People and Organizations: staff never see or edit a personal contact; only the founder changes
+      # personal/business; a record read from an old collection is saved as one superseding core record and the old
+      # collection is never written; no duplicate after an edit; clients never revert; the cold-gate fields stay
+      # locked; every edit is logged as a triaged Activity with the record's visibility.
+      - run: tsx --test lib/__tests__/core-model-edit.test.ts
+      # The Clients list: two client records sharing a company name are two rows (one was hidden behind the other,
+      # 2026-11-14); opportunities still collapse into their company's row.
+      - run: tsx --test lib/__tests__/client-rows.test.ts
 
       # The engine on AI SDK 7 (V1 item 2): the real generateText against the SDK's mock model. System text goes through
       # `instructions` (v7 rejects system messages inside `messages`), the cache markers and Gateway automatic caching

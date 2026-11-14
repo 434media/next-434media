@@ -447,6 +447,7 @@ test("swap: changing a saved Organization's domain releases the old one, and the
   assert.match(src, /tx\.delete\(oldClaim\)/)
   assert.match(src, /oldSnap\.data\(\)\?\.organization_id === id/, "only a claim this Organization holds is released")
   const ui = read("components/admin/people/PeopleWorkspace.tsx")
-  assert.match(ui, /function DomainEdit/)
-  assert.match(ui, /method: "PATCH", body: JSON\.stringify\(\{ domain:/)
+  // The full Organization edit (lib/core-model/edit.ts) carries the domain.
+  assert.match(ui, /function OrgEditForm/)
+  assert.match(ui, /JSON\.stringify\(\{ name, domain, roles, industry, location \}\)/)
 })

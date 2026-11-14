@@ -25,7 +25,7 @@ export function coreErrorResponse(label: string, err: unknown) {
   }
   if (err instanceof CoreRuleError) {
     if (err.status === 502) console.error(`[${label}]`, err.message)
-    return NextResponse.json({ error: err.message }, { status: err.status })
+    return NextResponse.json(err.code ? { error: err.message, code: err.code } : { error: err.message }, { status: err.status })
   }
   console.error(`[${label}]`, err)
   return NextResponse.json({ error: "Failed to save" }, { status: 500 })

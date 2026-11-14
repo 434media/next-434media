@@ -43,6 +43,14 @@ export async function findAffiliation(personId: string, organizationId: string, 
   return hit ?? null
 }
 
+/** Change a link's role, title or whether it is current. A link is never deleted: a move marks the old one inactive. */
+export async function updateAffiliation(id: string, patch: Partial<Pick<Affiliation, "role" | "title" | "active">>): Promise<void> {
+  const update: Record<string, unknown> = { updated_at: new Date().toISOString() }
+  for (const [k, v] of Object.entries(patch)) update[k] = v === undefined ? null : v
+  await getDb().collection(COLLECTION).doc(id).update(update)
+  invalidateAffiliations()
+}
+
 export async function createAffiliation(input: NewAffiliation): Promise<Affiliation> {
   const now = new Date().toISOString()
   const ref = getDb().collection(COLLECTION).doc()

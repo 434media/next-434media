@@ -137,10 +137,12 @@ test("cold gate: a cold Person's source, country and location are locked; a warm
 })
 
 test("cold gate: the Person PATCH route refuses a locked edit with 403 jurisdiction_locked", () => {
-  const src = read("app/api/admin/core/people/[id]/route.ts")
+  // The route edits through the one edit service (lib/core-model/edit.ts), which refuses a locked edit with 403.
+  assert.match(read("app/api/admin/core/people/[id]/route.ts"), /editPersonRecord\(/)
+  const src = read("lib/core-model/edit.ts")
   assert.match(src, /personColdEditRefusal\(/)
-  assert.match(src, /jurisdiction_locked/)
-  assert.match(src, /status: 403/)
+  assert.match(src, /CoreRuleError\(cold, 403, "jurisdiction_locked"\)/)
+  assert.match(read("lib/core-model/route-helpers.ts"), /code: err\.code/)
   // No country list of its own: the gate comes from the one allow-list.
   assert.doesNotMatch(read("lib/core-model/cold-gate.ts"), /EXCLUDED_COUNTR/)
 })

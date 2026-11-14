@@ -94,6 +94,10 @@ export class MemoryStore implements CoreStore {
     this.affs.set(a.id, a)
     return a
   }
+  async updateAffiliation(id: string, patch: Partial<Pick<Affiliation, "role" | "title" | "active">>) {
+    this.writes++
+    this.affs.set(id, { ...(this.affs.get(id) as Affiliation), ...patch })
+  }
   async createActivity(input: ActivityInput) {
     this.writes++
     const a: Activity = { ...input, id: this.id("act"), triaged: false, created_at: AT }

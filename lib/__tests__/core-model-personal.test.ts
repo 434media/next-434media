@@ -307,7 +307,9 @@ test("clients never revert: no move back from customer, through the rule, the se
   await ensurePerson(store, { contact: { email: "c@example.com" }, source: "web", at: AT, stage: "contact" })
   assert.equal(store.people.get(person.id)?.lifecycle_stage, "customer")
 
-  assert.match(read("app/api/admin/core/people/[id]/route.ts"), /stageMoveRefusal\(current\.lifecycle_stage/)
+  // The route edits through the one edit service, which refuses the move before anything is written.
+  assert.match(read("app/api/admin/core/people/[id]/route.ts"), /editPersonRecord\(/)
+  assert.match(read("lib/core-model/edit.ts"), /stageMoveRefusal\(current\.lifecycle_stage, edit\.lifecycle_stage\)/)
   assert.match(read("lib/firestore-people.ts"), /stageMoveRefusal\(cur\.data\(\)\?\.lifecycle_stage, patch\.lifecycle_stage\)/)
 })
 

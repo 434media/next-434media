@@ -7,6 +7,7 @@ import { HowItWorks } from "@/components/admin/HowItWorks"
 import { useSelection, BulkActionBar } from "@/components/admin/SubmissionStateUI"
 import { useTeamMembers } from "@/hooks/useTeamMembers"
 import type { Client } from "./types"
+import { clientRows } from "@/lib/crm/client-rows"
 
 function fmtCurrency(v: number): string {
   return v.toLocaleString(undefined, { style: "currency", currency: "USD", maximumFractionDigits: 0 })
@@ -68,38 +69,8 @@ export function ClientsView({
     pipelineByClient.set(c.client_id, e)
   }
 
-  // First, deduplicate clients by company_name + department to ensure each company/department combo appears only once
-  // This handles the case where a company has multiple opportunities - we want ONE client entry per department
-  // Priority: prefer non-opportunity records, but include opportunity-only companies too
-  const deduplicatedClients = clients.reduce((acc, client) => {
-    const companyName = (client.company_name || client.name || "").toLowerCase().trim()
-    if (!companyName) return acc
-    
-    // Create a unique key combining company name and department
-    const department = (client.department || "").toLowerCase().trim()
-    const uniqueKey = department ? `${companyName}|${department}` : companyName
-    
-    const existingIndex = acc.findIndex(c => {
-      const existingCompany = (c.company_name || c.name || "").toLowerCase().trim()
-      const existingDept = (c.department || "").toLowerCase().trim()
-      const existingKey = existingDept ? `${existingCompany}|${existingDept}` : existingCompany
-      return existingKey === uniqueKey
-    })
-    
-    if (existingIndex === -1) {
-      // First time seeing this company/department combo - add it
-      acc.push(client)
-    } else {
-      // Company/department already exists - prefer non-opportunity record over opportunity record
-      const existing = acc[existingIndex]
-      if (existing.is_opportunity && !client.is_opportunity) {
-        // Replace opportunity record with non-opportunity record
-        acc[existingIndex] = client
-      }
-      // If both are opportunities or both are non-opportunities, keep the first one
-    }
-    return acc
-  }, [] as Client[])
+  // One row per client record; opportunities collapse into their company's row (lib/crm/client-rows.ts).
+  const deduplicatedClients = clientRows(clients)
 
   // Filter clients based on search and filters
   const filteredClients = deduplicatedClients.filter((client) => {

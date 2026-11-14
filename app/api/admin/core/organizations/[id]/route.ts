@@ -3,11 +3,10 @@ import { requireAdmin } from "@/lib/auth"
 import { getVisibleCoreView, organizationDetail } from "@/lib/core-model/read"
 import { firestoreCoreStore } from "@/lib/core-model/firestore-store"
 import { normalizeDomain } from "@/lib/core-model/identity"
-import { scoreOrganization } from "@/lib/core-model/score"
-import { canSee, canSetVisibility, normalizeVisibility } from "@/lib/core-model/visibility"
+import { canSee } from "@/lib/core-model/visibility"
 import { coreErrorResponse, optString, readJson, viewerOf } from "@/lib/core-model/route-helpers"
 import { listIcpCohorts } from "@/lib/firestore-icp-cohorts"
-import type { NewOrganization } from "@/lib/core-model/service"
+import { editOrganizationRecord, type OrganizationEdit } from "@/lib/core-model/edit"
 import { CORE_ROLES, type CoreRole } from "@/types/core-model"
 
 export const runtime = "nodejs"
@@ -30,8 +29,10 @@ export async function GET(_request: NextRequest, ctx: Ctx) {
   }
 }
 
-// PATCH /api/admin/core/organizations/:id — edit a stored Organization. A change to what the rubric reads
-// (name, industry, location, size, revenue) rescores it with the shared rubric. Only full admins change visibility.
+// PATCH /api/admin/core/organizations/:id — edit an Organization: name, domain, roles, industry, location. One read
+// from an old collection is saved as a core record that replaces it; the old collection is never written. A change to
+// what the rubric reads rescores it with the shared rubric; a domain another Organization holds is refused (409 with
+// its id). Every edit is logged as an Activity (lib/core-model/edit.ts).
 export async function PATCH(request: NextRequest, ctx: Ctx) {
   const auth = await requireAdmin()
   if ("error" in auth) return NextResponse.json({ error: auth.error }, { status: auth.status })
@@ -39,43 +40,25 @@ export async function PATCH(request: NextRequest, ctx: Ctx) {
   const id = decodeURIComponent(rawId)
   const body = await readJson(request)
   if (!body) return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 })
+  const edit: OrganizationEdit = {}
+  if ("name" in body) edit.name = optString(body.name, 200) ?? ""
+  if ("domain" in body) {
+    const d = optString(body.domain, 300)
+    if (d && !normalizeDomain(d)) return NextResponse.json({ error: "That domain is not valid" }, { status: 400 })
+    edit.domain = d
+  }
+  if ("roles" in body) {
+    if (!Array.isArray(body.roles)) return NextResponse.json({ error: "roles must be a list" }, { status: 400 })
+    edit.roles = body.roles.filter((r) => CORE_ROLES.includes(r as CoreRole)) as CoreRole[]
+  }
+  if ("industry" in body) edit.industry = optString(body.industry, 200)
+  if ("location" in body) edit.location = optString(body.location, 200)
+  if ("visibility" in body) return NextResponse.json({ error: "An organization's visibility follows its people" }, { status: 400 })
   try {
     const viewer = await viewerOf(auth.session)
-    const current = await firestoreCoreStore.getOrganization(id)
-    if (!current || current.merged_into || !canSee(current, viewer)) {
-      return NextResponse.json({ error: "Not found, or read from an old collection" }, { status: 404 })
-    }
-    const patch: Partial<NewOrganization> = {}
-    const num = (v: unknown) => (typeof v === "number" && Number.isFinite(v) && v >= 0 ? v : undefined)
-    if ("name" in body) {
-      const name = optString(body.name, 200)
-      if (!name) return NextResponse.json({ error: "Name cannot be empty" }, { status: 400 })
-      patch.name = name
-    }
-    if ("domain" in body) {
-      const d = optString(body.domain, 300)
-      const domain = d ? normalizeDomain(d) : ""
-      if (d && !domain) return NextResponse.json({ error: "That domain is not valid" }, { status: 400 })
-      patch.domain = domain || undefined
-    }
-    if ("roles" in body) {
-      if (!Array.isArray(body.roles)) return NextResponse.json({ error: "roles must be a list" }, { status: 400 })
-      patch.roles = body.roles.filter((r) => CORE_ROLES.includes(r as CoreRole)) as CoreRole[]
-    }
-    if ("industry" in body) patch.industry = optString(body.industry, 200)
-    if ("location" in body) patch.location = optString(body.location, 200)
-    if ("employee_count" in body) patch.employee_count = num(body.employee_count)
-    if ("annual_revenue" in body) patch.annual_revenue = num(body.annual_revenue)
-    if ("capabilities" in body) patch.capabilities = optString(body.capabilities, 2000)
-    if ("rates" in body) patch.rates = optString(body.rates, 2000)
-    if ("visibility" in body) {
-      if (!canSetVisibility(viewer)) return NextResponse.json({ error: "Only a full admin can change visibility" }, { status: 403 })
-      patch.visibility = normalizeVisibility(body.visibility)
-      if (patch.visibility === "private") return NextResponse.json({ error: "visibility must be business or restricted" }, { status: 400 })
-    }
-    const rescore = ["name", "industry", "location", "employee_count", "annual_revenue"].some((k) => k in body)
-    if (rescore) Object.assign(patch, scoreOrganization({ ...current, ...patch }, await listIcpCohorts(), new Date().toISOString()))
-    const org = await firestoreCoreStore.updateOrganization(id, patch)
+    // The viewer's own view: a record they may not see is not found, and cannot be edited.
+    const [view, cohorts] = await Promise.all([getVisibleCoreView(viewer), listIcpCohorts().catch(() => [])])
+    const org = await editOrganizationRecord(firestoreCoreStore, view, id, edit, { viewer, actor: auth.session.email, cohorts })
     return NextResponse.json({ success: true, data: org })
   } catch (error) {
     return coreErrorResponse("PATCH /api/admin/core/organizations/:id", error)
