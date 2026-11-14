@@ -5,7 +5,13 @@
 export function normalizeEmail(value: unknown): string {
   if (typeof value !== "string") return ""
   const email = value.trim().toLowerCase()
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) ? email : ""
+  // Checked by hand, not by a regular expression: the old pattern backtracked polynomially on long hostile input
+  // from the public contact form (CodeQL js/polynomial-redos, alert 106). 254 is the longest valid address.
+  if (email.length > 254 || /\s/.test(email)) return ""
+  const at = email.indexOf("@")
+  if (at < 1 || at !== email.lastIndexOf("@")) return ""
+  const domain = email.slice(at + 1)
+  return domain.slice(1, -1).includes(".") ? email : ""
 }
 
 /**
