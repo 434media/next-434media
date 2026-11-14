@@ -118,6 +118,11 @@ jobs:
       # The Google Contacts sync: the import mapping, the import saved directly, incremental and resync, latest edit
       # wins, never delete, write-back off by default (and, on, only the 434 group, with the etag, logged), OAuth scope.
       - run: tsx --test lib/__tests__/google-contacts.test.ts
+      # The company lookup (V1 item 4): a business arrival's company is looked up once by its email domain, never for a
+      # personal contact, the Google Contacts import, free-mail or 434's own domains; capped daily and per run, every
+      # credit logged; it writes only the Organization and the grade is rescored on the real company. 434's own company
+      # is never a prospect or client, and a saved Organization's domain can be corrected.
+      - run: tsx --test lib/__tests__/company-lookup.test.ts
 
       # The engine on AI SDK 7 (V1 item 2): the real generateText against the SDK's mock model. System text goes through
       # `instructions` (v7 rejects system messages inside `messages`), the cache markers and Gateway automatic caching

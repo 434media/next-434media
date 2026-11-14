@@ -209,12 +209,36 @@ export interface Organization {
   /** Vendor role: what they do and what they charge, free text for now. */
   capabilities?: string
   rates?: string
+  /**
+   * The company lookup (V1 item 4, "Then the company lookup"): set once a domain has been looked up, so it is never
+   * looked up twice. Absent until then.
+   */
+  company_lookup?: CompanyLookupMark
+  /** True for 434's own company (lib/core-model/identity.ts, OWN_DOMAINS): never a prospect or client, never scored. */
+  own?: boolean
   visibility: Visibility
   legacy_refs: LegacyRef[]
   merged_into?: string
   read_only?: boolean
   created_at: string
   updated_at: string
+}
+
+/**
+ * The company lookup's record on an Organization: where the facts came from and when. `pending` holds the domain
+ * while a lookup is in flight; `error` (Apollo failed, no credit spent) may be retried by a later run. `matched`,
+ * `no_match` and `mismatch` are final: the domain is not looked up again.
+ */
+export interface CompanyLookupMark {
+  status: "pending" | "matched" | "no_match" | "mismatch" | "error"
+  source: "apollo"
+  at: string
+  /** Credits this domain's lookup spent: 1 on a match (Apollo charges per matched person), else 0. */
+  credits: number
+  apollo_organization_id?: string
+  /** The fields the lookup filled. A field already set by a person is never overwritten. */
+  filled?: string[]
+  error?: string
 }
 
 /**

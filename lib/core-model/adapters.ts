@@ -19,6 +19,7 @@ import type {
 import { consentFromSource } from "./consent"
 import { normalizeEmail, organizationDomain, organizationNameKey } from "./identity"
 import { summarize } from "./activity"
+import { rolesForDomain } from "./own-company"
 
 export interface CoreBundle {
   people: Person[]
@@ -51,7 +52,7 @@ function adaptedOrganization(input: {
     id: adaptedOrganizationId(input.domain, name),
     name,
     domain: input.domain || undefined,
-    roles: input.roles,
+    roles: rolesForDomain(input.domain, input.roles),
     industry: input.industry || undefined,
     location: input.location || undefined,
     employee_count: input.employee_count,
@@ -175,7 +176,7 @@ export function adaptClient(client: ClientRecord): CoreBundle {
         id: `client:${client.id}`,
         name: name || domain,
         domain: domain || undefined,
-        roles: [orgRole],
+        roles: rolesForDomain(domain, [orgRole]),
         industry: client.industry || undefined,
         location: [client.city, client.state].filter(Boolean).join(", ") || undefined,
         visibility: "business",

@@ -488,6 +488,7 @@ function OrgList({ rows, loading, onOpen }: { rows: OrgRow[]; loading: boolean; 
               {o.domain && <span className="ml-2 text-xs text-neutral-500">{o.domain}</span>}
             </div>
             <div className="flex items-center gap-3">
+              {o.own && <Pill>434</Pill>}
               {o.roles.map((r) => <Pill key={r}>{r}</Pill>)}
               <span className="text-xs text-neutral-500">{o.people_count} {o.people_count === 1 ? "person" : "people"}</span>
               <Fit org={o} />
@@ -755,9 +756,81 @@ interface OrgDetail {
   activities: Activity[]
 }
 
+/** Where an Organization's record comes from, in words: the stored record and each old collection it was read from. */
+const RECORD_SOURCE_LABEL: Record<string, string> = {
+  leads: "Lead",
+  crm_clients: "Client",
+  contact_forms: "Website form",
+  "aimsatx/contact_submissions": "AIM form",
+}
+function sourcesOf(o: Organization): string {
+  const parts = o.read_only ? [] : ["Saved here"]
+  for (const r of o.legacy_refs) parts.push(RECORD_SOURCE_LABEL[r.collection] ?? r.collection)
+  return Array.from(new Set(parts)).join(", ")
+}
+
+const LOOKUP_LABEL: Record<string, string> = {
+  pending: "In progress",
+  matched: "Found",
+  no_match: "Not found",
+  mismatch: "Found at another company; nothing filled",
+  error: "Failed; will retry",
+}
+
+/** The domain of a saved Organization, editable in place. One Organization per domain: a held domain is refused. */
+function DomainEdit({ org, onSaved }: { org: Organization; onSaved: () => void }) {
+  const [editing, setEditing] = useState(false)
+  const [value, setValue] = useState(org.domain ?? "")
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  if (org.read_only) return <>{org.domain || "—"}</>
+  if (!editing) {
+    return (
+      <span>
+        {org.domain || "—"}
+        <button onClick={() => { setValue(org.domain ?? ""); setError(null); setEditing(true) }} className="ml-2 text-xs text-neutral-500 underline-offset-2 hover:underline">
+          Edit
+        </button>
+      </span>
+    )
+  }
+  const save = async () => {
+    setSaving(true)
+    setError(null)
+    try {
+      await api(`/api/admin/core/organizations/${encodeURIComponent(org.id)}`, { method: "PATCH", body: JSON.stringify({ domain: value.trim() }) })
+      setEditing(false)
+      onSaved()
+    } catch (e) {
+      setError((e as Error).message)
+    } finally {
+      setSaving(false)
+    }
+  }
+  return (
+    <span className="block space-y-1">
+      <span className="flex gap-2">
+        <input
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          placeholder="example.com, or empty to clear"
+          aria-label="Domain"
+          className="w-full rounded-lg border border-neutral-200 px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-neutral-300"
+        />
+        <button onClick={save} disabled={saving} className="rounded-md bg-neutral-900 px-3 py-1 text-xs font-medium text-white hover:bg-neutral-800 disabled:opacity-40">
+          {saving ? "Saving…" : "Save"}
+        </button>
+        <button onClick={() => setEditing(false)} className="rounded-md px-2 py-1 text-xs font-medium text-neutral-600 hover:bg-neutral-100">Cancel</button>
+      </span>
+      {error && <span className="block text-xs text-red-600">{error}</span>}
+    </span>
+  )
+}
+
 function OrgDrawer({ id, onClose, onOpenPerson }: { id: string | null; onClose: () => void; onOpenPerson: (id: string) => void }) {
   const [detail, setDetail] = useState<OrgDetail | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [reload, setReload] = useState(0)
   useEffect(() => {
     setDetail(null)
     setError(null)
@@ -765,7 +838,7 @@ function OrgDrawer({ id, onClose, onOpenPerson }: { id: string | null; onClose: 
     api<{ data: OrgDetail }>(`/api/admin/core/organizations/${encodeURIComponent(id)}`)
       .then((r) => setDetail(r.data))
       .catch((e) => setError((e as Error).message))
-  }, [id])
+  }, [id, reload])
   const o = detail?.organization
   return (
     <DetailDrawer open={Boolean(id)} onClose={onClose} title={o?.name ?? (error ? "Not available" : "Loading…")} subtitle={o?.domain}>
@@ -773,10 +846,18 @@ function OrgDrawer({ id, onClose, onOpenPerson }: { id: string | null; onClose: 
       {o && detail && (
         <div className="space-y-6">
           <dl className="grid grid-cols-2 gap-4">
-            <Field label="Fit"><Fit org={o} /></Field>
+            <Field label="Fit">{o.own ? "434" : <Fit org={o} />}</Field>
             <Field label="Roles">{o.roles.join(", ")}</Field>
+            <Field label="Domain"><DomainEdit key={`${o.id}:${o.domain ?? ""}`} org={o} onSaved={() => setReload((n) => n + 1)} /></Field>
+            <Field label="Comes from">{sourcesOf(o)}</Field>
             <Field label="Industry">{o.industry}</Field>
             <Field label="Location">{o.location}</Field>
+            {o.company_lookup && (
+              <Field label="Company lookup">
+                {LOOKUP_LABEL[o.company_lookup.status] ?? o.company_lookup.status}
+                {o.company_lookup.at ? `, ${o.company_lookup.at.slice(0, 10)}` : ""}
+              </Field>
+            )}
             {o.icp_review && <Field label="Needs review">{o.icp_review}</Field>}
           </dl>
           <div>
