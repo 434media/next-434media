@@ -1,7 +1,8 @@
 "use client"
 
-// The founder-review queue and the console (V1 item 4, the proof slice; Display Standard §3.15, Provisional, drafted
-// for the founder's direction). Founder only: the page and every route it calls run the founder guard on the server.
+// The founder-review queue and the console (V1 item 4, the proof slice; Display Standard §3.15, Provisional). Signal red
+// marks state only (stopped, failures, checks needed); the destructive actions, Stop all and Reject, are neutral and
+// each asks to confirm (coordinator 18, on the founder's delegation, 2026-11-14). Founder only: the page and every route it calls run the founder guard on the server.
 // Nothing here sends on its own: a reply goes only when the founder presses Approve & send, and every control in
 // lib/agent/send-email.ts still applies.
 
@@ -262,7 +263,7 @@ function ControlsBar({ data, busy, onControls, onPin, onExam }: { data: Console;
             <Play className="w-3.5 h-3.5" /> Resume
           </button>
         ) : (
-          <button disabled={busy} onClick={() => onControls({ action: "stop" }, "Stopped. Nothing new runs or sends.")} className="inline-flex items-center gap-1 rounded-md bg-red-600 px-2.5 py-1.5 text-xs font-medium text-white hover:bg-red-700 disabled:opacity-40">
+          <button disabled={busy} onClick={() => onControls({ action: "stop" }, "Stopped. Nothing new runs or sends.")} className="inline-flex items-center gap-1 rounded-md border border-neutral-300 bg-white px-2.5 py-1.5 text-xs font-medium text-neutral-900 hover:bg-neutral-50 disabled:opacity-40">
             <Power className="w-3.5 h-3.5" /> Stop all
           </button>
         )}
@@ -393,7 +394,14 @@ function ReviewDrawer({ item, busy, onClose, onDecide }: { item: ReviewItem; bus
             </div>
             <div className="flex justify-end gap-2">
               <button onClick={onClose} className="rounded-md px-3 py-2 text-xs font-medium text-neutral-500 hover:bg-neutral-100">Cancel</button>
-              <button disabled={busy || !reason.trim()} onClick={() => onDecide(decision, code, reason, decision === "approved")} className={`rounded-md px-3 py-2 text-xs font-medium text-white disabled:opacity-40 ${decision === "approved" ? "bg-neutral-900 hover:bg-neutral-800" : "bg-red-600 hover:bg-red-700"}`}>
+              <button
+                disabled={busy || !reason.trim()}
+                onClick={() => {
+                  if (decision === "rejected" && !window.confirm("Reject this draft? It will never be sent; a new draft is needed to reply.")) return
+                  onDecide(decision, code, reason, decision === "approved")
+                }}
+                className="rounded-md bg-neutral-900 px-3 py-2 text-xs font-medium text-white hover:bg-neutral-800 disabled:opacity-40"
+              >
                 {decision === "approved" ? "Approve & send" : "Reject"}
               </button>
             </div>
