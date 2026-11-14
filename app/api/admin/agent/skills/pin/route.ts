@@ -10,7 +10,8 @@ export const maxDuration = 60
  * 434-context runs only after the founder pins it here. Nothing else writes `agent_skills` (it is a protected target:
  * lib/engine/protected-config.ts).
  *
- * GET  → the current pin, or null.
+ * GET  → the current pin, or null, and the source's coverage: the repositories the App's installation covers and its
+ *        permissions, read live with a short-lived Metadata: read token that is revoked at once (lib/skills/source.ts).
  * POST { ref?: "main" | <commit>, model?: <slug> } → reads the skill and the catalog at that commit, checks the skill
  *       (lib/skills/loader.ts parseSkill), takes the autonomy ceiling from the catalog, and stores the pin.
  *
@@ -22,7 +23,10 @@ export async function GET() {
   const auth = await requireFounder("GET /api/admin/agent/skills/pin")
   if ("error" in auth) return NextResponse.json({ error: auth.error }, { status: auth.status })
   const { readPin } = await import("@/lib/agent/intake-server")
-  return NextResponse.json({ pin: await readPin(SKILL) })
+  const { installationCoverage } = await import("@/lib/skills/source")
+  // The source's coverage, read live: which repositories the App's installation covers and what it may do there.
+  const source = await installationCoverage().catch((e: unknown) => ({ ok: false, problems: [e instanceof Error ? e.message : String(e)] }))
+  return NextResponse.json({ pin: await readPin(SKILL), source })
 }
 
 export async function POST(req: Request) {

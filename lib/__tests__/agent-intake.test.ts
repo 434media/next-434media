@@ -8,7 +8,7 @@ import assert from "node:assert/strict"
 import { createHash, createVerify, generateKeyPairSync } from "node:crypto"
 import { MockLanguageModelV4 } from "ai/test"
 import { fingerprint, type SkillFiles } from "../skills/loader"
-import { APP_KEY_ENV, CLIENT_ID_ENV, SkillSourceError, appJwt, catalogEntry, installationToken, readSkillAt, readSuiteAt, resetSkillSourceCache } from "../skills/source"
+import { APP_KEY_ENV, CLIENT_ID_ENV, SkillSourceError, appJwt, installationCoverage, catalogEntry, installationToken, readSkillAt, readSuiteAt, resetSkillSourceCache } from "../skills/source"
 import { scriptRefusal, skillScriptTool, type ScriptSandbox } from "../agent/skill-scripts"
 import { INTAKE_SKILL, intakeEligible, queueIntake, renderIntakeRequest, runIntake, taskIdFor, type IntakeDeps, type IntakeSubmission, type SkillPin } from "../agent/intake"
 import { parseControls, type AgentControls } from "../agent/controls"
@@ -32,7 +32,7 @@ const ENV = { [CLIENT_ID_ENV]: CLIENT_ID, [APP_KEY_ENV]: PEM }
 const gitSha = (text: string) => createHash("sha1").update(`blob ${Buffer.byteLength(text)}\0`).update(text).digest("hex")
 
 /** A fake GitHub holding one tree. Records each request. */
-function fakeGitHub(files: Record<string, string>, opts: { permissions?: Record<string, string>; tamper?: string } = {}) {
+function fakeGitHub(files: Record<string, string>, opts: { permissions?: Record<string, string>; tamper?: string; selection?: string; repos?: string[] } = {}) {
   const requests: { method: string; path: string; auth: string; body?: string }[] = []
   const blobs = new Map(Object.entries(files).map(([p, t]) => [gitSha(t), p]))
   const fetcher = (async (url: string | URL, init?: RequestInit) => {
@@ -41,7 +41,9 @@ function fakeGitHub(files: Record<string, string>, opts: { permissions?: Record<
     const auth = String((init?.headers as Record<string, string>)?.authorization ?? "")
     requests.push({ method, path: u.pathname + u.search, auth, body: init?.body as string | undefined })
     const json = (b: unknown, status = 200) => new Response(JSON.stringify(b), { status })
-    if (u.pathname === "/repos/434media/434-context/installation") return json({ id: 77 })
+    if (u.pathname === "/repos/434media/434-context/installation") return json({ id: 77, repository_selection: opts.selection ?? "selected", permissions: opts.permissions ?? { contents: "read", metadata: "read" } })
+    if (u.pathname === "/installation/repositories") return json({ repositories: (opts.repos ?? ["434media/434-context"]).map((full_name) => ({ full_name })) })
+    if (u.pathname === "/installation/token" && method === "DELETE") return new Response(null, { status: 204 })
     if (u.pathname === "/app/installations/77/access_tokens") return json({ token: "test-token", expires_at: at(3_600_000), permissions: opts.permissions ?? { contents: "read", metadata: "read" } }, 201)
     if (u.pathname.startsWith("/repos/434media/434-context/commits/")) return json({ sha: COMMIT })
     if (u.pathname === `/repos/434media/434-context/git/trees/${COMMIT}`) return json({ tree: Object.entries(files).map(([path, t]) => ({ path, type: "blob", sha: gitSha(t) })), truncated: false })
@@ -82,6 +84,25 @@ test("the installation token is narrowed to Contents: read on 434-context, and r
   resetSkillSourceCache()
   // The numeric App ID is no longer accepted as the issuer: the Client ID is.
   await assert.rejects(installationToken({ fetch: gh.fetcher, env: { [CLIENT_ID_ENV]: "123456", [APP_KEY_ENV]: PEM }, now: () => Date.parse(NOW) }), /not configured/)
+})
+
+test("the coverage check sees every repository the installation holds, with a metadata-only token it revokes", async () => {
+  const deps = (o = {}) => ({ fetch: fakeGitHub({}, o).fetcher, env: ENV, now: () => Date.parse(NOW) })
+  const good = fakeGitHub({})
+  const ok = await installationCoverage({ fetch: good.fetcher, env: ENV, now: () => Date.parse(NOW) })
+  assert.deepEqual([ok.ok, ok.repositories, ok.repositorySelection], [true, ["434media/434-context"], "selected"])
+  const mint = good.requests.find((r) => r.method === "POST")!
+  assert.deepEqual(JSON.parse(mint.body!), { permissions: { metadata: "read" } })
+  assert.ok(good.requests.some((r) => r.method === "DELETE" && r.path === "/installation/token"))
+  for (const [o, why] of [
+    [{ selection: "all" }, /not selected/],
+    [{ repos: ["434media/434-context", "434media/next-434media"] }, /not 434media\/434-context alone/],
+    [{ permissions: { contents: "write", metadata: "read" } }, /more than Contents: read/],
+  ] as const) {
+    const r = await installationCoverage(deps(o))
+    assert.equal(r.ok, false)
+    assert.match(r.problems.join("; "), why)
+  }
 })
 
 test("a skill is read at a commit only, every file checked against its git id; a suite reads its JSON only", async () => {

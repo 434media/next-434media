@@ -115,6 +115,50 @@ export async function installationToken(deps: SourceDeps = {}): Promise<string> 
   return minted.token
 }
 
+export interface InstallationCoverage {
+  installationId: number
+  repositorySelection: string
+  permissions: Record<string, string>
+  repositories: string[]
+  /** True only when the App holds Contents: read (and Metadata: read) on 434media/434-context and nothing else. */
+  ok: boolean
+  problems: string[]
+}
+
+/**
+ * What the App's installation covers, read with a token of its own: every repository it was given, not only the one a
+ * run asks for. The check mints a Metadata: read token (no contents), lists the installation's repositories, and
+ * revokes the token at once. Reads only; changes nothing at GitHub but that short-lived token.
+ */
+export async function installationCoverage(deps: SourceDeps = {}): Promise<InstallationCoverage> {
+  const now = (deps.now ?? Date.now)()
+  const { clientId, key } = credentials(deps.env ?? process.env)
+  const auth = { authorization: `Bearer ${appJwt(clientId, key, now)}` }
+  const inst = (await (await gh(`/repos/${CONTEXT_REPO.owner}/${CONTEXT_REPO.repo}/installation`, { headers: auth }, deps)).json()) as { id?: number; repository_selection?: string; permissions?: Record<string, string> }
+  if (!inst?.id) throw new SkillSourceError("The App is not installed on 434-context")
+  const minted = (await (
+    await gh(`/app/installations/${inst.id}/access_tokens`, { method: "POST", headers: { ...auth, "content-type": "application/json" }, body: JSON.stringify({ permissions: { metadata: "read" } }) }, deps)
+  ).json()) as { token?: string }
+  if (!minted?.token) throw new SkillSourceError("GitHub returned no installation token")
+  const tokenAuth = { authorization: `Bearer ${minted.token}` }
+  let repositories: string[] = []
+  try {
+    const list = (await (await gh(`/installation/repositories?per_page=100`, { headers: tokenAuth }, deps)).json()) as { repositories?: { full_name?: string }[] }
+    repositories = (list.repositories ?? []).map((r) => r.full_name ?? "").filter(Boolean).sort()
+  } finally {
+    await gh(`/installation/token`, { method: "DELETE", headers: tokenAuth }, deps).catch(() => {})
+  }
+  const permissions = inst.permissions ?? {}
+  const problems: string[] = []
+  const want = `${CONTEXT_REPO.owner}/${CONTEXT_REPO.repo}`
+  if (inst.repository_selection !== "selected") problems.push(`the installation covers ${inst.repository_selection ?? "unknown"} repositories, not selected ones`)
+  if (repositories.length !== 1 || repositories[0] !== want) problems.push(`the installation covers ${repositories.join(", ") || "no repository"}, not ${want} alone`)
+  const extra = Object.entries(permissions).filter(([k, v]) => !(k === "contents" && v === "read") && !(k === "metadata" && v === "read"))
+  if (extra.length) problems.push(`the App holds more than Contents: read (${extra.map(([k, v]) => `${k}:${v}`).join(", ")})`)
+  if (permissions.contents !== "read") problems.push("the App does not hold Contents: read")
+  return { installationId: inst.id, repositorySelection: inst.repository_selection ?? "", permissions, repositories, ok: problems.length === 0, problems }
+}
+
 async function authed(path: string, deps: SourceDeps): Promise<Response> {
   return gh(path, { headers: { authorization: `Bearer ${await installationToken(deps)}` } }, deps)
 }
