@@ -120,7 +120,10 @@ export interface WriteLog {
 }
 
 export interface PeopleIndex {
+  /** Kept for single lookups outside a run; a run uses its own index built once from `all()`. */
   byResourceName(resourceName: string): Promise<Person | null>
+  /** Every stored Person, read once at the start of a run to build its indexes. */
+  all(): Promise<Person[]>
   /** Every stored Person linked to a Google contact. */
   linked(): Promise<Person[]>
   /** Emails that already belong to a business record (stored or read from an old collection). */
@@ -136,7 +139,10 @@ export interface SyncDeps {
   log: WriteLog
   cohorts: CohortLike[]
   now(): string
-  /** ms budget for one run: the run stops between pages and the next run continues. */
+  /**
+   * ms budget for one run. Checked before every contact, so a run stops mid-page with time to save; the next run
+   * re-reads that page and skips what is done. Keep it well under the caller's maxDuration.
+   */
   budgetMs?: number
   nowMs?(): number
 }
@@ -152,8 +158,12 @@ export interface SyncResult {
   written: number
   stale_retries: number
   waiting_for_write_back: number
+  /** People a cut-off run had created without their Google link, linked now instead of copied. */
+  relinked: number
   errors: string[]
   done: boolean
+  /** True when the run stopped on its time budget; the next run continues from the saved page. */
+  stopped_on_budget: boolean
 }
 
 const emptyResult = (phase: SyncPhase): SyncResult => ({
@@ -167,8 +177,10 @@ const emptyResult = (phase: SyncPhase): SyncResult => ({
   written: 0,
   stale_retries: 0,
   waiting_for_write_back: 0,
+  relinked: 0,
   errors: [],
   done: false,
+  stopped_on_budget: false,
 })
 
 function linkOf(m: MappedContact, groupRn: string | undefined, now: string, prior?: GoogleLink): GoogleLink {
@@ -195,7 +207,8 @@ export function importRelationship(m: MappedContact, knownBusiness: ReadonlySet<
 
 async function importOne(deps: SyncDeps, m: MappedContact, ctx: RunCtx): Promise<void> {
   if (m.deleted || !m.resource_name) return
-  if (await deps.people.byResourceName(m.resource_name)) {
+  if (ctx.byRn.has(m.resource_name)) {
+    // Already imported (an earlier run, or this page before a cut-off): treat it as a change, which is idempotent.
     await incoming(deps, m, "sync", ctx)
     return
   }
@@ -207,19 +220,28 @@ async function importOne(deps: SyncDeps, m: MappedContact, ctx: RunCtx): Promise
   const now = deps.now()
   // An address already here: link the Google contact to that Person rather than make a second one.
   for (const email of fields.emails) {
-    const found = await deps.store.findPersonByEmail(email)
+    const found = await findByEmail(deps, ctx, email)
     if (!found) continue
     if (found.google) {
       // Two Google contacts share an address: the second waits in the inbox for the founder.
       await putArrival(deps, m, ctx)
       return
     }
-    await deps.store.updatePerson(found.id, { address_book: m.book, google: linkOf(m, ctx.groupRn, now) })
+    await linkExisting(deps, ctx, found, m, now)
     ctx.result.linked++
+    return
+  }
+  // A Person a cut-off run created from this contact before it could link it (no email, so no address to match
+  // on): link it now instead of making a copy.
+  const orphan = takeOrphan(ctx, fields.name)
+  if (orphan) {
+    await linkExisting(deps, ctx, orphan, m, now)
+    ctx.result.relinked++
     return
   }
   const relationship = importRelationship(m, ctx.knownBusiness)
   try {
+    // The Google link is written with the Person in one write, so a run cut off here leaves no unlinked copy.
     const { person, activity } = await recordArrival(
       deps.store,
       {
@@ -233,10 +255,12 @@ async function importOne(deps: SyncDeps, m: MappedContact, ctx: RunCtx): Promise
         relationship,
         allowPrivate: true,
         address_book: m.book,
+        google: linkOf(m, ctx.groupRn, now),
       },
       deps.cohorts,
     )
-    await deps.store.updatePerson(person.id, { name: fields.name, google: linkOf(m, ctx.groupRn, now) })
+    // A Person matched by email at the store (claimed after this run read its index) has no link yet: link it.
+    indexPerson(ctx, person.google ? person : await deps.store.updatePerson(person.id, { address_book: person.address_book ?? m.book, google: linkOf(m, ctx.groupRn, now) }))
     // Saved directly: the import never fills the inbox.
     await deps.store.recordTriage({ id: activity.id, decision: "save", by: SYNC_ACTOR, at: now, person_id: person.id })
     ctx.result.imported++
@@ -247,6 +271,36 @@ async function importOne(deps: SyncDeps, m: MappedContact, ctx: RunCtx): Promise
     }
     throw err
   }
+}
+
+async function linkExisting(deps: SyncDeps, ctx: RunCtx, person: Person, m: MappedContact, now: string) {
+  const updated = await deps.store.updatePerson(person.id, { address_book: person.address_book ?? m.book, google: linkOf(m, ctx.groupRn, now) })
+  indexPerson(ctx, updated)
+}
+
+/** The run's indexes: who is linked to which contact, who holds which email, and unlinked sync-made People. */
+function indexPerson(ctx: RunCtx, p: Person) {
+  if (p.merged_into) return
+  if (p.google?.resource_name) ctx.byRn.set(p.google.resource_name, p.id)
+  for (const e of p.emails) if (!ctx.byEmail.has(e)) ctx.byEmail.set(e, p.id)
+  if (!p.google && p.source === "google_contacts" && p.added_by === SYNC_ACTOR && p.emails.length === 0) {
+    const k = p.name.trim().toLowerCase()
+    ctx.orphans.set(k, [...(ctx.orphans.get(k) ?? []), p])
+  }
+}
+
+function takeOrphan(ctx: RunCtx, name: string): Person | undefined {
+  return ctx.orphans.get(name.trim().toLowerCase())?.shift()
+}
+
+async function findByEmail(deps: SyncDeps, ctx: RunCtx, email: string): Promise<Person | null> {
+  const id = ctx.byEmail.get(normalizeEmail(email))
+  return id ? deps.store.getPerson(id) : null
+}
+
+async function findLinked(deps: SyncDeps, ctx: RunCtx, resourceName: string): Promise<Person | null> {
+  const id = ctx.byRn.get(resourceName)
+  return id ? deps.store.getPerson(id) : null
 }
 
 // ── Incoming changes ────────────────────────────────────────────────────────────────────────────────────────────
@@ -298,6 +352,10 @@ async function mergeIntoPerson(deps: SyncDeps, person: Person, m: MappedContact,
     crmEditedAt: person.address_book_edited_at,
     googleUpdatedAt: m.update_time,
   })
+  // Unchanged since the last read (same etag, nothing to merge): no write. A page read again after a cut-off run
+  // costs a lookup per contact, not a write.
+  const groupNow = Boolean(g.in_434_group) || Boolean(ctx.groupRn && m.groups.includes(ctx.groupRn))
+  if (g.etag === m.etag && !r.changes.length && groupNow === Boolean(g.in_434_group) && !g.deleted_at) return person
   const patch: Partial<NewPerson> = { address_book: r.book, google: linkOf(m, ctx.groupRn, deps.now(), g) }
   const googleWon = r.changes.filter((c) => c.winner === "google").map((c) => c.field)
   if (googleWon.length) {
@@ -336,7 +394,7 @@ async function mergeIntoPerson(deps: SyncDeps, person: Person, m: MappedContact,
 
 async function incoming(deps: SyncDeps, m: MappedContact, mode: "sync" | "resync", ctx: RunCtx): Promise<void> {
   if (!m.resource_name) return
-  const person = await deps.people.byResourceName(m.resource_name)
+  const person = await findLinked(deps, ctx, m.resource_name)
   if (m.deleted) {
     // Never deleted here either: the Person is kept and marked; a waiting arrival is simply forgotten.
     if (person?.google && !person.google.deleted_at) {
@@ -443,6 +501,9 @@ async function claimGroup(deps: SyncDeps, ctx: RunCtx): Promise<void> {
 interface RunCtx {
   state: SyncState
   result: SyncResult
+  byRn: Map<string, string>
+  byEmail: Map<string, string>
+  orphans: Map<string, Person[]>
   groupRn?: string
   groupNames: Map<string, string>
   knownBusiness: Set<string>
@@ -456,7 +517,8 @@ interface RunCtx {
 export async function runSync(deps: SyncDeps): Promise<SyncResult> {
   const nowMs = deps.nowMs ?? (() => Date.now())
   const started = nowMs()
-  const budget = deps.budgetMs ?? 240_000
+  const budget = deps.budgetMs ?? 200_000
+  const outOfTime = () => nowMs() - started >= budget
   const state = await deps.state.read()
   const result = emptyResult(state.phase)
   const groups = await deps.api.listGroups()
@@ -469,7 +531,12 @@ export async function runSync(deps: SyncDeps): Promise<SyncResult> {
     groupNames: new Map(userGroups.map((g) => [g.resourceName, g.name])),
     knownBusiness: state.phase === "import" ? await deps.people.knownBusinessEmails() : new Set(),
     lastSyncedAt: state.last_synced_at,
+    byRn: new Map(),
+    byEmail: new Map(),
+    orphans: new Map(),
   }
+  // One read of the stored people per run, instead of a query per contact.
+  for (const p of await deps.people.all()) indexPerson(ctx, p)
   if (ctx.groupRn) state.group_resource_name = ctx.groupRn
   const save = async () => {
     state.last_run_at = deps.now()
@@ -479,7 +546,7 @@ export async function runSync(deps: SyncDeps): Promise<SyncResult> {
 
   try {
     let more = true
-    while (more && nowMs() - started < budget) {
+    while (more && !outOfTime()) {
       const listing = state.phase === "sync" ? { syncToken: state.sync_token, pageToken: state.page_token } : { pageToken: state.page_token }
       let page: Awaited<ReturnType<PeopleApi["list"]>>
       try {
@@ -495,9 +562,20 @@ export async function runSync(deps: SyncDeps): Promise<SyncResult> {
         throw err
       }
       for (const raw of page.connections ?? []) {
+        // Checked before every contact: a page is never allowed to outrun the budget. The page token is not moved,
+        // so the next run reads this page again and skips the contacts already done (they are in the index).
+        if (outOfTime()) {
+          result.stopped_on_budget = true
+          more = false
+          break
+        }
         const m = fromGooglePerson(raw, ctx.groupNames)
         if (state.phase === "import") await importOne(deps, m, ctx)
         else await incoming(deps, m, state.phase === "resync" ? "resync" : "sync", ctx)
+      }
+      if (result.stopped_on_budget) {
+        await save()
+        break
       }
       if (page.nextPageToken) {
         state.page_token = page.nextPageToken
@@ -515,7 +593,7 @@ export async function runSync(deps: SyncDeps): Promise<SyncResult> {
     if (state.write_back && result.done) {
       await claimGroup(deps, ctx)
       for (const p of await deps.people.linked()) {
-        if (nowMs() - started > budget) break
+        if (outOfTime()) break
         await pushOne(deps, p, ctx)
       }
     } else if (!state.write_back) {
