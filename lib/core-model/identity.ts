@@ -41,6 +41,19 @@ export const FREE_MAIL_DOMAINS: ReadonlySet<string> = new Set([
   "fastmail.com",
 ])
 
+/**
+ * 434's own domains. An Organization on one of these is 434 itself: never a prospect or client, never scored and
+ * never looked up. A subdomain (send.434media.com) counts as the domain.
+ */
+export const OWN_DOMAINS: ReadonlySet<string> = new Set(["434media.com"])
+
+export function isOwnDomain(domain: unknown): boolean {
+  const d = normalizeDomain(domain)
+  if (!d) return false
+  for (const own of OWN_DOMAINS) if (d === own || d.endsWith(`.${own}`)) return true
+  return false
+}
+
 /** A host as an Organization domain: lower-case, no `www.`, no port. Empty when unusable. */
 export function normalizeDomain(value: unknown): string {
   if (typeof value !== "string") return ""

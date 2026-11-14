@@ -40,9 +40,10 @@ import type {
 import { validateActivity, type ActivityInput } from "./activity"
 import { laterStage } from "./assemble"
 import { consentFromSource, mergeConsent } from "./consent"
-import { normalizeEmail, organizationDomain, organizationNameKey } from "./identity"
+import { isOwnDomain, normalizeEmail, organizationDomain, organizationNameKey } from "./identity"
 import { stageMoveRefusal } from "./lifecycle"
 import { scoreOrganization } from "./score"
+import { affiliationRoleForDomain, rolesForDomain } from "./own-company"
 import { effectiveVisibility } from "./visibility"
 
 export type NewPerson = Omit<Person, "id" | "created_at" | "updated_at" | "read_only">
@@ -230,10 +231,11 @@ export async function ensureOrganization(
     return await store.createOrganization({
       ...base,
       domain: domain || undefined,
-      roles: input.roles ?? [],
+      // 434's own company never takes the prospect or client role, and is never scored.
+      roles: rolesForDomain(domain, input.roles ?? []),
       visibility,
       legacy_refs: [],
-      ...scoreOrganization(base, cohorts, at),
+      ...(isOwnDomain(domain) ? {} : scoreOrganization(base, cohorts, at)),
     })
   } catch (err) {
     // Another arrival claimed the domain first: use theirs.
@@ -301,7 +303,9 @@ export async function recordArrival(
     cohorts,
   )
   const role: AffiliationRole = roles?.[0] ?? (fromAddressBook ? "works_at" : "prospect")
-  if (organization) await ensureAffiliation(store, person.id, organization.id, role, input.contact.title)
+  if (organization) {
+    await ensureAffiliation(store, person.id, organization.id, affiliationRoleForDomain(organization.domain, role), input.contact.title)
+  }
   const activity = await store.createActivity({
     ...activityInput,
     // The activity carries its Person's visibility, so it stays hidden even if read without its Person.
@@ -429,7 +433,7 @@ export async function triageActivity(
       { name: activity.contact.company, website: activity.contact.website, email: activity.contact.email },
       cohorts,
     )
-    if (org) await ensureAffiliation(store, person.id, org.id, "prospect", activity.contact.title)
+    if (org) await ensureAffiliation(store, person.id, org.id, affiliationRoleForDomain(org.domain, "prospect"), activity.contact.title)
   }
 
   let leadId: string | undefined

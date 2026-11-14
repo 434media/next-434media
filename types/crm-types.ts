@@ -616,6 +616,10 @@ export const CRM_COLLECTIONS = {
   GOOGLE_CONTACT_ARRIVALS: "crm_google_contact_arrivals",
   /** The log of every write the sync makes to Google. */
   GOOGLE_CONTACT_WRITES: "crm_google_contact_writes",
+  /** The company lookup's log: one line per Apollo lookup, with the credits it spent (lib/core-model/company-lookup.ts). */
+  COMPANY_LOOKUPS: "crm_company_lookups",
+  /** The company lookup's daily count, one doc per UTC day, reserved in a transaction against the daily cap. */
+  COMPANY_LOOKUP_DAYS: "crm_company_lookup_days",
 } as const
 
 // ============================================

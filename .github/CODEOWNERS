@@ -158,6 +158,15 @@
 /lib/core-model/service.ts                   @434media/founder
 /lib/core-model/firestore-store.ts           @434media/founder
 /lib/prospecting/scorer.ts                   @434media/founder
+# Money: the company lookup spends Apollo credits, and the Apollo client, its budget and credit log govern that spend.
+/lib/core-model/company-lookup.ts            @434media/founder
+/lib/core-model/company-lookup-server.ts     @434media/founder
+/lib/__tests__/company-lookup.test.ts        @434media/founder
+/lib/prospecting/apollo.ts                   @434media/founder
+/lib/prospecting/budget.ts                   @434media/founder
+/lib/prospecting/credit-log.ts               @434media/founder
+# Sends email (the admin notification) and now starts a paid lookup.
+/app/api/contact-form/                       @434media/founder
 /lib/prospecting/icp-base.md                 @434media/founder
 /app/api/cron/                               @434media/founder
 /app/api/webhooks/                           @434media/founder

@@ -1,6 +1,7 @@
-import { NextResponse } from "next/server"
+import { NextResponse, after } from "next/server"
 import { saveContactForm } from "@/lib/firestore-contact-forms"
 import { notifyNewContactForm } from "@/lib/contact-form-notification"
+import { lookupForArrival } from "@/lib/core-model/company-lookup-server"
 import { requireHumanRequest } from "@/lib/botid-guard"
 import { BUDGET_RANGES, ORGANIZATION_TYPES, REQUEST_OPTIONS, isOneOf } from "@/lib/start-a-production"
 
@@ -57,6 +58,16 @@ export async function POST(request: Request) {
     // Best-effort admin notification — never blocks or fails the submission.
     if (result.success) {
       await notifyNewContactForm({ id: result.id, ...submission })
+      // The company lookup, after the response is sent: a business address's company is looked up once by its
+      // domain (free-mail and 434's own skipped, capped, logged), so the arrival is graded on the real company.
+      // Best-effort: a failure here never touches the submission.
+      after(async () => {
+        try {
+          await lookupForArrival({ email, company, source: "web", activity_id: result.id ? `contact_forms:${result.id}` : undefined })
+        } catch (err) {
+          console.error("[contact-form] company lookup failed:", err)
+        }
+      })
     }
 
     return NextResponse.json({ message: "Contact form submission successful" }, { status: 200 })
