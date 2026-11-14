@@ -16,7 +16,11 @@
  */
 import { CRM_COLLECTIONS } from "../../types/crm-types"
 
-export const DECISION_SUBJECT_KINDS = ["person", "organization", "opportunity"] as const
+/**
+ * `contact` is an arrival with no Person record yet (a website form is read in at read time): its id is the email's
+ * claim id (lib/core-model/firestore-util.ts emailClaimId), a hash, never the address.
+ */
+export const DECISION_SUBJECT_KINDS = ["person", "organization", "opportunity", "contact"] as const
 export type DecisionSubjectKind = (typeof DECISION_SUBJECT_KINDS)[number]
 
 export interface DecisionRecord {
@@ -55,7 +59,7 @@ export const subjectKey = (kind: DecisionSubjectKind, id: string) => `${kind}:${
 /** Checks and shapes one decision. Every text field is trimmed and bounded; `chosen` and `why` are required. */
 export function buildDecision(input: Omit<DecisionRecord, "subject_key">): DecisionRecord {
   if (!input.id || !SUBJECT_ID.test(input.id)) throw new DecisionRefused("A decision needs an id")
-  if (!(DECISION_SUBJECT_KINDS as readonly string[]).includes(input.subject?.kind)) throw new DecisionRefused("A decision is about a person, an organization or an opportunity")
+  if (!(DECISION_SUBJECT_KINDS as readonly string[]).includes(input.subject?.kind)) throw new DecisionRefused("A decision is about a person, an organization, an opportunity or a contact")
   if (!SUBJECT_ID.test(input.subject.id ?? "")) throw new DecisionRefused("A decision names its subject by id")
   if (!BY.test(input.by ?? "")) throw new DecisionRefused("A decision names who made it: founder, skill:<name> or member:<id>")
   if (!Number.isFinite(Date.parse(input.at))) throw new DecisionRefused("A decision needs a time")

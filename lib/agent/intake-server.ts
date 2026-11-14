@@ -46,7 +46,7 @@ async function readSubmission(formId: string): Promise<IntakeSubmission | null> 
 /** The newest decisions about the person (by email) and their company (by domain), bounded. Never throws. */
 async function readDecisionMemory(email: string): Promise<string> {
   try {
-    const [{ findPersonByEmail }, { findOrganizationByDomain }, { domainFromEmail }, { listDecisions, summarizeForSkill }] = await Promise.all([
+    const [{ findPersonByEmail }, { findOrganizationByDomain }, { domainFromEmail, normalizeEmail }, { listDecisions, summarizeForSkill }] = await Promise.all([
       import("../firestore-people"),
       import("../firestore-organizations"),
       import("../core-model/identity"),
@@ -55,7 +55,12 @@ async function readDecisionMemory(email: string): Promise<string> {
     const person = await findPersonByEmail(email)
     const domain = domainFromEmail(email)
     const org = domain ? await findOrganizationByDomain(domain) : null
-    const all = [...(person ? await listDecisions("person", person.id) : []), ...(org ? await listDecisions("organization", org.id) : [])]
+    const { emailClaimId } = await import("../core-model/firestore-util")
+    const all = [
+      ...(person ? await listDecisions("person", person.id) : []),
+      ...(org ? await listDecisions("organization", org.id) : []),
+      ...(await listDecisions("contact", emailClaimId(normalizeEmail(email)))),
+    ]
     return summarizeForSkill(all, 5)
   } catch (e) {
     console.error("[agent:intake] decision memory could not be read; running without it:", e instanceof Error ? e.message : e)

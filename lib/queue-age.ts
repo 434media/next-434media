@@ -51,6 +51,24 @@ export const QUEUES: QueueSpec[] = [
     ageField: "createdAt",
     limitMs: 6 * HOUR,
   },
+  // The agent queues (V1 item 4, the proof slice). A task waiting for the founder's decision has been `awaiting_review`
+  // since its last update; one still `queued` an hour after it last moved means the sweep (every 10 minutes) cannot run it.
+  {
+    name: "agent-review",
+    what: "agent drafts waiting for your decision in the founder-review queue (/admin/review)",
+    collection: "agent_tasks",
+    where: { field: "state", equals: "awaiting_review" },
+    ageField: "updatedAt",
+    limitMs: 24 * HOUR,
+  },
+  {
+    name: "agent-tasks-queued",
+    what: "agent tasks not yet started",
+    collection: "agent_tasks",
+    where: { field: "state", equals: "queued" },
+    ageField: "updatedAt",
+    limitMs: 1 * HOUR,
+  },
 ]
 
 export const QUEUE_READ_LIMIT = 200
