@@ -206,6 +206,13 @@
 /app/api/admin/owned-meta/                   @434media/founder
 /app/api/admin/crm/content-posts/*/publish/  @434media/founder
 /app/api/admin/crm/content-posts/*/owned-meta/ @434media/founder
+# Sends and approvals for every path, the agent ledger and the kill switch (V1 item 4, the proof slice).
+/lib/send-approval.ts                        @434media/founder
+/lib/agent/                                  @434media/founder
+/lib/core-model/decisions.ts                 @434media/founder
+/lib/__tests__/send-approval.test.ts         @434media/founder
+/lib/__tests__/agent-controls.test.ts        @434media/founder
+/lib/__tests__/helpers/agent-db.ts           @434media/founder
 /app/api/admin/content/rows/*/               @434media/founder
 # The Instagram read routes hold each brand's Page access token, which can also publish.
 /app/api/instagram/                          @434media/founder

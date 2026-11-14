@@ -614,6 +614,14 @@ export const CRM_COLLECTIONS = {
   PERSON_EMAILS: "crm_person_emails",
   ORG_DOMAINS: "crm_org_domains",
   MERGES: "crm_merges",
+  /**
+   * Send approvals (V1 item 4, the proof slice; lib/send-approval.ts, lib/agent/send-email.ts): one per draft that waits
+   * for the founder. Holds what will be sent, in full, so the personal content stays in the CRM; the ledger
+   * (`agent_ledger`) holds only its id and hash.
+   */
+  SEND_APPROVALS: "crm_send_approvals",
+  /** Decision memory (V1 item 4): what was chosen about a Person, Organization or Opportunity, why, and when to look again. */
+  DECISIONS: "crm_decisions",
   /** Google Contacts arrivals waiting for a decision; a dismissal removes the entry (lib/google-contacts/server.ts). */
   GOOGLE_CONTACT_ARRIVALS: "crm_google_contact_arrivals",
   /** The log of every write the sync makes to Google. */
