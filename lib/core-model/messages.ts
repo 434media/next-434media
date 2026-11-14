@@ -53,7 +53,7 @@ export interface MessageRecord {
   recipientParts: { id: string; activity_id: string; part: number; emails: string[] }[]
 }
 
-/** "Name <a@b.com>" → "a@b.com", lower-case. Empty when there is no address. */
+/** "Name <pat@example.com>" → "pat@example.com", lower-case. Empty when there is no address. */
 export function addressOf(value: string | undefined): string {
   if (!value) return ""
   const angle = value.match(/<([^>]+)>/)
