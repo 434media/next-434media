@@ -198,12 +198,13 @@ test("once: a company that is not thin is not looked up", async () => {
 
 test("skip: free-mail addresses and 434's own domains are never looked up", async () => {
   const { deps, calls, store } = setup()
-  for (const email of ["ana@gmail.com", "ana@yahoo.com", "ana@icloud.com", "marcos@434media.com", "x@send.434media.com"]) {
+  const freeMail = ["gmail.com", "yahoo.com", "icloud.com"].map((d) => `someone@${d}`)
+  for (const email of [...freeMail, "someone@434media.com", "someone@send.434media.com"]) {
     const out = await lookupCompany(deps, arrival(email), "sweep")
     assert.equal(out.status, "skipped", email)
   }
-  assert.equal(lookupGate(arrival("a@gmail.com")).hasOwnProperty("reason"), true)
-  assert.deepEqual(lookupGate(arrival("a@434media.com")), { reason: "own_domain", domain: "434media.com" })
+  assert.equal(lookupGate(arrival(freeMail[0])).hasOwnProperty("reason"), true)
+  assert.deepEqual(lookupGate(arrival("someone@434media.com")), { reason: "own_domain", domain: "434media.com" })
   assert.equal(calls.length, 0)
   assert.equal(store.writes.length, 0, "nothing is even created for a skipped address")
 })
@@ -389,7 +390,7 @@ test("own: a stored record on 434media.com with the prospect role no longer show
   }
   const view = assembleCoreView(
     { ...emptyBundle(), organizations: [stored] },
-    [adaptLead({ id: "L9", name: "Jesse", company: "434 MEDIA", email: "jesse@434media.com", source: "web", status: "new", created_at: AT, updated_at: AT } as Lead)],
+    [adaptLead({ id: "L9", name: "Jesse", company: "434 MEDIA", email: "someone@434media.com", source: "web", status: "new", created_at: AT, updated_at: AT } as Lead)],
     new Set(),
   )
   const o = view.organizations.find((x) => x.id === "o434") as Organization
@@ -402,9 +403,9 @@ test("own: a stored record on 434media.com with the prospect role no longer show
 })
 
 test("own: a client row or lead on 434media.com never takes the prospect or client role", () => {
-  const client = adaptClient({ id: "c1", company_name: "434 MEDIA", email: "marcos@434media.com", status: "active" } as ClientRecord)
+  const client = adaptClient({ id: "c1", company_name: "434 MEDIA", email: "someone@434media.com", status: "active" } as ClientRecord)
   assert.deepEqual(client.organizations[0].roles, [])
-  const lead = adaptLead({ id: "L1", name: "Jesse", company: "434", email: "jesse@434media.com", source: "web", status: "new", created_at: AT, updated_at: AT } as Lead)
+  const lead = adaptLead({ id: "L1", name: "Jesse", company: "434", email: "someone@434media.com", source: "web", status: "new", created_at: AT, updated_at: AT } as Lead)
   assert.deepEqual(lead.organizations[0].roles, [])
 })
 
@@ -412,7 +413,7 @@ test("own: an arrival from a 434 address creates no prospect Organization and no
   const store = new MemoryStore()
   const r = await recordArrival(
     store,
-    { type: "note", source: "web", occurred_at: AT, contact: { name: "Jesse", email: "jesse@434media.com", company: "434 MEDIA" }, summary: "hi" },
+    { type: "note", source: "web", occurred_at: AT, contact: { name: "Jesse", email: "someone@434media.com", company: "434 MEDIA" }, summary: "hi" },
     [],
   )
   assert.deepEqual(r.organization?.roles, [])
@@ -424,20 +425,20 @@ test("own: an arrival from a 434 address creates no prospect Organization and no
 
 test("swap: each read-time Organization takes its name and domain from the same record, never from another", () => {
   // Two clients, each correct: no read path pairs one record's name with the other's domain.
-  const a = adaptClient({ id: "a", company_name: "8020 Foundation (weston urban)", website: "8020foundation.com", status: "active" } as ClientRecord)
-  const b = adaptClient({ id: "b", company_name: "911 Medical Devices", website: "911medicaldevices.com", status: "active" } as ClientRecord)
+  const a = adaptClient({ id: "a", company_name: "First Foundation (a note)", website: "firstfoundation.test", status: "active" } as ClientRecord)
+  const b = adaptClient({ id: "b", company_name: "Second Devices", website: "seconddevices.test", status: "active" } as ClientRecord)
   const view = assembleCoreView(emptyBundle(), [a, b], new Set())
   const byName = new Map(view.organizations.map((o) => [o.name, o.domain]))
-  assert.equal(byName.get("8020 Foundation (weston urban)"), "8020foundation.com")
-  assert.equal(byName.get("911 Medical Devices"), "911medicaldevices.com")
+  assert.equal(byName.get("First Foundation (a note)"), "firstfoundation.test")
+  assert.equal(byName.get("Second Devices"), "seconddevices.test")
   // A record whose contact email is at the other company gets that company's domain: the data, not the code.
   const crossed = adaptClient({
     id: "c",
-    company_name: "8020 Foundation (weston urban)",
+    company_name: "First Foundation (a note)",
     status: "active",
-    contacts: [{ id: "k", name: "Pat", email: "pat@911medicaldevices.com" }],
+    contacts: [{ id: "k", name: "Pat", email: "pat@seconddevices.test" }],
   } as unknown as ClientRecord)
-  assert.equal(crossed.organizations[0].domain, "911medicaldevices.com")
+  assert.equal(crossed.organizations[0].domain, "seconddevices.test")
 })
 
 test("swap: changing a saved Organization's domain releases the old one, and the drawer can edit it", () => {
