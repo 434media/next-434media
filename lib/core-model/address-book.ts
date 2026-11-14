@@ -187,16 +187,20 @@ export function personFieldsFromBook(book: AddressBook): Pick<Person, "name" | "
 
 /**
  * Apply a person's edit in the CRM to the Person's address book, so it can be written back. Only the fields the
- * Person form edits: name, phones, notes and title. A phone that is kept keeps its Google type.
+ * Person form edits: name, emails, phones, notes and title. An email or phone that is kept keeps its Google type.
  */
 export function applyPersonEditToBook(
   book: AddressBook,
-  patch: Partial<Pick<Person, "name" | "phones" | "notes" | "title">>,
+  patch: Partial<Pick<Person, "name" | "emails" | "phones" | "notes" | "title">>,
 ): AddressBook {
   const next: AddressBook = { ...book }
   if (patch.name !== undefined && patch.name !== bookDisplayName(book)) {
     const { firstName, lastName } = splitName(patch.name)
     next.name = { given: firstName || undefined, family: lastName || undefined }
+  }
+  if (patch.emails !== undefined) {
+    const typeOf = new Map(book.emails.map((e) => [normalizeEmail(e.value), e.type]))
+    next.emails = patch.emails.map((value) => ({ value, type: typeOf.get(normalizeEmail(value)) }))
   }
   if (patch.phones !== undefined) {
     const typeOf = new Map(book.phones.map((p) => [p.value, p.type]))

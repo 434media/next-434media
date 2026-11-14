@@ -47,6 +47,7 @@ function normalize(id: string, raw: FirebaseFirestore.DocumentData): Person {
     notes: typeof raw.notes === "string" && raw.notes ? raw.notes : undefined,
     added_by: typeof raw.added_by === "string" && raw.added_by ? raw.added_by : undefined,
     legacy_refs: Array.isArray(raw.legacy_refs) ? (raw.legacy_refs as LegacyRef[]) : [],
+    supersedes: Array.isArray(raw.supersedes) ? asStringArray(raw.supersedes) : undefined,
     merged_into: typeof raw.merged_into === "string" && raw.merged_into ? raw.merged_into : undefined,
     created_at: created,
     updated_at: toIsoString(raw.updated_at),

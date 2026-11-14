@@ -35,6 +35,7 @@ export const firestoreCoreStore: CoreStore = {
   updateOrganization: writes(orgs.updateOrganization),
   findAffiliation: affs.findAffiliation,
   createAffiliation: writes(affs.createAffiliation),
+  updateAffiliation: writes(affs.updateAffiliation),
   createActivity: writes(acts.createActivity),
   getTriage: acts.getTriage,
   recordTriage: writes(acts.recordTriage),

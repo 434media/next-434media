@@ -61,8 +61,20 @@ export function assembleCoreView(stored: CoreBundle, adapted: CoreBundle[], tria
     }
     personRemap.set(p.id, target)
   }
+  // A stored Person saved from a read-time one (an edit of a record read from an old collection) replaces it: the
+  // read-time record is not shown, its fields are not folded in (the edit is the truth), and its links are the stored
+  // Person's own. Only its old ids travel, in `legacy_refs`.
+  const supersededPerson = new Map<string, string>()
+  for (const p of people.values()) for (const old of p.supersedes ?? []) supersededPerson.set(old, p.id)
   for (const bundle of adapted) {
     for (const p of bundle.people) {
+      const by = supersededPerson.get(p.id)
+      if (by) {
+        const cur = people.get(by) as Person
+        people.set(by, { ...cur, legacy_refs: unionRefs(cur.legacy_refs, p.legacy_refs) })
+        personRemap.set(p.id, by)
+        continue
+      }
       const hit = p.emails.map((e) => byEmail.get(e)).find(Boolean)
       if (hit) {
         const cur = people.get(hit) as Person
@@ -106,8 +118,18 @@ export function assembleCoreView(stored: CoreBundle, adapted: CoreBundle[], tria
     orgs.set(o.id, { ...o })
     indexOrg(o)
   }
+  const supersededOrg = new Map<string, string>()
+  for (const o of orgs.values()) for (const old of o.supersedes ?? []) supersededOrg.set(old, o.id)
   for (const bundle of adapted) {
     for (const o of bundle.organizations) {
+      // Replaced by a stored record saved from it: shown once, as edited.
+      const by = supersededOrg.get(o.id)
+      if (by) {
+        const cur = orgs.get(by) as Organization
+        orgs.set(by, { ...cur, legacy_refs: unionRefs(cur.legacy_refs, o.legacy_refs) })
+        orgRemap.set(o.id, by)
+        continue
+      }
       // By domain first; a record with no domain folds in by name only.
       const hit = (o.domain && byDomain.get(o.domain)) || (!o.domain ? byName.get(organizationNameKey(o.name)) : undefined)
       if (hit) {
@@ -139,7 +161,11 @@ export function assembleCoreView(stored: CoreBundle, adapted: CoreBundle[], tria
 
   // ── Affiliations ──
   const affs = new Map<string, Affiliation>()
-  for (const a of [...stored.affiliations, ...adapted.flatMap((b) => b.affiliations)]) {
+  // A superseded read-time Person's links are not read: the stored Person carries its own (copied when it was saved).
+  const adaptedAffs = adapted.flatMap((b) => b.affiliations).filter((a) => !supersededPerson.has(a.person_id))
+  for (const a of [...stored.affiliations, ...adaptedAffs]) {
+    // A link someone ended (a move to another Organization) is history, kept in storage, not shown.
+    if (a.active === false) continue
     const p = person(a.person_id) as string
     const o = org(a.organization_id) as string
     if (!people.has(p) || !orgs.has(o)) continue

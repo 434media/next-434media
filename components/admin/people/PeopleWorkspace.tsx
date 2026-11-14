@@ -1,9 +1,10 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useState } from "react"
-import { Building2, CheckCircle2, AlertCircle, Inbox, Search, UserPlus, Users, Flag, Bookmark, X, Lock, Briefcase, RefreshCw, Contact } from "lucide-react"
+import { Building2, CheckCircle2, AlertCircle, Inbox, Search, UserPlus, Users, Flag, Bookmark, X, Lock, Briefcase, RefreshCw, Contact, Pencil, Plus } from "lucide-react"
 import { DetailDrawer } from "@/components/admin/DetailDrawer"
-import type { Activity, Affiliation, AddressBook, InboxItem, Organization, Person, Relationship } from "@/types/core-model"
+import type { Activity, Affiliation, AffiliationRole, AddressBook, CoreRole, InboxItem, LifecycleStage, Organization, Person, Relationship } from "@/types/core-model"
+import { AFFILIATION_ROLES, CORE_ROLES } from "@/types/core-model"
 
 type Tab = "inbox" | "people" | "organizations"
 type Toast = { type: "success" | "error"; message: string }
@@ -300,10 +301,26 @@ export function PeopleWorkspace() {
         founder={founder}
         onClose={() => setOpenPerson(null)}
         onOpenOrg={(id) => { setOpenPerson(null); setOpenOrg(id) }}
-        onChanged={(message) => { setPeople(null); setToast({ type: "success", message }) }}
+        onChanged={(message, newId) => {
+          setPeople(null)
+          setOrgs(null)
+          if (newId) setOpenPerson(newId)
+          setToast({ type: "success", message })
+        }}
         onError={(message) => setToast({ type: "error", message })}
       />
-      <OrgDrawer id={openOrg} onClose={() => setOpenOrg(null)} onOpenPerson={(id) => { setOpenOrg(null); setOpenPerson(id) }} />
+      <OrgDrawer
+        id={openOrg}
+        onClose={() => setOpenOrg(null)}
+        onOpenPerson={(id) => { setOpenOrg(null); setOpenPerson(id) }}
+        onChanged={(message, newId) => {
+          setOrgs(null)
+          setPeople(null)
+          if (newId) setOpenOrg(newId)
+          setToast({ type: "success", message })
+        }}
+        onError={(message) => setToast({ type: "error", message })}
+      />
       <AddPersonDrawer
         open={adding}
         founder={founder}
@@ -653,12 +670,15 @@ function PersonDrawer({
   founder: boolean
   onClose: () => void
   onOpenOrg: (id: string) => void
-  onChanged: (message: string) => void
+  /** `newId` when the edit saved a record read from an old collection: the drawer reopens on the saved one. */
+  onChanged: (message: string, newId?: string) => void
   onError: (message: string) => void
 }) {
   const [detail, setDetail] = useState<PersonDetail | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
+  const [editing, setEditing] = useState(false)
+  useEffect(() => setEditing(false), [id])
   const load = useCallback(() => {
     setDetail(null)
     setError(null)
@@ -689,22 +709,44 @@ function PersonDrawer({
       title={p?.name ?? (error ? "Not available" : "Loading…")}
       subtitle={p?.emails.join(", ")}
       footer={
-        p && founder && p.relationship === "personal" ? (
-          <div className="flex justify-end">
+        p && !editing ? (
+          <div className="flex justify-end gap-2">
             <button
-              onClick={makeBusiness}
-              disabled={saving}
-              title="Staff will see this person once it is business"
-              className="inline-flex items-center gap-1 rounded-md bg-neutral-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-neutral-800 disabled:opacity-40"
+              onClick={() => setEditing(true)}
+              className="inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-xs font-medium text-neutral-700 ring-1 ring-neutral-200 hover:bg-neutral-100"
             >
-              <Briefcase className="w-3.5 h-3.5" /> Make business
+              <Pencil className="w-3.5 h-3.5" /> Edit
             </button>
+            {founder && p.relationship === "personal" && (
+              <button
+                onClick={makeBusiness}
+                disabled={saving}
+                title="Staff will see this person once it is business"
+                className="inline-flex items-center gap-1 rounded-md bg-neutral-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-neutral-800 disabled:opacity-40"
+              >
+                <Briefcase className="w-3.5 h-3.5" /> Make business
+              </button>
+            )}
           </div>
         ) : undefined
       }
     >
       {error && <p className="text-sm text-red-600">{error}</p>}
-      {p && detail && (
+      {p && detail && editing && (
+        <PersonEditForm
+          detail={detail}
+          founder={founder}
+          onCancel={() => setEditing(false)}
+          onSaved={(saved) => {
+            setEditing(false)
+            const replaced = saved.id !== p.id
+            onChanged(replaced ? `${saved.name} saved. It now replaces the record read from the old list.` : `${saved.name} updated.`, replaced ? saved.id : undefined)
+            if (!replaced) load()
+          }}
+          onError={onError}
+        />
+      )}
+      {p && detail && !editing && (
         <div className="space-y-6">
           <dl className="grid grid-cols-2 gap-4">
             <Field label="Stage">{STAGE_LABEL[p.lifecycle_stage]}</Field>
@@ -777,60 +819,24 @@ const LOOKUP_LABEL: Record<string, string> = {
   error: "Failed; will retry",
 }
 
-/** The domain of a saved Organization, editable in place. One Organization per domain: a held domain is refused. */
-function DomainEdit({ org, onSaved }: { org: Organization; onSaved: () => void }) {
-  const [editing, setEditing] = useState(false)
-  const [value, setValue] = useState(org.domain ?? "")
-  const [saving, setSaving] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  if (org.read_only) return <>{org.domain || "—"}</>
-  if (!editing) {
-    return (
-      <span>
-        {org.domain || "—"}
-        <button onClick={() => { setValue(org.domain ?? ""); setError(null); setEditing(true) }} className="ml-2 text-xs text-neutral-500 underline-offset-2 hover:underline">
-          Edit
-        </button>
-      </span>
-    )
-  }
-  const save = async () => {
-    setSaving(true)
-    setError(null)
-    try {
-      await api(`/api/admin/core/organizations/${encodeURIComponent(org.id)}`, { method: "PATCH", body: JSON.stringify({ domain: value.trim() }) })
-      setEditing(false)
-      onSaved()
-    } catch (e) {
-      setError((e as Error).message)
-    } finally {
-      setSaving(false)
-    }
-  }
-  return (
-    <span className="block space-y-1">
-      <span className="flex gap-2">
-        <input
-          value={value}
-          onChange={(e) => setValue(e.target.value)}
-          placeholder="example.com, or empty to clear"
-          aria-label="Domain"
-          className="w-full rounded-lg border border-neutral-200 px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-neutral-300"
-        />
-        <button onClick={save} disabled={saving} className="rounded-md bg-neutral-900 px-3 py-1 text-xs font-medium text-white hover:bg-neutral-800 disabled:opacity-40">
-          {saving ? "Saving…" : "Save"}
-        </button>
-        <button onClick={() => setEditing(false)} className="rounded-md px-2 py-1 text-xs font-medium text-neutral-600 hover:bg-neutral-100">Cancel</button>
-      </span>
-      {error && <span className="block text-xs text-red-600">{error}</span>}
-    </span>
-  )
-}
-
-function OrgDrawer({ id, onClose, onOpenPerson }: { id: string | null; onClose: () => void; onOpenPerson: (id: string) => void }) {
+function OrgDrawer({
+  id,
+  onClose,
+  onOpenPerson,
+  onChanged,
+  onError,
+}: {
+  id: string | null
+  onClose: () => void
+  onOpenPerson: (id: string) => void
+  onChanged: (message: string, newId?: string) => void
+  onError: (message: string) => void
+}) {
   const [detail, setDetail] = useState<OrgDetail | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [reload, setReload] = useState(0)
+  const [editing, setEditing] = useState(false)
+  useEffect(() => setEditing(false), [id])
   useEffect(() => {
     setDetail(null)
     setError(null)
@@ -841,14 +847,44 @@ function OrgDrawer({ id, onClose, onOpenPerson }: { id: string | null; onClose: 
   }, [id, reload])
   const o = detail?.organization
   return (
-    <DetailDrawer open={Boolean(id)} onClose={onClose} title={o?.name ?? (error ? "Not available" : "Loading…")} subtitle={o?.domain}>
+    <DetailDrawer
+      open={Boolean(id)}
+      onClose={onClose}
+      title={o?.name ?? (error ? "Not available" : "Loading…")}
+      subtitle={o?.domain}
+      footer={
+        o && !editing ? (
+          <div className="flex justify-end">
+            <button
+              onClick={() => setEditing(true)}
+              className="inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-xs font-medium text-neutral-700 ring-1 ring-neutral-200 hover:bg-neutral-100"
+            >
+              <Pencil className="w-3.5 h-3.5" /> Edit
+            </button>
+          </div>
+        ) : undefined
+      }
+    >
       {error && <p className="text-sm text-red-600">{error}</p>}
-      {o && detail && (
+      {o && detail && editing && (
+        <OrgEditForm
+          org={o}
+          onCancel={() => setEditing(false)}
+          onSaved={(saved) => {
+            setEditing(false)
+            const replaced = saved.id !== o.id
+            onChanged(replaced ? `${saved.name} saved. It now replaces the record read from the old list.` : `${saved.name} updated.`, replaced ? saved.id : undefined)
+            if (!replaced) setReload((n) => n + 1)
+          }}
+          onError={onError}
+        />
+      )}
+      {o && detail && !editing && (
         <div className="space-y-6">
           <dl className="grid grid-cols-2 gap-4">
             <Field label="Fit">{o.own ? "434" : <Fit org={o} />}</Field>
             <Field label="Roles">{o.roles.join(", ")}</Field>
-            <Field label="Domain"><DomainEdit key={`${o.id}:${o.domain ?? ""}`} org={o} onSaved={() => setReload((n) => n + 1)} /></Field>
+            <Field label="Domain">{o.domain}</Field>
             <Field label="Comes from">{sourcesOf(o)}</Field>
             <Field label="Industry">{o.industry}</Field>
             <Field label="Location">{o.location}</Field>
@@ -884,6 +920,271 @@ function OrgDrawer({ id, onClose, onOpenPerson }: { id: string | null; onClose: 
         </div>
       )}
     </DetailDrawer>
+  )
+}
+
+// ── Edit forms ───────────────────────────────────────────────────────────────────────────────────────────────
+// One edit for every record. A record read from an old list (a lead, a client, a form) is saved as a new record that
+// replaces it; the old list is never changed. The server holds every rule (lib/core-model/edit.ts); these forms only
+// offer what may change.
+
+const inputClass = "w-full rounded-lg border border-neutral-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-neutral-300"
+const listText = (v: string[]) => v.join(", ")
+const textList = (v: string) => v.split(/[,\n]/).map((x) => x.trim()).filter(Boolean)
+
+function FormRow({ label, children, hint }: { label: string; children: React.ReactNode; hint?: string }) {
+  return (
+    <label className="block">
+      <span className="mb-1 block text-xs font-medium text-neutral-600">{label}</span>
+      {children}
+      {hint && <span className="mt-1 block text-xs text-neutral-500">{hint}</span>}
+    </label>
+  )
+}
+
+function RolePicker<R extends string>({ all, value, onChange }: { all: readonly R[]; value: R[]; onChange: (v: R[]) => void }) {
+  return (
+    <div className="flex flex-wrap gap-1">
+      {all.map((r) => {
+        const on = value.includes(r)
+        return (
+          <button
+            key={r}
+            type="button"
+            aria-pressed={on}
+            onClick={() => onChange(on ? value.filter((x) => x !== r) : [...value, r])}
+            className={`rounded-full px-2.5 py-1 text-xs font-medium ring-1 ${on ? "bg-neutral-900 text-white ring-neutral-900" : "text-neutral-600 ring-neutral-200 hover:bg-neutral-100"}`}
+          >
+            {r}
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+
+function FormButtons({ saving, onCancel, onSave }: { saving: boolean; onCancel: () => void; onSave: () => void }) {
+  return (
+    <div className="flex justify-end gap-2 pt-2">
+      <button type="button" onClick={onCancel} className="rounded-md px-3 py-1.5 text-xs font-medium text-neutral-600 hover:bg-neutral-100">Cancel</button>
+      <button type="button" onClick={onSave} disabled={saving} className="rounded-md bg-neutral-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-neutral-800 disabled:opacity-40">
+        {saving ? "Saving…" : "Save"}
+      </button>
+    </div>
+  )
+}
+
+/** "" is the "New organization…" choice. */
+type LinkRow = { organization_id: string; new_name: string; new_domain: string; role: AffiliationRole; title: string }
+
+function PersonEditForm({
+  detail,
+  founder,
+  onCancel,
+  onSaved,
+  onError,
+}: {
+  detail: PersonDetail
+  founder: boolean
+  onCancel: () => void
+  onSaved: (person: Person) => void
+  onError: (message: string) => void
+}) {
+  const p = detail.person
+  const [name, setName] = useState(p.name)
+  const [emails, setEmails] = useState(listText(p.emails))
+  const [phones, setPhones] = useState(listText(p.phones))
+  const [title, setTitle] = useState(p.title ?? "")
+  const [stage, setStage] = useState<LifecycleStage>(p.lifecycle_stage)
+  const [roles, setRoles] = useState<CoreRole[]>(p.roles)
+  const [relationship, setRelationship] = useState<Relationship>(p.relationship)
+  const [links, setLinks] = useState<LinkRow[]>(
+    detail.affiliations.map((a) => ({ organization_id: a.organization_id, new_name: "", new_domain: "", role: a.role, title: a.title ?? "" })),
+  )
+  const [orgs, setOrgs] = useState<Organization[] | null>(null)
+  const [saving, setSaving] = useState(false)
+  useEffect(() => {
+    api<{ data: Organization[] }>("/api/admin/core/organizations")
+      .then((r) => setOrgs(r.data))
+      .catch(() => setOrgs([]))
+  }, [])
+  // A client never reverts: once a customer, the stage stays.
+  const stages: LifecycleStage[] = p.lifecycle_stage === "customer" ? ["customer"] : ["contact", "lead", "customer"]
+  const setLink = (i: number, patch: Partial<LinkRow>) => setLinks(links.map((l, j) => (j === i ? { ...l, ...patch } : l)))
+  const orgOptions = useMemo(() => {
+    const known = new Map((orgs ?? []).map((o) => [o.id, o]))
+    for (const a of detail.affiliations) if (a.organization && !known.has(a.organization_id)) known.set(a.organization_id, a.organization)
+    return [...known.values()].sort((a, b) => a.name.localeCompare(b.name))
+  }, [orgs, detail.affiliations])
+
+  const save = async () => {
+    setSaving(true)
+    try {
+      const body: Record<string, unknown> = {
+        name,
+        emails: textList(emails),
+        phones: textList(phones),
+        title,
+        lifecycle_stage: stage,
+        roles,
+        links: links.map((l) =>
+          l.organization_id
+            ? { organization_id: l.organization_id, role: l.role, title: l.title }
+            : { create: { name: l.new_name, domain: l.new_domain }, role: l.role, title: l.title },
+        ),
+      }
+      if (founder) body.relationship = relationship
+      const r = await api<{ data: Person }>(`/api/admin/core/people/${encodeURIComponent(p.id)}`, { method: "PATCH", body: JSON.stringify(body) })
+      onSaved(r.data)
+    } catch (e) {
+      onError((e as Error).message)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="space-y-3">
+      {p.read_only && (
+        <p className="rounded-lg border border-neutral-200 bg-neutral-50 px-3 py-2 text-xs text-neutral-600">
+          Read from {p.legacy_refs.map((r) => RECORD_SOURCE_LABEL[r.collection] ?? r.collection).filter((c, i, all) => all.indexOf(c) === i).join(", ")}. Saving keeps a new record that replaces it here; the old list is not changed.
+        </p>
+      )}
+      {p.google && (
+        <p className="rounded-lg border border-neutral-200 bg-neutral-50 px-3 py-2 text-xs text-neutral-600">
+          Synced with Google Contacts. Changes to the name, emails, phones and title go to the phone when write-back is on; until then they wait here.
+        </p>
+      )}
+      <FormRow label="Name"><input value={name} onChange={(e) => setName(e.target.value)} className={inputClass} /></FormRow>
+      <FormRow label="Emails" hint="Separate with commas. The first is the primary."><input value={emails} onChange={(e) => setEmails(e.target.value)} className={inputClass} /></FormRow>
+      <FormRow label="Phones" hint="Separate with commas."><input value={phones} onChange={(e) => setPhones(e.target.value)} className={inputClass} /></FormRow>
+      <FormRow label="Title"><input value={title} onChange={(e) => setTitle(e.target.value)} className={inputClass} /></FormRow>
+      <FormRow label="Stage" hint={p.lifecycle_stage === "customer" ? "A client never goes back to lead or contact." : undefined}>
+        <select value={stage} onChange={(e) => setStage(e.target.value as LifecycleStage)} className={inputClass}>
+          {stages.map((s) => <option key={s} value={s}>{STAGE_LABEL[s]}</option>)}
+        </select>
+      </FormRow>
+      <div>
+        <span className="mb-1 block text-xs font-medium text-neutral-600">Roles</span>
+        <RolePicker all={CORE_ROLES} value={roles} onChange={setRoles} />
+      </div>
+      {founder && (
+        <fieldset>
+          <legend className="mb-1 block text-xs font-medium text-neutral-600">Personal or business</legend>
+          <div role="radiogroup" className="flex gap-1 rounded-lg border border-neutral-200 bg-white p-1">
+            {(["personal", "business"] as const).map((r) => (
+              <button
+                key={r}
+                type="button"
+                role="radio"
+                aria-checked={relationship === r}
+                onClick={() => setRelationship(r)}
+                className={`flex-1 rounded-md px-3 py-1.5 text-xs font-medium ${relationship === r ? "bg-neutral-900 text-white" : "text-neutral-600 hover:bg-neutral-100"}`}
+              >
+                {r === "personal" ? "Personal (only you)" : "Business"}
+              </button>
+            ))}
+          </div>
+        </fieldset>
+      )}
+      <div>
+        <span className="mb-1 block text-xs font-medium text-neutral-600">Organizations</span>
+        <div className="space-y-2">
+          {links.map((l, i) => (
+            <div key={i} className="space-y-2 rounded-lg border border-neutral-200 p-2">
+              <div className="flex gap-2">
+                <select
+                  aria-label="Organization"
+                  value={l.organization_id}
+                  onChange={(e) => setLink(i, { organization_id: e.target.value })}
+                  className={inputClass}
+                >
+                  <option value="">New organization…</option>
+                  {orgOptions.map((o) => (
+                    <option key={o.id} value={o.id}>{o.name}{o.domain ? ` (${o.domain})` : ""}</option>
+                  ))}
+                </select>
+                <button type="button" aria-label="Remove" onClick={() => setLinks(links.filter((_, j) => j !== i))} className="rounded-md px-2 text-neutral-500 hover:bg-neutral-100">
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+              {!l.organization_id && (
+                <div className="flex gap-2">
+                  <input placeholder="Name" aria-label="New organization name" value={l.new_name} onChange={(e) => setLink(i, { new_name: e.target.value })} className={inputClass} />
+                  <input placeholder="Domain (example.com)" aria-label="New organization domain" value={l.new_domain} onChange={(e) => setLink(i, { new_domain: e.target.value })} className={inputClass} />
+                </div>
+              )}
+              <div className="flex gap-2">
+                <select aria-label="Role" value={l.role} onChange={(e) => setLink(i, { role: e.target.value as AffiliationRole })} className={inputClass}>
+                  {AFFILIATION_ROLES.map((r) => <option key={r} value={r}>{r === "works_at" ? "works at" : r}</option>)}
+                </select>
+                <input placeholder="Title" aria-label="Title at this organization" value={l.title} onChange={(e) => setLink(i, { title: e.target.value })} className={inputClass} />
+              </div>
+            </div>
+          ))}
+          <button
+            type="button"
+            onClick={() => setLinks([...links, { organization_id: "", new_name: "", new_domain: "", role: "works_at", title: "" }])}
+            className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-neutral-700 hover:bg-neutral-100"
+          >
+            <Plus className="w-3.5 h-3.5" /> Add organization
+          </button>
+        </div>
+      </div>
+      <FormButtons saving={saving} onCancel={onCancel} onSave={save} />
+    </div>
+  )
+}
+
+function OrgEditForm({
+  org,
+  onCancel,
+  onSaved,
+  onError,
+}: {
+  org: Organization
+  onCancel: () => void
+  onSaved: (org: Organization) => void
+  onError: (message: string) => void
+}) {
+  const [name, setName] = useState(org.name)
+  const [domain, setDomain] = useState(org.domain ?? "")
+  const [roles, setRoles] = useState<CoreRole[]>(org.roles)
+  const [industry, setIndustry] = useState(org.industry ?? "")
+  const [location, setLocation] = useState(org.location ?? "")
+  const [saving, setSaving] = useState(false)
+  const save = async () => {
+    setSaving(true)
+    try {
+      const r = await api<{ data: Organization }>(`/api/admin/core/organizations/${encodeURIComponent(org.id)}`, {
+        method: "PATCH",
+        body: JSON.stringify({ name, domain, roles, industry, location }),
+      })
+      onSaved(r.data)
+    } catch (e) {
+      onError((e as Error).message)
+    } finally {
+      setSaving(false)
+    }
+  }
+  return (
+    <div className="space-y-3">
+      {org.read_only && (
+        <p className="rounded-lg border border-neutral-200 bg-neutral-50 px-3 py-2 text-xs text-neutral-600">
+          Read from {sourcesOf(org)}. Saving keeps a new record that replaces it here; the old list is not changed.
+        </p>
+      )}
+      <FormRow label="Name"><input value={name} onChange={(e) => setName(e.target.value)} className={inputClass} /></FormRow>
+      <FormRow label="Domain" hint="One organization per domain. Leave empty to clear."><input value={domain} onChange={(e) => setDomain(e.target.value)} placeholder="example.com" className={inputClass} /></FormRow>
+      <div>
+        <span className="mb-1 block text-xs font-medium text-neutral-600">Roles</span>
+        <RolePicker all={CORE_ROLES} value={roles} onChange={setRoles} />
+        {org.own && <span className="mt-1 block text-xs text-neutral-500">434 is never a prospect or client of itself.</span>}
+      </div>
+      <FormRow label="Industry"><input value={industry} onChange={(e) => setIndustry(e.target.value)} className={inputClass} /></FormRow>
+      <FormRow label="Location"><input value={location} onChange={(e) => setLocation(e.target.value)} placeholder="San Antonio, TX" className={inputClass} /></FormRow>
+      <FormButtons saving={saving} onCancel={onCancel} onSave={save} />
+    </div>
   )
 }
 

@@ -182,6 +182,12 @@ export interface Person {
   address_book_edited_at?: string
   google?: GoogleLink
   legacy_refs: LegacyRef[]
+  /**
+   * The read-time ids (e.g. `client-contact:<client>:<contact>`, `lead:<id>`) this stored record replaces. A Person read
+   * from an old collection is saved here when someone edits it; the read path then shows this record in its place.
+   * The old collection is never written.
+   */
+  supersedes?: string[]
   /** Set when an explicit merge absorbed this Person into another. The record is kept, never deleted. */
   merged_into?: string
   /** True when this Person is read from an old collection and has no stored record yet. */
@@ -218,6 +224,8 @@ export interface Organization {
   own?: boolean
   visibility: Visibility
   legacy_refs: LegacyRef[]
+  /** The read-time ids this stored record replaces (as on Person). */
+  supersedes?: string[]
   merged_into?: string
   read_only?: boolean
   created_at: string
@@ -270,6 +278,8 @@ export type ActivityType =
   | "google_contact"
   /** A change to address-book fields, keeping the value that was overwritten (latest edit wins). */
   | "address_book_change"
+  /** A person's edit of a Person or Organization in the CRM, with each field's value before and after. */
+  | "record_edit"
 export const ACTIVITY_TYPES: ActivityType[] = [
   "form_submission",
   "prospect_found",
@@ -278,6 +288,7 @@ export const ACTIVITY_TYPES: ActivityType[] = [
   "note",
   "google_contact",
   "address_book_change",
+  "record_edit",
 ]
 
 /** The full envelope of a sent or received email. The CRM keeps the full text (V1 item 4). */

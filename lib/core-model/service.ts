@@ -67,6 +67,8 @@ export interface CoreStore {
   updateOrganization(id: string, patch: Partial<NewOrganization>): Promise<Organization>
   findAffiliation(personId: string, organizationId: string, role: AffiliationRole): Promise<Affiliation | null>
   createAffiliation(input: NewAffiliation): Promise<Affiliation>
+  /** Role, title or `active`. Links are never deleted; a move marks the old one inactive. */
+  updateAffiliation(id: string, patch: Partial<Pick<Affiliation, "role" | "title" | "active">>): Promise<void>
   /** Write-once. There is no update or delete. */
   createActivity(input: ActivityInput): Promise<Activity>
   getTriage(activityId: string): Promise<TriageRecord | null>
@@ -93,7 +95,9 @@ export class DuplicateError extends Error {
 export class CoreRuleError extends Error {
   constructor(
     message: string,
-    readonly status: 400 | 404 | 409 | 502 = 400,
+    readonly status: 400 | 403 | 404 | 409 | 502 = 400,
+    /** A machine-readable reason, e.g. `jurisdiction_locked`, `client_never_reverts`. */
+    readonly code?: string,
   ) {
     super(message)
     this.name = "CoreRuleError"

@@ -44,6 +44,7 @@ function normalize(id: string, raw: FirebaseFirestore.DocumentData): Organizatio
     company_lookup: normalizeLookupMark(raw.company_lookup),
     visibility: normalizeVisibility(raw.visibility),
     legacy_refs: Array.isArray(raw.legacy_refs) ? (raw.legacy_refs as LegacyRef[]) : [],
+    supersedes: Array.isArray(raw.supersedes) ? asStringArray(raw.supersedes) : undefined,
     merged_into: str(raw.merged_into),
     created_at: toIsoString(raw.created_at),
     updated_at: toIsoString(raw.updated_at),
