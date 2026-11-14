@@ -1,5 +1,7 @@
 import { DAILY_SHARE_CAP, DEFAULT_SHARE_DAYS, MAX_SHARE_DAYS, REPEAT_WINDOW_MS, chicagoDay, countryCode, expiryFrom, hashShareToken, newShareToken, normalEmail, repeatKey, shareEmail, shareRefusal, shareUrl } from "./brand-share"
 import type { BrandShare, BrandShareStore, ShareVia } from "./firestore-brand-shares"
+import type { MessageInput } from "./core-model/messages"
+import { brandShareMessage, shareLinkPlaceholder } from "./core-model/message-paths"
 
 /**
  * The one send path for a brand-book share (plan v11.2.1 Step 4 items 4 and 5): the brand page's "Share with vendor"
@@ -30,6 +32,10 @@ export interface ShareDeps {
   book(brandId: string): Promise<{ ok: true; book: ShareBook } | { ok: false; reason: string }>
   isSuppressed(email: string): Promise<boolean>
   sendMail(m: { to: string; replyTo: string; subject: string; text: string; html: string }): Promise<{ id: string }>
+  /** The sender address the mail goes out from (lib/brand-share-deps.ts SHARE_FROM). */
+  from: string
+  /** Keeps the message in the CRM (lib/core-model/messages-server.ts recordMessage). Never throws. */
+  recordMessage(m: MessageInput): Promise<unknown>
   origin: string
   now?: () => Date
   newToken?: () => string
@@ -77,6 +83,9 @@ export async function sendBrandShare(req: ShareRequest, deps: ShareDeps): Promis
   try {
     const { id } = await deps.sendMail({ to: email, replyTo: sender, ...mail })
     await deps.shares.markSent(share.id, id)
+    // The CRM keeps the full text (V1 item 4), but not the link's token: the stored copy names the share instead.
+    const stored = shareEmail({ brand: b.book.label, recipientName: name, senderName: req.sender.name || sender, senderEmail: sender, url: shareLinkPlaceholder(share.id), expiresAt, versionId: b.book.versionId })
+    await deps.recordMessage(brandShareMessage({ from: deps.from, to: email, replyTo: sender, ...stored, messageId: id, at: now.toISOString(), sentBy: sender }))
     return { ok: true, share: { ...share, status: "sent", resend_message_id: id } }
   } catch (e) {
     const why = e instanceof Error ? e.message : String(e)

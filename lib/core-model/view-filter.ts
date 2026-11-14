@@ -23,17 +23,33 @@ export function filterViewFor<T extends CoreView>(view: T, viewer: Viewer): T {
   const organizations = view.organizations.filter((o) => canSee(o, viewer))
   const hiddenPeople = new Set(view.people.filter((p) => !canSee(p, viewer)).map((p) => p.id))
   const hiddenOrgs = new Set(view.organizations.filter((o) => !canSee(o, viewer)).map((o) => o.id))
+  const hiddenAddresses = new Set(view.people.filter((p) => !canSee(p, viewer)).flatMap((p) => p.emails))
   return {
     ...view,
     people,
     organizations,
     affiliations: view.affiliations.filter((a) => !hiddenPeople.has(a.person_id) && !hiddenOrgs.has(a.organization_id)),
-    activities: view.activities.filter(
-      (a) =>
-        canSee(a, viewer) &&
-        !(a.person_id && hiddenPeople.has(a.person_id)) &&
-        !(a.organization_id && hiddenOrgs.has(a.organization_id)),
-    ),
+    activities: view.activities
+      .filter(
+        (a) =>
+          canSee(a, viewer) &&
+          !(a.person_id && hiddenPeople.has(a.person_id)) &&
+          !(a.organization_id && hiddenOrgs.has(a.organization_id)),
+      )
+      .map((a) => (a.email ? redactHiddenAddresses(a, hiddenAddresses) : a)),
   }
+}
+
+/**
+ * A message's recipient list may name someone the viewer may not see (a broadcast went to many people, one of them a
+ * personal contact). Their address is removed from what this viewer is shown; the stored record is unchanged.
+ */
+function redactHiddenAddresses<A extends CoreView["activities"][number]>(a: A, hidden: Set<string>): A {
+  if (!a.email || hidden.size === 0) return a
+  const keep = (list: string[]) => list.filter((e) => !hidden.has(e))
+  const to = keep(a.email.to)
+  const cc = keep(a.email.cc)
+  if (to.length === a.email.to.length && cc.length === a.email.cc.length) return a
+  return { ...a, email: { ...a.email, to, cc } }
 }
 

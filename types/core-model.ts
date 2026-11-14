@@ -291,6 +291,53 @@ export const ACTIVITY_TYPES: ActivityType[] = [
   "record_edit",
 ]
 
+/**
+ * Which send or receive path a message came through (lib/core-model/messages.ts). One value per path, so a message
+ * record says where it came from without reading the code.
+ */
+export type MessagePath =
+  | "contact_form_reply"
+  | "contact_form_bulk_ack"
+  | "lead_outreach"
+  | "outreach_sequence"
+  | "sequence_reply"
+  | "broadcast"
+  | "brand_share"
+  | "call_request"
+export const MESSAGE_PATHS: MessagePath[] = [
+  "contact_form_reply",
+  "contact_form_bulk_ack",
+  "lead_outreach",
+  "outreach_sequence",
+  "sequence_reply",
+  "broadcast",
+  "brand_share",
+  "call_request",
+]
+
+/** An attachment is kept as a link to the file, never the file (founder guardrail 2, 2026-11-14). */
+export interface MessageAttachment {
+  filename: string
+  /** Where the file lives (https). The bytes are never stored on the record. */
+  url: string
+  content_type?: string
+  size?: number
+}
+
+/**
+ * A broadcast is one record: the body once, with the list of who it went to in `to` (founder guardrail 1). The parts
+ * of the body that differ per person are stored as placeholders, named here.
+ */
+export interface MessageBroadcast {
+  label?: string
+  /** Everyone it was sent to. Equals `to.length` unless the list overflowed into `crm_message_recipients` parts. */
+  recipient_count: number
+  /** Parts of the recipient list stored beside the record when it is too long for one document. 0 when none. */
+  recipient_parts: number
+  /** Placeholders in the stored body that were filled in per recipient, e.g. "{{first_name}}". */
+  personalized: string[]
+}
+
 /** The full envelope of a sent or received email. The CRM keeps the full text (V1 item 4). */
 export interface ActivityEmail {
   direction: "sent" | "received"
@@ -298,7 +345,21 @@ export interface ActivityEmail {
   to: string[]
   cc: string[]
   subject: string
+  /** The provider's message id (Resend), or the broadcast's run id. */
   message_id?: string
+  provider?: "resend"
+  reply_to?: string
+  /** The path that sent or received it. */
+  path?: MessagePath
+  /** The HTML part, when the message had one. The plain text is the Activity's `body`. */
+  html?: string
+  attachments?: MessageAttachment[]
+  broadcast?: MessageBroadcast
+  /**
+   * What was deliberately left out of the stored copy, and why (a bearer link's token, an HTML part too large for one
+   * record). Empty when the stored copy is the message as sent.
+   */
+  redactions?: string[]
 }
 
 /** Who the activity is about, as it arrived, before matching. */

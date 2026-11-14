@@ -157,6 +157,12 @@
 /lib/core-model/cold-gate.ts                 @434media/founder
 /lib/core-model/service.ts                   @434media/founder
 /lib/core-model/firestore-store.ts           @434media/founder
+# Recorded mail: the full text of every message sent or received (V1 item 4, "The CRM keeps the full text").
+/lib/core-model/messages.ts                  @434media/founder
+/lib/core-model/messages-server.ts           @434media/founder
+/lib/core-model/message-paths.ts             @434media/founder
+/lib/firestore-activities.ts                 @434media/founder
+/lib/__tests__/message-records.test.ts       @434media/founder
 # People data and permissions: the one edit service and its tests.
 /lib/core-model/edit.ts                      @434media/founder
 /lib/__tests__/core-model-edit.test.ts       @434media/founder

@@ -72,6 +72,23 @@ export async function createActivity(input: ActivityInput): Promise<Activity> {
   return { ...input, id: ref.id, triaged: false, created_at: now }
 }
 
+/**
+ * Write-once under a chosen id (a message record's id is derived from its provider id). Returns false, writing
+ * nothing, when a record with that id already exists: recording the same message twice is a no-op.
+ */
+export async function createActivityWithId(id: string, input: ActivityInput): Promise<boolean> {
+  const now = new Date().toISOString()
+  try {
+    await getDb().collection(COLLECTION).doc(safeDocId(id)).create(stripUndefined({ ...input, created_at: now }))
+  } catch (err) {
+    // gRPC ALREADY_EXISTS (6): the message is already recorded.
+    if ((err as { code?: unknown })?.code === 6) return false
+    throw err
+  }
+  invalidateActivities()
+  return true
+}
+
 // ── Triage ──
 
 export async function listTriage(): Promise<Map<string, TriageRecord>> {

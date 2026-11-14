@@ -6,6 +6,8 @@ import { updateLead, appendLeadActivity, recordResendEmailId, updateLeadSequence
 import { sendStepOnce, type StepClaim } from "@/lib/outreach-claim"
 import { stepGapMinutes } from "@/lib/outreach-step-gap"
 import { coldOutreachGateForLead } from "@/lib/prospecting/scorer"
+import { recordMessage } from "@/lib/core-model/messages-server"
+import { sequenceStepMessage } from "@/lib/core-model/message-paths"
 import type { Lead, OutreachSequence, OutreachSequenceStopReason } from "@/types/crm-types"
 
 /**
@@ -216,6 +218,21 @@ export async function runSequenceStep(lead: Lead): Promise<SequenceStepResult> {
   }
   const emailId = outcome.emailId
   const now = new Date()
+
+  // The CRM keeps the full text (V1 item 4). The record's id comes from the Resend id, so a retried step that was
+  // already recorded is not recorded twice.
+  await recordMessage(
+    sequenceStepMessage({
+      from,
+      to: lead.email,
+      replyTo: sequenceReplyTo(lead.id, seq.enrolled_by),
+      subject: step.subject,
+      text: step.body,
+      messageId: emailId,
+      at: now.toISOString(),
+      source: lead.source,
+    }),
+  )
 
   await updateLead(lead.id, {
     status: "contacted",

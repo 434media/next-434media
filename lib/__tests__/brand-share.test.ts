@@ -7,6 +7,7 @@ import assert from "node:assert/strict"
 import { DAILY_SHARE_CAP, chicagoDay, countryCode, excludedDomain, isAutomatedOpen, hashShareToken, isShareToken, newShareToken, shareRefusal, shareState } from "../brand-share"
 import { sendBrandShare, type ShareDeps, type ShareRequest } from "../brand-share-send"
 import type { BrandShare, BrandShareStore, NewBrandShare, ShareGuard } from "../firestore-brand-shares"
+import { buildMessageRecord, type MessageInput } from "../core-model/messages"
 
 const NOW = new Date("2026-10-27T15:00:00Z")
 
@@ -42,18 +43,21 @@ function fakeStore(): BrandShareStore & { all: BrandShare[]; viewsOf: Record<str
 
 function deps(over: Partial<ShareDeps> = {}) {
   const store = fakeStore(), mails: { to: string; replyTo: string; subject: string; text: string; html: string }[] = []
+  const records: MessageInput[] = []
   let t = 0
   const d: ShareDeps = {
     shares: store,
     book: async id => id === "milcity" ? { ok: true, book: { label: "MilCityUSA", versionId: "milcity@v10", n: 10 } } : { ok: false, reason: "no visual standard has been generated into the profile" },
     isSuppressed: async e => e === "gone@suppressed.example",
     sendMail: async m => { mails.push(m); return { id: `msg-${mails.length}` } },
+    from: "434 MEDIA <brandbook@send.434media.com>",
+    recordMessage: async m => { records.push(m) },
     origin: "https://www.434media.com",
     now: () => new Date(NOW.getTime() + (t++) * 60_000 * 11),
     newToken: newShareToken,
     ...over,
   }
-  return { d, store, mails }
+  return { d, store, mails, records }
 }
 const req = (over: Partial<ShareRequest> = {}): ShareRequest => ({ brandId: "milcity", recipientName: "Pat Vendor", recipientEmail: "Pat@Vendor.example", country: "United States", via: "button", sender: { email: "staff@434media.com", name: "Staff Person" }, ...over })
 
@@ -183,4 +187,31 @@ test("a prefetch or a link scanner is not a view; a person's browser is", () => 
   assert.equal(isAutomatedOpen(h({ "user-agent": chrome, purpose: "prefetch" })), true)
   for (const ua of ["Mozilla/5.0 (compatible; Slackbot-LinkExpanding 1.0; +https://api.slack.com/robots)", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko; Google-Safety) Chrome", "Mozilla/5.0 (Windows NT 5.1; rv:11.0) Gecko Firefox/11.0 (via ggpht.com GoogleImageProxy)", "Microsoft Office/16.0 (Windows NT 10.0; Microsoft Outlook 16.0.17928; Pro)", "facebookexternalhit/1.1", ""])
     assert.equal(isAutomatedOpen(h({ "user-agent": ua })), true, ua)
+})
+
+test("the CRM keeps the share's full text as one message record, without the link's token", async () => {
+  const { d, mails, records } = deps()
+  const out = await sendBrandShare(req(), d)
+  assert.equal(out.ok, true)
+  assert.equal(records.length, 1, "exactly one message record")
+  const token = /\/share\/brand-book\/([A-Za-z0-9_-]{43})/.exec(mails[0].text)![1]
+  const rec = buildMessageRecord(records[0])
+  assert.equal(JSON.stringify(rec).includes(token), false, "the token is not stored")
+  assert.equal(rec.activity.email?.path, "brand_share")
+  assert.equal(rec.activity.email?.message_id, "msg-1")
+  assert.deepEqual(rec.activity.email?.to, ["pat@vendor.example"])
+  assert.equal(rec.activity.contact.email, "pat@vendor.example")
+  // Everything else in the mail is kept: the stored text is the sent text with only the link replaced.
+  const out1 = out as { ok: true; share: BrandShare }
+  assert.equal(rec.activity.body, mails[0].text.replace(/https:\/\/\S+\/share\/brand-book\/[A-Za-z0-9_-]{43}/, `[brand book link for share ${out1.share.id}; the token is not stored]`))
+  assert.ok(rec.activity.email?.redactions?.[0].startsWith("share link"))
+})
+
+test("a refused or failed share records no message", async () => {
+  const refused = deps()
+  await sendBrandShare(req({ recipientEmail: "gone@suppressed.example" }), refused.d)
+  assert.equal(refused.records.length, 0)
+  const failed = deps({ sendMail: async () => { throw new Error("down") } })
+  await sendBrandShare(req(), failed.d)
+  assert.equal(failed.records.length, 0)
 })

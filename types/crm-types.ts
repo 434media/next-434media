@@ -609,6 +609,8 @@ export const CRM_COLLECTIONS = {
   AFFILIATIONS: "crm_affiliations",
   ACTIVITIES: "crm_activities",
   ACTIVITY_TRIAGE: "crm_activity_triage",
+  /** Overflow parts of a broadcast's recipient list (emails only, never the body). */
+  MESSAGE_RECIPIENTS: "crm_message_recipients",
   PERSON_EMAILS: "crm_person_emails",
   ORG_DOMAINS: "crm_org_domains",
   MERGES: "crm_merges",

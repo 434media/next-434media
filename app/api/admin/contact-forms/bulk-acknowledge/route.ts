@@ -2,6 +2,8 @@ import { type NextRequest, NextResponse } from "next/server"
 import { requireSendCapable } from "@/lib/auth"
 import { getResend, OUTREACH_FROM, RESEND_DOMAIN, assertVerifiedSender } from "@/lib/resend"
 import { setSubmissionState } from "@/lib/firestore-submission-states"
+import { recordMessage } from "@/lib/core-model/messages-server"
+import { bulkAckMessage } from "@/lib/core-model/message-paths"
 
 // POST /api/admin/contact-forms/bulk-acknowledge
 // Body: { recipients: Array<{ submissionId, email, firstName }> }
@@ -110,16 +112,19 @@ export async function POST(req: NextRequest) {
     // Send. We sequence (not parallelize) to stay well under Resend's rate
     // limits without complex throttling — at MAX_RECIPIENTS=50 this is
     // ~10–20 seconds worst case, acceptable for a bulk action.
+    const text = buildBody(firstName)
+    let messageId: string
     try {
       const { data, error } = await resend.emails.send({
         from,
         to: email,
         replyTo,
         subject: SUBJECT,
-        text: buildBody(firstName),
+        text,
       })
       if (error) throw new Error(error.message ?? JSON.stringify(error))
       if (!data?.id) throw new Error("Resend returned no email id")
+      messageId = data.id
     } catch (err) {
       console.error("[POST /bulk-acknowledge] Resend send failed for:", email, err)
       results.push({
@@ -130,6 +135,11 @@ export async function POST(req: NextRequest) {
       })
       continue
     }
+
+    // The CRM keeps the full text: each acknowledgment is its own record (it greets the person by name).
+    await recordMessage(
+      bulkAckMessage({ from, to: email, replyTo, subject: SUBJECT, text, messageId, at: new Date().toISOString(), sentBy: auth.session.email }),
+    )
 
     // Flip state — non-fatal: email already went out. Surfaces partial
     // success per-recipient via the result status so the rep can act on it.

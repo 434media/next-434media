@@ -111,6 +111,9 @@ jobs:
       # locked), consent per source with suppression winning, the full text of every email kept, a dismissed Google
       # Contacts entry never stored, duplicates matched by email and domain and merged only explicitly, visibility.
       - run: tsx --test lib/__tests__/core-model.test.ts
+      # The CRM keeps the full text (V1 item 4): each send and receive path writes exactly one message record with the
+      # whole body; a broadcast is one record with its recipient list; attachments are links; the Person is untouched.
+      - run: tsx --test lib/__tests__/message-records.test.ts
       # People: personal and business. `private` is the founder only (staff, full admins, super admins and agents
       # cannot see it in any read path); staff adds are business; a personal contact never reaches the lead path, a
       # sequence or a broadcast; clients never revert; automation never edits the address book; latest edit wins.

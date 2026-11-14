@@ -17,7 +17,7 @@ import { getAllStatesForSource } from "@/lib/firestore-submission-states"
 import { listIcpCohorts } from "@/lib/firestore-icp-cohorts"
 import type { Activity, InboxItem, Organization, Person } from "@/types/core-model"
 import { adaptClient, adaptContactForm, adaptLead, type CoreBundle } from "./adapters"
-import { assembleCoreView, inboxOf, type CoreView } from "./assemble"
+import { assembleCoreView, inboxOf, onPersonTimeline, type CoreView } from "./assemble"
 import { scoreOrganization } from "./score"
 import { filterViewFor, type Viewer } from "./view-filter"
 import { listArrivalActivities } from "@/lib/google-contacts/server"
@@ -128,7 +128,7 @@ export function personDetail(view: CoreView, id: string) {
   const affiliations = view.affiliations
     .filter((a) => a.person_id === id)
     .map((a) => ({ ...a, organization: orgs.get(a.organization_id) as Organization | undefined }))
-  const activities: Activity[] = view.activities.filter((a) => a.person_id === id)
+  const activities: Activity[] = view.activities.filter((a) => onPersonTimeline(a, person))
   return { person, affiliations, activities }
 }
 

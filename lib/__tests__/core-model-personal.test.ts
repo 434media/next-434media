@@ -271,7 +271,13 @@ test("outbound: no outbound surface reads the core model's people (sequences and
     "app/api/cron/outreach-sequence/route.ts",
     "app/api/cron/mailchimp-push/route.ts",
   ]) {
-    assert.doesNotMatch(read(f), /core-model|firestore-people|crm_people/, f)
+    // Recording what was sent (lib/core-model/messages*, message-paths: write-only, V1 item 4 "The CRM keeps the full
+    // text") is allowed; any other use of the core model, or any read of people, is not.
+    const src = read(f).replace(/["']@?\/?(?:\.\.?\/|lib\/)*core-model\/(?:messages|messages-server|message-paths)["']/g, "")
+    assert.doesNotMatch(src, /core-model|firestore-people|crm_people/, f)
+  }
+  for (const f of ["lib/core-model/messages.ts", "lib/core-model/messages-server.ts", "lib/core-model/message-paths.ts"]) {
+    assert.doesNotMatch(read(f), /firestore-people|crm_people|listPeople|getCoreView/, `${f} reads no people`)
   }
 })
 

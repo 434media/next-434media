@@ -2,6 +2,8 @@ import { type NextRequest, NextResponse } from "next/server"
 import { requireSendCapable } from "@/lib/auth"
 import { getResend, OUTREACH_FROM, RESEND_DOMAIN, assertVerifiedSender } from "@/lib/resend"
 import { setSubmissionState } from "@/lib/firestore-submission-states"
+import { recordMessage } from "@/lib/core-model/messages-server"
+import { contactFormReplyMessage } from "@/lib/core-model/message-paths"
 
 // POST /api/admin/contact-forms/[id]/reply
 // Body: { to, subject, body }
@@ -92,6 +94,11 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
     )
   }
 
+  // The CRM keeps the full text (V1 item 4): the reply as sent, as its own record linked to the person by address.
+  const record = await recordMessage(
+    contactFormReplyMessage({ from, to, replyTo, subject, text: emailBody, messageId: emailId, at: new Date().toISOString(), sentBy: auth.session.email }),
+  )
+
   // Auto-flip state → replied. Non-fatal: email is already sent, rep can
   // manually flip if persistence fails. The response carries `stateUpdated`
   // so the frontend doesn't optimistically lie about local state when the
@@ -105,5 +112,5 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
     // Fall through — email already sent, surface the state-failure to caller.
   }
 
-  return NextResponse.json({ success: true, emailId, stateUpdated })
+  return NextResponse.json({ success: true, emailId, stateUpdated, recorded: record.recorded })
 }
