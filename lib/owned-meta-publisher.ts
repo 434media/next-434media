@@ -1,4 +1,4 @@
-import { createHash } from "node:crypto"
+import { canonicalJson, contentHash } from "./send-approval"
 import type { SafeMetaError } from "./owned-meta-errors"
 
 export const META_BRANDS = ["txmx", "vemos", "milcity", "ampd"] as const
@@ -112,12 +112,10 @@ export const legacyReelsPreparation = (p: Record<string, string>) => !!(p.video 
 /** How long a final publication may wait on Meta's processing before a person looks (a Facebook Reel, Step 3 part 5). */
 export const META_PROCESSING_WINDOW_MS = 24 * 60 * 60 * 1000
 export class MetaPermissionError extends Error { constructor(public readonly detail?: SafeMetaError) { super("Publishing permission failed; this brand needs a new permission check"); this.name = "MetaPermissionError" } }
-export function canonicalJson(value: unknown): string {
-  if (Array.isArray(value)) return `[${value.map(canonicalJson).join(",")}]`
-  if (value && typeof value === "object") return `{${Object.entries(value).filter(([, v]) => v !== undefined).sort(([a], [b]) => a.localeCompare(b)).map(([k, v]) => `${JSON.stringify(k)}:${canonicalJson(v)}`).join(",")}}`
-  return JSON.stringify(value) ?? "null"
-}
-export function manifestHash(value: MetaManifest): string { return createHash("sha256").update(canonicalJson(value)).digest("hex") }
+// The hash and its canonical form live in the shared approval core (lib/send-approval.ts), which every send path uses
+// (build plan v3: sends and approvals extend this publisher). Moved unchanged; a Meta hash is what it was.
+export { canonicalJson }
+export function manifestHash(value: MetaManifest): string { return contentHash(value) }
 export function validateManifest(value: unknown): asserts value is MetaManifest {
   const m = value as MetaManifest
   if (!m || m.schema !== 1 || !Number.isSafeInteger(m.revision) || m.revision < 1 || !META_BRANDS.includes(m.brand)) throw new MetaBlocked("Invalid manifest identity")
