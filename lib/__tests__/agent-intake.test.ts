@@ -41,7 +41,7 @@ function fakeGitHub(files: Record<string, string>, opts: { permissions?: Record<
     requests.push({ method, path: u.pathname + u.search, auth, body: init?.body as string | undefined })
     const json = (b: unknown, status = 200) => new Response(JSON.stringify(b), { status })
     if (u.pathname === "/repos/434media/434-context/installation") return json({ id: 77 })
-    if (u.pathname === "/app/installations/77/access_tokens") return json({ token: "installation-token-for-tests", expires_at: at(3_600_000), permissions: opts.permissions ?? { contents: "read", metadata: "read" } }, 201)
+    if (u.pathname === "/app/installations/77/access_tokens") return json({ token: "test-token", expires_at: at(3_600_000), permissions: opts.permissions ?? { contents: "read", metadata: "read" } }, 201)
     if (u.pathname.startsWith("/repos/434media/434-context/commits/")) return json({ sha: COMMIT })
     if (u.pathname === `/repos/434media/434-context/git/trees/${COMMIT}`) return json({ tree: Object.entries(files).map(([path, t]) => ({ path, type: "blob", sha: gitSha(t) })), truncated: false })
     if (u.pathname.startsWith("/repos/434media/434-context/git/blobs/")) {
@@ -70,7 +70,7 @@ test("the App's JWT is RS256, signed with its key, short-lived", () => {
 test("the installation token is narrowed to Contents: read on 434-context, and refused if it carries more", async () => {
   resetSkillSourceCache()
   const gh = fakeGitHub({})
-  assert.equal(await installationToken({ fetch: gh.fetcher, env: ENV, now: () => Date.parse(NOW) }), "installation-token-for-tests")
+  assert.equal(await installationToken({ fetch: gh.fetcher, env: ENV, now: () => Date.parse(NOW) }), "test-token")
   const mint = gh.requests.find((r) => r.method === "POST")!
   assert.deepEqual(JSON.parse(mint.body!), { repositories: ["434-context"], permissions: { contents: "read" } })
   assert.match(mint.auth, /^Bearer ey/)
