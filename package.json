@@ -4,7 +4,7 @@
   "private": true,
   "packageManager": "pnpm@10.4.1",
   "engines": {
-    "node": ">=22",
+    "node": ">=22.19.0",
     "pnpm": ">=10"
   },
   "scripts": {
@@ -22,7 +22,7 @@
     "@types/sanitize-html": "^2.16.0",
     "@vercel/blob": "^2.0.0",
     "@vercel/oidc": "3.2.0",
-    "@vercel/sandbox": "3.9.1",
+    "@vercel/sandbox": "4.0.0",
     "ai": "^7.0.161",
     "botid": "^1.5.10",
     "cheerio": "^1.0.0",

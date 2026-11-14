@@ -8,7 +8,7 @@ import assert from "node:assert/strict"
 import { createHash, createVerify, generateKeyPairSync } from "node:crypto"
 import { MockLanguageModelV4 } from "ai/test"
 import { fingerprint, type SkillFiles } from "../skills/loader"
-import { APP_ID_ENV, APP_KEY_ENV, SkillSourceError, appJwt, catalogEntry, installationToken, readSkillAt, readSuiteAt, resetSkillSourceCache } from "../skills/source"
+import { APP_KEY_ENV, CLIENT_ID_ENV, SkillSourceError, appJwt, catalogEntry, installationToken, readSkillAt, readSuiteAt, resetSkillSourceCache } from "../skills/source"
 import { scriptRefusal, skillScriptTool, type ScriptSandbox } from "../agent/skill-scripts"
 import { INTAKE_SKILL, intakeEligible, queueIntake, renderIntakeRequest, runIntake, taskIdFor, type IntakeDeps, type IntakeSubmission, type SkillPin } from "../agent/intake"
 import { parseControls, type AgentControls } from "../agent/controls"
@@ -27,7 +27,8 @@ const SINK = TEST_SINK_RECIPIENTS[0]
 // ── The skill source ────────────────────────────────────────────────────────────────────────────────────────────────
 const { privateKey, publicKey } = generateKeyPairSync("rsa", { modulusLength: 2048 })
 const PEM = privateKey.export({ type: "pkcs8", format: "pem" }).toString()
-const ENV = { [APP_ID_ENV]: "123456", [APP_KEY_ENV]: PEM }
+const CLIENT_ID = "Iv23liTestClient01"
+const ENV = { [CLIENT_ID_ENV]: CLIENT_ID, [APP_KEY_ENV]: PEM }
 const gitSha = (text: string) => createHash("sha1").update(`blob ${Buffer.byteLength(text)}\0`).update(text).digest("hex")
 
 /** A fake GitHub holding one tree. Records each request. */
@@ -56,14 +57,14 @@ function fakeGitHub(files: Record<string, string>, opts: { permissions?: Record<
   return { fetcher, requests }
 }
 
-test("the App's JWT is RS256, signed with its key, short-lived", () => {
-  const jwt = appJwt("123456", PEM, Date.parse(NOW))
+test("the App's JWT is RS256, signed with its key, short-lived, and issued by the Client ID", () => {
+  const jwt = appJwt(CLIENT_ID, PEM, Date.parse(NOW))
   const [h, b, sig] = jwt.split(".")
   const v = createVerify("RSA-SHA256")
   v.update(`${h}.${b}`)
   assert.ok(v.verify(publicKey, Buffer.from(sig, "base64url")))
   const claims = JSON.parse(Buffer.from(b, "base64url").toString())
-  assert.equal(claims.iss, "123456")
+  assert.equal(claims.iss, CLIENT_ID)
   assert.ok(claims.exp - claims.iat <= 600)
 })
 
@@ -78,6 +79,9 @@ test("the installation token is narrowed to Contents: read on 434-context, and r
   await assert.rejects(installationToken({ fetch: fakeGitHub({}, { permissions: { contents: "write" } }).fetcher, env: ENV, now: () => Date.parse(NOW) }), /more than Contents: read/)
   resetSkillSourceCache()
   await assert.rejects(installationToken({ fetch: gh.fetcher, env: {}, now: () => Date.parse(NOW) }), /not configured/)
+  resetSkillSourceCache()
+  // The numeric App ID is no longer accepted as the issuer: the Client ID is.
+  await assert.rejects(installationToken({ fetch: gh.fetcher, env: { [CLIENT_ID_ENV]: "123456", [APP_KEY_ENV]: PEM }, now: () => Date.parse(NOW) }), /not configured/)
 })
 
 test("a skill is read at a commit only, every file checked against its git id; a suite reads its JSON only", async () => {

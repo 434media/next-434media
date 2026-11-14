@@ -6,7 +6,9 @@
  * §2), and the site holds no token that can write there (CLAUDE.md, "No backup token on the site"). So a run reads the
  * skill through a GitHub App that can only read:
  *  - the App has one permission, Contents: read, and is installed on 434media/434-context alone;
- *  - its id and private key are Vercel Production Sensitive variables (`CONTEXT_APP_ID`, `CONTEXT_APP_PRIVATE_KEY`);
+ *  - its Client ID and private key are Vercel Production variables (`CONTEXT_APP_CLIENT_ID`, Encrypted; and
+ *    `CONTEXT_APP_PRIVATE_KEY`, Sensitive). The App's JWT names the Client ID as its issuer, as GitHub's JWT guide
+ *    recommends ("Use of the client ID is recommended"); the numeric App ID is not used;
  *  - each read mints a short-lived installation token (an hour at most, Contents: read, that one repository), so no
  *    long-lived token exists anywhere.
  *
@@ -23,7 +25,7 @@ import type { SkillFiles } from "./loader"
 export const CONTEXT_REPO = { owner: "434media", repo: "434-context" } as const
 export const SKILLS_DIR = "03 Skills"
 export const CATALOG_PATH = "03 Skills/skills-index.json"
-export const APP_ID_ENV = "CONTEXT_APP_ID"
+export const CLIENT_ID_ENV = "CONTEXT_APP_CLIENT_ID"
 export const APP_KEY_ENV = "CONTEXT_APP_PRIVATE_KEY"
 
 const API = "https://api.github.com"
@@ -46,22 +48,26 @@ export interface SourceDeps {
 
 const b64url = (b: Buffer | string) => Buffer.from(b).toString("base64").replace(/=+$/, "").replace(/\+/g, "-").replace(/\//g, "_")
 
-/** The App's own JWT (RS256): issued a minute in the past for clock drift, valid nine minutes. GitHub allows ten. */
-export function appJwt(appId: string, privateKeyPem: string, nowMs: number): string {
+/**
+ * The App's own JWT (RS256): issued a minute in the past for clock drift, valid nine minutes (GitHub allows ten). The
+ * issuer is the App's Client ID.
+ */
+export function appJwt(clientId: string, privateKeyPem: string, nowMs: number): string {
   const iat = Math.floor(nowMs / 1000) - 60
   const head = b64url(JSON.stringify({ alg: "RS256", typ: "JWT" }))
-  const body = b64url(JSON.stringify({ iat, exp: iat + 600 - 60, iss: appId }))
+  const body = b64url(JSON.stringify({ iat, exp: iat + 600 - 60, iss: clientId }))
   const signer = createSign("RSA-SHA256")
   signer.update(`${head}.${body}`)
   return `${head}.${body}.${b64url(signer.sign(privateKeyPem))}`
 }
 
-function credentials(env: Record<string, string | undefined>): { appId: string; key: string } {
-  const appId = (env[APP_ID_ENV] ?? "").trim()
+function credentials(env: Record<string, string | undefined>): { clientId: string; key: string } {
+  const clientId = (env[CLIENT_ID_ENV] ?? "").trim()
   // Vercel stores a multi-line value as is; a value pasted with literal "\n" is accepted too.
   const key = (env[APP_KEY_ENV] ?? "").replace(/\\n/g, "\n").trim()
-  if (!/^\d+$/.test(appId) || !key.includes("PRIVATE KEY")) throw new SkillSourceError(`The skill source is not configured (${APP_ID_ENV}, ${APP_KEY_ENV})`)
-  return { appId, key }
+  // A GitHub App Client ID is letters and digits ("Iv23li…", or the older "Iv1.…").
+  if (!/^Iv[A-Za-z0-9.]{6,60}$/.test(clientId) || !key.includes("PRIVATE KEY")) throw new SkillSourceError(`The skill source is not configured (${CLIENT_ID_ENV}, ${APP_KEY_ENV})`)
+  return { clientId, key }
 }
 
 let tokenCache: { token: string; expiresAt: number } | null = null
@@ -89,8 +95,8 @@ async function gh(path: string, init: RequestInit, deps: SourceDeps): Promise<Re
 export async function installationToken(deps: SourceDeps = {}): Promise<string> {
   const now = (deps.now ?? Date.now)()
   if (tokenCache && tokenCache.expiresAt - 5 * 60_000 > now) return tokenCache.token
-  const { appId, key } = credentials(deps.env ?? process.env)
-  const jwt = appJwt(appId, key, now)
+  const { clientId, key } = credentials(deps.env ?? process.env)
+  const jwt = appJwt(clientId, key, now)
   const auth = { authorization: `Bearer ${jwt}` }
   const inst = (await (await gh(`/repos/${CONTEXT_REPO.owner}/${CONTEXT_REPO.repo}/installation`, { headers: auth }, deps)).json()) as { id?: number }
   if (!inst?.id) throw new SkillSourceError("The App is not installed on 434-context")
