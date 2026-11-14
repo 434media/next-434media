@@ -128,6 +128,9 @@ jobs:
       # collection is never written; no duplicate after an edit; clients never revert; the cold-gate fields stay
       # locked; every edit is logged as a triaged Activity with the record's visibility.
       - run: tsx --test lib/__tests__/core-model-edit.test.ts
+      # The Clients list: two client records sharing a company name are two rows (one was hidden behind the other,
+      # 2026-11-14); opportunities still collapse into their company's row.
+      - run: tsx --test lib/__tests__/client-rows.test.ts
 
       # The engine on AI SDK 7 (V1 item 2): the real generateText against the SDK's mock model. System text goes through
       # `instructions` (v7 rejects system messages inside `messages`), the cache markers and Gateway automatic caching
