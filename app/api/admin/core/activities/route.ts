@@ -3,7 +3,7 @@ import { requireAdmin } from "@/lib/auth"
 import { firestoreCoreStore } from "@/lib/core-model/firestore-store"
 import { recordArrival } from "@/lib/core-model/service"
 import { normalizeEmail } from "@/lib/core-model/identity"
-import { coreErrorResponse, optString, readJson } from "@/lib/core-model/route-helpers"
+import { coreErrorResponse, optString, readJson, viewerOf } from "@/lib/core-model/route-helpers"
 import { listIcpCohorts } from "@/lib/firestore-icp-cohorts"
 import { ACTIVITY_TYPES, CORE_SOURCES, type ActivityEmail, type ActivityType, type CoreSource } from "@/types/core-model"
 
@@ -18,7 +18,7 @@ export async function POST(request: NextRequest) {
   const body = await readJson(request)
   if (!body) return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 })
   const type = body.type as ActivityType
-  if (!ACTIVITY_TYPES.includes(type) || type === "google_contact" || type === "form_submission") {
+  if (!ACTIVITY_TYPES.includes(type) || type === "google_contact" || type === "form_submission" || type === "address_book_change") {
     return NextResponse.json({ error: "type must be note, meeting, email or prospect_found" }, { status: 400 })
   }
   const email = normalizeEmail(body.email)
@@ -49,6 +49,8 @@ export async function POST(request: NextRequest) {
         body: text,
         email: envelope,
         created_by: auth.session.email,
+        // Only the founder may log against a private (personal) Person; for anyone else the address is "on file".
+        allowPrivate: (await viewerOf(auth.session)).founder === true,
       },
       await listIcpCohorts(),
     )

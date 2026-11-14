@@ -30,6 +30,7 @@ export const firestoreCoreStore: CoreStore = {
   reassignEmails: writes(people.reassignPersonEmails),
   getOrganization: orgs.getOrganization,
   findOrganizationByDomain: orgs.findOrganizationByDomain,
+  findOrganizationByName: orgs.findOrganizationByName,
   createOrganization: writes(orgs.createOrganization),
   updateOrganization: writes(orgs.updateOrganization),
   findAffiliation: affs.findAffiliation,
@@ -53,6 +54,8 @@ function leadSourceOf(person: Person): LeadSource {
  */
 export const firestoreLeadPath: LeadPath = {
   async createLeadFor(person: Person, activity: Activity) {
+    // Defence in depth: the service makes a Person business before it reaches here. A personal one never does.
+    if (person.relationship === "personal") return { leadId: null }
     const email = person.emails[0] ?? ""
     if (!email) return { leadId: null }
     if (activity.type === "form_submission") {

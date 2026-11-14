@@ -22,6 +22,9 @@ export interface ActivityInput {
   email?: ActivityEmail
   legacy_ref?: Activity["legacy_ref"]
   created_by?: string
+  visibility?: Activity["visibility"]
+  relationship?: Activity["relationship"]
+  change?: Activity["change"]
 }
 
 const isIso = (v: unknown) => typeof v === "string" && v.length > 0 && !Number.isNaN(Date.parse(v))

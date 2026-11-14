@@ -4,6 +4,7 @@ import type { Activity, ActivityType, CoreSource, MergeRecord, TriageDecision, T
 import { ACTIVITY_TYPES, CORE_SOURCES, TRIAGE_DECISIONS } from "../types/core-model"
 import type { ActivityInput } from "./core-model/activity"
 import { safeDocId, stripUndefined, toIsoString } from "./core-model/firestore-util"
+import { normalizeVisibility } from "./core-model/visibility"
 
 // Activities (the core model): every touch, written once and never edited. This module exports no update and
 // no delete, on purpose. The CRM keeps the full text: `body` is stored whole. Whether an activity is triaged is
@@ -41,6 +42,9 @@ function normalize(id: string, raw: FirebaseFirestore.DocumentData): Activity {
     email: raw.email && typeof raw.email === "object" ? (raw.email as Activity["email"]) : undefined,
     legacy_ref: raw.legacy_ref && typeof raw.legacy_ref === "object" ? (raw.legacy_ref as Activity["legacy_ref"]) : undefined,
     created_by: str(raw.created_by),
+    visibility: raw.visibility === undefined ? undefined : normalizeVisibility(raw.visibility),
+    relationship: raw.relationship === "personal" ? "personal" : raw.relationship === "business" ? "business" : undefined,
+    change: Array.isArray(raw.change) ? (raw.change as Activity["change"]) : undefined,
     triaged: false,
     created_at: toIsoString(raw.created_at),
   }

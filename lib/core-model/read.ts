@@ -15,12 +15,12 @@ import { getClients } from "@/lib/firestore-crm"
 import { getContactForms } from "@/lib/firestore-contact-forms"
 import { getAllStatesForSource } from "@/lib/firestore-submission-states"
 import { listIcpCohorts } from "@/lib/firestore-icp-cohorts"
-import type { AdminRole } from "@/lib/session-cookie"
 import type { Activity, InboxItem, Organization, Person } from "@/types/core-model"
 import { adaptClient, adaptContactForm, adaptLead, type CoreBundle } from "./adapters"
 import { assembleCoreView, inboxOf, type CoreView } from "./assemble"
 import { scoreOrganization } from "./score"
-import { canSee } from "./visibility"
+import { filterViewFor, type Viewer } from "./view-filter"
+import { listArrivalActivities } from "@/lib/google-contacts/server"
 
 export interface BuiltCoreView extends CoreView {
   warnings: string[]
@@ -49,7 +49,7 @@ async function settle<T>(label: string, p: Promise<T>, fallback: T, warnings: st
 
 async function build(): Promise<BuiltCoreView> {
   const warnings: string[] = []
-  const [people, organizations, affiliations, activities, triage, leads, clients, forms, formStates, cohorts] = await Promise.all([
+  const [people, organizations, affiliations, activities, triage, leads, clients, forms, formStates, cohorts, arrivals] = await Promise.all([
     listPeople(),
     listOrganizations(),
     listAffiliations(),
@@ -60,6 +60,7 @@ async function build(): Promise<BuiltCoreView> {
     settle("Contact forms", getContactForms(), [], warnings),
     settle("Contact form states", getAllStatesForSource("contact_forms"), new Map(), warnings),
     settle("ICP cohorts", listIcpCohorts(), [], warnings),
+    settle("Google Contacts arrivals", listArrivalActivities(), [], warnings),
   ])
 
   const stored: CoreBundle = { people, organizations, affiliations, activities }
@@ -70,6 +71,8 @@ async function build(): Promise<BuiltCoreView> {
       const state = f.id ? formStates.get(f.id) : undefined
       return adaptContactForm(f, Boolean(state && state !== "new"))
     }),
+    // Phone arrivals waiting for a decision: read only, never stored as Activities until someone saves them.
+    { people: [], organizations: [], affiliations: [], activities: arrivals },
   ]
   const view = assembleCoreView(stored, adapted, new Set(triage.keys()))
 
@@ -98,27 +101,11 @@ export async function getCoreView(): Promise<BuiltCoreView> {
   return inFlight
 }
 
-export interface Viewer {
-  role?: AdminRole | null
-  superAdmin?: boolean
-}
+export type { Viewer } from "./view-filter"
 
-/** The view a viewer may see: restricted People and Organizations, and everything linked to them, are removed. */
+/** The view a viewer may see (filterViewFor over the cached whole view). */
 export async function getVisibleCoreView(viewer: Viewer): Promise<BuiltCoreView> {
-  const view = await getCoreView()
-  const people = view.people.filter((p) => canSee(p, viewer))
-  const organizations = view.organizations.filter((o) => canSee(o, viewer))
-  const hiddenPeople = new Set(view.people.filter((p) => !canSee(p, viewer)).map((p) => p.id))
-  const hiddenOrgs = new Set(view.organizations.filter((o) => !canSee(o, viewer)).map((o) => o.id))
-  return {
-    ...view,
-    people,
-    organizations,
-    affiliations: view.affiliations.filter((a) => !hiddenPeople.has(a.person_id) && !hiddenOrgs.has(a.organization_id)),
-    activities: view.activities.filter(
-      (a) => !(a.person_id && hiddenPeople.has(a.person_id)) && !(a.organization_id && hiddenOrgs.has(a.organization_id)),
-    ),
-  }
+  return filterViewFor(await getCoreView(), viewer)
 }
 
 /** The inbox: untriaged activities with their Person and Organization (fit and grade). */

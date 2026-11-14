@@ -612,6 +612,10 @@ export const CRM_COLLECTIONS = {
   PERSON_EMAILS: "crm_person_emails",
   ORG_DOMAINS: "crm_org_domains",
   MERGES: "crm_merges",
+  /** Google Contacts arrivals waiting for a decision; a dismissal removes the entry (lib/google-contacts/server.ts). */
+  GOOGLE_CONTACT_ARRIVALS: "crm_google_contact_arrivals",
+  /** The log of every write the sync makes to Google. */
+  GOOGLE_CONTACT_WRITES: "crm_google_contact_writes",
 } as const
 
 // ============================================

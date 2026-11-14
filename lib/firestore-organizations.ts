@@ -4,7 +4,7 @@ import type { IcpFitBreakdown, IcpGrade } from "../types/crm-types"
 import type { CoreRole, LegacyRef, Organization } from "../types/core-model"
 import { CORE_ROLES } from "../types/core-model"
 import { normalizeVisibility } from "./core-model/visibility"
-import { normalizeDomain } from "./core-model/identity"
+import { normalizeDomain, organizationNameKey } from "./core-model/identity"
 import { DuplicateError, type NewOrganization } from "./core-model/service"
 import { asStringArray, domainClaimId, stripUndefined, toIsoString } from "./core-model/firestore-util"
 
@@ -68,6 +68,14 @@ export async function findOrganizationByDomain(domain: string): Promise<Organiza
   const claim = await getDb().collection(DOMAINS).doc(domainClaimId(key)).get()
   const orgId = claim.exists ? (claim.data()?.organization_id as string | undefined) : undefined
   return orgId ? getOrganization(orgId) : null
+}
+
+/** A stored, unmerged Organization with no domain whose folded name matches. */
+export async function findOrganizationByName(name: string): Promise<Organization | null> {
+  const key = organizationNameKey(name)
+  if (!key) return null
+  const all = await listOrganizations()
+  return all.find((o) => !o.domain && !o.merged_into && organizationNameKey(o.name) === key) ?? null
 }
 
 export async function createOrganization(input: NewOrganization): Promise<Organization> {

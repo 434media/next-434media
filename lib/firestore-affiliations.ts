@@ -1,7 +1,7 @@
 import { getDb } from "./firebase-admin"
 import { CRM_COLLECTIONS } from "../types/crm-types"
-import type { Affiliation, CoreRole } from "../types/core-model"
-import { CORE_ROLES } from "../types/core-model"
+import type { Affiliation, AffiliationRole } from "../types/core-model"
+import { AFFILIATION_ROLES } from "../types/core-model"
 import type { NewAffiliation } from "./core-model/service"
 import { stripUndefined, toIsoString } from "./core-model/firestore-util"
 
@@ -21,7 +21,7 @@ function normalize(id: string, raw: FirebaseFirestore.DocumentData): Affiliation
     id,
     person_id: typeof raw.person_id === "string" ? raw.person_id : "",
     organization_id: typeof raw.organization_id === "string" ? raw.organization_id : "",
-    role: (CORE_ROLES.includes(raw.role) ? raw.role : "prospect") as CoreRole,
+    role: (AFFILIATION_ROLES.includes(raw.role) ? raw.role : "prospect") as AffiliationRole,
     title: typeof raw.title === "string" && raw.title ? raw.title : undefined,
     active: raw.active !== false,
     created_at: toIsoString(raw.created_at),
@@ -37,7 +37,7 @@ export async function listAffiliations(): Promise<Affiliation[]> {
   return data
 }
 
-export async function findAffiliation(personId: string, organizationId: string, role: CoreRole): Promise<Affiliation | null> {
+export async function findAffiliation(personId: string, organizationId: string, role: AffiliationRole): Promise<Affiliation | null> {
   const snap = await getDb().collection(COLLECTION).where("person_id", "==", personId).get()
   const hit = snap.docs.map((d) => normalize(d.id, d.data())).find((a) => a.organization_id === organizationId && a.role === role)
   return hit ?? null

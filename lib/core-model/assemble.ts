@@ -119,6 +119,9 @@ export function assembleCoreView(stored: CoreBundle, adapted: CoreBundle[], tria
           location: cur.location || o.location,
           employee_count: cur.employee_count ?? o.employee_count,
           annual_revenue: cur.annual_revenue ?? o.annual_revenue,
+          // A company known only from a personal contact becomes business once a business record names it, so a
+          // client or lead is never hidden behind the founder's address book.
+          visibility: cur.visibility === "private" && o.visibility !== "private" ? "business" : cur.visibility,
           legacy_refs: unionRefs(cur.legacy_refs, o.legacy_refs),
         })
         indexOrg(orgs.get(hit) as Organization)
