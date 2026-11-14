@@ -10,6 +10,8 @@ import {
 import { isSuppressed } from "@/lib/firestore-suppression"
 import { getMailchimpMemberProfile } from "@/lib/mailchimp-analytics"
 import { coldOutreachGateForLead } from "@/lib/prospecting/scorer"
+import { recordMessage } from "@/lib/core-model/messages-server"
+import { leadOutreachMessage } from "@/lib/core-model/message-paths"
 
 export const runtime = "nodejs"
 export const maxDuration = 30
@@ -159,8 +161,13 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
     )
   }
 
-  // Schedule the follow-up reminder
   const now = new Date()
+  // The CRM keeps the full text (V1 item 4): the message as sent, as its own record. The lead keeps only its id.
+  const record = await recordMessage(
+    leadOutreachMessage({ from, to: lead.email, replyTo, subject, text: emailBody, messageId: emailId, at: now.toISOString(), sentBy: auth.session.email, source: lead.source }),
+  )
+
+  // Schedule the follow-up reminder
   const followUp = new Date(now)
   followUp.setDate(followUp.getDate() + FOLLOWUP_DAYS)
   const followUpDate = followUp.toISOString().split("T")[0]
@@ -185,7 +192,7 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
       actor: auth.session.email,
       detail: `Sent “${subject}” · follow-up ${followUpDate}${optedOutOverridden ? " · ⚠ sent despite marketing opt-out" : ""}`,
     }).catch(() => {})
-    return NextResponse.json({ success: true, lead: updated, emailId })
+    return NextResponse.json({ success: true, lead: updated, emailId, recorded: record.recorded })
   } catch (err) {
     console.error(`[POST /api/admin/leads/${id}/send-outreach] persist error:`, err)
     // Email already went out — surface a clear partial-success error.

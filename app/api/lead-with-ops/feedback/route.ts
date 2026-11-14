@@ -6,6 +6,8 @@ import { FEEDBACK_COLLECTION } from "@/lib/lead-with-ops-feedback"
 import { handleFeedbackPost } from "@/lib/lead-with-ops-feedback-handler"
 import { CALL_REQUEST_ROUTE_ID, resolveCallRequestRecipients } from "@/lib/lead-with-ops-call-request"
 import { getNotificationRoute } from "@/lib/firestore-notification-routes"
+import { recordMessage } from "@/lib/core-model/messages-server"
+import { callRequestRecord } from "@/lib/core-model/message-paths"
 
 /**
  * Post-event feedback intake for the Lead with Ops. Layer in AI. lunch. The
@@ -31,8 +33,10 @@ export async function POST(request: Request) {
         return
       }
       assertVerifiedSender(message.from)
-      const { error } = await getResend().emails.send(message)
+      const { data, error } = await getResend().emails.send(message)
       if (error) throw new Error(error.message ?? JSON.stringify(error))
+      // The CRM keeps the full text (V1 item 4): the call request goes to a partner outside 434.
+      if (data?.id) await recordMessage(callRequestRecord({ ...message, messageId: data.id, at: new Date().toISOString() }))
     },
     afterResponse: (task) => after(task),
   })

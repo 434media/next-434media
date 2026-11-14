@@ -7,6 +7,7 @@ import { profileProblems, type BrandProfile } from "./content-pipeline/profile"
 import { PIPELINE_PROPERTIES } from "./content-pipeline/properties"
 import type { BrandBook } from "./content-pipeline/brand-book"
 import type { ShareDeps } from "./brand-share-send"
+import { recordMessage } from "./core-model/messages-server"
 
 /** Brand-book shares are sent from the 434 sending domain (lib/resend.ts); replies go to the person who sent it. */
 export const SHARE_FROM = `434 MEDIA <brandbook@${RESEND_DOMAIN}>`
@@ -32,6 +33,8 @@ export function liveShareDeps(origin: string): ShareDeps {
       if (error || !data?.id) throw new Error(error?.message || "Resend returned no message id")
       return { id: data.id }
     },
+    from: SHARE_FROM,
+    recordMessage: (m) => recordMessage(m),
     origin,
   }
 }

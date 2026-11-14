@@ -3,6 +3,9 @@ import { inviteEmailHtml } from "./email-templates/lead-with-ops"
 import { unsubscribeUrl } from "./unsubscribe-token"
 import { getDb } from "./firebase-admin"
 import type { BroadcastRecipient } from "./broadcast-recipients"
+import { recordMessage } from "./core-model/messages-server"
+import { broadcastMessage } from "./core-model/message-paths"
+import { BROADCAST_PLACEHOLDERS } from "./core-model/messages"
 
 // Phase 3 send engine. Renders the branded invite per-recipient (FNAME + signed
 // unsubscribe URL), sends via Resend batch API in throttled chunks, and logs the
@@ -162,6 +165,29 @@ export async function sendBroadcast(opts: SendBroadcastOpts): Promise<BroadcastS
       errorsCount: errors.length,
       sentAt: new Date().toISOString(),
     })
+
+  // The CRM keeps the full text (V1 item 4), and a broadcast is stored once (founder guardrail 1): one record with the
+  // body rendered once, placeholders where each person's copy differed (their first name, their own signed
+  // unsubscribe link), and the list of everyone it actually went to. Never one copy per person.
+  if (sentEmails.length > 0) {
+    const record = await recordMessage(
+      broadcastMessage({
+        from: opts.from,
+        replyTo: opts.replyTo,
+        subject: opts.subject,
+        html: inviteEmailHtml({
+          firstName: BROADCAST_PLACEHOLDERS.firstName,
+          registrationUrl: opts.registrationUrl,
+          unsubscribeUrl: BROADCAST_PLACEHOLDERS.unsubscribeUrl,
+        }),
+        sentEmails,
+        broadcastId,
+        label: opts.label,
+        at: new Date().toISOString(),
+      }),
+    )
+    if (!record.recorded) console.error(`[broadcast] ${broadcastId} sent but NOT RECORDED in the CRM: ${record.error}`)
+  }
 
   return { attempted: payloads.length, sent, failed, invalid, batches, errors, sentEmails, broadcastId }
 }

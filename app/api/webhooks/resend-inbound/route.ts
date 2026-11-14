@@ -4,6 +4,8 @@ import sanitizeHtml from "sanitize-html"
 import { getLeadById } from "@/lib/firestore-leads"
 import { markSequenceReplied } from "@/lib/outreach-sequence"
 import { getResend, OUTREACH_FROM, assertVerifiedSender } from "@/lib/resend"
+import { recordMessage } from "@/lib/core-model/messages-server"
+import { sequenceReplyMessage, type ReceivedEmail } from "@/lib/core-model/message-paths"
 
 export const runtime = "nodejs"
 
@@ -108,12 +110,11 @@ function htmlToText(html: string): string {
   return text.replace(/\n{3,}/g, "\n\n").trim()
 }
 
-// Fetch the received email's body. The email.received webhook is metadata-only,
-// so the reply text lives behind the Received Emails API. Best-effort: returns
-// undefined (never throws) so a failed fetch degrades to a body-less timeline
-// note rather than breaking the stop-sequence path. One short retry covers the
-// brief window where the email isn't queryable the instant the webhook fires.
-async function fetchReceivedEmailText(emailId: string): Promise<string | undefined> {
+// Fetch the received email. The email.received webhook is metadata-only, so the reply's text, HTML and attachment
+// list live behind the Received Emails API. Best-effort: returns undefined (never throws) so a failed fetch degrades
+// to a body-less timeline note rather than breaking the stop-sequence path. One short retry covers the brief window
+// where the email isn't queryable the instant the webhook fires.
+async function fetchReceivedEmail(emailId: string): Promise<ReceivedEmail | undefined> {
   const key = process.env.RESEND_API_KEY
   if (!key) return undefined
   for (let attempt = 0; attempt < 2; attempt++) {
@@ -122,9 +123,28 @@ async function fetchReceivedEmailText(emailId: string): Promise<string | undefin
         headers: { Authorization: `Bearer ${key}` },
       })
       if (res.ok) {
-        const body = (await res.json()) as { text?: string | null; html?: string | null }
-        const text = body.text?.trim() || (body.html ? htmlToText(body.html) : "")
-        return text || undefined
+        const body = (await res.json()) as Record<string, unknown>
+        const str = (v: unknown) => (typeof v === "string" ? v : undefined)
+        const list = (v: unknown) => recipientEmails(v as InboundTo)
+        const attachments = Array.isArray(body.attachments)
+          ? (body.attachments as Array<Record<string, unknown>>).map((a) => ({
+              id: str(a.id),
+              filename: str(a.filename),
+              content_type: str(a.content_type),
+              size: typeof a.size === "number" ? a.size : undefined,
+            }))
+          : []
+        return {
+          id: emailId,
+          from: typeof body.from === "string" ? body.from : str((body.from as { email?: unknown } | undefined)?.email),
+          to: list(body.to),
+          cc: list(body.cc),
+          subject: str(body.subject),
+          text: str(body.text) ?? null,
+          html: str(body.html) ?? null,
+          created_at: str(body.created_at),
+          attachments,
+        }
       }
       if (res.status === 404 && attempt === 0) {
         await new Promise((r) => setTimeout(r, 1200)) // not yet queryable — retry once
@@ -195,9 +215,25 @@ export async function POST(req: NextRequest) {
 
     // Pull the actual reply body (webhook is metadata-only) so it lands in the
     // timeline and the rep's forwarded copy.
-    const replyText = event.data?.email_id
-      ? await fetchReceivedEmailText(event.data.email_id)
-      : undefined
+    const received = event.data?.email_id ? await fetchReceivedEmail(event.data.email_id) : undefined
+    const replyText = received ? received.text?.trim() || (received.html ? htmlToText(received.html) : "") || undefined : undefined
+
+    // The CRM keeps the full text (V1 item 4): the reply whole, quoted lines included, with its attachments as links.
+    // The lead's timeline note below keeps only the short excerpt it always had.
+    if (received) {
+      const sender = typeof event.data?.from === "string" ? event.data.from : event.data?.from?.email
+      await recordMessage(
+        sequenceReplyMessage(received, {
+          from: sender || lead.email,
+          to: rcpts,
+          subject: event.data?.subject,
+          at: new Date().toISOString(),
+          source: lead.source,
+        }),
+      )
+    } else {
+      console.error(`[webhooks/resend-inbound] reply NOT RECORDED: its content could not be fetched. email_id=${event.data?.email_id ?? "none"} leadId=${leadId}`)
+    }
 
     const stopped = await markSequenceReplied(lead, {
       text: replyText,

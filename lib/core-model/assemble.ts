@@ -201,7 +201,21 @@ export function assembleCoreView(stored: CoreBundle, adapted: CoreBundle[], tria
   }
 }
 
-/** The inbox is a view: activities not yet triaged, newest first. */
+/**
+ * The inbox is a view: activities not yet triaged, newest first. Mail 434 sent is a record of what went out, not an
+ * arrival, so it is never in the inbox; a reply that comes back is.
+ */
 export function inboxOf(view: CoreView): Activity[] {
-  return view.activities.filter((a) => !a.triaged)
+  return view.activities.filter((a) => !a.triaged && a.email?.direction !== "sent")
+}
+
+/**
+ * Whether an activity belongs on this Person's timeline: linked to them, or a broadcast whose recipient list holds one
+ * of their addresses (a broadcast is one record for everyone it went to, linked to no single person).
+ */
+export function onPersonTimeline(a: Activity, person: { id: string; emails: string[] }): boolean {
+  if (a.person_id === person.id) return true
+  if (!a.email?.broadcast) return false
+  const mine = new Set(person.emails)
+  return a.email.to.some((e) => mine.has(e))
 }
