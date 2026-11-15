@@ -194,14 +194,28 @@ export async function readSkillFolder(dir: string, opts: { maxFiles?: number; ma
   return out
 }
 
-/** The agent's instructions: the skill's body, then where its other files are and how to read them. */
-export function skillInstructions(skill: Skill): string {
+/**
+ * The tool that runs a skill's own scripts in a sandbox (lib/agent/skill-scripts.ts, SCRIPT_TOOL). Named here, not
+ * imported, so the loader does not load the sandbox client; lib/__tests__/skill-loader.test.ts checks the two agree.
+ */
+export const SCRIPT_TOOL_NAME = "run_skill_script"
+
+/**
+ * The agent's instructions: the skill's body, then where its other files are and how to read them, then how its
+ * scripts run. With `scriptTool`, the run has the script-running tool, and the instructions say to use it; without it,
+ * a step that needs a script stops. (Before 2026-11-15 the line always said the scripts "cannot be run here", even
+ * when the tool was offered: Opus 5.5 obeyed it and stopped on every exam case.)
+ */
+export function skillInstructions(skill: Skill, opts: { scriptTool?: boolean } = {}): string {
   const files = skill.resources.length
     ? `\n\n---\nThis skill's other files can be read with the read_skill_file tool, by these paths:\n${skill.resources.map(p => `- ${p}`).join("\n")}`
     : ""
-  const scripts = skill.scripts.length
-    ? `\n\nThe skill's scripts (${skill.scripts.join(", ")}) cannot be run here. Where a step needs one, stop and say which step and which script.`
-    : ""
+  const list = skill.scripts.join(", ")
+  const scripts = !skill.scripts.length
+    ? ""
+    : opts.scriptTool
+      ? `\n\nRun the skill's scripts (${list}) with the ${SCRIPT_TOOL_NAME} tool: pass the script's path and its arguments. There is no shell; where the skill says \`python3 scripts/<name>.py\`, that is this tool.`
+      : `\n\nThe skill's scripts (${list}) cannot be run here. Where a step needs one, stop and say which step and which script.`
   return `${skill.body}${files}${scripts}`
 }
 
@@ -273,7 +287,7 @@ export function skillAgent(opts: SkillAgentOptions): { agent: ToolLoopAgent<neve
   const gateway = { ...(opts.providerOptions?.gateway ?? {}), caching: "auto" }
   const agent = new ToolLoopAgent({
     model: opts.model,
-    instructions: skillInstructions(skill),
+    instructions: skillInstructions(skill, { scriptTool: Object.prototype.hasOwnProperty.call(tools, SCRIPT_TOOL_NAME) }),
     tools,
     stopWhen: isStepCount(opts.maxSteps ?? 20),
     ...(opts.maxOutputTokens ? { maxOutputTokens: opts.maxOutputTokens } : {}),
