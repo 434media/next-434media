@@ -10,7 +10,7 @@ import { join } from "node:path"
 import { tool } from "ai"
 import { MockLanguageModelV4 } from "ai/test"
 import { z } from "zod"
-import { fingerprint, parseFrontmatter, parseSkill, readSkillFolder, skillAgent, skillInstructions, skillTools, type SkillFiles } from "../skills/loader"
+import { fingerprint, parseFrontmatter, parseSkill, readSkillFolder, skillAgent, skillInstructions, skillTools, SCRIPT_TOOL_NAME, type SkillFiles } from "../skills/loader"
 
 const DIR = join(__dirname, "fixtures/skills/sample-greeter")
 const load = () => readSkillFolder(DIR)
@@ -100,6 +100,38 @@ test("the instructions carry the body, the readable files, and that scripts cann
   assert.match(text, /^# Sample greeter/)
   assert.match(text, /- references\/rules\.md/)
   assert.match(text, /scripts\/format\.py\) cannot be run here/)
+})
+
+test("with the script tool, the instructions say to run the scripts with it, never that they cannot run", async () => {
+  const r = parseSkill(await load())
+  assert.ok(r.ok)
+  const text = skillInstructions(r.skill, { scriptTool: true })
+  assert.match(text, /Run the skill's scripts \(scripts\/format\.py\) with the run_skill_script tool/)
+  assert.match(text, /There is no shell/)
+  assert.doesNotMatch(text, /cannot be run here/)
+  assert.doesNotMatch(text, /stop and say/)
+})
+
+test("skillAgent tells the model to use the script tool when the run has it, and that scripts cannot run when it does not", async () => {
+  const files = { ...md("name: script-skill\ndescription: d\nallowed-tools: run_skill_script"), "scripts/check.py": "print(1)" }
+  const reply = { content: [{ type: "text" as const, text: "ok" }], finishReason: { unified: "stop" as const, raw: undefined }, usage: { inputTokens: { total: 1, noCache: 1, cacheRead: undefined, cacheWrite: undefined }, outputTokens: { total: 1, text: 1, reasoning: 0 } }, warnings: [] }
+  const system = async (tools: Record<string, ReturnType<typeof tool>>, skillFiles: SkillFiles) => {
+    let seen = ""
+    const model = new MockLanguageModelV4({ doGenerate: async o => { seen = String(o.prompt[0].content); return reply } })
+    await skillAgent({ files: skillFiles, model, tools }).agent.generate({ prompt: "go" })
+    return seen
+  }
+  const run_skill_script = tool({ inputSchema: z.object({ script: z.string() }), execute: async () => ({ ok: true }) })
+  const withTool = await system({ run_skill_script }, files)
+  assert.match(withTool, /Run the skill's scripts \(scripts\/check\.py\) with the run_skill_script tool/)
+  assert.doesNotMatch(withTool, /cannot be run here/)
+  const without = await system({}, { ...md("name: script-skill\ndescription: d"), "scripts/check.py": "print(1)" })
+  assert.match(without, /scripts\/check\.py\) cannot be run here/)
+})
+
+test("the loader's script tool name is the engine's", async () => {
+  const { SCRIPT_TOOL } = await import("../agent/skill-scripts")
+  assert.equal(SCRIPT_TOOL_NAME, SCRIPT_TOOL)
 })
 
 test("skillAgent refuses a bad skill, a changed one, and one needing a tool the run lacks", async () => {
