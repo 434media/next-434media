@@ -7,7 +7,7 @@
  */
 
 /** The rules version this deployment ships. The 3-day step changes it and redeploys (the test's step 3). */
-export const D1_RULES_VERSION = "d1-rules@1"
+export const D1_RULES_VERSION = "d1-rules@2"
 
 /** One document per run, keyed by the engine's run id. */
 export const D1_RUNS = "d1_runs"
