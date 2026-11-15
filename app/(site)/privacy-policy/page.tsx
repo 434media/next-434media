@@ -37,12 +37,13 @@ export default function PrivacyPolicyPage() {
 
           <div className="prose prose-lg max-w-none">
             <p className="text-neutral-700 mb-6">
-              {/* The date of the last change to this page's text: commit 4734dd9
-                  (2025-03-21), which created it. Later commits changed only
-                  markup, styling and metadata. Update it when the text changes;
-                  the section below says this date marks when changes were made,
-                  so it must never be the load or build date. */}
-              Last Updated: March 21, 2025
+              {/* The date of the last change to this page's text: section 6,
+                  publishing to our social media accounts, added 2026-11-15 for
+                  the LinkedIn and YouTube API applications. Update it
+                  when the text changes; the section below says this date marks
+                  when changes were made, so it must never be the load or build
+                  date. */}
+              Last Updated: November 15, 2026
             </p>
 
             <h2 className="t-heading-m text-neutral-900 mt-8 mb-4">1. Introduction</h2>
@@ -105,14 +106,65 @@ export default function PrivacyPolicyPage() {
               cookies, web beacons, and other technologies to collect information about your use of our website.
             </p>
 
-            <h2 className="t-heading-m text-neutral-900 mt-8 mb-4">6. Data Security</h2>
+            <h2 className="t-heading-m text-neutral-900 mt-8 mb-4">6. Publishing to Our Social Media Accounts</h2>
+            <p className="text-neutral-700 mb-4">
+              We publish content to social media accounts that 434 MEDIA owns, including the accounts of our own
+              brands. To do that, our publishing tool uses the LinkedIn API and YouTube API Services.
+              The tool is used only by our staff. A person approves every post before it is published, and the tool
+              posts only to our own LinkedIn Pages and YouTube channels.
+            </p>
+            <p className="text-neutral-700 mb-4">
+              When a member of our staff connects one of these accounts, the service asks them to approve our access.
+              Through that connection we access and store only:
+            </p>
+            <ul className="list-disc pl-6 mb-4 text-neutral-700">
+              <li>The access and refresh tokens the service issues</li>
+              <li>The ID and name of the Page or channel we post to</li>
+              <li>The ID, link and status of each post or video we publish</li>
+            </ul>
+            <p className="text-neutral-700 mb-4">
+              We use this information only to publish our approved posts and to confirm that they went live. We do not
+              read, collect or store information about the people who view, comment on or otherwise interact with
+              those posts, and we do not sell or share any of this information or use it for advertising. Tokens are
+              encrypted and kept on our servers, and only the publishing tool uses them.
+            </p>
+            <p className="text-neutral-700 mb-4">
+              Access can be removed at any time. When an account is disconnected in our tool, we revoke its token with
+              the service right away and delete the stored tokens and account details within 7 days. Information we
+              obtain from YouTube is refreshed or deleted at least every 30 days. You can also remove our access from
+              your own account settings on LinkedIn or YouTube. For a Google account, use the{" "}
+              <a href="https://security.google.com/settings/security/permissions" className="text-emerald-600 hover:text-emerald-700">
+                Google security settings page
+              </a>
+              . When access is removed on either service, we delete the related data within 30 days. To ask for any of this
+              information to be deleted, or to ask a question about it, write to us at the address in &quot;Contact
+              Us&quot; below.
+            </p>
+            <p className="text-neutral-700 mb-4">
+              Our use of YouTube API Services is subject to the{" "}
+              <a href="https://www.youtube.com/t/terms" className="text-emerald-600 hover:text-emerald-700">
+                YouTube Terms of Service
+              </a>
+              , and by using our YouTube features you agree to be bound by them. Information obtained through YouTube
+              API Services is also subject to the{" "}
+              <a href="https://www.google.com/policies/privacy/" className="text-emerald-600 hover:text-emerald-700">
+                Google Privacy Policy
+              </a>
+              . LinkedIn handles information on its own service under the{" "}
+              <a href="https://www.linkedin.com/legal/privacy-policy" className="text-emerald-600 hover:text-emerald-700">
+                LinkedIn Privacy Policy
+              </a>
+              .
+            </p>
+
+            <h2 className="t-heading-m text-neutral-900 mt-8 mb-4">7. Data Security</h2>
             <p className="text-neutral-700 mb-4">
               We implement appropriate technical and organizational measures to protect the security of your personal
               information. However, please be aware that no method of transmission over the internet or electronic
               storage is 100% secure, and we cannot guarantee absolute security.
             </p>
 
-            <h2 className="t-heading-m text-neutral-900 mt-8 mb-4">7. Your Rights</h2>
+            <h2 className="t-heading-m text-neutral-900 mt-8 mb-4">8. Your Rights</h2>
             <p className="text-neutral-700 mb-4">
               Depending on your location, you may have certain rights regarding your personal information, such as:
             </p>
@@ -127,14 +179,14 @@ export default function PrivacyPolicyPage() {
               section below.
             </p>
 
-            <h2 className="t-heading-m text-neutral-900 mt-8 mb-4">8. Changes to This Privacy Policy</h2>
+            <h2 className="t-heading-m text-neutral-900 mt-8 mb-4">9. Changes to This Privacy Policy</h2>
             <p className="text-neutral-700 mb-4">
               We may update our Privacy Policy from time to time. We will notify you of any changes by posting the new
               Privacy Policy on this page and updating the &quot;Last Updated&quot; date. You are advised to review this
               Privacy Policy periodically for any changes.
             </p>
 
-            <h2 className="t-heading-m text-neutral-900 mt-8 mb-4">9. Contact Us</h2>
+            <h2 className="t-heading-m text-neutral-900 mt-8 mb-4">10. Contact Us</h2>
             <p className="text-neutral-700 mb-4">
               If you have any questions about this Privacy Policy, please contact us at:
             </p>
