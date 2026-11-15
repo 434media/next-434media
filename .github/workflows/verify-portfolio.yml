@@ -156,6 +156,7 @@ jobs:
       - run: tsx --test lib/__tests__/agent-controls.test.ts
       - run: tsx --test lib/__tests__/agent-intake.test.ts
       - run: tsx --test lib/__tests__/agent-review.test.ts
+      - run: tsx --test lib/__tests__/exam-reports.test.ts
       # Owned Meta tool route, Slack approval binding and processing continuation (all transports faked).
       - run: tsx --test lib/__tests__/owned-meta-tool.test.ts
       # Owned Meta service entry for the shared Slack app: pilot identity and acting-person checks.

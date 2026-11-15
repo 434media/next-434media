@@ -22,6 +22,7 @@ import {
   X,
 } from "lucide-react"
 import { DetailDrawer } from "@/components/admin/DetailDrawer"
+import type { StoredExamReport } from "@/lib/agent/exam-reports"
 import type { CostSummary, HandoffWait, ReasonGroup, ReviewItem, RunSummary } from "@/lib/agent/review"
 
 type Mode = "off" | "proof" | "draft"
@@ -53,6 +54,18 @@ const REASONS = {
     { code: "other", label: "Other" },
   ],
 } as const
+const EXAM_STATE = { running: "Running", done: "Done", failed: "Failed", "timed-out": "Timed out" } as const
+type StoredExam = Omit<StoredExamReport, "state"> & { state: keyof typeof EXAM_STATE }
+interface ExamView {
+  model: string
+  markdown: string
+  pass: number
+  cases: number
+  state?: keyof typeof EXAM_STATE
+  error?: string
+  outputs?: StoredExam["cases"]
+}
+const examView = (r: StoredExam): ExamView => ({ model: r.model, markdown: r.markdown, pass: r.totals?.pass ?? 0, cases: r.planned, state: r.state, error: r.error, outputs: r.cases })
 const EXAM_MODELS = ["anthropic/claude-sonnet-5.5", "anthropic/claude-opus-5.5"]
 
 const STATUS_LABEL: Record<string, string> = {
@@ -99,7 +112,17 @@ export function ReviewQueue() {
   const [open, setOpen] = useState<ReviewItem | null>(null)
   const [busy, setBusy] = useState(false)
   const [toast, setToast] = useState<{ type: "success" | "error"; message: string } | null>(null)
-  const [exam, setExam] = useState<{ model: string; markdown: string; pass: number; cases: number } | null>(null)
+  const [exam, setExam] = useState<ExamView | null>(null)
+  const [examReports, setExamReports] = useState<StoredExam[] | null>(null)
+  const loadExams = useCallback(async () => {
+    try {
+      const res = await fetch("/api/admin/engine/exam", { cache: "no-store" })
+      const body = await res.json()
+      if (res.ok) setExamReports(body.reports ?? [])
+    } catch {
+      // The panel says it could not read; the rest of the console stands.
+    }
+  }, [])
 
   const load = useCallback(async () => {
     try {
@@ -147,8 +170,9 @@ export function ReviewQueue() {
   async function runExam(model: string) {
     if (!window.confirm(`Run the intake exam on ${model}? It spends Gateway credit and runs the skill's scripts in a sandbox. It sends nothing.`)) return
     const r = await post("/api/admin/engine/exam", { suite: "intake-qualification", model })
+    void loadExams()
     if (!r.ok) {
-      say("error", String(r.body.error ?? "The exam could not run"))
+      say("error", String(r.body.error ?? "The exam could not run. Any cases it finished are kept under Exam reports in the Console."))
       return
     }
     const totals = (r.body.report as { totals?: { pass?: number; cases?: number } })?.totals ?? {}
@@ -211,7 +235,7 @@ export function ReviewQueue() {
 
             {tab === "waiting" && <QueueList items={waiting} empty="Nothing waiting. Every draft has a decision." onOpen={setOpen} />}
             {tab === "decided" && <QueueList items={decided} empty="No decisions yet." onOpen={setOpen} />}
-            {tab === "console" && <ConsoleView data={data} />}
+            {tab === "console" && <ConsoleView data={data} exams={examReports} onLoadExams={loadExams} onOpenExam={(r) => setExam(examView(r))} />}
           </>
         )}
       </main>
@@ -236,8 +260,17 @@ export function ReviewQueue() {
       )}
 
       {exam && (
-        <DetailDrawer open onClose={() => setExam(null)} title="Intake exam" subtitle={`${exam.model}: ${exam.pass} of ${exam.cases} cases pass`} width="xl">
-          <pre className="whitespace-pre-wrap font-mono text-[11px] leading-relaxed text-neutral-700">{exam.markdown}</pre>
+        <DetailDrawer open onClose={() => setExam(null)} title="Intake exam" subtitle={`${exam.model}: ${exam.pass} of ${exam.cases} cases pass${exam.state && exam.state !== "done" ? ` · ${EXAM_STATE[exam.state]}` : ""}`} width="xl">
+          {exam.error && <p className="mb-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-800">{exam.error}</p>}
+          <pre className="whitespace-pre-wrap font-mono text-[11px] leading-relaxed text-neutral-700">{exam.markdown || "No case finished yet."}</pre>
+          {exam.outputs?.map((o) => (
+            <details key={o.id} className="mt-3 rounded-lg border border-neutral-200 bg-white">
+              <summary className="cursor-pointer px-3 py-2 text-xs font-medium text-neutral-700">
+                <span className="font-mono">{o.id}</span> · {o.status}
+              </summary>
+              <pre className="whitespace-pre-wrap border-t border-neutral-100 px-3 py-2 font-mono text-[11px] leading-relaxed text-neutral-700">{o.output || "No answer."}{o.outputCut ? "\n…" : ""}</pre>
+            </details>
+          ))}
         </DetailDrawer>
       )}
     </div>
@@ -489,7 +522,10 @@ function Rows({ rows, empty }: { rows: [string, string][]; empty: string }) {
   )
 }
 
-function ConsoleView({ data }: { data: Console }) {
+function ConsoleView({ data, exams, onLoadExams, onOpenExam }: { data: Console; exams: StoredExam[] | null; onLoadExams: () => void; onOpenExam: (r: StoredExam) => void }) {
+  useEffect(() => {
+    onLoadExams()
+  }, [onLoadExams])
   const waiting = data.queue.filter((i) => i.status === "pending")
   const states = Object.entries(data.runs.byState) as [string, number][]
   return (
@@ -520,6 +556,26 @@ function ConsoleView({ data }: { data: Console }) {
         </div>
         <div className="mt-3 text-[10px] font-medium uppercase tracking-wide text-neutral-400">Costliest tasks</div>
         <Rows rows={data.costs.byTask.map((r) => [r.key, usd(r.usd)])} empty="No calls." />
+      </Card>
+      <Card title="Exam reports">
+        {exams === null ? (
+          <p className="text-xs text-neutral-500">Loading…</p>
+        ) : exams.length ? (
+          <ul className="divide-y divide-neutral-100">
+            {exams.map((r) => (
+              <li key={r.id}>
+                <button onClick={() => onOpenExam(r)} className="flex w-full items-center gap-2 py-1.5 text-left text-xs hover:bg-neutral-50">
+                  <span className="flex-1 truncate">{r.model.replace("anthropic/claude-", "")}{r.only ? ` · batch of ${r.only.length}` : ""}</span>
+                  <span className="text-neutral-500">{r.totals?.pass ?? 0} of {r.planned} pass{r.state !== "done" ? ` · ${r.totals?.cases ?? 0} finished` : ""}</span>
+                  {r.state !== "done" && <Pill tone={r.state === "running" ? "neutral" : "red"}>{EXAM_STATE[r.state]}</Pill>}
+                  <span className="w-28 text-right text-neutral-400">{r.startedAt.slice(0, 16).replace("T", " ")}Z</span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="text-xs text-neutral-500">No exam has run since reports were kept.</p>
+        )}
       </Card>
       <Card title="Your reasons this week">
         {data.reasons.length ? (

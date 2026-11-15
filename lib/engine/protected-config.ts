@@ -25,6 +25,8 @@ export const PROTECTED_TARGETS = [
   // The skill pins and the kill switch (V1 item 4): set by the founder, signed in, never by a run.
   "agent_skills",
   "crm_meta",
+  // Exam reports (V1 item 4): written only by the founder's exam route.
+  "agent_exam_reports",
   "skills/",
   ".claude/",
   "03 Skills/",

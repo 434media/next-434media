@@ -60,6 +60,11 @@ export interface RunOptions {
   only?: string[]
   gitSha?: string
   now?: () => Date
+  /**
+   * Called after every case with the report so far, so a caller can keep a run that stops early (a function's time
+   * limit). Awaited; a throw is the caller's to handle and stops nothing here.
+   */
+  onCase?: (partial: ExamReport) => void | Promise<void>
 }
 
 export async function runSuite(suite: Suite, executor: Executor, opts: RunOptions = {}): Promise<ExamReport> {
@@ -67,8 +72,18 @@ export async function runSuite(suite: Suite, executor: Executor, opts: RunOption
   const startedAt = now().toISOString()
   const cases = opts.only ? suite.cases.filter(c => opts.only!.includes(c.id)) : suite.cases
   const results: CaseResult[] = []
-  for (const c of cases) results.push(await runCase(suite, c, executor, opts.judge))
-  return { suite: { id: suite.spec.id, title: suite.spec.title, version: suite.spec.version, sha256: suite.sha256, subject: suite.spec.subject }, executor: executor.name, startedAt, finishedAt: now().toISOString(), gitSha: opts.gitSha, cases: results, totals: totals(results) }
+  const report = (): ExamReport => ({ suite: { id: suite.spec.id, title: suite.spec.title, version: suite.spec.version, sha256: suite.sha256, subject: suite.spec.subject }, executor: executor.name, startedAt, finishedAt: now().toISOString(), gitSha: opts.gitSha, cases: [...results], totals: totals(results) })
+  for (const c of cases) {
+    results.push(await runCase(suite, c, executor, opts.judge))
+    if (opts.onCase) {
+      try {
+        await opts.onCase(report())
+      } catch (e) {
+        console.warn("[exam] onCase failed; the run continues:", (e as Error).message)
+      }
+    }
+  }
+  return report()
 }
 
 async function runCase(suite: Suite, c: CaseSpec, executor: Executor, judge?: Judge): Promise<CaseResult> {
