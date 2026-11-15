@@ -147,6 +147,31 @@ export async function GET(request: Request) {
         return json({ ok: true, deploymentId, rebuilt, restartedAs })
       }
 
+      // Clean-up after the test: list (dry run) or delete only the D1 collections this test created in staging.
+      case "purge": {
+        const paths: string[] = []
+        const refs: ReturnType<Db["doc"]>[] = []
+        for (const run of (await db.collection(D1_RUNS).get()).docs) {
+          for (const ev of (await run.ref.collection(D1_EVENTS).get()).docs) {
+            paths.push(ev.ref.path)
+            refs.push(ev.ref)
+          }
+          paths.push(run.ref.path)
+          refs.push(run.ref)
+        }
+        for (const c of (await db.collection(D1_CONTROLS).get()).docs) {
+          paths.push(c.ref.path)
+          refs.push(c.ref)
+        }
+        const confirm = url.searchParams.get("confirm") === "delete-d1"
+        if (confirm) {
+          const batch = db.batch()
+          for (const r of refs) batch.delete(r)
+          await batch.commit()
+        }
+        return json({ ok: true, deploymentId, deleted: confirm, count: paths.length, paths })
+      }
+
       default:
         return json({ ok: false, error: `unknown action ${action}` }, 400)
     }
