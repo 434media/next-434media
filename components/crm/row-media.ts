@@ -21,7 +21,11 @@ async function optimize(url: string, name: string, size?: number): Promise<Media
   const data = await res.json()
   if (!res.ok) throw new Error(data.error || "The media could not be optimized")
   const media = data.media as RowMedia
-  return { media: { ...media, bytes: media.bytes ?? size }, message: data.action === "resized" ? "Photo resized ✓" : "Video ready ✓" }
+  const mb = (n: number) => `${Math.max(1, Math.round(n / 1048576))} MB`
+  const message = data.action === "resized" ? "Photo resized ✓"
+    : data.action === "shrunk" ? `Video shrunk for social ✓ (${mb(data.inBytes)} → ${mb(media.bytes ?? 0)})`
+    : typeof data.note === "string" ? data.note : "Video ready ✓"
+  return { media: { ...media, bytes: media.bytes ?? size }, message }
 }
 
 export async function mediaFromFile(file: File): Promise<MediaResult> {
