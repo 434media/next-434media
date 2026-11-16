@@ -7,7 +7,8 @@ import { test } from "node:test"
 import assert from "node:assert/strict"
 import { published, loadPublishedProfileFirst } from "./published-profile"
 import { CREATE_PLATFORMS, choiceLabel, formatChoices, mediaShapeOf, normalizePlatforms, platformProblems, cellRoles, isHandPosted, platformIdsOf, templateGap, createTemplates, ddmmmyy, designText, chicagoToday, followToday, isPastDate, exportFileBase, formatsOf, rowProblems, type CreateRow, type RoundupStory } from "../content-pipeline/create-table"
-import { PAGE_LINK_MESSAGE, blobStoreHost, dvidsImagePage, isCreateUpload, isPageLink, isPageType, mediaKind, transcodeArgs, videoContainer, videoPlan } from "../content-pipeline/create-media"
+import { PAGE_LINK_MESSAGE, SHRINK_MAX_SECONDS, TRANSCODE_MAX_BYTES, beyondSocial, blobStoreHost, dvidsImagePage, isCreateUpload, isPageLink, isPageType, mediaKind, transcodeArgs, videoContainer, videoPlan } from "../content-pipeline/create-media"
+import { parseMoov, probeVideo, type VideoMeta } from "../content-pipeline/mp4-probe"
 import { cardSubject } from "../content-pipeline/series"
 import { humanPlus, humanPlusRoundup, HumanPlusError, withoutMediaLines, type HumanPlusDeps } from "../content-pipeline/human-plus"
 import { roundupChoices } from "../content-pipeline/roundup"
@@ -117,6 +118,78 @@ test("media: photos and Canva's video containers are taken; a phone MP4 or MOV p
   assert.ok(!isCreateUpload("https://other.public.blob.vercel-storage.com/content-create/x.mp4", host), "another Blob store is refused")
   assert.ok(!isCreateUpload("https://evil.example.com/content-create/x.mp4", host))
   assert.ok(!isCreateUpload("https://abc123.public.blob.vercel-storage.com/content-create/x.mp4", null), "no store configured, nothing is ours")
+})
+
+test("media: an MP4 or MOV sized beyond social is shrunk when it fits the function, and kept with a note when it does not", () => {
+  const ftyp = (brand: string) => new Uint8Array([0, 0, 0, 0x20, 0x66, 0x74, 0x79, 0x70, ...[...brand.padEnd(4)].map(c => c.charCodeAt(0))])
+  const MB = 1024 * 1024
+  const meta = (m: Partial<VideoMeta>): VideoMeta => ({ width: 1080, height: 1920, fps: 30, seconds: 60, codec: "avc1", ...m })
+  // Already sized for social: a 1080×1920, 30 fps minute at 8 Mbps, a 29.97 fps clip, a Canva export.
+  assert.deepEqual(videoPlan(ftyp("isom"), 60 * MB, meta({})), { action: "passthrough" })
+  assert.deepEqual(videoPlan(ftyp("qt"), 50 * MB, meta({ fps: 29.97 })), { action: "passthrough" })
+  assert.deepEqual(beyondSocial(40 * MB, meta({ width: 1080, height: 1350, seconds: 45 })), [])
+  // Beyond social: 4K, 60 fps, or a phone's 1080p bitrate (16 Mbps) — each says why.
+  assert.deepEqual(videoPlan(ftyp("qt"), 150 * MB, meta({ width: 2160, height: 3840, seconds: 20 })), { action: "transcode", why: "2160×3840, 63 Mbps", shrink: true })
+  assert.deepEqual(videoPlan(ftyp("isom"), 50 * MB, meta({ fps: 59.94 })), { action: "transcode", why: "60 fps", shrink: true })
+  assert.deepEqual(videoPlan(ftyp("qt"), 120 * MB, meta({})), { action: "transcode", why: "17 Mbps", shrink: true })
+  // Without a readable header, size alone decides: over 100 MB is shrunk, under it passes as before.
+  assert.deepEqual(videoPlan(ftyp("isom"), 150 * MB, null), { action: "transcode", why: "over 100 MB", shrink: true })
+  assert.deepEqual(videoPlan(ftyp("isom"), 90 * MB), { action: "passthrough" })
+  // Too big or too long to shrink in the function: kept as it is (today's behaviour), and the note says so.
+  const big = videoPlan(ftyp("qt"), TRANSCODE_MAX_BYTES + MB, meta({ width: 2160, height: 3840, seconds: 40 }))
+  assert.equal(big.action, "passthrough"); assert.match(big.action === "passthrough" ? big.note ?? "" : "", /over 200 MB, too long to shrink here/)
+  const long = videoPlan(ftyp("qt"), 150 * MB, meta({ fps: 60, seconds: SHRINK_MAX_SECONDS + 1 }))
+  assert.equal(long.action, "passthrough"); assert.match(long.action === "passthrough" ? long.note ?? "" : "", new RegExp(`over ${SHRINK_MAX_SECONDS / 60} minutes, too long to shrink here`))
+  // An unusual container is still converted, never a "shrink" (its failure is an error, not a passthrough), and 500 MB is still refused.
+  assert.deepEqual(videoPlan(new Uint8Array([0x1a, 0x45, 0xdf, 0xa3]), 30 * MB, null), { action: "transcode", why: "a WEBM file" })
+  assert.equal(videoPlan(ftyp("isom"), 600 * MB, meta({})).action, "refuse")
+  // The output is capped near 8 Mbps so a busy clip cannot balloon.
+  assert.ok(transcodeArgs("in.mov", "out.mp4").join(" ").includes("-crf 23 -maxrate 8M -bufsize 16M"))
+})
+
+/** A minimal ISO BMFF box (32-bit size), and a moov with one video track, as a phone writes it. */
+function box(type: string, ...parts: Uint8Array[]): Uint8Array {
+  const body = Buffer.concat(parts), out = Buffer.alloc(8 + body.length)
+  out.writeUInt32BE(out.length, 0); out.write(type, 4, "latin1"); body.copy(out, 8)
+  return out
+}
+function videoMoov(o: { width: number; height: number; rotate?: boolean; timescale: number; duration: number; frames: number; handler?: string; codec?: string }): Uint8Array {
+  const tkhd = Buffer.alloc(84) // version 0: 4 flags + 20 + 8 reserved + 8 layer/group/volume + 36 matrix + 8 size
+  const m = 84 - 44
+  if (o.rotate) { tkhd.writeInt32BE(0, m); tkhd.writeInt32BE(65536, m + 4); tkhd.writeInt32BE(-65536, m + 12) } else { tkhd.writeInt32BE(65536, m); tkhd.writeInt32BE(65536, m + 16) }
+  tkhd.writeInt32BE(0x40000000, m + 32); tkhd.writeUInt32BE(o.width * 65536, 76); tkhd.writeUInt32BE(o.height * 65536, 80)
+  const mdhd = Buffer.alloc(24); mdhd.writeUInt32BE(o.timescale, 12); mdhd.writeUInt32BE(o.duration, 16)
+  const hdlr = Buffer.alloc(24); hdlr.write(o.handler ?? "vide", 8, "latin1")
+  const stsz = Buffer.alloc(12); stsz.writeUInt32BE(o.frames, 8)
+  const entry = Buffer.alloc(16); entry.writeUInt32BE(16, 0); entry.write(o.codec ?? "hvc1", 4, "latin1")
+  const stsd = Buffer.concat([Buffer.from([0, 0, 0, 0, 0, 0, 0, 1]), entry])
+  const sound = box("trak", box("tkhd", Buffer.alloc(84)), box("mdia", box("hdlr", Buffer.from("\0\0\0\0\0\0\0\0soun\0\0\0\0\0\0\0\0\0\0\0\0", "latin1"))))
+  return box("moov", box("mvhd", Buffer.alloc(100)), sound, box("trak", box("tkhd", tkhd), box("mdia", box("mdhd", mdhd), box("hdlr", hdlr), box("minf", box("stbl", box("stsd", stsd), box("stsz", stsz))))))
+}
+
+test("media: the MP4 header gives the shown size (after rotation), frame rate and length, read from the end of a phone clip", async () => {
+  // An iPhone portrait clip: stored 3840×2160 with a 90° matrix, 600 timescale, 10 s, 600 frames (60 fps), HEVC.
+  const moov = videoMoov({ width: 3840, height: 2160, rotate: true, timescale: 600, duration: 6000, frames: 600 })
+  assert.deepEqual(parseMoov(moov), { width: 2160, height: 3840, fps: 60, seconds: 10, codec: "hvc1" })
+  assert.deepEqual(parseMoov(videoMoov({ width: 1080, height: 1920, timescale: 30000, duration: 30000 * 12, frames: 360, codec: "avc1" })), { width: 1080, height: 1920, fps: 30, seconds: 12, codec: "avc1" })
+  assert.equal(parseMoov(videoMoov({ width: 1080, height: 1920, timescale: 600, duration: 600, frames: 30, handler: "soun" })), null)
+  assert.equal(parseMoov(new Uint8Array([0, 0, 0, 8, 0x66, 0x72, 0x65, 0x65])), null)
+  // The file: ftyp, then a large mdat, then moov at the end. Ranged reads walk the box headers and never read the media.
+  const ftypBox = box("ftyp", Buffer.from("qt  \0\0\0\0qt  ", "latin1"))
+  const mdatSize = 50 * 1024 * 1024, mdatHead = Buffer.alloc(8); mdatHead.writeUInt32BE(mdatSize, 0); mdatHead.write("mdat", 4, "latin1")
+  const fileBytes = ftypBox.length + mdatSize + moov.length
+  const reads: [number, number][] = []
+  const read = async (offset: number, length: number) => {
+    reads.push([offset, length])
+    const at = (o: number) => o < ftypBox.length ? ftypBox[o] : o < ftypBox.length + 8 ? mdatHead[o - ftypBox.length] : o < ftypBox.length + mdatSize ? 0 : moov[o - ftypBox.length - mdatSize]
+    return Uint8Array.from({ length: Math.min(length, fileBytes - offset) }, (_, i) => at(offset + i))
+  }
+  assert.deepEqual(await probeVideo(read, fileBytes), { width: 2160, height: 3840, fps: 60, seconds: 10, codec: "hvc1" })
+  assert.ok(reads.every(([, n]) => n <= moov.length), JSON.stringify(reads))
+  assert.equal(reads.length, 4)
+  // A read that fails, or a file with no moov, gives null; the size alone then decides.
+  assert.equal(await probeVideo(async () => { throw new Error("416") }, fileBytes), null)
+  assert.equal(await probeVideo(read, ftypBox.length + 8), null)
 })
 
 // ── Human+ ──

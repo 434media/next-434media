@@ -2,7 +2,8 @@ import { NextResponse, type NextRequest } from "next/server"
 import { randomUUID } from "node:crypto"
 import { z } from "zod4"
 import { requireContentRunner } from "../../content-pipeline/auth"
-import { IMAGE_MAX_BYTES, IMAGE_MAX_PX, PAGE_LINK_MESSAGE, TRANSCODE_MAX_BYTES, UPLOAD_PREFIX, VIDEO_MAX_BYTES, isCreateUpload, isPageLink, isPageType, mediaKind, videoPlan } from "@/lib/content-pipeline/create-media"
+import { IMAGE_MAX_BYTES, IMAGE_MAX_PX, PAGE_LINK_MESSAGE, TRANSCODE_MAX_BYTES, UPLOAD_PREFIX, VIDEO_MAX_BYTES, isCreateUpload, isPageLink, isPageType, mediaKind, videoContainer, videoPlan } from "@/lib/content-pipeline/create-media"
+import { probeVideo, type VideoMeta } from "@/lib/content-pipeline/mp4-probe"
 
 export const runtime = "nodejs"
 // A conversion pass streams the clip to disk, converts it and stores the result.
@@ -10,11 +11,14 @@ export const maxDuration = 300
 
 const input = z.object({ url: z.string().url().max(2000), name: z.string().trim().max(120).default("media") }).strict()
 const MAX_PASTED_VIDEO = 100 * 1024 * 1024
+/** How long reading a dropped clip's header may take before the size alone decides. */
+const PROBE_MS = 10_000
 
 /**
  * POST /api/admin/content/media-optimize — prepares a Create row's media for Canva, the moment it lands (plan v11 Step
  * 2 item 4): a photo (JPEG, PNG, WebP, AVIF, GIF or TIFF) is turned upright, flattened on white and resized to fit IMAGE_MAX_PX as a JPEG; a web-page link gets PAGE_LINK_MESSAGE; a video Canva takes as it is passes
- * through, and any other video gets one ffmpeg pass (lib/content-pipeline/transcode.ts). The url is the table's own upload (content-create/), or a pasted public https link, which is fetched (SSRF-
+ * through, one sized beyond social (an MP4 or MOV wider than 1080 px, above 30 fps or above 10 Mbps, read from its header
+ * by ranged reads) is shrunk when it fits the function and otherwise passes through with a note, and any other video gets one ffmpeg pass (lib/content-pipeline/transcode.ts). The url is the table's own upload (content-create/), or a pasted public https link, which is fetched (SSRF-
  * guarded) and stored first. Returns the media the row keeps.
  */
 export async function POST(req: NextRequest) {
@@ -48,7 +52,19 @@ export async function POST(req: NextRequest) {
     let seen = 0
     while (seen < 64) { const { done, value } = await reader.read(); if (done) break; first.push(value); seen += value.byteLength }
     const head = Buffer.concat(first), bytes = declared || head.byteLength
-    const plan = videoPlan(head.subarray(0, 64), bytes)
+    // A dropped MP4 or MOV: its header says whether it is already sized for social. A ranged read on the table's own
+    // storage only; a pasted link (under 100 MB) keeps today's rule.
+    let meta: VideoMeta | null = null
+    if (own && videoContainer(head.subarray(0, 64)).kind === "isobmff") {
+      const read = async (offset: number, length: number) => {
+        const r = await fetchAllowingSafeRedirects(safe.url, safe.addresses, 5, { range: `bytes=${offset}-${offset + length - 1}` })
+        if (r.status !== 206 || !r.body) { await r.body?.cancel().catch(() => {}); throw new Error(`ranged read answered ${r.status}`) }
+        return new Uint8Array(await r.arrayBuffer())
+      }
+      meta = await Promise.race([probeVideo(read, bytes), new Promise<null>(resolve => setTimeout(() => resolve(null), PROBE_MS))])
+    }
+    const found = videoPlan(head.subarray(0, 64), bytes, meta)
+    const plan = found.action === "transcode" && found.shrink && !own ? { action: "passthrough" as const } : found
     if (plan.action === "refuse") { await reader.cancel().catch(() => {}); return NextResponse.json({ error: plan.why }, { status: 400 }) }
     const rest = new ReadableStream<Uint8Array>({
       start(c) { c.enqueue(head) },
@@ -61,15 +77,23 @@ export async function POST(req: NextRequest) {
       try {
         const { transcodeToMp4 } = await import("@/lib/content-pipeline/transcode")
         const out = await transcodeToMp4(rest, { deadline, maxBytes: Math.min(cap, TRANSCODE_MAX_BYTES) })
+        // A shrink that came out no smaller (rare: an already efficient clip) keeps the original.
+        if (plan.shrink && out.bytes.byteLength >= bytes) {
+          console.info("[content/media-optimize] shrink kept original", JSON.stringify({ by: auth.session.email, why: plan.why, meta, inBytes: bytes, outBytes: out.bytes.byteLength, ms: out.ms }))
+          return NextResponse.json({ media: { url, kind: "video", name, bytes, optimized: "done" }, action: "passthrough" })
+        }
         const blob = await put(`${UPLOAD_PREFIX}${randomUUID()}-${safeName.replace(/\.[^.]*$/, "")}.mp4`, out.bytes, { access: "public", addRandomSuffix: false, contentType: "video/mp4" })
-        console.info("[content/media-optimize] converted", JSON.stringify({ by: auth.session.email, why: plan.why, inBytes: bytes, outBytes: out.bytes.byteLength, ms: out.ms }))
-        return NextResponse.json({ media: { url: blob.url, kind: "video", name, bytes: out.bytes.byteLength, optimized: "done", ...from }, action: "converted", ms: out.ms })
+        console.info(`[content/media-optimize] ${plan.shrink ? "shrunk" : "converted"}`, JSON.stringify({ by: auth.session.email, why: plan.why, meta, inBytes: bytes, outBytes: out.bytes.byteLength, ms: out.ms }))
+        return NextResponse.json({ media: { url: blob.url, kind: "video", name, bytes: out.bytes.byteLength, optimized: "done", ...from }, action: plan.shrink ? "shrunk" : "converted", inBytes: bytes, ms: out.ms })
       } catch (err) {
         console.error("[POST /api/admin/content/media-optimize] conversion:", err instanceof Error ? err.message : err)
+        // A shrink is an improvement, not a need: the clip already works in Canva, so it is kept as it is, and the note says why.
+        if (plan.shrink) return NextResponse.json({ media: { url, kind: "video", name, bytes, optimized: "done" }, action: "passthrough", note: `Video kept as it is: it is larger than social needs (${plan.why}) but could not be shrunk here (${err instanceof Error ? err.message : "unknown error"}). Trim it and drop it again to have it shrunk.` })
         return NextResponse.json({ error: `This video (${plan.why}) could not be converted: ${err instanceof Error ? err.message : "unknown error"}. Save it as MP4 and drop it again.` }, { status: 422 })
       }
     }
-    if (own) { await reader.cancel().catch(() => {}); return NextResponse.json({ media: { url, kind: "video", name, bytes, optimized: "done" }, action: "passthrough" }) }
+    const note = "note" in plan && plan.note ? { note: plan.note } : {}
+    if (own) { await reader.cancel().catch(() => {}); return NextResponse.json({ media: { url, kind: "video", name, bytes, optimized: "done" }, action: "passthrough", ...note }) }
     // A pasted link that passes through is stored as it is, so Canva fetches it from the table's own storage.
     const chunks: Uint8Array[] = []
     let size = 0
