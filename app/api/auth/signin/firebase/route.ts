@@ -3,6 +3,7 @@ import type { NextRequest } from 'next/server'
 import { verifyFirebaseToken } from '@/lib/firebase-admin'
 import { setSession, authorizeAdminSignIn, isWorkspaceEmail } from '@/lib/auth'
 import { decideFirebaseSignIn } from '@/lib/firebase-signin'
+import { checkAuthProject, tokenProjectAllowed } from '@/lib/preview-auth'
 
 // Auto-registration used to live here: any address that could obtain a Firebase
 // token was written into `crm_team_members` and handed a session. Because the
@@ -21,12 +22,31 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // Which auth project this deployment may use, before any token is read: a preview signs in against c434-staging
+    // only, and production never against staging (lib/preview-auth.ts). A preview not fully pointed at staging is
+    // refused rather than allowed to fall back to anything else.
+    const authProject = checkAuthProject()
+    if (!authProject.ok) {
+      console.error(`[auth] sign-in refused: ${authProject.reason}`)
+      return NextResponse.json(
+        { error: 'config_error', message: 'Sign-in is not configured for this deployment.' },
+        { status: 503 }
+      )
+    }
+
     // Verify the token is genuine. This proves WHO they are — it says nothing about
     // whether they may administer 434 Media, because this Firebase project's Auth tenant is shared with our other web
     // properties. decideFirebaseSignIn then requires a verified email and the roster (lib/firebase-signin.ts).
     // Not checkRevoked: that reads the user record from Firebase Auth, which this site's service account may not do
     // (auth/insufficient-permission), and an ID token expires within the hour anyway.
     const decodedToken = await verifyFirebaseToken(idToken)
+    if (!tokenProjectAllowed(decodedToken, authProject)) {
+      console.warn(`[auth] denied admin sign-in: token from another project (${authProject.env})`)
+      return NextResponse.json(
+        { error: 'authentication_failed', message: 'Authentication failed. Please try again.' },
+        { status: 401 }
+      )
+    }
     const tokenName = decodedToken.name || decodedToken.email?.split('@')[0] || 'User'
     const picture = decodedToken.picture
 

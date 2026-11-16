@@ -8,6 +8,9 @@ import { signInWithEmailAndPassword, sendPasswordResetEmail, sendEmailVerificati
 import { auth } from "@/lib/firebase"
 import { AdminShell } from "@/components/admin/AdminShell"
 
+// Vercel exposes the environment to the browser as NEXT_PUBLIC_VERCEL_ENV. Display only: the server decides.
+const IS_PREVIEW_DEPLOYMENT = process.env.NEXT_PUBLIC_VERCEL_ENV === "preview"
+
 export default function AdminLayout({
   children,
 }: {
@@ -82,6 +85,8 @@ export default function AdminLayout({
       'access_denied': 'Access was denied.',
       'invalid_credentials': 'Invalid email or password.',
       'too_many_requests': 'Too many failed attempts. Please try again later.',
+      'google_not_on_preview': 'This is a preview: sign in with a staging test account by email.',
+      'config_error': 'Sign-in is not configured for this deployment.',
     }
     return errors[errorCode] || 'An error occurred during sign in.'
   }
@@ -231,7 +236,9 @@ export default function AdminLayout({
 
             {!showEmailForm ? (
               <>
-                {/* Google Sign In Button */}
+                {/* Google Sign In Button: production only. A preview signs in with staging test accounts
+                    (lib/preview-auth.ts); the server refuses Google there whatever this shows. */}
+                {!IS_PREVIEW_DEPLOYMENT && (<>
                 <button
                   onClick={handleSignIn}
                   className="w-full bg-white hover:bg-gray-100 text-gray-900 font-semibold py-3 px-6 rounded-lg transition-all duration-200 flex items-center justify-center gap-3 shadow-lg hover:shadow-xl mb-4"
@@ -266,6 +273,7 @@ export default function AdminLayout({
                     <span className="px-2 bg-transparent text-gray-400">or</span>
                   </div>
                 </div>
+                </>)}
 
                 {/* Email/Password Option */}
                 <button
@@ -286,7 +294,9 @@ export default function AdminLayout({
 
                 {/* Info */}
                 <p className="text-xs text-gray-400 text-center mt-6">
-                  434 Media workspace accounts or authorized emails only
+                  {IS_PREVIEW_DEPLOYMENT
+                    ? 'Preview: staging test accounts only, with made-up data'
+                    : '434 Media workspace accounts or authorized emails only'}
                 </p>
               </>
             ) : (

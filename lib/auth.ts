@@ -2,6 +2,7 @@ import { cookies } from 'next/headers'
 import { ADMIN_ROLES, SESSION_COOKIE, parseSessionCookieWithExpiry, sessionLifetime, signPayload } from './session-cookie'
 import type { AdminRole, AuthProvider, User } from './session-cookie'
 import { applyRosterDecision, createRosterChecker } from './session-roster'
+import { ownerEmailsVariable } from './preview-auth'
 
 export type { AdminRole, AuthProvider, User } from './session-cookie'
 export { parseSessionCookie } from './session-cookie'
@@ -15,10 +16,15 @@ export { parseSessionCookie } from './session-cookie'
  * No access check in this repository names an address: owners, and the owners-only Facebook recovery in the publisher
  * (app/api/admin/crm/content-posts/[id]/owned-meta), read this setting. Unset, it names no owner, every role comes from
  * the roster, and that recovery is open to no one.
+ *
+ * On a Vercel preview the owners come from `STAGING_ADMIN_OWNER_EMAILS` instead (Preview only): staging test accounts,
+ * never production's owners (lib/preview-auth.ts).
  */
 
 export function ownerEmails(env: Record<string, string | undefined> = process.env): string[] {
-  return (env.ADMIN_OWNER_EMAILS ?? '')
+  // On a Vercel preview the owners are the staging test accounts (STAGING_ADMIN_OWNER_EMAILS), never production's
+  // owners; everywhere else ADMIN_OWNER_EMAILS, exactly as before (lib/preview-auth.ts).
+  return (env[ownerEmailsVariable(env)] ?? '')
     .split(',')
     .map((e) => e.trim().toLowerCase())
     .filter((e) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e))
