@@ -21,10 +21,10 @@ import {
 const m = (email: string, tags: string[] = ["434media"], firstName?: string): PlannedMember => ({ email, tags, firstName })
 
 test("fingerprint: stable across tag order and email case, changes with tags or name", () => {
-  const a = m("a@x.com", ["b", "a"])
-  assert.equal(fingerprint(a), fingerprint(m("A@X.com", ["a", "b"])))
-  assert.notEqual(fingerprint(a), fingerprint(m("a@x.com", ["a", "b", "c"])))
-  assert.notEqual(fingerprint(a), fingerprint(m("a@x.com", ["a", "b"], "Ana")))
+  const a = m("a@example.com", ["b", "a"])
+  assert.equal(fingerprint(a), fingerprint(m("A@EXAMPLE.com", ["a", "b"])))
+  assert.notEqual(fingerprint(a), fingerprint(m("a@example.com", ["a", "b", "c"])))
+  assert.notEqual(fingerprint(a), fingerprint(m("a@example.com", ["a", "b"], "Ana")))
   assert.match(fingerprint(a), /^[0-9a-f]{12}$/)
 })
 
@@ -37,17 +37,17 @@ test("isFullPassDue: first run, a day later, unreadable; not within the day", ()
 })
 
 test("pendingMembers: only new or changed members", () => {
-  const known = m("known@x.com")
-  const sent = new Set([fingerprint(known), fingerprint(m("retagged@x.com", ["old"]))])
-  const plan = [known, m("new@x.com"), m("retagged@x.com", ["new"])]
-  assert.deepEqual(pendingMembers(plan, sent).map((p) => p.email), ["new@x.com", "retagged@x.com"])
+  const known = m("known@example.com")
+  const sent = new Set([fingerprint(known), fingerprint(m("retagged@example.com", ["old"]))])
+  const plan = [known, m("new@example.com"), m("retagged@example.com", ["new"])]
+  assert.deepEqual(pendingMembers(plan, sent).map((p) => p.email), ["new@example.com", "retagged@example.com"])
   assert.equal(pendingMembers(plan, new Set()).length, 3, "an empty set (the full pass) sends everyone")
 })
 
 test("pushRequests: one tag-set per request, at most PUSH_CHUNK members", () => {
   const plan = [
-    ...Array.from({ length: PUSH_CHUNK + 1 }, (_, i) => m(`a${i}@x.com`, ["a"])),
-    m("b@x.com", ["b"]),
+    ...Array.from({ length: PUSH_CHUNK + 1 }, (_, i) => m(`a${i}@example.com`, ["a"])),
+    m("b@example.com", ["b"]),
   ]
   const reqs = pushRequests(plan)
   assert.deepEqual(reqs.map((r) => [r.tags.join("|"), r.members.length]), [["a", PUSH_CHUNK], ["a", 1], ["b", 1]])
@@ -57,11 +57,11 @@ test("drainPending: sends with each request's tags, retries errored members next
   const calls: Array<{ emails: string[]; tags: string[] }> = []
   const push: PushFn = async (members, tags) => {
     calls.push({ emails: members.map((x) => x.email), tags })
-    return { newMembers: 1, updatedMembers: members.length - 2, errors: [{ email: "BAD@x.com" }] }
+    return { newMembers: 1, updatedMembers: members.length - 2, errors: [{ email: "BAD@example.com" }] }
   }
-  const pending = [m("ok@x.com", ["a"]), m("bad@x.com", ["a"]), m("ok2@x.com", ["a"])]
+  const pending = [m("ok@example.com", ["a"]), m("bad@example.com", ["a"]), m("ok2@example.com", ["a"])]
   const r = await drainPending(pending, push, { deadline: Number.POSITIVE_INFINITY })
-  assert.deepEqual(calls, [{ emails: ["ok@x.com", "bad@x.com", "ok2@x.com"], tags: ["a"] }])
+  assert.deepEqual(calls, [{ emails: ["ok@example.com", "bad@example.com", "ok2@example.com"], tags: ["a"] }])
   assert.equal(r.attempted, 3)
   assert.equal(r.errors, 1)
   assert.equal(r.deferred, 0)
@@ -74,7 +74,7 @@ test("drainPending: stops at the deadline and defers the rest", async () => {
     clock += 100
     return { newMembers: members.length, updatedMembers: 0, errors: [] }
   }
-  const pending = [m("a@x.com", ["a"]), m("b@x.com", ["b"]), m("c@x.com", ["c"])]
+  const pending = [m("a@example.com", ["a"]), m("b@example.com", ["b"]), m("c@example.com", ["c"])]
   const r = await drainPending(pending, push, { deadline: 150, now: () => clock })
   assert.equal(r.attempted, 2)
   assert.equal(r.deferred, 1)
@@ -82,9 +82,9 @@ test("drainPending: stops at the deadline and defers the rest", async () => {
 })
 
 test("nextSentSet: keeps current remembered, adds accepted, drops what left the plan", () => {
-  const stay = m("stay@x.com")
-  const gone = m("gone@x.com")
-  const fresh = m("fresh@x.com")
+  const stay = m("stay@example.com")
+  const gone = m("gone@example.com")
+  const fresh = m("fresh@example.com")
   const plan = [stay, fresh]
   const out = nextSentSet(plan, new Set([fingerprint(stay), fingerprint(gone)]), [fingerprint(fresh)])
   assert.deepEqual(out, [fingerprint(stay), fingerprint(fresh)].sort())
