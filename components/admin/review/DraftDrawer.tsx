@@ -101,6 +101,9 @@ export function DraftDrawer({ item, onClose, onDone, onEdited }: { item: DraftIt
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [showRecord, setShowRecord] = useState(false)
+  // Reject confirms on the page, not with window.confirm: a browser that silences dialogs made the click do nothing
+  // (proof run, 2026-11-17).
+  const [confirmingReject, setConfirmingReject] = useState(false)
 
   // A new draft opened: start clean. An edited one defaults to "Edited, then approved".
   useEffect(() => {
@@ -137,7 +140,11 @@ export function DraftDrawer({ item, onClose, onDone, onEdited }: { item: DraftIt
 
   async function decideNow(d: Decision) {
     if (!item) return
-    if (d === "rejected" && !window.confirm("Reject this draft? It will never be sent; a new draft is needed to reply.")) return
+    if (d === "rejected" && !confirmingReject) {
+      setConfirmingReject(true)
+      return
+    }
+    setConfirmingReject(false)
     setBusy(true)
     setError(null)
     try {
@@ -178,7 +185,7 @@ export function DraftDrawer({ item, onClose, onDone, onEdited }: { item: DraftIt
           <div className="flex flex-col gap-2">
             {error && <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-800">{error}</p>}
             <div className="flex flex-col sm:flex-row gap-2">
-              <select value={choice} onChange={(e) => setChoice(e.target.value as typeof choice)} aria-label="Reason" className="rounded-lg border border-neutral-200 bg-white px-2 py-2 text-sm sm:w-60">
+              <select value={choice} onChange={(e) => { setChoice(e.target.value as typeof choice); setConfirmingReject(false) }} aria-label="Reason" className="rounded-lg border border-neutral-200 bg-white px-2 py-2 text-sm sm:w-60">
                 <optgroup label="Approve because">
                   {REASONS.approved.map((r) => (
                     <option key={r.code} value={`approved:${r.code}`}>{r.label}</option>
@@ -193,15 +200,31 @@ export function DraftDrawer({ item, onClose, onDone, onEdited }: { item: DraftIt
               <input value={reason} onChange={(e) => setReason(e.target.value)} maxLength={1000} placeholder="Why, in a sentence (required, recorded)" aria-label="Your reason" className="flex-1 rounded-lg border border-neutral-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-neutral-300" />
             </div>
             <div className="flex flex-wrap items-center justify-end gap-2">
-              <span className="mr-auto text-xs text-neutral-500">{editing ? "Save or cancel the edit first." : decision === "approved" ? "Sends to the address above once you approve." : "A rejected draft never sends."}</span>
+              <span className="mr-auto text-xs text-neutral-500">{editing
+                  ? "Save or cancel the edit first."
+                  : confirmingReject
+                    ? "Reject this draft? It will never be sent; a new draft is needed to reply."
+                    : !reason.trim()
+                      ? "Write why in a sentence to approve or reject."
+                      : decision === "approved"
+                        ? "Sends to the address above once you approve. To reject, pick a reason under “Reject because”."
+                        : "A rejected draft never sends."}</span>
               <button
                 disabled={!ready || decision !== "rejected"}
                 title={decision !== "rejected" ? "Pick a reason under “Reject because” to reject" : undefined}
                 onClick={() => void decideNow("rejected")}
                 className="rounded-md border border-neutral-300 bg-white px-3 py-2 text-xs font-medium text-neutral-900 hover:bg-neutral-50 disabled:opacity-40"
               >
-                Reject
+                {confirmingReject ? "Confirm reject" : "Reject"}
               </button>
+              {confirmingReject && (
+                <button
+                  onClick={() => setConfirmingReject(false)}
+                  className="rounded-md px-3 py-1.5 text-xs font-medium text-neutral-500 hover:bg-neutral-100"
+                >
+                  Cancel
+                </button>
+              )}
               <button
                 disabled={!ready || decision !== "approved"}
                 title={decision !== "approved" ? "Pick a reason under “Approve because” to approve" : undefined}
