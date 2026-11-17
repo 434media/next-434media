@@ -111,6 +111,10 @@ export class MemoryStore implements CoreStore {
     this.writes++
     this.triage.set(r.id, r)
   }
+  async removeTriage(id: string) {
+    this.writes++
+    this.triage.delete(id)
+  }
   async recordMerge(r: Omit<MergeRecord, "id">) {
     this.writes++
     this.merges.push(r)
@@ -119,10 +123,14 @@ export class MemoryStore implements CoreStore {
 
 export class FakeLeadPath implements LeadPath {
   calls: Array<{ person: Person; activity: Activity }> = []
-  constructor(private readonly leadId: string | null = "lead-1") {}
+  removed: string[] = []
+  constructor(private readonly leadId: string | null = "lead-1", private readonly created = true) {}
   async createLeadFor(person: Person, activity: Activity) {
     this.calls.push({ person, activity })
-    return { leadId: this.leadId }
+    return { leadId: this.leadId, created: this.created }
+  }
+  async removeLead(id: string) {
+    this.removed.push(id)
   }
 }
 

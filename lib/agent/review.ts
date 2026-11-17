@@ -24,6 +24,7 @@ export const WEEK_MS = 7 * 24 * 60 * 60 * 1000
 export const REASON_CODES = {
   approve: [
     { code: "as-drafted", label: "Right as drafted" },
+    { code: "edited", label: "Edited, then approved" },
     { code: "routing-right", label: "Routing is right" },
     { code: "proof-run", label: "Proof run" },
     { code: "other", label: "Other" },
@@ -70,6 +71,15 @@ export interface ReviewItem {
   decision?: { decision: "approved" | "rejected"; at: string; reasonCode: string; reason: string }
   sent?: { at: string; messageId: string }
   taskCancelled: boolean
+  /** The arrival's Activity in the People Inbox (`contact_forms:<formId>`), where the draft is shown inline. */
+  activityId?: string
+  /** Edits made before the decision; the drafted text is kept on the approval as evidence. */
+  edits: number
+}
+
+/** The People Inbox Activity an intake draft answers: the website form it was drafted from. */
+export function arrivalActivityId(a: Pick<StoredApproval, "arrival">): string | undefined {
+  return a.arrival?.formId ? `contact_forms:${a.arrival.formId}` : undefined
 }
 
 export function reviewItem(a: StoredApproval, now: string, task?: Pick<AgentTask, "cancelled">): ReviewItem {
@@ -98,6 +108,8 @@ export function reviewItem(a: StoredApproval, now: string, task?: Pick<AgentTask
     ...(d ? { decision: { decision: a.approval ? "approved" : "rejected", at: d.at, reasonCode: d.reasonCode, reason: d.reason } } : {}),
     ...(a.receipt ? { sent: { at: a.receipt.at, messageId: a.receipt.messageId } } : {}),
     taskCancelled: !!task?.cancelled,
+    ...(arrivalActivityId(a) ? { activityId: arrivalActivityId(a) } : {}),
+    edits: a.revisions?.length ?? 0,
   }
 }
 

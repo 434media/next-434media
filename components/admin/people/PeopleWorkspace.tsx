@@ -1,13 +1,22 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useState } from "react"
-import { Building2, CheckCircle2, AlertCircle, Inbox, Search, UserPlus, Users, Flag, Bookmark, X, Lock, Briefcase, RefreshCw, Contact, Pencil, Plus } from "lucide-react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import Link from "next/link"
+import { Building2, CheckCircle2, AlertCircle, Inbox, Search, UserPlus, Users, Flag, Bookmark, X, Lock, Briefcase, RefreshCw, Contact, Pencil, Plus, ClipboardCheck, Power, FileText } from "lucide-react"
 import { DetailDrawer } from "@/components/admin/DetailDrawer"
+import { DraftDrawer, type DraftItem } from "@/components/admin/review/DraftDrawer"
+import { WaitingOnYou } from "@/components/admin/people/WaitingOnYou"
+import { waitingRows } from "@/lib/core-model/waiting"
 import type { Activity, Affiliation, AffiliationRole, AddressBook, CoreRole, InboxItem, LifecycleStage, Organization, Person, Relationship } from "@/types/core-model"
 import { AFFILIATION_ROLES, CORE_ROLES } from "@/types/core-model"
 
-type Tab = "inbox" | "people" | "organizations"
-type Toast = { type: "success" | "error"; message: string }
+type Tab = "waiting" | "inbox" | "people" | "organizations"
+const TABS: Tab[] = ["waiting", "inbox", "people", "organizations"]
+/** `undo`, when present, puts an Undo button on the toast and keeps it up a little longer. */
+type Toast = { type: "success" | "error"; message: string; undo?: () => void }
+/** How long the triage toast offers Undo. The server allows a little more (lib/core-model/service.ts). */
+const UNDO_MS = 6000
+interface AgentsLine { stopped: boolean; mode: string; sends: boolean }
 type Decision = "promote" | "save" | "dismiss"
 type Triage = (i: InboxItem, d: Decision, relationship?: Relationship) => void
 
@@ -88,7 +97,8 @@ async function api<T>(url: string, init?: RequestInit): Promise<T> {
 }
 
 export function PeopleWorkspace() {
-  const [tab, setTab] = useState<Tab>("inbox")
+  // "Waiting on you" is first (one work area, founder 2026-11-16); ?tab= picks another (/admin/review lands here).
+  const [tab, setTab] = useState<Tab>("waiting")
   const [toast, setToast] = useState<Toast | null>(null)
   const [inbox, setInbox] = useState<InboxItem[] | null>(null)
   const [people, setPeople] = useState<PersonRow[] | null>(null)
@@ -100,6 +110,12 @@ export function PeopleWorkspace() {
   const [openOrg, setOpenOrg] = useState<string | null>(null)
   const [openActivity, setOpenActivity] = useState<InboxItem | null>(null)
   const [adding, setAdding] = useState(false)
+  // "Waiting on you": the approval records, founder only on the server. null until read; [] when not the founder.
+  const [drafts, setDrafts] = useState<DraftItem[] | null>(null)
+  const [openDraft, setOpenDraft] = useState<DraftItem | null>(null)
+  const [agents, setAgents] = useState<AgentsLine | null>(null)
+  // A phone arrival's dismissal is held for the undo window: once sent, nothing about it is left to restore.
+  const heldDismiss = useRef<{ timer: ReturnType<typeof setTimeout>; send: () => void } | null>(null)
   // The founder is whoever the Google Contacts status answers for (founder only on the server); everyone else gets
   // 401/403 and sees no personal controls. The server enforces the rule either way.
   const [sync, setSync] = useState<SyncStatus | null>(null)
@@ -123,9 +139,57 @@ export function PeopleWorkspace() {
 
   useEffect(() => {
     if (!toast) return
-    const t = setTimeout(() => setToast(null), 3500)
+    const t = setTimeout(() => setToast(null), toast.undo ? UNDO_MS : 3500)
     return () => clearTimeout(t)
   }, [toast])
+
+  useEffect(() => {
+    const q = new URLSearchParams(window.location.search).get("tab") as Tab | null
+    if (q && TABS.includes(q)) setTab(q)
+    // Leaving the page sends a held dismissal at once, so the decision is not lost.
+    return () => {
+      const held = heldDismiss.current
+      if (held) {
+        clearTimeout(held.timer)
+        held.send()
+      }
+    }
+  }, [])
+
+  const loadDrafts = useCallback(async () => {
+    try {
+      const res = await fetch("/api/admin/review/waiting", { cache: "no-store" })
+      if (res.status === 401 || res.status === 403) {
+        // Not the founder: no drafts, and Waiting on you holds their inbox arrivals only.
+        setDrafts([])
+        return
+      }
+      const body = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(body.error ?? "Waiting on you could not be read")
+      setDrafts(body.items ?? [])
+    } catch (e) {
+      setDrafts([])
+      setToast({ type: "error", message: (e as Error).message })
+    }
+  }, [])
+  useEffect(() => {
+    void loadDrafts()
+    void (async () => {
+      try {
+        const c = (await api<{ controls: { stopped: boolean; skills: Record<string, string>; sends: Record<string, boolean> } }>("/api/admin/agent/controls")).controls
+        setAgents({ stopped: c.stopped, mode: c.skills["434-intake-qualification"] ?? "off", sends: c.sends.intake_reply === true })
+      } catch {
+        setAgents(null)
+      }
+    })()
+  }, [loadDrafts])
+
+  /** The pending draft for each inbox arrival, by its Activity id. */
+  const draftFor = useMemo(() => {
+    const m = new Map<string, DraftItem>()
+    for (const d of drafts ?? []) if (d.status === "pending" && d.activityId && !m.has(d.activityId)) m.set(d.activityId, d)
+    return m
+  }, [drafts])
 
   const loadInbox = useCallback(async () => {
     try {
@@ -155,32 +219,82 @@ export function PeopleWorkspace() {
   }, [])
 
   useEffect(() => {
-    if (tab === "inbox" && inbox === null) void loadInbox()
+    if ((tab === "inbox" || tab === "waiting") && inbox === null) void loadInbox()
     if (tab === "people" && people === null) void loadPeople()
     if (tab === "organizations" && orgs === null) void loadOrgs()
   }, [tab, inbox, people, orgs, loadInbox, loadPeople, loadOrgs])
 
+  const whoOf = (item: InboxItem) => item.person?.name || item.activity.contact.name || item.activity.contact.email || "Item"
+  const doneMessage = (item: InboxItem, decision: Decision, relationship?: Relationship) =>
+    decision === "promote"
+      ? `${whoOf(item)} is now a lead.`
+      : decision === "save"
+        ? `${whoOf(item)} saved as ${relationship === "personal" ? "a personal contact" : "a contact"}.`
+        : isPhoneArrival(item.activity)
+          ? "Dismissed. Nothing was kept; the contact stays on the phone."
+          : "Dismissed."
+  const putBack = (item: InboxItem) =>
+    setInbox((cur) => (cur && !cur.some((i) => i.activity.id === item.activity.id) ? [item, ...cur].sort((a, b) => b.activity.occurred_at.localeCompare(a.activity.occurred_at)) : cur))
+
+  const undoTriage = async (activityId: string, item: InboxItem) => {
+    try {
+      await api(`/api/admin/core/inbox/${encodeURIComponent(activityId)}/triage/undo`, { method: "POST" })
+      putBack(item)
+      setInbox(null)
+      setPeople(null)
+      setToast({ type: "success", message: `Undone. ${whoOf(item)} is back in the inbox.` })
+    } catch (e) {
+      setToast({ type: "error", message: (e as Error).message })
+    }
+  }
+
   const triage: Triage = async (item, decision, relationship) => {
+    const remove = () => setInbox((cur) => (cur ?? []).filter((i) => i.activity.id !== item.activity.id))
+    // A phone arrival's dismissal stores nothing, so there would be nothing to restore: it is held for the undo
+    // window and sent when the window closes (or at once if the page is left).
+    if (decision === "dismiss" && isPhoneArrival(item.activity)) {
+      const prior = heldDismiss.current
+      if (prior) {
+        clearTimeout(prior.timer)
+        prior.send()
+      }
+      const send = () => {
+        heldDismiss.current = null
+        void api(`/api/admin/core/inbox/${encodeURIComponent(item.activity.id)}/triage`, { method: "POST", keepalive: true, body: JSON.stringify({ decision }) }).catch((e) => {
+          putBack(item)
+          setToast({ type: "error", message: (e as Error).message })
+        })
+      }
+      heldDismiss.current = { timer: setTimeout(send, UNDO_MS), send }
+      remove()
+      setOpenActivity(null)
+      setToast({
+        type: "success",
+        message: doneMessage(item, decision),
+        undo: () => {
+          const held = heldDismiss.current
+          if (held) clearTimeout(held.timer)
+          heldDismiss.current = null
+          putBack(item)
+          setToast({ type: "success", message: `Undone. ${whoOf(item)} is back in the inbox.` })
+        },
+      })
+      return
+    }
     setBusy(item.activity.id)
     try {
-      await api(`/api/admin/core/inbox/${encodeURIComponent(item.activity.id)}/triage`, {
+      const r = await api<{ data?: { activityId?: string } }>(`/api/admin/core/inbox/${encodeURIComponent(item.activity.id)}/triage`, {
         method: "POST",
         body: JSON.stringify({ decision, relationship }),
       })
-      setInbox((cur) => (cur ?? []).filter((i) => i.activity.id !== item.activity.id))
+      remove()
       setPeople(null)
       setOpenActivity(null)
-      const who = item.person?.name || item.activity.contact.name || item.activity.contact.email || "Item"
+      const decidedOn = r.data?.activityId
       setToast({
         type: "success",
-        message:
-          decision === "promote"
-            ? `${who} is now a lead.`
-            : decision === "save"
-              ? `${who} saved as ${relationship === "personal" ? "a personal contact" : "a contact"}.`
-              : isPhoneArrival(item.activity)
-                ? "Dismissed. Nothing was kept; the contact stays on the phone."
-                : "Dismissed.",
+        message: doneMessage(item, decision, relationship),
+        ...(decidedOn ? { undo: () => void undoTriage(decidedOn, item) } : {}),
       })
     } catch (e) {
       setToast({ type: "error", message: (e as Error).message })
@@ -210,7 +324,10 @@ export function PeopleWorkspace() {
     [orgs, q],
   )
 
+  // The combined count: one per arrival, an arrival with a draft counted once (lib/core-model/waiting.ts).
+  const waitingCount = drafts && inbox ? waitingRows(drafts, inbox).length : undefined
   const tabs: Array<{ id: Tab; label: string; icon: typeof Inbox; count?: number }> = [
+    { id: "waiting", label: "Waiting on you", icon: ClipboardCheck, count: waitingCount },
     { id: "inbox", label: "Inbox", icon: Inbox, count: inbox?.length },
     { id: "people", label: "People", icon: Users, count: people?.length },
     { id: "organizations", label: "Organizations", icon: Building2, count: orgs?.length },
@@ -228,6 +345,18 @@ export function PeopleWorkspace() {
           >
             {toast.type === "success" ? <CheckCircle2 className="w-4 h-4 mt-0.5 shrink-0" /> : <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />}
             <span className="flex-1">{toast.message}</span>
+            {toast.undo && (
+              <button
+                onClick={() => {
+                  const u = toast.undo
+                  setToast(null)
+                  u?.()
+                }}
+                className="shrink-0 rounded-md bg-white/20 px-2 py-0.5 text-xs font-semibold hover:bg-white/30"
+              >
+                Undo
+              </button>
+            )}
             <button onClick={() => setToast(null)} aria-label="Dismiss notification" className="shrink-0">
               <X className="w-4 h-4" />
             </button>
@@ -241,6 +370,14 @@ export function PeopleWorkspace() {
           <p className="mt-1 text-sm text-neutral-500">
             One record per person and per company. Every way in lands in the Inbox until someone decides what it is.
           </p>
+          {agents && (
+            <p className="mt-2 flex flex-wrap items-center gap-1.5 text-xs text-neutral-500">
+              <Power className={`w-3.5 h-3.5 ${agents.stopped ? "text-red-600" : "text-green-600"}`} />
+              <span className="text-neutral-700">{agents.stopped ? "Agents stopped" : "Agents running"}</span>
+              <span>· Intake <span className="capitalize">{agents.mode}</span> · Sends {agents.sends ? "on" : "off"} ·</span>
+              <Link href="/admin/agents" className="font-medium text-neutral-800 underline underline-offset-2">Agents page</Link>
+            </p>
+          )}
         </div>
 
         <div className="flex flex-col sm:flex-row sm:items-center gap-3 mb-4">
@@ -288,14 +425,54 @@ export function PeopleWorkspace() {
           </p>
         )}
 
+        {tab === "waiting" && (
+          <WaitingOnYou
+            drafts={drafts ?? []}
+            inbox={shownInbox}
+            loading={drafts === null || inbox === null}
+            onOpen={setOpenDraft}
+            onOpenArrival={setOpenActivity}
+            actions={(item) => <TriageButtons item={item} busy={busy === item.activity.id} founder={founder} onTriage={triage} />}
+            sourceLabel={(item) => `${SOURCE_LABEL[item.activity.source] ?? item.activity.source}${item.activity.channel ? ` · ${item.activity.channel}` : ""}`}
+          />
+        )}
         {tab === "inbox" && (
-          <InboxList items={shownInbox} loading={inbox === null} busy={busy} founder={founder} onTriage={triage} onOpen={setOpenActivity} />
+          <InboxList
+            items={shownInbox}
+            loading={inbox === null}
+            busy={busy}
+            founder={founder}
+            drafts={draftFor}
+            onTriage={triage}
+            onOpen={(i) => {
+              const d = draftFor.get(i.activity.id)
+              if (d) setOpenDraft(d)
+              else setOpenActivity(i)
+            }}
+          />
         )}
         {tab === "people" && <PeopleList rows={shownPeople} loading={people === null} onOpen={setOpenPerson} />}
         {tab === "organizations" && <OrgList rows={shownOrgs} loading={orgs === null} onOpen={setOpenOrg} />}
       </main>
 
       <ActivityDrawer item={openActivity} busy={busy} founder={founder} onClose={() => setOpenActivity(null)} onTriage={triage} />
+      <DraftDrawer
+        item={openDraft}
+        onClose={() => setOpenDraft(null)}
+        onEdited={(next) => {
+          setOpenDraft(next)
+          setDrafts((cur) => (cur ?? []).map((d) => (d.id === next.id ? next : d)))
+        }}
+        onDone={(o) => {
+          setOpenDraft(null)
+          setToast({ type: o.type, message: o.message })
+          if (o.changed) {
+            void loadDrafts()
+            setInbox(null)
+            setPeople(null)
+          }
+        }}
+      />
       <PersonDrawer
         id={openPerson}
         founder={founder}
@@ -351,6 +528,7 @@ function InboxList({
   loading,
   busy,
   founder,
+  drafts,
   onTriage,
   onOpen,
 }: {
@@ -358,6 +536,7 @@ function InboxList({
   loading: boolean
   busy: string | null
   founder: boolean
+  drafts: Map<string, DraftItem>
   onTriage: Triage
   onOpen: (i: InboxItem) => void
 }) {
@@ -375,6 +554,11 @@ function InboxList({
                 {a.contact.company && <span className="text-xs text-neutral-500">{a.contact.company}</span>}
                 <Pill>{SOURCE_LABEL[a.source] ?? a.source}{a.channel ? ` · ${a.channel}` : ""}</Pill>
                 {a.relationship === "personal" && <PersonalPill />}
+                {drafts.has(a.id) && (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-neutral-900 px-2 py-0.5 text-[10px] font-medium text-white" title="An agent drafted a reply. Open to read, edit, approve or reject it.">
+                    <FileText className="w-2.5 h-2.5" /> Draft ready
+                  </span>
+                )}
               </div>
               <p className="mt-0.5 truncate text-xs text-neutral-500">{a.summary}</p>
             </button>

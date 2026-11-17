@@ -29,7 +29,7 @@ import {
   LayoutDashboard,
   Palette,
   Landmark,
-  ClipboardCheck,
+  Bot,
   Users,
 } from "lucide-react"
 import type { LucideIcon } from "lucide-react"
@@ -75,14 +75,15 @@ export interface SidebarUser {
   founder?: boolean
 }
 
-// The founder-review queue (V1 item 4): approvals happen here, by the founder, signed in (build plan v3 R2). Like
-// Finance, the link follows the founder guard; the page and its routes refuse everyone else on the server.
-const REVIEW_ITEM: SidebarLink = {
-  id: "review",
-  label: "Review",
-  icon: ClipboardCheck,
-  href: "/admin/review",
-  matchPrefix: "/admin/review",
+// The Agents page (V1 item 4): the kill switch, modes, pin, exams and console. Drafts are decided in "Waiting on you"
+// on the People page (one work area, founder 2026-11-16). Like Finance, the link follows the founder guard; the page
+// and its routes refuse everyone else on the server.
+const AGENTS_ITEM: SidebarLink = {
+  id: "agents",
+  label: "Agents",
+  icon: Bot,
+  href: "/admin/agents",
+  matchPrefix: "/admin/agents",
   roles: [],
 }
 
@@ -419,7 +420,7 @@ export function AdminSidebar({
     ...s,
     items: s.items.filter(canSee),
   })).filter((s) => s.items.length > 0)
-  const footerItems = [...(user.founder ? [REVIEW_ITEM, FINANCE_ITEM] : []), ...FOOTER_ITEMS.filter(canSee)]
+  const footerItems = [...(user.founder ? [AGENTS_ITEM, FINANCE_ITEM] : []), ...FOOTER_ITEMS.filter(canSee)]
 
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>(() => {
     const out: Record<string, boolean> = {}

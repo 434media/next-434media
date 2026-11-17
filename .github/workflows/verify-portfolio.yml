@@ -156,6 +156,8 @@ jobs:
       - run: tsx --test lib/__tests__/agent-controls.test.ts
       - run: tsx --test lib/__tests__/agent-intake.test.ts
       - run: tsx --test lib/__tests__/agent-review.test.ts
+      # One work area (2026-11-16): the edit re-hash, the arrival closed after a send, and Undo on triage.
+      - run: tsx --test lib/__tests__/one-work-area.test.ts
       - run: tsx --test lib/__tests__/exam-reports.test.ts
       # Owned Meta tool route, Slack approval binding and processing continuation (all transports faked).
       - run: tsx --test lib/__tests__/owned-meta-tool.test.ts

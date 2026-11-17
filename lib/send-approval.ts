@@ -85,6 +85,20 @@ export interface SendApproval {
   abortedBeforeDispatch?: { at: string; why: string }
   /** The provider call failed or its answer was lost: whether it went is unknown. A person reconciles it. */
   outcomeUnknown?: { at: string; why: string }
+  /**
+   * Each edit a person made before deciding, oldest first: the text it replaced and the hash on each side. An edit
+   * re-hashes the draft (`reviseDraft`), so the decision binds the edited text and the drafted text stays as evidence.
+   */
+  revisions?: DraftRevision[]
+}
+
+export interface DraftRevision {
+  by: string
+  at: string
+  fromHash: string
+  toHash: string
+  /** The text the edit replaced, kept whole on the CRM record (the ledger keeps only the hashes). */
+  previousText: string
 }
 
 export type ApprovalStatus =
@@ -188,6 +202,28 @@ export function decide(a: SendApproval, d: { decision: "approved" | "rejected"; 
   if (reason.length > MAX_REASON) throw new ApprovalBlocked(`The reason is over ${MAX_REASON} characters`)
   const decision: ApprovalDecision = { by: d.by.trim(), at: d.at, hash: a.hash, reasonCode: d.reasonCode, reason }
   return d.decision === "approved" ? { ...a, approval: decision } : { ...a, rejection: decision }
+}
+
+/**
+ * A person's edit to a draft that is still waiting: the new text replaces the old and the hash is computed again over
+ * the same fields, so the approval that follows binds the edited text. Refused once decided, expired, or when the draft
+ * changed since it was shown. The schedule and expiry do not move: an edit never extends an approval's life. Returns
+ * the new record; the caller writes it in one transaction.
+ */
+export function reviseDraft(a: SendApproval, e: { text: string; by: string; at: string; shownHash: string }): SendApproval {
+  assertIntact(a)
+  if (a.approval || a.rejection) throw new ApprovalBlocked("This draft already has a decision; it can no longer be edited")
+  if (e.shownHash !== a.hash) throw new ApprovalBlocked("The draft changed since it was shown; reload it before editing")
+  if (!isIso(e.at)) throw new ApprovalBlocked("A valid time is required")
+  if (expired(a, e.at)) throw new ApprovalBlocked("This draft has expired; it is regenerated, never revived")
+  if (typeof e.by !== "string" || !e.by.trim()) throw new ApprovalBlocked("The edit needs the signed-in person who made it")
+  const text = typeof e.text === "string" ? e.text.replace(/\r\n/g, "\n") : ""
+  if (text === a.payload.text) throw new ApprovalBlocked("Nothing changed")
+  const payload: EmailPayload = { ...a.payload, text }
+  assertPayload(payload)
+  const hash = approvalHash({ ...a, payload })
+  const revision: DraftRevision = { by: e.by.trim(), at: e.at, fromHash: a.hash, toHash: hash, previousText: a.payload.text }
+  return { ...a, payload, hash, revisions: [...(a.revisions ?? []), revision] }
 }
 
 /**

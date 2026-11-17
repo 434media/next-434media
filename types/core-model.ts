@@ -424,6 +424,19 @@ export interface TriageRecord {
   at: string
   person_id?: string
   lead_id?: string
+  /**
+   * What the triage changed, so it can be undone for a short while (lib/core-model/service.ts undoTriage): whether it
+   * created the Person, the Person's stage and relationship before it, whether it created the lead, and the
+   * relationship the arrival came with. Missing on a record written before undo existed: those are never undone.
+   */
+  undo?: TriageUndo
+}
+
+export interface TriageUndo {
+  person_created: boolean
+  person_before?: { lifecycle_stage: LifecycleStage; relationship: Relationship; visibility: Visibility }
+  lead_created: boolean
+  arrival_relationship: Relationship
 }
 
 export interface MergeRecord {

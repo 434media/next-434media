@@ -10,7 +10,7 @@ import { MockLanguageModelV4 } from "ai/test"
 import { fingerprint, type SkillFiles } from "../skills/loader"
 import { APP_KEY_ENV, CLIENT_ID_ENV, SkillSourceError, appJwt, installationCoverage, catalogEntry, installationToken, readSkillAt, readSuiteAt, resetSkillSourceCache } from "../skills/source"
 import { scriptRefusal, skillScriptTool, type ScriptSandbox } from "../agent/skill-scripts"
-import { INTAKE_SKILL, intakeEligible, queueIntake, renderIntakeRequest, runIntake, taskIdFor, type IntakeDeps, type IntakeSubmission, type SkillPin } from "../agent/intake"
+import { INTAKE_SKILL, intakeEligible, queueIntake, renderIntakeRequest, runIntake, taskIdFor, type ArrivalMark, type IntakeDeps, type IntakeSubmission, type SkillPin } from "../agent/intake"
 import { parseControls, type AgentControls } from "../agent/controls"
 import { SEND_APPROVALS_COLLECTION, TEST_SINK_RECIPIENTS } from "../agent/send-email"
 import { createTask, step } from "../agent/ledger-server"
@@ -211,7 +211,7 @@ function scriptedModel(steps: { tool?: string; input?: unknown; text?: string }[
   return { model, calls }
 }
 
-async function intakeSetup(opts: { controls?: AgentControls; pin?: SkillPin | null; email?: string; steps?: { tool?: string; input?: unknown; text?: string }[]; skill?: SkillFiles } = {}) {
+async function intakeSetup(opts: { controls?: AgentControls; pin?: SkillPin | null; email?: string; mark?: ArrivalMark; steps?: { tool?: string; input?: unknown; text?: string }[]; skill?: SkillFiles } = {}) {
   const db = new MemoryAgentDb()
   const sb = fakeSandbox()
   const { model, calls } = scriptedModel(opts.steps ?? [
@@ -227,6 +227,7 @@ async function intakeSetup(opts: { controls?: AgentControls; pin?: SkillPin | nu
     skillAt: async (commit) => (assert.equal(commit, COMMIT), opts.skill ?? SKILL),
     submission: async () => SUBMISSION(opts.email),
     decisions: async () => "- 2026-11-01 (organization): chose discovery first. Why: scope unclear",
+    arrivalMark: async () => opts.mark ?? null,
     model: () => model,
     sandbox: sb.factory,
     now: () => at(clock++ * 1000),
@@ -349,4 +350,17 @@ test("the sweep runs tasks left queued past their grace, fails dead runs, and le
   assert.deepEqual(out.failedStale, ["dead"])
   assert.equal(db.task("dead")!.state, "failed")
   assert.deepEqual(ran.sort(), ["old-1", "old-2"])
+})
+
+test("the token guard: an arrival marked spam or duplicate is refused before any model call, and no draft is queued", async () => {
+  for (const mark of ["spam", "duplicate"] as const) {
+    const { db, deps, calls } = await intakeSetup({ mark })
+    const taskId = await queueIntake(db, { formId: `form-${mark}`, email: SINK }, LIVE("draft"), at())
+    const out = await runIntake(taskId!, deps)
+    assert.equal(out.ok, false)
+    assert.equal(out.ok === false && out.code, `arrival-${mark}`)
+    assert.equal(calls.length, 0, "the model was never called")
+    assert.equal(db.col(SEND_APPROVALS_COLLECTION).size, 0)
+    assert.equal(db.task(taskId!)?.state, "cancelled")
+  }
 })

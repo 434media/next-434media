@@ -1,20 +1,8 @@
-import type { Metadata } from "next"
-import { forbidden } from "next/navigation"
-import RefreshWhenSignedIn from "@/components/admin/RefreshWhenSignedIn"
-import { ReviewQueue } from "@/components/admin/review/ReviewQueue"
-import { founderPageAccess } from "@/lib/founder-guard"
+import { redirect } from "next/navigation"
 
-// The founder-review queue and the console (V1 item 4, the proof slice; build plan v3 R2: "Approvals happen in the
-// signed-in admin's founder-review queue"). Founder only, guarded here on the server before anything renders, as the
-// finance page is; the queue loads in the browser from GET /api/admin/review, which runs the same guard.
-export const metadata: Metadata = {
-  title: "Review",
-  robots: { index: false, follow: false },
-}
-
-export default async function ReviewPage() {
-  const access = await founderPageAccess("/admin/review")
-  if (access === "signed_out") return <RefreshWhenSignedIn />
-  if (access === "forbidden") forbidden()
-  return <ReviewQueue />
+// /admin/review is now "Waiting on you", the first tab of the People page (one work area, founder 2026-11-16): the
+// drafts are decided where the arrival lives, and the Decided history is a filter there. The console moved to
+// /admin/agents. Kept as a redirect so old links and the watchdog's email still land in the right place.
+export default function ReviewPage() {
+  redirect("/admin/people?tab=waiting")
 }
