@@ -38,7 +38,6 @@ interface OverviewCounts {
   audiencesTotal: number
   audiences7d: number
   inboxAwaiting: number
-  inboxTotal: number
   leadsActive: number
   leadsPriority: number
   prospected7d: number
@@ -109,7 +108,7 @@ export function AdminOverview() {
         jget("/api/admin/crm/clients", now),
         isFull ? jget("/api/admin/email-lists-firestore", now) : Promise.resolve(null),
         isFull ? jget("/api/admin/event-registrations", now) : Promise.resolve(null),
-        isFull ? jget("/api/admin/contact-forms/inbox-stats", now) : Promise.resolve(null),
+        isFull ? jget("/api/admin/core/inbox", now) : Promise.resolve(null),
         isFull ? jget("/api/admin/audiences/partner-list-members", now) : Promise.resolve(null),
         jget("/api/admin/kpis/funnel", now),
       ])
@@ -130,7 +129,8 @@ export function AdminOverview() {
       const evBody = ok<{ success?: boolean; registrations?: Array<{ registeredAt: string }> }>(evR)
       const registrations = evBody?.success ? evBody.registrations ?? [] : []
 
-      const inboxBody = ok<{ awaitingReply?: number; totalSubmissions?: number }>(inboxR)
+      // The People Inbox: every untriaged arrival (GET /api/admin/core/inbox).
+      const inboxBody = ok<{ data?: unknown[] }>(inboxR)
 
       // "Lists" audience source = the partner_list_members cohort (the same
       // collection the Audiences page counts), NOT promoted partner leads — so
@@ -158,8 +158,7 @@ export function AdminOverview() {
           countRecent(signups.map((s) => s.created_at).filter(Boolean), now) +
           countRecent(registrations.map((r) => r.registeredAt).filter(Boolean), now) +
           countRecent(members.map((m) => m.importedAt ?? "").filter(Boolean), now),
-        inboxAwaiting: inboxBody?.awaitingReply ?? 0,
-        inboxTotal: inboxBody?.totalSubmissions ?? 0,
+        inboxAwaiting: inboxBody?.data?.length ?? 0,
         leadsActive,
         leadsPriority,
         prospected7d,
@@ -241,16 +240,12 @@ export function AdminOverview() {
                 cta="Start prospecting"
               />
               <StageNode
-                href="/admin/inbox"
+                href="/admin/people?tab=inbox"
                 icon={Inbox}
                 title="Inbox"
                 stat={counts?.inboxAwaiting ?? 0}
-                statLabel="awaiting reply"
-                sub={
-                  counts
-                    ? `${counts.inboxTotal} total inquiries · reply within hours`
-                    : "Direct contact-form inquiries"
-                }
+                statLabel="waiting"
+                sub="Website inquiries and other arrivals, in People"
                 loading={showLoading}
                 accent={!!counts && counts.inboxAwaiting > 0}
               />

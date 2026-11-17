@@ -15,9 +15,9 @@ import type { Toast } from "@/components/admin/submissions/types"
 // Stage 3 — /admin/audiences groups the three campaign-feeder surfaces
 // (Newsletter, Events, Lists) under one route with sub-tab navigation.
 // These three share an operational flow: collect → opt-ins auto-sync to
-// Mailchimp (cold/partner lists don't) → promote to Lead. The Inbox surface
-// lives separately at /admin/inbox because contact forms have a different
-// response cadence.
+// Mailchimp (cold/partner lists don't) → promote to Lead. Website inquiries
+// are answered in the People Inbox (/admin/people), because contact forms
+// have a different response cadence.
 //
 // Sub-tabs are driven by `?sub=newsletter|events|lists`; default is
 // `newsletter` since it has the highest volume.

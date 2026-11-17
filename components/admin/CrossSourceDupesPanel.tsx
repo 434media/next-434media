@@ -70,7 +70,7 @@ const SOURCE_META: Record<SourceKey, { label: string; icon: typeof Mail; searchP
   contact_forms: {
     label: "Contact Form",
     icon: MessageSquare,
-    searchPath: "/admin/inbox?search=",
+    searchPath: "/admin/people?tab=people&search=",
   },
   event_registrations: {
     label: "Event",

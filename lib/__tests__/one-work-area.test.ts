@@ -138,9 +138,8 @@ function formArrival(formId = "form-1"): Activity {
   return adaptContactForm(sub, false).activities[0]
 }
 
-test("after an approved send the arrival is saved as a contact (triaged), and the old inbox entry is marked replied", async () => {
+test("after an approved send or a hand-written reply, the arrival is saved as a contact (triaged)", async () => {
   const store = new MemoryStore()
-  const replied: string[] = []
   const a = approval()
   const activity = formArrival()
   assert.equal(arrivalActivityId(a), activity.id)
@@ -149,14 +148,14 @@ test("after an approved send the arrival is saved as a contact (triaged), and th
     triage: async (act) => {
       await triageActivity(store, new FakeLeadPath(), { activity: act, decision: "save", actor: FOUNDER, founder: true }, [])
     },
-    markReplied: async (formId) => void replied.push(formId),
   })
   assert.deepEqual(out, { closed: true, activityId: activity.id })
   const rec = store.triage.get(activity.id)!
   assert.equal(rec.decision, "save")
   assert.equal(rec.by, FOUNDER)
-  assert.deepEqual(replied, ["form-1"])
   assert.equal([...store.people.values()][0]?.lifecycle_stage, "contact")
+  // "Write reply" (the reply route) names the arrival by its form id alone, and reaches the same Activity.
+  assert.equal(arrivalActivityId({ arrival: { formId: "form-1" } }), activity.id)
 })
 
 test("closing an arrival already triaged, or not found, never throws; a failed triage is reported, not raised", async () => {

@@ -2,9 +2,10 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import Link from "next/link"
-import { Building2, CheckCircle2, AlertCircle, Inbox, Search, UserPlus, Users, Flag, Bookmark, X, Lock, Briefcase, RefreshCw, Contact, Pencil, Plus, ClipboardCheck, Power, FileText } from "lucide-react"
+import { Building2, CheckCircle2, AlertCircle, Inbox, Search, UserPlus, Users, Flag, Bookmark, X, Lock, Briefcase, RefreshCw, Contact, Pencil, Plus, ClipboardCheck, Power, FileText, Reply } from "lucide-react"
 import { DetailDrawer } from "@/components/admin/DetailDrawer"
 import { DraftDrawer, type DraftItem } from "@/components/admin/review/DraftDrawer"
+import { InboxReplyModal } from "@/components/admin/people/InboxReplyModal"
 import { WaitingOnYou } from "@/components/admin/people/WaitingOnYou"
 import { waitingRows } from "@/lib/core-model/waiting"
 import type { Activity, Affiliation, AffiliationRole, AddressBook, CoreRole, InboxItem, LifecycleStage, Organization, Person, Relationship } from "@/types/core-model"
@@ -58,6 +59,8 @@ const SOURCE_LABEL: Record<string, string> = {
 
 const STAGE_LABEL: Record<string, string> = { contact: "Contact", lead: "Lead", customer: "Customer" }
 
+/** A website inquiry's Activity id is its contact-form id under this prefix (lib/agent/review.ts, arrivalActivityId). */
+const CONTACT_FORM_PREFIX = "contact_forms:"
 const isPhoneArrival = (a: Activity) => a.source === "google_contacts" && Boolean(a.read_only)
 
 function when(iso: string): string {
@@ -115,6 +118,7 @@ export function PeopleWorkspace() {
   const [openDraft, setOpenDraft] = useState<DraftItem | null>(null)
   const [agents, setAgents] = useState<AgentsLine | null>(null)
   // A phone arrival's dismissal is held for the undo window: once sent, nothing about it is left to restore.
+  const pendingOpen = useRef<string | null>(null)
   const heldDismiss = useRef<{ timer: ReturnType<typeof setTimeout>; send: () => void } | null>(null)
   // The founder is whoever the Google Contacts status answers for (founder only on the server); everyone else gets
   // 401/403 and sees no personal controls. The server enforces the rule either way.
@@ -144,8 +148,15 @@ export function PeopleWorkspace() {
   }, [toast])
 
   useEffect(() => {
-    const q = new URLSearchParams(window.location.search).get("tab") as Tab | null
+    const params = new URLSearchParams(window.location.search)
+    const q = params.get("tab") as Tab | null
     if (q && TABS.includes(q)) setTab(q)
+    // Links from elsewhere (the new-inquiry email, a person's history, the old /admin/inbox address):
+    // ?search= fills the search box, ?open= opens that arrival once the inbox has loaded.
+    const search = params.get("search")
+    if (search) setQuery(search)
+    const open = params.get("open")
+    if (open) pendingOpen.current = open
     // Leaving the page sends a held dismissal at once, so the decision is not lost.
     return () => {
       const held = heldDismiss.current
@@ -190,6 +201,17 @@ export function PeopleWorkspace() {
     for (const d of drafts ?? []) if (d.status === "pending" && d.activityId && !m.has(d.activityId)) m.set(d.activityId, d)
     return m
   }, [drafts])
+
+  useEffect(() => {
+    const id = pendingOpen.current
+    if (!id || inbox === null || drafts === null) return
+    pendingOpen.current = null
+    const d = draftFor.get(id)
+    if (d) return setOpenDraft(d)
+    const item = inbox.find((i) => i.activity.id === id)
+    if (item) setOpenActivity(item)
+    else setToast({ type: "success", message: "That inquiry has already been handled. Search finds the person." })
+  }, [inbox, drafts, draftFor])
 
   const loadInbox = useCallback(async () => {
     try {
@@ -455,7 +477,23 @@ export function PeopleWorkspace() {
         {tab === "organizations" && <OrgList rows={shownOrgs} loading={orgs === null} onOpen={setOpenOrg} />}
       </main>
 
-      <ActivityDrawer item={openActivity} busy={busy} founder={founder} onClose={() => setOpenActivity(null)} onTriage={triage} />
+      <ActivityDrawer
+        item={openActivity}
+        busy={busy}
+        founder={founder}
+        onClose={() => setOpenActivity(null)}
+        onTriage={triage}
+        onReplied={(closed) => {
+          setOpenActivity(null)
+          setToast(
+            closed
+              ? { type: "success", message: "Reply sent. The inquiry is saved as a contact and has left the inbox." }
+              : { type: "error", message: "Reply sent, but the inquiry is still in the inbox. Save or Dismiss it." },
+          )
+          void loadInbox()
+        }}
+        onError={(message) => setToast({ type: "error", message })}
+      />
       <DraftDrawer
         item={openDraft}
         onClose={() => setOpenDraft(null)}
@@ -794,22 +832,61 @@ function ActivityDrawer({
   founder,
   onClose,
   onTriage,
+  onReplied,
+  onError,
 }: {
   item: InboxItem | null
   busy: string | null
   founder: boolean
   onClose: () => void
   onTriage: Triage
+  /** After a hand-written reply is sent; `closed` says whether the arrival left the inbox. */
+  onReplied: (closed: boolean) => void
+  onError: (message: string) => void
 }) {
   const a = item?.activity
+  const [replying, setReplying] = useState(false)
+  useEffect(() => setReplying(false), [a?.id])
+  // A website inquiry with no agent draft (the agent is off or stopped, or the founder answers himself) is answered
+  // here, through the same reply route the old /admin/inbox used.
+  const formId = a?.id.startsWith(CONTACT_FORM_PREFIX) && a.contact.email ? a.id.slice(CONTACT_FORM_PREFIX.length) : null
+  const [first, ...rest] = (a?.contact.name ?? "").trim().split(/\s+/)
   return (
     <DetailDrawer
       open={Boolean(item)}
       onClose={onClose}
       title={item?.person?.name || a?.contact.name || a?.contact.email || ""}
       subtitle={a ? `${SOURCE_LABEL[a.source] ?? a.source}${a.channel ? ` · ${a.channel}` : ""} · ${when(a.occurred_at)}` : undefined}
-      footer={item ? <TriageButtons item={item} busy={busy === item.activity.id} founder={founder} onTriage={onTriage} /> : undefined}
+      footer={
+        item ? (
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            {formId ? (
+              <button
+                onClick={() => setReplying(true)}
+                className="inline-flex items-center gap-1.5 rounded-md border border-neutral-200 bg-white px-2.5 py-1.5 text-xs font-medium text-neutral-800 hover:bg-neutral-50"
+              >
+                <Reply className="w-3.5 h-3.5" /> Write reply
+              </button>
+            ) : (
+              <span />
+            )}
+            <TriageButtons item={item} busy={busy === item.activity.id} founder={founder} onTriage={onTriage} />
+          </div>
+        ) : undefined
+      }
     >
+      {formId && a && (
+        <InboxReplyModal
+          open={replying}
+          submission={{ id: formId, firstName: first ?? "", lastName: rest.join(" "), email: a.contact.email!, message: a.body || a.summary, source: a.source }}
+          onClose={() => setReplying(false)}
+          onSent={(_, closed) => {
+            setReplying(false)
+            onReplied(closed)
+          }}
+          onError={onError}
+        />
+      )}
       {a && (
         <div className="space-y-5">
           <dl className="grid grid-cols-2 gap-4">

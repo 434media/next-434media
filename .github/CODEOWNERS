@@ -194,7 +194,6 @@
 /app/api/admin/mailchimp/                    @434media/founder
 /app/api/admin/audiences/                    @434media/founder
 /app/api/admin/contact-forms/*/reply/        @434media/founder
-/app/api/admin/contact-forms/bulk-acknowledge/ @434media/founder
 /app/api/admin/leads/*/send-outreach/        @434media/founder
 /app/api/admin/leads/*/sequence/             @434media/founder
 /app/api/sdoh-impact-report/                 @434media/founder
