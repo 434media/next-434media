@@ -7,6 +7,7 @@ import { DetailDrawer } from "@/components/admin/DetailDrawer"
 import { DraftDrawer, type DraftItem } from "@/components/admin/review/DraftDrawer"
 import { InboxReplyModal } from "@/components/admin/people/InboxReplyModal"
 import { WaitingOnYou } from "@/components/admin/people/WaitingOnYou"
+import { TodayCard } from "@/components/admin/people/TodayCard"
 import { waitingRows } from "@/lib/core-model/waiting"
 import type { Activity, Affiliation, AffiliationRole, AddressBook, CoreRole, InboxItem, LifecycleStage, Organization, Person, Relationship } from "@/types/core-model"
 import { AFFILIATION_ROLES, CORE_ROLES } from "@/types/core-model"
@@ -408,6 +409,9 @@ export function PeopleWorkspace({ view = "records" }: { view?: "todo" | "records
             </p>
           )}
         </div>
+
+        {/* The front door's Today card: founder only (the agents line above is read from a founder-only route). */}
+        {view === "todo" && agents && <TodayCard />}
 
         <div className="flex flex-col sm:flex-row sm:items-center gap-3 mb-4">
           {view === "records" && <div role="tablist" className="flex gap-1 rounded-lg bg-white border border-neutral-200 p-1 w-full sm:w-auto overflow-x-auto">
