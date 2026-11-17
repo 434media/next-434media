@@ -77,6 +77,16 @@ export interface MetaProvider {
   /** pending: published, and Meta is still processing it; check again later. */
   verify(manifest: MetaManifest, destination: MetaDestination, remoteId: string): Promise<{ verified: boolean; pending?: boolean; permalink?: string; blocker?: string; notice?: string }>
 }
+/**
+ * When a completed post went out: the earliest final publication across its destinations, which is when it reached
+ * the platform. A post confirmed or verified late keeps the day it was published, so the ICYMI counts it in its own
+ * week (2026-11-17: a Page video verified days later had been dated the day of the check). Undefined when no final
+ * intent is recorded; the caller then uses the time of completion.
+ */
+export function publishedAtOf(batch: Pick<MetaBatch, "jobs">): string | undefined {
+  const times = Object.values(batch.jobs).map(j => j.finalIntent?.at).filter((t): t is string => typeof t === "string" && Number.isFinite(Date.parse(t)))
+  return times.length ? times.sort()[0] : undefined
+}
 /** A verify result on the job: verified, still with Meta (re-checked within the processing window), or for a person. */
 function applyVerify(j: MetaJob, v: Awaited<ReturnType<MetaProvider["verify"]>>, at: string): void {
   if (v.notice) j.notice = v.notice
