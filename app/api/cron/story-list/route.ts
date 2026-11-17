@@ -43,7 +43,7 @@ export async function GET(request: NextRequest) {
 
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://www.434media.com"
     const mail = storyListEmail(list, { brand: active.profile.name, day: today, createUrl: `${baseUrl}/admin/content`, versionId: active.versionId })
-    const { error } = await getResend().emails.send({ from: sender, to, subject: mail.subject, text: mail.text })
+    const { error } = await getResend().emails.send({ from: sender, to, subject: mail.subject, text: mail.text, html: mail.html })
     const detail = {
       today, kind: list.kind, profile: active.versionId, stories: list.stories.length,
       photoLeads: list.stories.filter(s => "pageUrl" in s.photo).length, hold: list.hold?.slice(0, 300) ?? null,

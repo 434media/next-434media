@@ -1908,9 +1908,10 @@ test("story list: research's candidates, each with its source, why it fits and a
   assert.ok(list.calls.some(c => c.step === "research"), "model calls are reported for the run's cost")
   assert.equal(w.store.jobs.size + w.store.drafts.size, 0, "nothing is drafted"); assert.equal(w.posts.length, 0)
   const mail = storyListEmail(list, { brand: "Invented Brand", day: "2026-11-18", createUrl: "https://example.test/admin/content", versionId: "fixture@v0" })
-  assert.equal(mail.subject, "Invented Brand story list, 2026-11-18: 2 candidates")
-  for (const s of list.stories) { assert.ok(mail.text.includes(s.url)); assert.ok(mail.text.includes(`Why it fits: ${s.why}`)) }
-  assert.match(mail.text, /Photo lead: https:\/\/commons\.wikimedia\.org/); assert.match(mail.text, /Create: https:\/\/example\.test\/admin\/content/)
+  assert.equal(mail.subject, "Invented Brand story list · Wed, Nov 18 · 2 candidates")
+  for (const s of list.stories) { assert.ok(mail.text.includes(s.url)); assert.ok(mail.text.includes(`Why it fits: ${s.why}`)); assert.ok(mail.html.includes(s.url.replace(/&/g, "&amp;"))) }
+  assert.match(mail.html, /Wednesday, November 18/); assert.match(mail.html, /Open Create/); assert.ok(!mail.html.includes("@v") && !mail.text.includes("@v"), "the profile version is not shown")
+  assert.match(mail.text, /Photo lead: https:\/\/commons\.wikimedia\.org/); assert.match(mail.text, /Open Create: https:\/\/example\.test\/admin\/content/)
 })
 
 test("story list: out of time, a story still goes on the list without a photo check; nothing found sends the reason", async () => {
