@@ -175,6 +175,7 @@ test("every queue, switch, pin and exam route runs the founder guard first, and 
   const routes = [
     "app/api/admin/review/route.ts",
     "app/api/admin/review/[id]/route.ts",
+    "app/api/admin/review/waiting/route.ts",
     "app/api/admin/review/[id]/send/route.ts",
     "app/api/admin/agent/controls/route.ts",
     "app/api/admin/agent/skills/pin/route.ts",
@@ -182,11 +183,14 @@ test("every queue, switch, pin and exam route runs the founder guard first, and 
   ]
   for (const r of routes) {
     const src = readFileSync(join(root, r), "utf8")
-    const handlers = [...src.matchAll(/export async function (GET|POST)/g)].length
-    const guarded = [...src.matchAll(/export async function (?:GET|POST)\([^)]*\)\s*\{\n\s*const auth = await requireFounder\(/g)].length
+    const handlers = [...src.matchAll(/export async function (GET|POST|PATCH)/g)].length
+    const guarded = [...src.matchAll(/export async function (?:GET|POST|PATCH)\([^)]*\)\s*\{\n\s*const auth = await requireFounder\(/g)].length
     assert.ok(handlers > 0 && handlers === guarded, `${r}: every handler starts with requireFounder`)
   }
-  const page = readFileSync(join(root, "app/admin/review/page.tsx"), "utf8")
-  assert.match(page, /founderPageAccess\("\/admin\/review"\)/)
+  // The console's page (the Agents page, 2026-11-16) is guarded before it renders; /admin/review is now the
+  // "Waiting on you" view on the People page, whose drafts load from the founder-only routes above.
+  const page = readFileSync(join(root, "app/admin/agents/page.tsx"), "utf8")
+  assert.match(page, /founderPageAccess\("\/admin\/agents"\)/)
   assert.match(page, /forbidden\(\)/)
+  assert.match(readFileSync(join(root, "app/admin/review/page.tsx"), "utf8"), /redirect\("\/admin\/people\?tab=waiting"\)/)
 })

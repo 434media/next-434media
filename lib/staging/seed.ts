@@ -1,9 +1,12 @@
 import { createHash } from "node:crypto"
 import { STAGING_PROJECT_ID } from "../preview-auth"
+import { draftApproval } from "../send-approval"
+import { AGENT_LEDGER_COLLECTION, AGENT_TASKS_COLLECTION, advance, buildEntry, newTask } from "../agent/ledger"
 
 /**
  * Made-up records for the staging store, c434-staging, so a preview's admin has something to show: content posts (one
- * of them a video post), leads, contacts and two roster members. Nothing here is a real person, company or post:
+ * of them a video post), leads, contacts, two roster members, and one website arrival with an agent's reply draft waiting
+ * for a decision, so the People Inbox shows its "Draft ready" drawer. Nothing here is a real person, company or post:
  * every address is on example.com (RFC 2606), every phone a 555 number, and every company invented.
  *
  * Writes go to c434-staging and nowhere else: `writeStagingSeed` refuses any other project before it touches the
@@ -136,7 +139,80 @@ export function buildStagingSeed(opts: { origin: string; now?: Date }): SeedDoc[
     member("seed-member-2", "Drew Sample", "drew@example.com", "intern"),
   ]
 
-  return [...posts, ...leads, ...people, ...team]
+  return [...posts, ...leads, ...people, ...team, ...draftWaiting(iso)]
+}
+
+/**
+ * One made-up website arrival and the agent's reply draft waiting on it: the form, the intake task with its two ledger
+ * entries (created, draft queued) and the pending approval, hashed as the intake run hashes one. Its recipient is on
+ * example.com, outside the send allow-list, so Approve and send on a preview records the decision and is refused at
+ * the send: nothing can go out.
+ */
+function draftWaiting(iso: string): SeedDoc[] {
+  const formId = "seed-form-1"
+  const taskId = "seed-intake-1"
+  const email = "jamie@example.com"
+  const form: SeedDoc = {
+    collection: "contact_forms",
+    id: formId,
+    data: {
+      seed: SEED_MARK,
+      firstName: "Jamie",
+      lastName: "Example",
+      company: "Example Brewing Co",
+      email,
+      phone: "210-555-0142",
+      role: "Marketing Manager",
+      organizationType: "Business",
+      requestType: "Video production",
+      timeline: "Next quarter",
+      budgetRange: "$10,000 to $25,000",
+      referralSource: "Instagram",
+      message: "[Staging] Made-up message. We are opening a second taproom in the spring and want a short launch film and a few social cuts.",
+      source: "434Media",
+      created_at: iso,
+    },
+  }
+  let task = newTask({ id: taskId, property: "434", objective: "intake-reply", workflow: "434-intake-qualification/draft", budgetUsd: 1, lineage: { event: `contact_forms:${formId}` }, now: iso })
+  const a = draftApproval({
+    id: "seed-ap-1",
+    path: "intake_reply",
+    taskId,
+    payload: {
+      from: "434 Media <hello@example.com>",
+      to: [email],
+      subject: "Your launch film for the new taproom",
+      text: "Hi Jamie,\n\n[Staging] A made-up draft reply. Thank you for writing to us about the new taproom. A short launch film with a few social cuts is work we do often, and spring gives us room to plan it well.\n\nCould you share the opening date and where the taproom is? From there we can suggest a shoot day and an outline.\n\nThe 434 Media team",
+    },
+    reviewReason: "[Staging] First reply to a new website arrival; check the routing and the tone.",
+    now: iso,
+  })
+  const entries = []
+  const created = buildEntry(task, { kind: "task_created", actor: "system", refs: { event: `contact_forms:${formId}` } }, iso)
+  task = advance(task, created)
+  entries.push(created)
+  const started = buildEntry(task, { kind: "run_started", actor: "skill:434-intake-qualification" }, iso)
+  task = advance(task, started, "running")
+  entries.push(started)
+  const queued = buildEntry(task, { kind: "draft_queued", actor: "skill:434-intake-qualification", refs: { approval: a.id, event: `contact_forms:${formId}` }, hashes: { draft: a.hash }, outcome: "qualified" }, iso)
+  task = advance(task, queued, "awaiting_review")
+  entries.push(queued)
+  return [
+    form,
+    { collection: AGENT_TASKS_COLLECTION, id: taskId, data: { ...task, seed: SEED_MARK } },
+    ...entries.map((e) => ({ collection: AGENT_LEDGER_COLLECTION, id: e.id, data: { ...e, seed: SEED_MARK } as Record<string, unknown> })),
+    {
+      collection: "crm_send_approvals",
+      id: a.id,
+      data: {
+        ...a,
+        seed: SEED_MARK,
+        routing: { outcome: "qualified" },
+        intake: { policyVersion: "staging", record: "[Staging] A made-up intake record.", nextOwner: "Founder", due: iso.slice(0, 10), returnCondition: "No reply in five business days", model: "anthropic/claude-sonnet-5.5" },
+        arrival: { formId, receivedAt: iso },
+      },
+    },
+  ]
 }
 
 /** The smallest Firestore surface the writer needs, so a test can pass a fake. */

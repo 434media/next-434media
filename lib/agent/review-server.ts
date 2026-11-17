@@ -208,6 +208,11 @@ export async function readWaiting(viewer: Viewer, now = new Date().toISOString()
   return { now, items }
 }
 
+/** One approval as stored, or null. */
+export async function readApproval(approvalId: string, store: AgentDb = db()): Promise<StoredApproval | null> {
+  return (await store.run((tx) => tx.getDoc<StoredApproval>(SEND_APPROVALS_COLLECTION, approvalId))) ?? null
+}
+
 /** The send, through every control in lib/agent/send-email.ts. */
 export async function sendApproval(approvalId: string, store: AgentDb = db()): Promise<SendResult> {
   const { getResend } = await import("../resend")

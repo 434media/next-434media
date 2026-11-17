@@ -229,6 +229,11 @@
 /app/admin/review/                           @434media/founder
 /components/admin/review/                    @434media/founder
 /lib/__tests__/agent-review.test.ts          @434media/founder
+# One work area (2026-11-16): the draft drawer approves and sends from the People Inbox, and the Agents page holds the
+# kill switch, so both take the strictest lane; the test pins the edit re-hash and the close-on-send.
+/app/admin/agents/                           @434media/founder
+/components/admin/agents/                    @434media/founder
+/lib/__tests__/one-work-area.test.ts         @434media/founder
 /lib/__tests__/exam-reports.test.ts          @434media/founder
 /app/api/admin/content/rows/*/               @434media/founder
 # The Instagram read routes hold each brand's Page access token, which can also publish.

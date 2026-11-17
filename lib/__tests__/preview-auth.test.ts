@@ -17,6 +17,8 @@ import {
 } from "../preview-auth"
 import { ownerEmails } from "../auth"
 import { parseSessionCookieWithExpiry, sessionSigningContext, signPayload } from "../session-cookie"
+import { approvalHash, type SendApproval } from "../send-approval"
+import { recipientRefusal } from "../agent/send-email"
 import { SEED_MARK, assertStagingProject, buildStagingSeed, writeStagingSeed, type SeedDb } from "../staging/seed"
 
 const PROD_PROJECT = "made-up-production-project"
@@ -187,7 +189,7 @@ test("the seed writes to c434-staging and refuses every other project before tou
   const counts = await writeStagingSeed(f.db, STAGING_PROJECT_ID, docs)
   assert.equal(f.writes.length, docs.length)
   assert.equal(f.commits(), 1)
-  assert.deepEqual(Object.keys(counts).sort(), ["crm_content_posts", "crm_people", "crm_person_emails", "crm_team_members", "leads"])
+  assert.deepEqual(Object.keys(counts).sort(), ["agent_ledger", "agent_tasks", "contact_forms", "crm_content_posts", "crm_people", "crm_person_emails", "crm_send_approvals", "crm_team_members", "leads"])
 })
 
 test("the seed is made-up data only, marked, warm-sourced, and includes a video post", () => {
@@ -206,6 +208,11 @@ test("the seed is made-up data only, marked, warm-sourced, and includes a video 
   const video = docs.find((d) => d.collection === "crm_content_posts" && (d.data.assets as { kind: string }[]).some((a) => a.kind === "video"))
   assert.ok(video, "a video post")
   assert.equal((video!.data.assets as { url: string }[])[0].url, "https://preview.example.test/hero/hero-720p.mp4")
+  // One reply draft waiting, intact (its hash is the hash of what is stored) and addressed outside the send allow-list.
+  const draft = docs.find((d) => d.collection === "crm_send_approvals")!
+  assert.equal(draft.data.hash, approvalHash(draft.data as unknown as SendApproval))
+  assert.equal(recipientRefusal((draft.data as unknown as SendApproval).payload.to), "a recipient is outside the allow-list")
+  assert.equal(docs.find((d) => d.collection === "agent_tasks")!.data.state, "awaiting_review")
   const roles = docs.filter((d) => d.collection === "crm_team_members").map((d) => d.data.role)
   assert.ok(!roles.includes("crm_super_admin") && !roles.includes("full_admin"), "seeded roster members hold narrow roles only")
 })
