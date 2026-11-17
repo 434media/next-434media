@@ -210,6 +210,7 @@
 /app/api/owned-meta/                         @434media/founder
 /app/api/admin/owned-meta/                   @434media/founder
 /app/api/admin/crm/content-posts/*/publish/  @434media/founder
+/app/api/cron/content-exceptions/            @434media/founder
 /app/api/admin/crm/content-posts/*/owned-meta/ @434media/founder
 # Sends and approvals for every path, the agent ledger and the kill switch (V1 item 4, the proof slice).
 /lib/send-approval.ts                        @434media/founder
