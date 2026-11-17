@@ -158,6 +158,7 @@
 /lib/mailchimp-*.ts                          @434media/founder
 /lib/newsletter-subscribe.ts                 @434media/founder
 /lib/firestore-suppression.ts                @434media/founder
+/lib/firestore-mailchimp-push-state.ts       @434media/founder
 /lib/core-model/consent.ts                   @434media/founder
 /lib/core-model/cold-gate.ts                 @434media/founder
 /lib/core-model/service.ts                   @434media/founder

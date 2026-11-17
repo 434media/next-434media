@@ -1,13 +1,22 @@
 import { getDefaultAudienceId } from "./mailchimp-config"
 import { getEmailSignups } from "./firestore-email-signups"
 import { getEventRegistrations } from "./firestore-event-registrations"
-import { pushMembersToMailchimp, type MailchimpPushMember } from "./mailchimp-analytics"
+import { pushMembersToMailchimp } from "./mailchimp-analytics"
 import {
   mailchimpIntentForEmailSignup,
   mailchimpIntentForEventRegistration,
   type MailchimpIntent,
 } from "./mailchimp-intent"
 import { getSuppressedEmails } from "./firestore-suppression"
+import { readMailchimpPushState, writeMailchimpPushState } from "./firestore-mailchimp-push-state"
+import {
+  PUSH_BUDGET_MS,
+  drainPending,
+  isFullPassDue,
+  nextSentSet,
+  pendingMembers,
+  type PlannedMember,
+} from "./mailchimp-push-plan"
 
 // Phase 2 of the alignment plan — the Firestore → Mailchimp auto-sync engine.
 //
@@ -16,15 +25,14 @@ import { getSuppressedEmails } from "./firestore-suppression"
 // audience. The opposite direction from the daily Mailchimp → Firestore
 // `mailchimp-sync` cron; both run independently.
 //
-// Stateless and idempotent: pushMembersToMailchimp uses update_existing +
-// status_if_new, so re-upserting never changes an existing member's status
-// (no resurrection of unsubscribed/cleaned) — only brand-new emails get
-// `subscribed`. Tags refresh harmlessly each run.
-
-interface SyncGroup {
-  tags: string[]
-  members: MailchimpPushMember[]
-}
+// Idempotent: pushMembersToMailchimp uses update_existing + status_if_new, so
+// re-upserting never changes an existing member's status (no resurrection of
+// unsubscribed/cleaned) — only brand-new emails get `subscribed`.
+//
+// Incremental (founder, 2026-11-17): each run sends only members that are new
+// or changed since the last successful push, and once a day every member again,
+// within a time budget (lib/mailchimp-push-plan.ts). Pushing the whole list
+// every hour had outgrown the function's time limit.
 
 export interface AutoSyncResult {
   dryRun: boolean
@@ -42,23 +50,31 @@ export interface AutoSyncResult {
   byTag: Record<string, number>
   /** A few example skips with reasons, for dry-run transparency. */
   sampleSkips: Array<{ email: string; reason: string }>
-  /** Present only on a live (non-dry-run) pass. */
-  push?: { attempted: number; newMembers: number; updatedMembers: number; errors: number }
+  /** This run started the daily full pass (every member is pending again). */
+  fullPass: boolean
+  /** Members new or changed since the last successful push: what this run sends. */
+  pending: number
+  /** Present only on a live (non-dry-run) pass. `deferred` carry over to the next run. */
+  push?: { attempted: number; newMembers: number; updatedMembers: number; errors: number; deferred: number }
 }
 
 /**
  * Run one reconciliation pass. DRY-RUN BY DEFAULT — computes and returns the
  * full plan without writing to Mailchimp. Pass { dryRun: false } to execute.
  */
-export async function runAutoSync(opts: { dryRun?: boolean } = {}): Promise<AutoSyncResult> {
+export async function runAutoSync(
+  opts: { dryRun?: boolean; startedAt?: Date } = {},
+): Promise<AutoSyncResult> {
   const dryRun = opts.dryRun ?? true
+  const startedAt = opts.startedAt ?? new Date()
   const audienceId = getDefaultAudienceId()
   if (!audienceId) throw new Error("No Mailchimp audience configured")
 
-  const [signups, regs, suppressed] = await Promise.all([
+  const [signups, regs, suppressed, state] = await Promise.all([
     getEmailSignups(),
     getEventRegistrations(),
     getSuppressedEmails(),
+    readMailchimpPushState(),
   ])
 
   const intents: MailchimpIntent[] = [
@@ -96,18 +112,24 @@ export async function runAutoSync(opts: { dryRun?: boolean } = {}): Promise<Auto
     }
   }
 
-  // Group by identical tag-set. pushMembersToMailchimp applies one tags[] per
-  // call, so each distinct tag-set is its own batch.
-  const groups = new Map<string, SyncGroup>()
+  // Group by identical tag-set, for the report. The push itself groups only
+  // the pending members (lib/mailchimp-push-plan.ts).
+  const groups = new Map<string, { tags: string[]; count: number }>()
   const byTag: Record<string, number> = {}
+  const planned: PlannedMember[] = []
   for (const m of merged.values()) {
     const tags = [...m.tags].sort()
     for (const t of tags) byTag[t] = (byTag[t] ?? 0) + 1
     const key = tags.join("|")
-    const g = groups.get(key) ?? { tags, members: [] }
-    g.members.push({ email: m.email, firstName: m.firstName, lastName: m.lastName })
+    const g = groups.get(key) ?? { tags, count: 0 }
+    g.count++
     groups.set(key, g)
+    planned.push({ email: m.email, firstName: m.firstName, lastName: m.lastName, tags })
   }
+
+  const fullPass = isFullPassDue(state.lastFullPassAt, startedAt)
+  const remembered = fullPass ? new Set<string>() : state.sent
+  const pending = pendingMembers(planned, remembered)
 
   const result: AutoSyncResult = {
     dryRun,
@@ -117,29 +139,30 @@ export async function runAutoSync(opts: { dryRun?: boolean } = {}): Promise<Auto
     skipped: skippedCount,
     excludedSuppressed,
     uniqueContacts: merged.size,
-    groups: [...groups.values()]
-      .map((g) => ({ tags: g.tags, count: g.members.length }))
-      .sort((a, b) => b.count - a.count),
+    groups: [...groups.values()].sort((a, b) => b.count - a.count),
     byTag,
     sampleSkips: intents
       .filter((i) => !i.include)
       .slice(0, 10)
       .map((i) => ({ email: i.email || "(blank)", reason: i.reason })),
+    fullPass,
+    pending: pending.length,
   }
 
   if (!dryRun) {
-    let newMembers = 0
-    let updatedMembers = 0
-    let errors = 0
-    let attempted = 0
-    for (const g of groups.values()) {
-      attempted += g.members.length
-      const r = await pushMembersToMailchimp(audienceId, g.members, "subscribed", g.tags)
-      newMembers += r.newMembers
-      updatedMembers += r.updatedMembers
-      errors += r.errors.length
-    }
-    result.push = { attempted, newMembers, updatedMembers, errors }
+    const drained = await drainPending(
+      pending,
+      (members, tags) => pushMembersToMailchimp(audienceId, members, "subscribed", tags),
+      { deadline: startedAt.getTime() + PUSH_BUDGET_MS },
+    )
+    await writeMailchimpPushState({
+      sent: nextSentSet(planned, remembered, drained.accepted),
+      lastFullPassAt: fullPass ? startedAt.toISOString() : state.lastFullPassAt!,
+      updatedAt: new Date().toISOString(),
+      pending: drained.deferred + drained.errors,
+    })
+    const { attempted, newMembers, updatedMembers, errors, deferred } = drained
+    result.push = { attempted, newMembers, updatedMembers, errors, deferred }
   }
 
   return result
