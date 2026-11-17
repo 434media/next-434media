@@ -45,6 +45,11 @@
 /lib/auth.ts                                 @434media/founder
 /lib/session-cookie.ts                       @434media/founder
 /lib/firebase-signin.ts                      @434media/founder
+/lib/preview-auth.ts                         @434media/founder
+/lib/__tests__/preview-auth.test.ts          @434media/founder
+/lib/staging/                                @434media/founder
+/app/api/admin/staging/                      @434media/founder
+/scripts/staging/                            @434media/founder
 /lib/founder-guard.ts                        @434media/founder
 /lib/__tests__/admin-owners.test.ts          @434media/founder
 /lib/__tests__/firebase-signin.test.ts       @434media/founder

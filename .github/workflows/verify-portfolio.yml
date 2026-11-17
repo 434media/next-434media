@@ -210,6 +210,10 @@ jobs:
       - run: tsx --test lib/__tests__/quickbooks.test.ts
       # Admin email sign-in (security log ADM-1): verified email required; workspace addresses use Google in production.
       - run: tsx --test lib/__tests__/firebase-signin.test.ts
+      # Preview sign-in against the staging store: production's config, owners and session signature are unchanged, a
+      # preview signs in against c434-staging only (no production token, Google sign-in, owner or cookie), and the
+      # staging seed writes made-up data to c434-staging only.
+      - run: tsx --test lib/__tests__/preview-auth.test.ts
       # Travel itineraries: only super admins and full admins read them as staff; crm_only and intern need a
       # travel_access record for the page (security log PSM-2).
       - run: tsx --test lib/__tests__/travel-staff-access.test.ts

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
+import { googleSignInAllowed } from '@/lib/preview-auth'
 import { setSession, isVerifiedWorkspaceGoogleAccount, authorizeAdminSignIn, workspaceDomain } from '@/lib/auth'
 
 interface GoogleTokenResponse {
@@ -21,6 +22,12 @@ interface GoogleUserInfo {
 }
 
 export async function GET(request: NextRequest) {
+  // A preview signs in only with a staging test account (lib/preview-auth.ts): Google sign-in would bring a production
+  // Google identity into it, and its redirect is registered for production's hosts only.
+  if (!googleSignInAllowed()) {
+    return NextResponse.redirect(new URL('/admin?error=google_not_on_preview', request.url))
+  }
+
   const searchParams = request.nextUrl.searchParams
   const code = searchParams.get('code')
   const state = searchParams.get('state')

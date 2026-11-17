@@ -1,4 +1,5 @@
 import { createHmac, timingSafeEqual } from 'node:crypto'
+import { deployEnv } from './preview-auth'
 
 // The admin session cookie's codec: signing and verifying, and nothing that reads Firestore, so the proxy can check a
 // session without bundling firebase-admin. lib/auth.ts issues and reads sessions through it.
@@ -44,8 +45,19 @@ function getSessionSecret(): string {
   return secret
 }
 
-export function signPayload(payload: string): string {
-  return createHmac('sha256', getSessionSecret()).update(payload).digest('base64url')
+/**
+ * What a session's signature is bound to, besides its payload. Production (and an unset VERCEL_ENV, as everywhere in
+ * lib/preview-auth.ts) signs the payload alone, exactly as before, so production's cookies are unchanged. A preview or
+ * development deployment prefixes its environment's name, so a cookie it signs never verifies on production, even if
+ * the two share ADMIN_SESSION_SECRET, and a production cookie never verifies on a preview.
+ */
+export function sessionSigningContext(env: Record<string, string | undefined> = process.env): string {
+  const de = deployEnv(env)
+  return de === 'production' ? '' : `434-admin-session:${de}\n`
+}
+
+export function signPayload(payload: string, env: Record<string, string | undefined> = process.env): string {
+  return createHmac('sha256', getSessionSecret()).update(sessionSigningContext(env) + payload).digest('base64url')
 }
 
 /** Constant-time compare that can't throw on length mismatch. */
