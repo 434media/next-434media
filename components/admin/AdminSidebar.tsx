@@ -26,6 +26,7 @@ import {
   Shapes,
   Globe,
   LayoutDashboard,
+  ListTodo,
   Palette,
   Landmark,
   Bot,
@@ -129,14 +130,23 @@ interface SidebarSection {
   items: SidebarEntry[]
 }
 
-// Pinned above the sections — the shared home for every role.
+// Pinned above the sections: To do first (the first screen after sign-in; founder, 2026-11-17), then Overview.
+const TODO_ITEM: SidebarLink = {
+  id: "todo",
+  label: "To do",
+  icon: ListTodo,
+  href: "/admin/todo",
+  matchPrefix: "/admin/todo",
+  description: "Everything waiting on you: drafts to approve and arrivals to decide",
+  roles: ["full_admin", "crm_only", "intern"],
+}
+
 const OVERVIEW_ITEM: SidebarLink = {
   id: "overview",
   label: "Overview",
   icon: LayoutDashboard,
-  href: "/admin",
-  matchPrefix: "/admin",
-  exact: true,
+  href: "/admin/overview",
+  matchPrefix: "/admin/overview",
   roles: ["crm_super_admin", "full_admin", "crm_only", "intern"],
 }
 
@@ -405,6 +415,7 @@ export function AdminSidebar({
   const signpostLinks = squad ? [...(SQUAD_SIGNPOSTS[squad] ?? []), ...SIGNPOST_COMMON] : []
 
   const overviewVisible = canSee(OVERVIEW_ITEM)
+  const todoVisible = canSee(TODO_ITEM)
   // Filter each section's items by role, then drop any section left empty.
   const sections = SIDEBAR_SECTIONS.map((s) => ({
     ...s,
@@ -543,7 +554,12 @@ export function AdminSidebar({
 
       {/* Items */}
       <nav className="flex-1 overflow-y-auto py-2 px-2">
-        {overviewVisible && <div className="space-y-0.5">{renderEntry(OVERVIEW_ITEM)}</div>}
+        {(todoVisible || overviewVisible) && (
+          <div className="space-y-0.5">
+            {todoVisible && renderEntry(TODO_ITEM)}
+            {overviewVisible && renderEntry(OVERVIEW_ITEM)}
+          </div>
+        )}
 
         {/* Squad signpost — where this person works. Additive: every section
             below still renders in full. */}

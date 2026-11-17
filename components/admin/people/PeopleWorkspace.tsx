@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import Link from "next/link"
-import { Building2, CheckCircle2, AlertCircle, Inbox, Search, UserPlus, Users, Flag, Bookmark, X, Lock, Briefcase, RefreshCw, Contact, Pencil, Plus, ClipboardCheck, Power, FileText, Reply } from "lucide-react"
+import { Building2, CheckCircle2, AlertCircle, Inbox, Search, UserPlus, Users, Flag, Bookmark, X, Lock, Briefcase, RefreshCw, Contact, Pencil, Plus, Power, FileText, Reply } from "lucide-react"
 import { DetailDrawer } from "@/components/admin/DetailDrawer"
 import { DraftDrawer, type DraftItem } from "@/components/admin/review/DraftDrawer"
 import { InboxReplyModal } from "@/components/admin/people/InboxReplyModal"
@@ -12,7 +12,8 @@ import type { Activity, Affiliation, AffiliationRole, AddressBook, CoreRole, Inb
 import { AFFILIATION_ROLES, CORE_ROLES } from "@/types/core-model"
 
 type Tab = "waiting" | "inbox" | "people" | "organizations"
-const TABS: Tab[] = ["waiting", "inbox", "people", "organizations"]
+/** The People page's tabs. "waiting" is the To do page (/admin/todo), the same workspace shown as one list. */
+const TABS: Tab[] = ["inbox", "people", "organizations"]
 /** `undo`, when present, puts an Undo button on the toast and keeps it up a little longer. */
 type Toast = { type: "success" | "error"; message: string; undo?: () => void }
 /** How long the triage toast offers Undo. The server allows a little more (lib/core-model/service.ts). */
@@ -99,9 +100,13 @@ async function api<T>(url: string, init?: RequestInit): Promise<T> {
   return json as T
 }
 
-export function PeopleWorkspace() {
-  // "Waiting on you" is first (one work area, founder 2026-11-16); ?tab= picks another (/admin/review lands here).
-  const [tab, setTab] = useState<Tab>("waiting")
+/**
+ * `todo`: the To do page, everything waiting on the viewer (founder, 2026-11-17: its own page, first in the sidebar).
+ * `records`: the People page, the Inbox, People and Organizations. One workspace, so a draft or an arrival opens and is
+ * decided the same way on both.
+ */
+export function PeopleWorkspace({ view = "records" }: { view?: "todo" | "records" }) {
+  const [tab, setTab] = useState<Tab>(view === "todo" ? "waiting" : "inbox")
   const [toast, setToast] = useState<Toast | null>(null)
   const [inbox, setInbox] = useState<InboxItem[] | null>(null)
   const [people, setPeople] = useState<PersonRow[] | null>(null)
@@ -150,7 +155,8 @@ export function PeopleWorkspace() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
     const q = params.get("tab") as Tab | null
-    if (q && TABS.includes(q)) setTab(q)
+    if (view === "records" && q === "waiting") return void window.location.replace("/admin/todo")
+    if (view === "records" && q && TABS.includes(q)) setTab(q)
     // Links from elsewhere (the new-inquiry email, a person's history, the old /admin/inbox address):
     // ?search= fills the search box, ?open= opens that arrival once the inbox has loaded.
     const search = params.get("search")
@@ -165,7 +171,7 @@ export function PeopleWorkspace() {
         held.send()
       }
     }
-  }, [])
+  }, [view])
 
   const loadDrafts = useCallback(async () => {
     try {
@@ -176,7 +182,7 @@ export function PeopleWorkspace() {
         return
       }
       const body = await res.json().catch(() => ({}))
-      if (!res.ok) throw new Error(body.error ?? "Waiting on you could not be read")
+      if (!res.ok) throw new Error(body.error ?? "To do could not be read")
       setDrafts(body.items ?? [])
     } catch (e) {
       setDrafts([])
@@ -349,7 +355,6 @@ export function PeopleWorkspace() {
   // The combined count: one per arrival, an arrival with a draft counted once (lib/core-model/waiting.ts).
   const waitingCount = drafts && inbox ? waitingRows(drafts, inbox).length : undefined
   const tabs: Array<{ id: Tab; label: string; icon: typeof Inbox; count?: number }> = [
-    { id: "waiting", label: "Waiting on you", icon: ClipboardCheck, count: waitingCount },
     { id: "inbox", label: "Inbox", icon: Inbox, count: inbox?.length },
     { id: "people", label: "People", icon: Users, count: people?.length },
     { id: "organizations", label: "Organizations", icon: Building2, count: orgs?.length },
@@ -388,9 +393,11 @@ export function PeopleWorkspace() {
 
       <main className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
         <div className="mb-5">
-          <h1 className="text-lg font-semibold text-neutral-900">People</h1>
+          <h1 className="text-lg font-semibold text-neutral-900">{view === "todo" ? "To do" : "People"}</h1>
           <p className="mt-1 text-sm text-neutral-500">
-            One record per person and per company. Every way in lands in the Inbox until someone decides what it is.
+            {view === "todo"
+              ? `Everything waiting on you: drafts to approve and arrivals to decide${typeof waitingCount === "number" ? ` (${waitingCount})` : ""}.`
+              : "One record per person and per company. Every way in lands in the Inbox until someone decides what it is."}
           </p>
           {agents && (
             <p className="mt-2 flex flex-wrap items-center gap-1.5 text-xs text-neutral-500">
@@ -403,7 +410,7 @@ export function PeopleWorkspace() {
         </div>
 
         <div className="flex flex-col sm:flex-row sm:items-center gap-3 mb-4">
-          <div role="tablist" className="flex gap-1 rounded-lg bg-white border border-neutral-200 p-1 w-full sm:w-auto overflow-x-auto">
+          {view === "records" && <div role="tablist" className="flex gap-1 rounded-lg bg-white border border-neutral-200 p-1 w-full sm:w-auto overflow-x-auto">
             {tabs.map((t) => (
               <button
                 key={t.id}
@@ -419,7 +426,7 @@ export function PeopleWorkspace() {
                 {typeof t.count === "number" && <span className={tab === t.id ? "text-neutral-300" : "text-neutral-400"}>{t.count}</span>}
               </button>
             ))}
-          </div>
+          </div>}
           <div className="relative flex-1">
             <Search className="w-4 h-4 text-neutral-400 absolute left-3 top-1/2 -translate-y-1/2" />
             <input

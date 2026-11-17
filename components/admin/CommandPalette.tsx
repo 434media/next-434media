@@ -8,6 +8,7 @@ import {
   Search,
   Rocket,
   Inbox,
+  ListTodo,
   BarChart3,
   Rss,
   PencilLine,
@@ -125,6 +126,15 @@ const STATIC_ITEMS: CommandItem[] = [
     section: "Navigate",
     search: "inbox contact forms inquiries reply messages",
     run: (router) => router.push("/admin/people?tab=inbox"),
+  },
+  {
+    id: "nav-todo",
+    label: "To do",
+    hint: "Everything waiting on you: drafts to approve and arrivals to decide",
+    icon: ListTodo,
+    section: "Navigate",
+    search: "to do todo waiting approvals drafts review queue",
+    run: (router) => router.push("/admin/todo"),
   },
   {
     id: "nav-people",

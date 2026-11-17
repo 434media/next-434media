@@ -2,7 +2,7 @@
 
 // The Agents page: the kill switch, intake's mode and send flag, the pin, the exams and the console (V1 item 4; moved
 // here from /admin/review on the founder's one-work-area decision, 2026-11-16; Display Standard §3.15, Provisional).
-// Drafts are decided in "Waiting on you" on the People page, not here. Signal red
+// Drafts are decided in To do (/admin/todo), not here. Signal red
 // marks state only (stopped, failures, checks needed); the destructive actions, Stop all and Reject, are neutral and
 // each asks to confirm (coordinator 18, on the founder's delegation, 2026-11-14). Founder only: the page and every route it calls run the founder guard on the server.
 // Nothing here sends on its own: a reply goes only when the founder presses Approve & send, and every control in
@@ -168,7 +168,7 @@ export function AgentsConsole() {
             <h1 className="text-lg font-semibold text-neutral-900">Agents</h1>
             <p className="mt-1 text-sm text-neutral-500">
               The switch, the modes, the pinned skill and what the agents cost. Drafts are decided in{" "}
-              <Link href="/admin/people?tab=waiting" className="font-medium text-neutral-800 underline underline-offset-2">Waiting on you</Link>. Visible to the founder only.
+              <Link href="/admin/todo" className="font-medium text-neutral-800 underline underline-offset-2">To do</Link>. Visible to the founder only.
             </p>
           </div>
           <button onClick={() => void load()} className="inline-flex items-center gap-1.5 rounded-lg border border-neutral-200 bg-white px-3 py-2 text-xs font-medium text-neutral-700 hover:bg-neutral-50">
@@ -300,7 +300,7 @@ function ConsoleView({ data, exams, onLoadExams, onOpenExam }: { data: Console; 
         <Rows rows={waiting.map((i) => [i.subject, `${duration(i.waitingMs)}${i.late ? " · late" : ""}`])} empty="Nothing waiting." />
         {waiting.length > 0 && (
           <p className="mt-2 text-xs text-neutral-500">
-            Decide them in <Link href="/admin/people?tab=waiting" className="font-medium text-neutral-800 underline underline-offset-2">Waiting on you</Link>. Past 24 hours, the watchdog emails you.
+            Decide them in <Link href="/admin/todo" className="font-medium text-neutral-800 underline underline-offset-2">To do</Link>. Past 24 hours, the watchdog emails you.
           </p>
         )}
       </Card>
