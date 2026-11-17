@@ -192,5 +192,5 @@ test("every queue, switch, pin and exam route runs the founder guard first, and 
   const page = readFileSync(join(root, "app/admin/agents/page.tsx"), "utf8")
   assert.match(page, /founderPageAccess\("\/admin\/agents"\)/)
   assert.match(page, /forbidden\(\)/)
-  assert.match(readFileSync(join(root, "app/admin/review/page.tsx"), "utf8"), /redirect\("\/admin\/people\?tab=waiting"\)/)
+  assert.match(readFileSync(join(root, "app/admin/review/page.tsx"), "utf8"), /redirect\("\/admin\/todo"\)/)
 })
