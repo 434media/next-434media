@@ -25,6 +25,10 @@
       "schedule": "0 22 * * *"
     },
     {
+      "path": "/api/cron/story-list",
+      "schedule": "0 12 * * 1-5"
+    },
+    {
       "path": "/api/cron/stale-opportunity-alert",
       "schedule": "0 12 * * 1"
     },

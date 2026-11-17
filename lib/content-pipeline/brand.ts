@@ -1,5 +1,6 @@
 import { AsyncLocalStorage } from "node:async_hooks"
 import type { BrandProfile } from "./profile"
+import type { ProfileExamples } from "./profile-store"
 
 /**
  * The brand profile the engine runs. Profiles live in Firestore (lib/firestore-brand-profiles.ts, `brand_profiles`),
@@ -15,6 +16,8 @@ export interface ActiveProfile {
   profile: BrandProfile
   /** The published version's id ("milcity@v1"), stamped on every post written under it (profile_version_id). */
   versionId: string
+  /** The same version's approved and rejected examples; the writer is shown approved ones of its series (examples.ts). */
+  examples?: ProfileExamples
 }
 
 const scope = new AsyncLocalStorage<ActiveProfile>()

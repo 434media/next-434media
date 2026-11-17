@@ -132,3 +132,21 @@ export async function claimCronSkipRecord(nowMs: number, everyMs: number): Promi
     return true
   })
 }
+
+/**
+ * The morning story list's memory (lib/content-pipeline/story-list.ts): the day it last sent, and the stories it sent
+ * in its last lists (at most STORY_LIST_KEEP), so a story is not suggested again the next morning and a second firing
+ * on the same day sends nothing. One document per brand, `story_list_<brand>`.
+ */
+export const STORY_LIST_KEEP = 30
+export interface StoryListSent { lastDay: string | null; items: { title: string; url: string; day: string }[] }
+const storyListDoc = (brand: string) => `story_list_${brand.replace(/[^a-z0-9-]/g, "")}`
+export async function getStoryListSent(brand: string): Promise<StoryListSent> {
+  const d = (await getDb().collection(CONFIG).doc(storyListDoc(brand)).get()).data()
+  const items = Array.isArray(d?.items) ? d.items.filter((i: unknown): i is StoryListSent["items"][number] => !!i && typeof (i as { url?: unknown }).url === "string" && typeof (i as { title?: unknown }).title === "string") : []
+  return { lastDay: typeof d?.lastDay === "string" ? d.lastDay : null, items }
+}
+export async function saveStoryListSent(brand: string, day: string, sent: { title: string; url: string }[], before: StoryListSent): Promise<void> {
+  const items = [...sent.map(s => ({ title: s.title, url: s.url, day })), ...before.items].slice(0, STORY_LIST_KEEP)
+  await getDb().collection(CONFIG).doc(storyListDoc(brand)).set(clean({ lastDay: day, items, updatedAt: new Date().toISOString() }))
+}

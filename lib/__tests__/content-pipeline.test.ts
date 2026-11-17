@@ -24,6 +24,10 @@ import { candidateFields, cardSubject, cutOffWords } from "../content-pipeline/s
 import { candidateProblems, copyProblems, MAX_CANDIDATE_BATCHES } from "../content-pipeline/worker"
 import { sourcedFacts, MIN_FACTS, placeholderLines, unsourcedClaims } from "../content-pipeline/worker"
 import { factsBrief, FACTS_RULE } from "../content-pipeline/model"
+import { examplesFor, examplesBrief, MAX_EXAMPLES } from "../content-pipeline/examples"
+import { buildStoryList, storyListEmail, listKind } from "../content-pipeline/story-list"
+import { activeProfile, withProfile } from "../content-pipeline/brand"
+import type { ProfileExamples } from "../content-pipeline/profile-store"
 
 loadPublishedProfileFirst()
 // The profile's own values, so the engine tests pass on any valid profile (the fixture, or a real one).
@@ -1855,4 +1859,65 @@ test("coordinator review of #210: sentences aren't placeholders, places match by
   assert.deepEqual(unsourcedClaims(["Traction: Tested Fort Bragg, NC", "📍Skydio San Mateo, CA"], source), [])
   assert.deepEqual(unsourcedClaims(["Traction: Tested Fort Hood, TX"], source), ["Fort Hood, TX"])
   assert.equal(meaningful("unused"), undefined); assert.equal(meaningful("Unused."), undefined)
+})
+
+// ── the writer reads approved examples of its series; the morning story list (V1 item 0, 2026-11-17) ──
+
+const EXAMPLES: ProfileExamples = {
+  approved: [
+    { text: "Invented news card one.", series: "news", at: "2026-11-01T00:00:00Z" },
+    { text: "Invented explainer card.", series: "dt101", at: "2026-11-09T00:00:00Z" },
+    { text: "Invented news card two.", series: "news", at: "2026-11-05T00:00:00Z", note: "Short, active headline." },
+    { text: "Untagged A.", at: "2026-10-01T00:00:00Z" },
+    { text: "Untagged B.", at: "2026-10-02T00:00:00Z" },
+    { text: "Untagged C." },
+    { text: "x".repeat(4000), series: "news", at: "2026-10-20T00:00:00Z" },
+  ],
+  rejected: [{ text: "A rejected card." }],
+}
+
+test("examples: the writer is shown approved examples of its own series first, newest first, then untagged ones, at most five", () => {
+  const news = examplesFor(EXAMPLES, "news")
+  assert.equal(news.length, MAX_EXAMPLES)
+  assert.deepEqual(news.map(e => e.text.slice(0, 22)), ["Invented news card two", "Invented news card one", "x".repeat(22), "Untagged B.", "Untagged A."])
+  assert.ok(!news.some(e => e.series === "dt101"), "an example of another series is never shown")
+  assert.deepEqual(examplesFor(EXAMPLES, "dt101").map(e => e.text), ["Invented explainer card.", "Untagged B.", "Untagged A.", "Untagged C."])
+  assert.deepEqual(examplesFor(undefined, "news"), [])
+  assert.deepEqual(examplesFor({ approved: [], rejected: EXAMPLES.rejected }, "news"), [], "rejected examples are not shown")
+})
+
+test("examples: the brief is bounded and empty without examples; the published version's examples are in scope", () => {
+  const series = Object.keys(publishedProfile.milcity.series)[0]
+  assert.equal(examplesBrief(null, series), "")
+  const brief = examplesBrief(EXAMPLES, "news")
+  assert.match(brief, /APPROVED EXAMPLES/); assert.match(brief, /Example 5:/); assert.doesNotMatch(brief, /Example 6:/)
+  assert.match(brief, /Why it was approved: Short, active headline\./)
+  assert.ok(!brief.includes("x".repeat(1_501)), "each example is cut to a bounded length")
+  assert.ok(brief.length < 5 * 2_000, `bounded prompt (${brief.length} characters)`)
+  withProfile({ ...publishedProfile.active, examples: EXAMPLES }, () => assert.equal(examplesBrief(activeProfile().examples, "news"), brief))
+})
+
+test("story list: research's candidates, each with its source, why it fits and a photo lead; stories already sent are refused", async () => {
+  const w = world({ ai: { research: async () => ({ candidates: [1, 2, 3].map(n => ({ title: `Story ${n}`, primaryUrl: `https://www.army.mil/article/${n}`, publisher: "U.S. Army", why: `Fits the brand, reason ${n}.` })) }) } })
+  const kind = listKind()
+  assert.ok(kind && publishedProfile.milcity.requestKinds.some(k => k.kind === kind))
+  const list = await buildStoryList(w.deps, { titles: [], urls: ["https://www.army.mil/article/2"] }, 1e9)
+  assert.deepEqual(list.stories.map(s => s.url), ["https://www.army.mil/article/1", "https://www.army.mil/article/3"])
+  assert.deepEqual(list.stories.map(s => s.why), ["Fits the brand, reason 1.", "Fits the brand, reason 3."])
+  assert.ok(list.stories.every(s => "pageUrl" in s.photo && s.photo.pageUrl === CANDIDATE.pageUrl), "photo first found each one's photo")
+  assert.ok(list.calls.some(c => c.step === "research"), "model calls are reported for the run's cost")
+  assert.equal(w.store.jobs.size + w.store.drafts.size, 0, "nothing is drafted"); assert.equal(w.posts.length, 0)
+  const mail = storyListEmail(list, { brand: "Invented Brand", day: "2026-11-18", createUrl: "https://example.test/admin/content", versionId: "fixture@v0" })
+  assert.equal(mail.subject, "Invented Brand story list, 2026-11-18: 2 candidates")
+  for (const s of list.stories) { assert.ok(mail.text.includes(s.url)); assert.ok(mail.text.includes(`Why it fits: ${s.why}`)) }
+  assert.match(mail.text, /Photo lead: https:\/\/commons\.wikimedia\.org/); assert.match(mail.text, /Create: https:\/\/example\.test\/admin\/content/)
+})
+
+test("story list: out of time, a story still goes on the list without a photo check; nothing found sends the reason", async () => {
+  const w = world()
+  const list = await buildStoryList(w.deps, { titles: [], urls: [] }, 0)
+  assert.ok(list.stories.length >= 1)
+  assert.ok(list.stories.every(s => "none" in s.photo && /out of time/.test(s.photo.none)))
+  const empty = storyListEmail({ stories: [], hold: "no candidates found" }, { brand: "Invented Brand", day: "2026-11-18", createUrl: "https://example.test/admin/content", versionId: "fixture@v0" })
+  assert.match(empty.subject, /no candidates this morning/); assert.match(empty.text, /Why: no candidates found/)
 })

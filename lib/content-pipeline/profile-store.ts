@@ -20,7 +20,8 @@ export type BrandType = typeof BRAND_TYPES[number]
 export const PLATFORMS = ["instagram", "facebook"] as const
 export type ProfilePlatform = typeof PLATFORMS[number]
 
-export interface ProfileExample { text: string; note?: string; url?: string; at?: string }
+/** series: the series key the example is of (news, dt101, …); the writer is shown approved examples of the series it writes (examples.ts). */
+export interface ProfileExample { text: string; note?: string; url?: string; at?: string; series?: string }
 export interface ProfileExamples { approved: ProfileExample[]; rejected: ProfileExample[] }
 export interface ProfileIdentity {
   /** Where the brand's names, definitions and mottos come from; they are read there and never copied here. */
@@ -96,13 +97,13 @@ export function templateMap(profile: BrandProfile): TemplateMap {
 const isObj = (v: unknown): v is Record<string, unknown> => !!v && typeof v === "object" && !Array.isArray(v)
 function exampleProblems(v: unknown): string[] {
   if (!isObj(v) || !Array.isArray(v.approved) || !Array.isArray(v.rejected)) return ["examples: {approved: [], rejected: []}"]
-  const ok = (e: unknown) => isObj(e) && typeof e.text === "string" && e.text.trim() !== "" && e.text.length <= 5000 && Object.keys(e).every(k => ["text", "note", "url", "at"].includes(k))
-    && (e.note === undefined || (typeof e.note === "string" && e.note.length <= 1000)) && (e.url === undefined || (typeof e.url === "string" && /^https:\/\//.test(e.url))) && (e.at === undefined || typeof e.at === "string")
+  const ok = (e: unknown) => isObj(e) && typeof e.text === "string" && e.text.trim() !== "" && e.text.length <= 5000 && Object.keys(e).every(k => ["text", "note", "url", "at", "series"].includes(k))
+    && (e.note === undefined || (typeof e.note === "string" && e.note.length <= 1000)) && (e.url === undefined || (typeof e.url === "string" && /^https:\/\//.test(e.url))) && (e.at === undefined || typeof e.at === "string") && (e.series === undefined || (typeof e.series === "string" && /^[a-z0-9_]{1,40}$/.test(e.series)))
   const p: string[] = []
   for (const k of ["approved", "rejected"] as const) {
     const list = v[k] as unknown[]
     if (list.length > 50) p.push(`examples.${k}: at most 50`)
-    list.forEach((e, i) => { if (!ok(e)) p.push(`examples.${k}[${i}]: {text, note?, url? (https), at?}`) })
+    list.forEach((e, i) => { if (!ok(e)) p.push(`examples.${k}[${i}]: {text, note?, url? (https), at?, series? (a series key)}`) })
   }
   return p
 }
