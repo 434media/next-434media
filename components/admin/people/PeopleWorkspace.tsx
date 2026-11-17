@@ -182,7 +182,7 @@ export function PeopleWorkspace({ view = "records" }: { view?: "todo" | "records
         return
       }
       const body = await res.json().catch(() => ({}))
-      if (!res.ok) throw new Error(body.error ?? "Waiting on you could not be read")
+      if (!res.ok) throw new Error(body.error ?? "To do could not be read")
       setDrafts(body.items ?? [])
     } catch (e) {
       setDrafts([])

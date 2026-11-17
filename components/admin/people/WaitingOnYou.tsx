@@ -1,6 +1,6 @@
 "use client"
 
-// "Waiting on you", the People page's first tab (one work area, founder 2026-11-16; Display Standard §3.14,
+// To do (/admin/todo), formerly "Waiting on you", the People page's first tab (one work area, founder 2026-11-16; Display Standard §3.14,
 // Provisional): the signed-in person's one list, a view over the approval records and the Inbox's untriaged
 // arrivals, never a store of its own (lib/core-model/waiting.ts). Drafts first, oldest first, then arrivals, newest
 // first; an arrival with a draft is one row. The Decided history is one tap away. A draft row opens the draft drawer;

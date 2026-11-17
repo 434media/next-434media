@@ -16,6 +16,6 @@ export async function GET() {
     return NextResponse.json(await readWaiting(await viewerOf(auth.session)))
   } catch (e) {
     console.error("[GET /api/admin/review/waiting]", e)
-    return NextResponse.json({ error: "Waiting on you could not be read" }, { status: 500 })
+    return NextResponse.json({ error: "To do could not be read" }, { status: 500 })
   }
 }
