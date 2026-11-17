@@ -36,9 +36,11 @@ export const SEND_APPROVALS_COLLECTION = CRM_COLLECTIONS.SEND_APPROVALS
 
 /**
  * Who may receive a send in the proof slice: Resend's test address, which accepts and reports delivery and reaches no
- * one (resend.com/docs/dashboard/emails/send-test-emails). Widening this list is V1 item 6, on the founder's word.
+ * one (resend.com/docs/dashboard/emails/send-test-emails). The labelled form is the same test address ("All test
+ * email addresses support labeling"), so a proof run can reject a second draft without the 72-hour duplicate guard
+ * refusing it (2026-11-17). Widening this list beyond Resend's test address is V1 item 6, on the founder's word.
  */
-export const TEST_SINK_RECIPIENTS: readonly string[] = ["delivered@resend.dev"]
+export const TEST_SINK_RECIPIENTS: readonly string[] = ["delivered@resend.dev", "delivered+reject@resend.dev"]
 
 /** Null when every recipient is allowed; otherwise why not. Compared by address, lower-cased. */
 export function recipientRefusal(to: string[], allow: readonly string[] = TEST_SINK_RECIPIENTS): string | null {

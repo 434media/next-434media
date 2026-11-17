@@ -22,7 +22,9 @@
     "you@email.com",
     "speaker@mail.com",
     "project_id@iam.gserviceaccount.com",
-    "delivered@resend.dev"
+    "delivered@resend.dev",
+    "delivered+reject@resend.dev",
+    "delivered+other@resend.dev"
   ],
   "skipPaths": [
     "pnpm-lock.yaml"
