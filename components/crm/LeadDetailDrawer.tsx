@@ -96,7 +96,7 @@ const ORIGIN_META: Record<OriginCollection, { label: string; href: (email: strin
   partner_list_members: { label: "Lists", href: (e) => `/admin/audiences?sub=lists&search=${encodeURIComponent(e)}` },
   event_registrations: { label: "Events", href: (e) => `/admin/audiences?sub=events&search=${encodeURIComponent(e)}` },
   email_signups: { label: "the Newsletter", href: (e) => `/admin/audiences?sub=newsletter&search=${encodeURIComponent(e)}` },
-  contact_forms: { label: "the Inbox", href: (e) => `/admin/inbox?search=${encodeURIComponent(e)}` },
+  contact_forms: { label: "People", href: (e) => `/admin/people?tab=people&search=${encodeURIComponent(e)}` },
   apollo: { label: "Apollo prospecting", href: () => null },
 }
 

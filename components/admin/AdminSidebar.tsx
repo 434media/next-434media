@@ -5,7 +5,6 @@ import { usePathname } from "next/navigation"
 import { useEffect, useState } from "react"
 import {
   Rocket,
-  Inbox,
   BarChart3,
   CircleGauge,
   Layers,
@@ -142,7 +141,7 @@ const OVERVIEW_ITEM: SidebarLink = {
 }
 
 // Sections mirror the lifecycle: "Pipeline" runs in funnel order
-// (Prospect → Audiences → Inbox → Leads → Opportunities → Funnel KPIs) so the sidebar
+// (Prospect → Audiences → People → Leads → Opportunities → Funnel KPIs) so the sidebar
 // reads start → qualify → win → measure, top-to-bottom. Prospect leads as the
 // active starting action; Funnel KPIs closes as the scoreboard. Analytics and
 // Workspace hold the supporting surfaces.
@@ -161,15 +160,6 @@ const SIDEBAR_SECTIONS: SidebarSection[] = [
         // The active start of the sales funnel — leads the section so it's the
         // first thing a new admin sees. Same reach as Leads.
         roles: ["full_admin", "crm_only", "intern"],
-      },
-      {
-        id: "inbox",
-        label: "Inbox",
-        icon: Inbox,
-        href: "/admin/inbox",
-        matchPrefix: "/admin/inbox",
-        // QA: interns get the full Pipeline section to test the funnel end-to-end.
-        roles: ["full_admin", "intern"],
       },
       {
         id: "people",

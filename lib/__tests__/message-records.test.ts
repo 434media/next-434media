@@ -19,7 +19,6 @@ import { MAX_RECORD_BYTES, RECIPIENTS_PER_RECORD, attachmentRefusal, buildMessag
 import { recordMessage, type MessageSink } from "../core-model/messages-server"
 import {
   broadcastMessage,
-  bulkAckMessage,
   callRequestRecord,
   contactFormReplyMessage,
   leadOutreachMessage,
@@ -67,7 +66,6 @@ const ONE_TO_ONE = {
 
 const PATHS: [string, MessageInput][] = [
   ["contact-form reply", contactFormReplyMessage(ONE_TO_ONE)],
-  ["bulk acknowledgment", bulkAckMessage(ONE_TO_ONE)],
   ["1:1 send-outreach", leadOutreachMessage({ ...ONE_TO_ONE, source: "prospected" })],
   ["outreach-sequence step", sequenceStepMessage({ ...ONE_TO_ONE, source: "prospected" })],
   [
@@ -301,7 +299,6 @@ test("a 1:1 message to a private person is hidden with them", async () => {
 test("every send and receive path in the inventory records its message", () => {
   const wired: [string, RegExp][] = [
     ["app/api/admin/contact-forms/[id]/reply/route.ts", /recordMessage\(\s*contactFormReplyMessage\(/],
-    ["app/api/admin/contact-forms/bulk-acknowledge/route.ts", /recordMessage\(\s*bulkAckMessage\(/],
     ["app/api/admin/leads/[id]/send-outreach/route.ts", /recordMessage\(\s*leadOutreachMessage\(/],
     ["lib/outreach-sequence.ts", /recordMessage\(\s*sequenceStepMessage\(/],
     ["app/api/webhooks/resend-inbound/route.ts", /recordMessage\(\s*sequenceReplyMessage\(/],

@@ -18,7 +18,7 @@ The admin **Pipeline** section is the funnel, left to right:
 | Surface | Route | Role in the funnel |
 |---|---|---|
 | **Prospect** | `/admin/prospect` | Outbound: NL prompt → Apollo + LLM → ICP-scored candidates → approve into Leads |
-| **Inbox** | `/admin/inbox` | Inbound contact-form inquiries with a response-time queue |
+| **Inbox** | `/admin/people?tab=inbox` | Every arrival not yet triaged, website inquiries among them, with the agent's draft or "Write reply" (the old `/admin/inbox` redirects here) |
 | **Audiences** | `/admin/audiences` | Newsletter / Events / Lists cohorts → Mailchimp sync → promote to Leads |
 | **Leads** | `/admin/leads` | The scored working queue — the funnel's center of gravity |
 | **CRM** | `/admin/crm` | Clients, opportunities, tasks (post-conversion) |

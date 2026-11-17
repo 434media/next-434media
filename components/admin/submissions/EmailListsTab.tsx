@@ -990,7 +990,7 @@ export function EmailListsTab({
                       ))}
                       {cross && cross.contactForms > 0 && (
                         <a
-                          href={`/admin/inbox?search=${encodeURIComponent(selectedSignup.email)}`}
+                          href={`/admin/people?tab=people&search=${encodeURIComponent(selectedSignup.email)}`}
                           className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-sm text-[11px] font-medium bg-amber-50 text-amber-700 hover:bg-amber-100 transition-colors"
                           title="View contact form submissions for this email"
                         >

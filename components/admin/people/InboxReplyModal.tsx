@@ -3,8 +3,9 @@
 import { useEffect, useMemo, useState } from "react"
 import { Loader2, X, Send, AlertCircle, Mail, MessageSquare } from "lucide-react"
 
-// Stage 5b — compose modal for replying to a contact-form inquiry via
-// Resend. Single-row, opens from the ContactFormsTab detail drawer footer.
+// Compose modal for answering a website inquiry by hand via Resend. Opens from
+// "Write reply" on an arrival in the People Inbox (it began in the old
+// /admin/inbox, retired 2026-11-17).
 //
 // Design notes:
 //  - Centered modal overlay (drawer stays in place behind the backdrop).
@@ -13,8 +14,8 @@ import { Loader2, X, Send, AlertCircle, Mail, MessageSquare } from "lucide-react
 //    pre-populated — most reps have their own.
 //  - Original message is shown read-only above the form so the rep has
 //    context without scrolling back to the drawer.
-//  - On send: backend auto-flips submission state to "replied", parent gets
-//    notified via onSent so the drawer's state badge updates locally.
+//  - On send: the server records the reply and takes the arrival out of the
+//    People Inbox (saved as a contact); onSent says whether that happened.
 
 interface ContactFormSubmissionLite {
   id: string
@@ -30,12 +31,11 @@ interface InboxReplyModalProps {
   submission: ContactFormSubmissionLite | null
   onClose: () => void
   /**
-   * Called after a successful send. `stateUpdated` reflects whether the
-   * server-side state-flip to "replied" persisted: when false the parent
-   * must NOT optimistically update local state (that would mask the silent
-   * desync) and should surface a clear "mark replied manually" prompt.
+   * Called after a successful send. `closed` says whether the arrival left
+   * the People Inbox; when false the parent says so, so it can be saved or
+   * dismissed by hand.
    */
-  onSent: (submissionId: string, stateUpdated: boolean) => void
+  onSent: (submissionId: string, closed: boolean) => void
   onError: (message: string) => void
 }
 
@@ -148,14 +148,7 @@ export function InboxReplyModal({
       if (!res.ok || !data?.success) {
         throw new Error(data?.error || "Failed to send reply")
       }
-      // Pass `stateUpdated` through so the parent decides whether to apply
-      // the optimistic local state update. If state didn't persist on the
-      // server, optimistically marking it "replied" locally would silently
-      // desync the badge — the rep would see "replied" while the source of
-      // truth still says triaged, and the inquiry would resurface in
-      // "awaiting reply" on the next refresh.
-      const stateUpdated: boolean = data.stateUpdated !== false
-      onSent(submission.id, stateUpdated)
+      onSent(submission.id, data.closed === true)
       onClose()
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Failed to send reply"

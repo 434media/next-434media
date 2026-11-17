@@ -48,12 +48,11 @@ function appBaseUrl(): string {
  * form submission that triggered it. Call this AFTER the submission has been
  * persisted — it's purely a notification.
  *
- * The CTA links to /admin/inbox?search=<email>, which the inbox already honors
- * via `initialSearch`, landing the admin on exactly this submission without
- * needing a new row-level deep-link param. `reply-to` is set to the sender so
- * a quick reply from the mailbox reaches the prospect directly; for a tracked
- * reply (logged + state→replied), the admin uses the in-app composer via the
- * Open in Inbox link.
+ * The CTA opens this inquiry in the People Inbox (?open=contact_forms:<id>),
+ * where its agent draft or "Write reply" is; without an id it searches by
+ * email. `reply-to` is set to the sender so a quick reply from the mailbox
+ * reaches the prospect directly; a reply sent from the admin is recorded and
+ * takes the inquiry out of the inbox.
  */
 export async function notifyNewContactForm(sub: ContactFormNotification): Promise<void> {
   try {
@@ -63,7 +62,9 @@ export async function notifyNewContactForm(sub: ContactFormNotification): Promis
       dateStyle: "medium",
       timeStyle: "short",
     })
-    const inboxUrl = `${appBaseUrl()}/admin/inbox?search=${encodeURIComponent(sub.email)}`
+    const inboxUrl = sub.id
+      ? `${appBaseUrl()}/admin/people?tab=inbox&open=${encodeURIComponent(`contact_forms:${sub.id}`)}`
+      : `${appBaseUrl()}/admin/people?tab=inbox&search=${encodeURIComponent(sub.email)}`
     const subject = `New inbox message — ${fullName}${sub.company ? `, ${sub.company}` : ""}`
 
     // Intake fields (master 9.5) appear only when set; older submissions lack them.

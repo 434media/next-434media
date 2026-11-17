@@ -21,7 +21,6 @@ interface AdminTopBarProps {
 const ROUTE_LABELS: Array<{ match: string | RegExp; label: string }> = [
   { match: "/admin/opportunities", label: "Opportunities" },
   { match: "/admin/leads", label: "Leads" },
-  { match: "/admin/inbox", label: "Inbox" },
   { match: "/admin/people", label: "People" },
   { match: "/admin/audiences", label: "Audiences" },
   { match: "/admin/analytics-web", label: "Analytics · Web" },

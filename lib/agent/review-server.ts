@@ -102,11 +102,10 @@ export async function editDraft(input: { approvalId: string; shownHash: string; 
   return next
 }
 
-/** What closing an arrival needs: its Activity as the inbox has it, the triage, and the old inbox's state. */
+/** What closing an arrival needs: its Activity as the inbox has it, and the triage. */
 export interface CloseArrivalDeps {
   activity: (id: string) => Promise<Activity | null>
   triage: (activity: Activity) => Promise<void>
-  markReplied?: (formId: string) => Promise<void>
 }
 
 export type CloseArrivalResult = { closed: true; activityId: string } | { closed: false; reason: string }
@@ -114,7 +113,7 @@ export type CloseArrivalResult = { closed: true; activityId: string } | { closed
 /**
  * After an approved send: the reply is already an Activity (send-email.ts step 6); this takes the arrival out of the
  * People Inbox, so the inbox is true. The arrival is saved as a contact (triage `save`): answered, not yet decided as a
- * lead; Lead stays one move away on the person. Also marks the old /admin/inbox entry replied while that page lives.
+ * lead; Lead stays one move away on the person. Used after an approved draft and after a hand-written reply.
  * Never throws: the send has happened, and a failure here is reported, not raised.
  */
 export async function closeArrivalAfterSend(approval: Pick<StoredApproval, "arrival">, deps: CloseArrivalDeps): Promise<CloseArrivalResult> {
@@ -124,8 +123,6 @@ export async function closeArrivalAfterSend(approval: Pick<StoredApproval, "arri
     const activity = await deps.activity(activityId)
     if (!activity) return { closed: false, reason: "The arrival is not in the inbox view" }
     if (!activity.triaged) await deps.triage(activity)
-    // The old /admin/inbox reads its own state; marked after the triage, which reads the arrival as untriaged.
-    if (approval.arrival?.formId && deps.markReplied) await deps.markReplied(approval.arrival.formId).catch((e) => console.error(`[agent:send] old inbox state not updated for ${activityId}:`, e))
     return { closed: true, activityId }
   } catch (e) {
     const reason = e instanceof Error ? e.message : String(e)
@@ -135,24 +132,20 @@ export async function closeArrivalAfterSend(approval: Pick<StoredApproval, "arri
   }
 }
 
-/** The live wiring: the core view as the founder sees it, the core triage, the old inbox's state. */
+/** The live wiring: the core view as the founder sees it, and the core triage. */
 export async function closeArrivalLive(approval: Pick<StoredApproval, "arrival">, actor: string, viewer: Viewer): Promise<CloseArrivalResult> {
-  const [{ getVisibleCoreView, invalidateCoreView }, { firestoreCoreStore, firestoreLeadPath }, { triageActivity }, { listIcpCohorts }, { pendingArrivals }, { setSubmissionState }] = await Promise.all([
+  const [{ getVisibleCoreView, invalidateCoreView }, { firestoreCoreStore, firestoreLeadPath }, { triageActivity }, { listIcpCohorts }, { pendingArrivals }] = await Promise.all([
     import("../core-model/read"),
     import("../core-model/firestore-store"),
     import("../core-model/service"),
     import("../firestore-icp-cohorts"),
     import("../google-contacts/server"),
-    import("../firestore-submission-states"),
   ])
   invalidateCoreView()
   const out = await closeArrivalAfterSend(approval, {
     activity: async (id) => (await getVisibleCoreView(viewer)).activities.find((a) => a.id === id) ?? null,
     triage: async (activity) => {
       await triageActivity(firestoreCoreStore, firestoreLeadPath, { activity, decision: "save", actor, founder: true }, await listIcpCohorts(), pendingArrivals)
-    },
-    markReplied: async (formId) => {
-      await setSubmissionState("contact_forms", formId, "replied", actor)
     },
   })
   invalidateCoreView()

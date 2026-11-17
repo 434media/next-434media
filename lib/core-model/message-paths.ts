@@ -40,10 +40,8 @@ function oneToOne(path: MessageInput["path"], s: OneToOneSend): MessageInput {
   }
 }
 
-/** POST /api/admin/contact-forms/[id]/reply. */
+/** POST /api/admin/contact-forms/[id]/reply ("Write reply" in the People Inbox). */
 export const contactFormReplyMessage = (s: OneToOneSend) => oneToOne("contact_form_reply", { ...s, source: s.source ?? "web" })
-/** POST /api/admin/contact-forms/bulk-acknowledge: each person's acknowledgment is its own message (it greets them by name). */
-export const bulkAckMessage = (s: OneToOneSend) => oneToOne("contact_form_bulk_ack", { ...s, source: s.source ?? "web" })
 /** POST /api/admin/leads/[id]/send-outreach. */
 export const leadOutreachMessage = (s: OneToOneSend) => oneToOne("lead_outreach", s)
 /** An outreach-sequence step (lib/outreach-sequence.ts, runSequenceStep). */

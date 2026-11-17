@@ -120,11 +120,11 @@ const STATIC_ITEMS: CommandItem[] = [
   {
     id: "nav-inbox",
     label: "Inbox",
-    hint: "Contact form inquiries needing reply",
+    hint: "Website inquiries and every other arrival, in People",
     icon: Inbox,
     section: "Navigate",
     search: "inbox contact forms inquiries reply messages",
-    run: (router) => router.push("/admin/inbox"),
+    run: (router) => router.push("/admin/people?tab=inbox"),
   },
   {
     id: "nav-people",

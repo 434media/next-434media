@@ -1,22 +1,17 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { requireSendCapable } from "@/lib/auth"
 import { getResend, OUTREACH_FROM, RESEND_DOMAIN, assertVerifiedSender } from "@/lib/resend"
-import { setSubmissionState } from "@/lib/firestore-submission-states"
 import { recordMessage } from "@/lib/core-model/messages-server"
 import { contactFormReplyMessage } from "@/lib/core-model/message-paths"
 
 // POST /api/admin/contact-forms/[id]/reply
 // Body: { to, subject, body }
 //
-// Stage 5b — single-row reply via Resend. Mirrors the lead outreach pattern
-// in /api/admin/leads/[id]/send-outreach: Resend sends from OUTREACH_FROM,
-// reply-to is the sending rep's email so replies route directly to them
-// rather than to a shared inbox.
-//
-// On success, auto-flips the submission state to "replied" so the rep doesn't
-// have to manually mark it. State update failures are non-fatal — the email
-// already went out — but the response surfaces a warning so the rep knows to
-// flip it manually.
+// A hand-written answer to a website inquiry, from "Write reply" on an arrival in the People Inbox (used when there is
+// no agent draft: the agent is off or stopped, or the founder answers himself). Resend sends from OUTREACH_FROM with
+// the sender's name; reply-to is the sender, so the answer comes back to them. The reply is recorded as a message,
+// then the arrival leaves the People Inbox exactly as after an approved draft (closeArrivalLive: saved as a contact).
+// The close never fails the request: the email has gone, and `closed: false` tells the page to say so.
 
 export const runtime = "nodejs"
 export const maxDuration = 30
@@ -99,18 +94,9 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
     contactFormReplyMessage({ from, to, replyTo, subject, text: emailBody, messageId: emailId, at: new Date().toISOString(), sentBy: auth.session.email }),
   )
 
-  // Auto-flip state → replied. Non-fatal: email is already sent, rep can
-  // manually flip if persistence fails. The response carries `stateUpdated`
-  // so the frontend doesn't optimistically lie about local state when the
-  // sidecar write actually didn't happen — that's the silent-desync trap.
-  let stateUpdated = false
-  try {
-    await setSubmissionState("contact_forms", id, "replied", auth.session.email)
-    stateUpdated = true
-  } catch (err) {
-    console.error(`[POST /api/admin/contact-forms/${id}/reply] state update failed:`, err)
-    // Fall through — email already sent, surface the state-failure to caller.
-  }
+  const { closeArrivalLive } = await import("@/lib/agent/review-server")
+  const { viewerOf } = await import("@/lib/core-model/route-helpers")
+  const closed = await closeArrivalLive({ arrival: { formId: id } }, auth.session.email, await viewerOf(auth.session))
 
-  return NextResponse.json({ success: true, emailId, stateUpdated, recorded: record.recorded })
+  return NextResponse.json({ success: true, emailId, closed: closed.closed, recorded: record.recorded })
 }
