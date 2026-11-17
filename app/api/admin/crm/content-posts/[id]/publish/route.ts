@@ -3,10 +3,12 @@ import type { NextRequest } from "next/server"
 import { getSession, isAuthorizedAdmin, canSend, canRunContent } from "@/lib/auth"
 import { getContentPostById, updateContentPost } from "@/lib/firestore-crm"
 import type { ContentPostStatus, TaskComment } from "@/components/crm/types"
-import { outcomeStatusRefusal } from "@/lib/content-post-guards"
+import { outcomeStatusRefusal, postedDateFrom } from "@/lib/content-post-guards"
 
 // POST /api/admin/crm/content-posts/[id]/publish
 // Body: { published_url?: string, posted_at?: string }
+// On a post already posted, a body with posted_at alone corrects the posted
+// date (a post marked late keeps the day it went out; 2026-11-17).
 //
 // "Mark as posted" — the manual-assisted close of the loop. An admin posts the
 // approved content natively on the platform, then records it here: status →
@@ -62,10 +64,12 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
     )
   }
   // Accept a caller-supplied posted_at (e.g. backdating), else stamp now.
-  const postedAt =
-    typeof body.posted_at === "string" && body.posted_at.trim()
-      ? body.posted_at.trim()
-      : new Date().toISOString()
+  let postedAt = new Date().toISOString()
+  if (typeof body.posted_at === "string" && body.posted_at.trim()) {
+    const given = postedDateFrom(body.posted_at)
+    if ("error" in given) return NextResponse.json({ error: given.error }, { status: 400 })
+    postedAt = given.at
+  }
 
   const post = await getContentPostById(id)
   if (!post) {
@@ -75,6 +79,25 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
   const outcomeRefusal = outcomeStatusRefusal(post, "posted")
   if (outcomeRefusal) {
     return NextResponse.json({ error: outcomeRefusal }, { status: 409 })
+  }
+  // Correcting the date on a post already posted: posted_at only, recorded in the thread.
+  if (post.status === "posted" && typeof body.posted_at === "string" && body.posted_at.trim() && !publishedUrl) {
+    const actor = session.name?.trim() || session.email
+    const note: TaskComment = {
+      id: crypto.randomUUID(),
+      content: `${actor} changed the posted date to ${postedAt.slice(0, 10)}${post.posted_at ? ` (was ${post.posted_at.slice(0, 10)})` : ""}.`,
+      author_name: actor,
+      author_email: session.email,
+      created_at: new Date().toISOString(),
+      mentions: [],
+    }
+    try {
+      await updateContentPost(id, { posted_at: postedAt, comments: [...(post.comments ?? []), note] })
+    } catch (err) {
+      console.error(`[content publish ${id}] date correction failed:`, err)
+      return NextResponse.json({ error: "Failed to change the posted date" }, { status: 500 })
+    }
+    return NextResponse.json({ success: true, status: "posted", posted_at: postedAt, published_url: post.published_url ?? null })
   }
   if (!POSTABLE_FROM.includes(post.status)) {
     return NextResponse.json(

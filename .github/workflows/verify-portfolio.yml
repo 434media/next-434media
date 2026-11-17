@@ -160,6 +160,8 @@ jobs:
       - run: tsx --test lib/__tests__/one-work-area.test.ts
       # A repeat inquiry from the same person reaches the inbox; only a double submit (same message within a minute) collapses (2026-11-17).
       - run: tsx --test lib/__tests__/contact-form-dedupe.test.ts
+      # A post marked late keeps the day it went out (2026-11-17).
+      - run: tsx --test lib/__tests__/posted-date.test.ts
       - run: tsx --test lib/__tests__/exam-reports.test.ts
       # Owned Meta tool route, Slack approval binding and processing continuation (all transports faked).
       - run: tsx --test lib/__tests__/owned-meta-tool.test.ts
