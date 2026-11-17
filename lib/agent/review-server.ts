@@ -6,7 +6,7 @@
  *  - `sendApproval`: the send, through lib/agent/send-email.ts (approval, expiry, consumed and hash checked; the kill
  *    switch read immediately before Resend; the sent text kept in full on the CRM).
  *  - `setControls`, `stopAgents`: the kill switch. A stop also cancels open tasks and sends in-flight ones to a person.
- *  - `readConsole`: everything the queue page shows.
+ *  - `readConsole`: everything the queue page shows, and To do's Today card (lib/agent/today.ts).
  *
  * Every caller is a founder-only route. Nothing here decides who may act: the route's guard does.
  */
@@ -20,6 +20,7 @@ import { applyStop, firestoreAgentDb, step, type AgentDb } from "./ledger-server
 import { SEND_APPROVALS_COLLECTION, sendApprovedEmail, type SendResult } from "./send-email"
 import { INTAKE_SKILL } from "./intake"
 import { REASON_CODES, WEEK_MS, arrivalActivityId, costSummary, groupReasons, handoffWaits, reviewItem, runSummary, sortQueue, type ReviewItem, type StoredApproval } from "./review"
+import { costSince, todayBrief } from "./today"
 import type { Activity, Organization } from "../../types/core-model"
 import type { Viewer } from "../core-model/read"
 
@@ -275,6 +276,7 @@ export async function readConsole(now = new Date().toISOString()) {
   const { AI_CALL_COSTS_COLLECTION } = await import("../engine/cost-ledger")
   const since = new Date(Date.parse(now) - WEEK_MS).toISOString()
   const d = getDb()
+  const watch = readWatch(new Date(now))
   const [approvalsSnap, tasksSnap, ledgerSnap, costsSnap, controls, pin] = await Promise.all([
     d.collection(SEND_APPROVALS_COLLECTION).orderBy("createdAt", "desc").limit(100).get(),
     d.collection(AGENT_TASKS_COLLECTION).where("updatedAt", ">=", since).limit(500).get(),
@@ -288,14 +290,50 @@ export async function readConsole(now = new Date().toISOString()) {
   const taskById = new Map(tasks.map((t) => [t.id, t]))
   const entries = ledgerSnap.docs.map((x) => x.data() as LedgerEntry)
   const costs = costsSnap.docs.map((x) => x.data() as { at: string; task: string; property?: string; usd: number })
+  const runs = runSummary(tasks, entries)
+  const costTotals = costSummary(costs)
   return {
     now,
     controls,
     pin,
     queue: sortQueue(approvals.map((a) => reviewItem(a, now, taskById.get(a.taskId)))),
     reasons: groupReasons(approvals, now),
-    runs: runSummary(tasks, entries),
+    runs,
     waits: handoffWaits(entries),
-    costs: costSummary(costs),
+    costs: costTotals,
+    today: todayBrief({ now, ...(await watch), runs, costs: costTotals, cost24hUsd: costSince(costs, now) }),
   }
+}
+
+/**
+ * The watchdog's two reads, for the Today card: jobs that did not fire when due and queues past their limit. The same
+ * functions the hourly alert uses (app/api/cron/cron-watchdog), without its once-a-day dedupe: Today shows what is true
+ * now. A read that fails is reported as unreadable rather than failing the page.
+ */
+async function readWatch(now: Date) {
+  const { getDb } = await import("../firebase-admin")
+  const { readCronHeartbeats } = await import("../cron-heartbeat")
+  const { missedCrons } = await import("../cron-watchdog")
+  const { QUEUES, QUEUE_READ_LIMIT, overdueQueues, readQueue } = await import("../queue-age")
+  const vercelConfig = (await import("../../vercel.json")).default as { crons?: { path: string; schedule: string }[] }
+  const unreadable: string[] = []
+  let missed: Awaited<ReturnType<typeof missedCrons>> = []
+  try {
+    const heartbeats = await readCronHeartbeats()
+    const first = heartbeats.get("cron-watchdog")?.firstFiredAt
+    missed = missedCrons(vercelConfig.crons ?? [], heartbeats, first ? new Date(first) : null, now)
+  } catch (e) {
+    unreadable.push(`cron heartbeats: ${(e as Error).message}`)
+  }
+  const d = getDb()
+  const readings = await Promise.all(QUEUES.map(async (q) => {
+    try {
+      const snap = await d.collection(q.collection).where(q.where.field, "==", q.where.equals).limit(QUEUE_READ_LIMIT).get()
+      return readQueue(q, snap.docs.map((x) => x.data()))
+    } catch (e) {
+      unreadable.push(`${q.name}: ${(e as Error).message}`)
+      return null
+    }
+  }))
+  return { missed, overdue: overdueQueues(readings.filter((r) => r !== null), now), unreadable }
 }
