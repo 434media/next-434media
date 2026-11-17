@@ -23,6 +23,8 @@ export interface CallCostRecord {
   kind: string
   property?: string
   skill?: string
+  /** The chain's first task, set only when it is not `task` (a task another task started). */
+  root?: string
   model: string
   /** The provider the Gateway routed to, when it said. */
   provider?: string
@@ -57,6 +59,22 @@ export async function recordCallCost(rec: CallCostRecord): Promise<void> {
   } catch (e) {
     console.error(`[engine:cost] Failed to record a call's cost (task ${rec.task}, ${rec.model}):`, e)
   }
+}
+
+/**
+ * What a task's chain has spent: the root's own calls (`task` = root) plus every call made by a task under it (`root` =
+ * root, which is set only when it differs from `task`, so no call is counted twice). Two equality queries on single
+ * fields, served by Firestore's automatic indexes. Throws when the records cannot be read; the caller fails closed.
+ */
+export async function readTaskSpend(root: string): Promise<number> {
+  const col = getDb().collection(AI_CALL_COSTS_COLLECTION)
+  const [own, under] = await Promise.all([col.where("task", "==", root).select("usd").get(), col.where("root", "==", root).select("usd").get()])
+  let total = 0
+  for (const d of [...own.docs, ...under.docs]) {
+    const usd = d.get("usd")
+    if (typeof usd === "number" && Number.isFinite(usd)) total += usd
+  }
+  return total
 }
 
 /**

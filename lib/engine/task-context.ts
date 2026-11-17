@@ -17,6 +17,11 @@ export interface TaskContext {
   kind: string
   property?: string
   skill?: string
+  /**
+   * The first task of the chain this task belongs to, when it is not the task itself (lib/agent/ledger.ts
+   * `budgetRoot`). Recorded on each call so the chain's shared budget can be summed.
+   */
+  root?: string
 }
 
 /**

@@ -13,10 +13,10 @@ import { scriptRefusal, skillScriptTool, type ScriptSandbox } from "../agent/ski
 import { INTAKE_SKILL, intakeEligible, queueIntake, renderIntakeRequest, runIntake, taskIdFor, type ArrivalMark, type IntakeDeps, type IntakeSubmission, type SkillPin } from "../agent/intake"
 import { parseControls, type AgentControls } from "../agent/controls"
 import { SEND_APPROVALS_COLLECTION, TEST_SINK_RECIPIENTS } from "../agent/send-email"
-import { createTask, step } from "../agent/ledger-server"
-import { newTask, verifyChain } from "../agent/ledger"
+import { checkBudget, createTask, step } from "../agent/ledger-server"
+import { LedgerRefused, budgetRoot, childLineage, engineRunOf, newTask, verifyChain, type AgentTask } from "../agent/ledger"
 import { approvalStatus, type SendApproval } from "../send-approval"
-import { sweepAgentTasks } from "../agent/sweep"
+import { ENGINE_RETENTION_MS, ENGINE_WAIT_CAP_MS, sweepAgentTasks, type EngineRunStatus } from "../agent/sweep"
 import { MemoryAgentDb } from "./helpers/agent-db"
 
 const NOW = "2026-11-14T12:00:00.000Z"
@@ -211,7 +211,7 @@ function scriptedModel(steps: { tool?: string; input?: unknown; text?: string }[
   return { model, calls }
 }
 
-async function intakeSetup(opts: { controls?: AgentControls; pin?: SkillPin | null; email?: string; mark?: ArrivalMark; steps?: { tool?: string; input?: unknown; text?: string }[]; skill?: SkillFiles } = {}) {
+async function intakeSetup(opts: { controls?: AgentControls; pin?: SkillPin | null; email?: string; mark?: ArrivalMark; spend?: number | Error; steps?: { tool?: string; input?: unknown; text?: string }[]; skill?: SkillFiles } = {}) {
   const db = new MemoryAgentDb()
   const sb = fakeSandbox()
   const { model, calls } = scriptedModel(opts.steps ?? [
@@ -229,6 +229,10 @@ async function intakeSetup(opts: { controls?: AgentControls; pin?: SkillPin | nu
     decisions: async () => "- 2026-11-01 (organization): chose discovery first. Why: scope unclear",
     arrivalMark: async () => opts.mark ?? null,
     model: () => model,
+    taskSpend: async () => {
+      if (opts.spend instanceof Error) throw opts.spend
+      return opts.spend ?? 0
+    },
     sandbox: sb.factory,
     now: () => at(clock++ * 1000),
     runId: "run-1",
@@ -363,4 +367,144 @@ test("the token guard: an arrival marked spam or duplicate is refused before any
     assert.equal(db.col(SEND_APPROVALS_COLLECTION).size, 0)
     assert.equal(db.task(taskId!)?.state, "cancelled")
   }
+})
+
+// ── Ledger slice 1: the shared budget, who asked, and the lost-run close (the D1 finding) ─────────────────────────────
+const mkTask = (id: string, extra: Partial<Parameters<typeof newTask>[0]> = {}) =>
+  newTask({ id, property: "434", objective: "intake-reply", workflow: "w", budgetUsd: 1, lineage: { event: `e:${id}` }, now: NOW, ...extra })
+
+test("a run whose task has spent its budget is refused before any model call", async () => {
+  const { db, deps, calls } = await intakeSetup({ spend: 1 })
+  const id = await queued(db)
+  const out = await runIntake(id, deps)
+  assert.deepEqual([out.ok, (out as { code: string }).code], [false, "budget-spent"])
+  assert.equal(calls.length, 0)
+  assert.equal(db.task(id)?.state, "failed")
+  assert.equal(db.entries(id).at(-1)?.reasonCode, "budget-spent")
+})
+
+test("a spend that cannot be read refuses the run (fails closed)", async () => {
+  const { db, deps, calls } = await intakeSetup({ spend: new Error("firestore down") })
+  const id = await queued(db)
+  const out = await runIntake(id, deps)
+  assert.deepEqual([out.ok, (out as { code: string }).code], [false, "budget-unreadable"])
+  assert.equal(calls.length, 0)
+})
+
+test("a run within budget goes ahead", async () => {
+  const { db, deps } = await intakeSetup({ spend: 0.25 })
+  const id = await queued(db)
+  assert.equal((await runIntake(id, deps)).ok, true)
+})
+
+test("the budget is shared: a child and a grandchild spend their root's budget, never their own", async () => {
+  const db = new MemoryAgentDb()
+  const root = (await createTask(db, mkTask("root", { budgetUsd: 2 }), "system", NOW)).task
+  const child = (await createTask(db, mkTask("child", { budgetUsd: 50, lineage: childLineage(root, "e:child") }), "system", NOW)).task
+  const grand = (await createTask(db, mkTask("grand", { budgetUsd: 50, lineage: childLineage(child, "e:grand") }), "system", NOW)).task
+  assert.deepEqual([budgetRoot(root), budgetRoot(child), budgetRoot(grand)], ["root", "root", "root"])
+  const asked: string[] = []
+  const spend = (n: number) => async (r: string) => (asked.push(r), n)
+  assert.equal((await checkBudget(db, grand, spend(1.5))).ok, true)
+  const over = await checkBudget(db, grand, spend(2))
+  assert.equal(over.ok === false && over.code, "budget-spent")
+  assert.deepEqual([...new Set(asked)], ["root"])
+  // A missing root refuses, as an unreadable spend does.
+  const orphan = mkTask("orphan", { lineage: { event: "e:o", parent: "gone", root: "gone" } })
+  const r = await checkBudget(db, orphan, spend(0))
+  assert.equal(r.ok === false && r.code, "budget-unreadable")
+})
+
+test("who asked is recorded as an actor id, never a name or an address", () => {
+  assert.equal(mkTask("t1", { requestedBy: "member:abc123" }).requestedBy, "member:abc123")
+  assert.equal(mkTask("t2", { requestedBy: "founder" }).requestedBy, "founder")
+  assert.equal("requestedBy" in mkTask("t3"), false)
+  for (const bad of ["marcos@434media.com", "Marcos Resendez", "member:"]) assert.throws(() => mkTask("t4", { requestedBy: bad }), LedgerRefused)
+  assert.throws(() => mkTask("t5", { lineage: { event: "e:x", root: "r" } }), LedgerRefused, "a root without a parent")
+})
+
+async function onEngine(db: MemoryAgentDb, id: string, state: AgentTask["state"], since = NOW) {
+  await createTask(db, mkTask(id), "system", NOW)
+  const path: AgentTask["state"][] = { queued: [], running: ["running"], awaiting_review: ["running", "awaiting_review"], approved: ["running", "awaiting_review", "approved"], sending: ["running", "awaiting_review", "approved", "sending"] }[state as "queued"] ?? []
+  for (const [i, to] of path.entries()) {
+    const last = i === path.length - 1
+    await step(db, { taskId: id, at: at(1000 + i), decide: () => ({ fields: { kind: "run_started", actor: "system" }, to, ...(last ? { engineRun: engineRunOf(`wrun_${id}`, since) } : {}) }) })
+  }
+}
+
+function sweepDeps(db: MemoryAgentDb, nowMs: number, statuses?: Record<string, EngineRunStatus | Error>) {
+  const all = () => [...db.col("agent_tasks").values()] as AgentTask[]
+  return {
+    db,
+    listByState: async (s: "queued" | "running") => all().filter((t) => t.state === s),
+    run: async () => ({ ok: true }),
+    now: () => at(nowMs),
+    listOnEngine: async () => all().filter((t) => t.engineRun),
+    ...(statuses
+      ? {
+          engineStatus: async (id: string) => {
+            const v = statuses[id] ?? "not_found"
+            if (v instanceof Error) throw v
+            return v
+          },
+        }
+      : {}),
+  }
+}
+
+test("D1: a run the engine lost is closed with a reconciled entry, never left waiting", async () => {
+  const db = new MemoryAgentDb()
+  await onEngine(db, "held", "awaiting_review")
+  await onEngine(db, "cancelled", "awaiting_review")
+  await onEngine(db, "gone", "running")
+  await onEngine(db, "done-unrecorded", "approved")
+  await onEngine(db, "mid-send", "sending")
+  await onEngine(db, "unreadable", "awaiting_review")
+  const out = await sweepAgentTasks(sweepDeps(db, 60 * 60_000, {
+    wrun_held: "pending",
+    wrun_cancelled: "cancelled",
+    wrun_gone: "not_found",
+    "wrun_done-unrecorded": "completed",
+    "wrun_mid-send": "failed",
+    wrun_unreadable: new Error("engine down"),
+  }))
+  assert.deepEqual(out.lostRuns.sort(), ["cancelled", "done-unrecorded", "gone", "mid-send"])
+  assert.equal(out.engineUnchecked, 1)
+  assert.deepEqual(out.failedStale, [], "an engine-held run is not judged by the 15-minute clock")
+  assert.equal(db.task("held")?.state, "awaiting_review")
+  assert.ok(db.task("held")?.engineRun)
+  for (const [id, state, code] of [["cancelled", "failed", "engine-cancelled"], ["gone", "failed", "engine-not-found"], ["done-unrecorded", "failed", "engine-completed"], ["mid-send", "needs_reconciliation", "engine-failed"]] as const) {
+    const t = db.task(id)!
+    assert.equal(t.state, state, id)
+    assert.equal(t.engineRun, undefined, `${id} no longer waits on the engine`)
+    const e = db.entries(id).at(-1)!
+    assert.deepEqual([e.kind, e.reasonCode, e.refs?.run], ["reconciled", code, `wrun_${id}`])
+    assert.equal(verifyChain(db.entries(id)).ok, true)
+  }
+  // A second sweep changes nothing.
+  const again = await sweepAgentTasks(sweepDeps(db, 70 * 60_000, { wrun_held: "pending", wrun_unreadable: "running" }))
+  assert.deepEqual(again.lostRuns, [])
+})
+
+test("D1: a wait past the cap is closed before the engine's retention can lose it, with or without the engine's status", async () => {
+  assert.ok(ENGINE_WAIT_CAP_MS < ENGINE_RETENTION_MS)
+  const db = new MemoryAgentDb()
+  await onEngine(db, "old", "awaiting_review", NOW)
+  await onEngine(db, "young", "awaiting_review", at(ENGINE_WAIT_CAP_MS - 60_000))
+  const out = await sweepAgentTasks(sweepDeps(db, ENGINE_WAIT_CAP_MS + 1000))
+  assert.deepEqual(out.lostRuns, ["old"])
+  assert.equal(out.engineUnchecked, 1, "without the engine's status, the young wait is counted, not closed")
+  const e = db.entries("old").at(-1)!
+  assert.deepEqual([e.kind, e.reasonCode, db.task("old")?.state], ["expired", "engine-wait-cap", "failed"])
+  assert.equal(db.task("young")?.state, "awaiting_review")
+})
+
+test("an engine run is attached and cleared through the ledger step, and checked as an id", async () => {
+  const db = new MemoryAgentDb()
+  await onEngine(db, "t", "running")
+  assert.equal(db.task("t")?.engineRun?.id, "wrun_t")
+  await step(db, { taskId: "t", at: at(5000), decide: () => ({ fields: { kind: "run_finished", actor: "system" }, to: "awaiting_review", engineRun: null }) })
+  assert.equal(db.task("t")?.engineRun, undefined)
+  assert.throws(() => engineRunOf("has a space", NOW), LedgerRefused)
+  assert.throws(() => engineRunOf("wrun_1", "not a time"), LedgerRefused)
 })

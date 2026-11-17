@@ -24,8 +24,8 @@ import type { ToolDeclarations } from "../engine/tool-policy"
 import type { SkillFiles } from "../skills/loader"
 import { contentHash, draftApproval } from "../send-approval"
 import { skillMode, type AgentControls } from "./controls"
-import { ROUTING_OUTCOMES, newTask, type AgentTask } from "./ledger"
-import { createTask, step, type AgentDb } from "./ledger-server"
+import { ROUTING_OUTCOMES, budgetRoot, newTask, type AgentTask } from "./ledger"
+import { checkBudget, createTask, step, type AgentDb } from "./ledger-server"
 import { SEND_APPROVALS_COLLECTION, TEST_SINK_RECIPIENTS } from "./send-email"
 import { SCRIPT_TOOL, SCRIPT_TOOL_DECLARATION, skillScriptTool, type SandboxFactory } from "./skill-scripts"
 import { addressOf } from "../core-model/messages"
@@ -170,6 +170,8 @@ export interface IntakeDeps {
   arrivalMark: (formId: string, email: string) => Promise<ArrivalMark>
   /** A model from its slug: the guarded Gateway in production; a scripted model in tests. */
   model: (slug: string) => LanguageModel
+  /** What a task's chain has spent, in US dollars (lib/engine/cost-ledger.ts readTaskSpend). Throwing refuses the run. */
+  taskSpend: (root: string) => Promise<number>
   sandbox?: SandboxFactory
   now: () => string
   runId: string
@@ -213,6 +215,10 @@ export async function runIntake(taskId: string, deps: IntakeDeps): Promise<Intak
   const controls = await deps.controls()
   if (skillMode(controls, INTAKE_SKILL) === "off") return refuse("skill-off", "The kill switch is on or intake is switched off", "cancelled")
 
+  // The task's shared budget, checked before any model call (fails closed when the spend cannot be read).
+  const budget = await checkBudget(deps.db, task, deps.taskSpend)
+  if (!budget.ok) return refuse(budget.code, budget.reason)
+
   // The pin, the skill at it, and the fingerprint (checked again by the loader).
   const pin = await deps.pin()
   if (!pin || pin.skill !== INTAKE_SKILL || !/^[a-f0-9]{40}$/.test(pin.commit) || !/^[a-f0-9]{64}$/.test(pin.sha256)) return refuse("not-pinned", "No version of the intake skill is pinned")
@@ -255,7 +261,7 @@ export async function runIntake(taskId: string, deps: IntakeDeps): Promise<Intak
       tools,
       declarations: INTAKE_DECLARATIONS,
       model: deps.model(model),
-      task: { task: taskId, kind: `skill:${INTAKE_SKILL}`, property: "434" },
+      task: { task: taskId, kind: `skill:${INTAKE_SKILL}`, property: "434", root: budgetRoot(task) },
       maxSteps: INTAKE_MAX_STEPS,
       maxOutputTokens: INTAKE_MAX_OUTPUT_TOKENS,
       providerOptions: { anthropic: { output_config: { effort: "low" } } },
