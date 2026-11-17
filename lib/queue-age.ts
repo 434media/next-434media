@@ -55,7 +55,7 @@ export const QUEUES: QueueSpec[] = [
   // since its last update; one still `queued` an hour after it last moved means the sweep (every 10 minutes) cannot run it.
   {
     name: "agent-review",
-    what: "agent drafts waiting for your decision in Waiting on you (/admin/people)",
+    what: "agent drafts waiting for your decision in To do (/admin/todo)",
     collection: "agent_tasks",
     where: { field: "state", equals: "awaiting_review" },
     ageField: "updatedAt",
