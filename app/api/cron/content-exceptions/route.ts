@@ -11,7 +11,7 @@ export const maxDuration = 60
 
 /**
  * GET /api/cron/content-exceptions — the end-of-day content exceptions report (434 build sequence V1 item 0, founder
- * 2026-11-17). Each evening: every approved or scheduled post whose day to post has passed but is not confirmed
+ * 2026-11-17). At 4 pm Central (22:00 UTC; 5 pm in daylight time), before the day ends: every approved or scheduled post whose day to post has passed but is not confirmed
  * Posted, grouped by the person assigned, and one email to each of them. Nothing when there is nothing. A post whose
  * assignee is not an active team member with an address goes to the founder instead. Reads and reports; changes no post.
  */

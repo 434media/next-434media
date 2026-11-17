@@ -22,7 +22,7 @@
     },
     {
       "path": "/api/cron/content-exceptions",
-      "schedule": "0 1 * * *"
+      "schedule": "0 22 * * *"
     },
     {
       "path": "/api/cron/stale-opportunity-alert",
