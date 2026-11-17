@@ -10,6 +10,8 @@ const BUILD_BUDGET_MS = 200_000
 const BRAND_ID = "milcity"
 /** Staff only: the list goes to the producer's 434 address (STORY_LIST_TO overrides it, comma-separated). */
 const DEFAULT_TO = "audrey@434media.com"
+/** Where Audrey's replies ("Reply to this email with feedback") go: the founder. */
+const REPLY_TO = process.env.STORY_LIST_REPLY_TO || "marcos@434media.com"
 
 /**
  * GET /api/cron/story-list — the morning story list (434 build sequence V1 item 0, founder 2026-11-17). Weekday
@@ -43,7 +45,8 @@ export async function GET(request: NextRequest) {
 
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://www.434media.com"
     const mail = storyListEmail(list, { brand: active.profile.name, day: today, createUrl: `${baseUrl}/admin/content`, versionId: active.versionId })
-    const { error } = await getResend().emails.send({ from: sender, to, subject: mail.subject, text: mail.text, html: mail.html })
+    // The email says "Reply to this email with feedback": replies go to the founder, not to the sending address.
+    const { error } = await getResend().emails.send({ from: sender, to, replyTo: REPLY_TO, subject: mail.subject, text: mail.text, html: mail.html })
     const detail = {
       today, kind: list.kind, profile: active.versionId, stories: list.stories.length,
       photoLeads: list.stories.filter(s => "pageUrl" in s.photo).length, hold: list.hold?.slice(0, 300) ?? null,
