@@ -21,6 +21,10 @@
       "schedule": "0 13 * * 1"
     },
     {
+      "path": "/api/cron/content-exceptions",
+      "schedule": "0 1 * * *"
+    },
+    {
       "path": "/api/cron/stale-opportunity-alert",
       "schedule": "0 12 * * 1"
     },
