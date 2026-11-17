@@ -84,7 +84,7 @@ const FONT = "-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif"
 /**
  * The email to the producer (founder, 2026-11-17: formatted like a briefing, not plain text). A navy header with the
  * brand and the day, one card per candidate (a red numeral, the outlet and date, the headline, why it fits, links to
- * the story and the photo lead). Replies reach the founder (the route's reply-to). `text` is the plain-text alternative for mail clients that
+ * the story and the photo lead). Just the list: no buttons, no feedback step (founder, 2026-11-17). `text` is the plain-text alternative for mail clients that
  * show no HTML. The profile version is kept in the run record, not shown to the producer.
  */
 export function storyListEmail(list: Pick<StoryList, "stories" | "hold">, p: { brand: string; day: string; createUrl: string; versionId: string }): { subject: string; text: string; html: string } {
@@ -142,7 +142,7 @@ export function storyListEmail(list: Pick<StoryList, "stories" | "hold">, p: { b
 <tr><td bgcolor="${RED}" style="background:${RED};height:4px;font-size:0;line-height:0;">&nbsp;</td></tr>
 <tr><td style="padding:22px 28px 16px;font-family:${FONT};font-size:15px;line-height:1.5;color:#333;">${esc(lead)}</td></tr>
 ${list.stories.map(card).join("")}
-<tr><td style="padding:10px 28px 24px;"><div style="font-family:${FONT};font-size:12px;line-height:1.5;color:#999;border-top:1px solid #EEE;padding-top:14px;">Sent each weekday morning by the 434 MEDIA content engine. Reply to this email with feedback.</div></td></tr>
+<tr><td style="padding:0 0 14px;font-size:0;line-height:0;">&nbsp;</td></tr>
 </table></td></tr></table></body></html>`
 
   return { subject, text, html }
