@@ -1,11 +1,12 @@
 // The Firestore implementation of the core model's store and of the lead path. Every write here clears the
 // read view's cache (lib/core-model/read.ts) as well as the module's own list cache.
 
-import { captureLeadFromContactForm, createLead, findLeadByEmail } from "@/lib/firestore-leads"
+import { captureLeadFromContactForm, createLead, deleteLead, findLeadByEmail } from "@/lib/firestore-leads"
 import * as people from "@/lib/firestore-people"
 import * as orgs from "@/lib/firestore-organizations"
 import * as affs from "@/lib/firestore-affiliations"
 import * as acts from "@/lib/firestore-activities"
+import { removeTriage } from "@/lib/firestore-triage-undo"
 import type { LeadSource } from "@/types/crm-types"
 import type { Activity, Person } from "@/types/core-model"
 import { invalidateCoreView } from "./read"
@@ -39,6 +40,7 @@ export const firestoreCoreStore: CoreStore = {
   createActivity: writes(acts.createActivity),
   getTriage: acts.getTriage,
   recordTriage: writes(acts.recordTriage),
+  removeTriage: writes(removeTriage),
   recordMerge: writes(acts.recordMerge),
 }
 
@@ -71,10 +73,10 @@ export const firestoreLeadPath: LeadPath = {
         source: activity.channel || "434Media",
       })
       invalidateCoreView()
-      return { leadId: r.leadId }
+      return { leadId: r.leadId, created: r.created }
     }
     const existing = await findLeadByEmail(email)
-    if (existing) return { leadId: existing.id }
+    if (existing) return { leadId: existing.id, created: false }
     const lead = await createLead({
       name: person.name || email,
       company: activity.contact.company || "",
@@ -88,6 +90,11 @@ export const firestoreLeadPath: LeadPath = {
       tags: [],
     })
     invalidateCoreView()
-    return { leadId: lead.id }
+    return { leadId: lead.id, created: true }
+  },
+  /** Undo only (undoTriage): the lead a triage created seconds ago. Never called for a lead that already existed. */
+  async removeLead(leadId: string) {
+    await deleteLead(leadId)
+    invalidateCoreView()
   },
 }

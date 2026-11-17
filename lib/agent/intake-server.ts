@@ -11,7 +11,7 @@ import type { LanguageModel } from "ai"
 import { COLLECTIONS } from "../firebase-admin"
 import { readAgentControls } from "./controls"
 import { firestoreAgentDb } from "./ledger-server"
-import { AGENT_SKILLS_COLLECTION, INTAKE_SKILL, queueIntake, runIntake, type IntakeDeps, type IntakeSubmission, type SkillPin } from "./intake"
+import { AGENT_SKILLS_COLLECTION, INTAKE_SKILL, queueIntake, runIntake, type ArrivalMark, type IntakeDeps, type IntakeSubmission, type SkillPin } from "./intake"
 import { vercelSandbox } from "./skill-scripts"
 
 const str = (v: unknown) => (typeof v === "string" ? v : undefined)
@@ -68,6 +68,32 @@ async function readDecisionMemory(email: string): Promise<string> {
   }
 }
 
+/**
+ * The token guard's reading: "spam" when the old inbox marked the submission spam; "duplicate" when a draft to the same
+ * address was made within an approval's life and was not rejected (waiting, approved or sent). Fails open to null on a
+ * read error, so a broken read never blocks intake; the founder still reviews every draft.
+ */
+export async function readArrivalMark(formId: string, email: string): Promise<ArrivalMark> {
+  try {
+    const { getDb } = await import("../firebase-admin")
+    const { DEFAULT_APPROVAL_TTL_MS } = await import("../send-approval")
+    const { SEND_APPROVALS_COLLECTION } = await import("./send-email")
+    const d = getDb()
+    const state = (await d.collection("submission_states").doc(`contact_forms:${formId}`).get()).data()
+    if (state?.state === "spam") return "spam"
+    const since = new Date(Date.now() - DEFAULT_APPROVAL_TTL_MS).toISOString()
+    const prior = await d.collection(SEND_APPROVALS_COLLECTION).where("payload.to", "array-contains", email).limit(20).get()
+    const live = prior.docs.some((x) => {
+      const a = x.data() as { createdAt?: string; rejection?: unknown; arrival?: { formId?: string } }
+      return a.arrival?.formId !== formId && !a.rejection && typeof a.createdAt === "string" && a.createdAt >= since
+    })
+    return live ? "duplicate" : null
+  } catch (e) {
+    console.error("[agent:intake] the spam and duplicate check could not read; running without it:", e instanceof Error ? e.message : e)
+    return null
+  }
+}
+
 export function liveIntakeDeps(): IntakeDeps {
   return {
     db: firestoreAgentDb(),
@@ -76,6 +102,7 @@ export function liveIntakeDeps(): IntakeDeps {
     skillAt: async (commit) => (await import("../skills/source")).readSkillAt(INTAKE_SKILL, commit),
     submission: readSubmission,
     decisions: readDecisionMemory,
+    arrivalMark: readArrivalMark,
     // A slug resolves through the guarded Gateway, the AI SDK's default provider (instrumentation.ts).
     model: (slug) => slug as LanguageModel,
     sandbox: vercelSandbox,

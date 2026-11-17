@@ -35,6 +35,7 @@ import type {
   Relationship,
   TriageDecision,
   TriageRecord,
+  TriageUndo,
   Visibility,
 } from "@/types/core-model"
 import { validateActivity, type ActivityInput } from "./activity"
@@ -73,13 +74,17 @@ export interface CoreStore {
   createActivity(input: ActivityInput): Promise<Activity>
   getTriage(activityId: string): Promise<TriageRecord | null>
   recordTriage(record: TriageRecord): Promise<void>
+  /** Undo only (undoTriage): the activity goes back to the inbox. */
+  removeTriage(activityId: string): Promise<void>
   recordMerge(record: Omit<MergeRecord, "id">): Promise<void>
 }
 
 /** The existing lead path (lib/firestore-leads.ts), behind an interface so it can be tested. */
 export interface LeadPath {
   /** Never called for a personal Person: the service refuses before it gets here. */
-  createLeadFor(person: Person, activity: Activity): Promise<{ leadId: string | null }>
+  createLeadFor(person: Person, activity: Activity): Promise<{ leadId: string | null; created?: boolean }>
+  /** Undo only: removes a lead this triage created a moment ago. A lead that already existed is never touched. */
+  removeLead?(leadId: string): Promise<void>
 }
 
 export class DuplicateError extends Error {
@@ -328,6 +333,8 @@ export interface TriageResult {
   stored: boolean
   person?: Person
   leadId?: string
+  /** The activity the decision was recorded on (a phone arrival gets a new one when saved): what an undo names. */
+  activityId?: string
 }
 
 /** True for an address-book entry that is waiting in the inbox and has never been written to the store. */
@@ -379,6 +386,19 @@ export async function triageActivity(
   const relationship: Relationship =
     decision === "promote" ? "business" : (input.relationship ?? activity.relationship ?? "business")
   if (relationship === "personal" && !founder) throw new CoreRuleError("Only the founder can save a personal contact.", 400)
+  const arrivalRelationship: Relationship = activity.relationship ?? "business"
+  // The Person as it was before this decision, so an undo can put it back (undoTriage).
+  const email = normalizeEmail(activity.contact.email)
+  const prior = email ? await store.findPersonByEmail(email) : null
+  const before: TriageUndo["person_before"] = prior
+    ? { lifecycle_stage: prior.lifecycle_stage, relationship: prior.relationship, visibility: prior.visibility }
+    : undefined
+  const undoOf = (person: Person | undefined, leadCreated: boolean): TriageUndo => ({
+    person_created: Boolean(person && !prior),
+    ...(before ? { person_before: before } : {}),
+    lead_created: leadCreated,
+    arrival_relationship: arrivalRelationship,
+  })
 
   if (isPendingGoogleContact(activity)) {
     if (decision === "dismiss") {
@@ -407,8 +427,8 @@ export async function triageActivity(
     await pending.discard(pendingId)
     activity = { ...arrival.activity }
     if (decision === "save") {
-      await store.recordTriage({ id: activity.id, decision, by: actor, at: now(), person_id: linked.id })
-      return { decision, stored: true, person: linked }
+      await store.recordTriage({ id: activity.id, decision, by: actor, at: now(), person_id: linked.id, undo: undoOf(linked, false) })
+      return { decision, stored: true, person: linked, activityId: activity.id }
     }
   } else {
     const existing = await store.getTriage(activity.id)
@@ -416,8 +436,8 @@ export async function triageActivity(
   }
 
   if (decision === "dismiss") {
-    await store.recordTriage({ id: activity.id, decision, by: actor, at: now() })
-    return { decision, stored: true }
+    await store.recordTriage({ id: activity.id, decision, by: actor, at: now(), undo: undoOf(undefined, false) })
+    return { decision, stored: true, activityId: activity.id }
   }
 
   let { person } = await ensurePerson(store, {
@@ -441,14 +461,68 @@ export async function triageActivity(
   }
 
   let leadId: string | undefined
+  let leadCreated = false
   if (decision === "promote") {
     person = await promoteToBusiness(store, person, founder)
     const result = await leads.createLeadFor(person, activity)
     if (!result.leadId) throw new CoreRuleError("The lead could not be created through the lead path.", 502)
     leadId = result.leadId
+    leadCreated = result.created === true
   }
-  await store.recordTriage({ id: activity.id, decision, by: actor, at: now(), person_id: person.id, ...(leadId ? { lead_id: leadId } : {}) })
-  return { decision, stored: true, person, leadId }
+  await store.recordTriage({
+    id: activity.id,
+    decision,
+    by: actor,
+    at: now(),
+    person_id: person.id,
+    ...(leadId ? { lead_id: leadId } : {}),
+    undo: undoOf(person, leadCreated),
+  })
+  return { decision, stored: true, person, leadId, activityId: activity.id }
+}
+
+/** How long a triage decision can be undone. The toast offers Undo for a few seconds; the server allows a little more. */
+export const TRIAGE_UNDO_WINDOW_MS = 2 * 60 * 1000
+
+/**
+ * Undo a triage decision made a moment ago (the founder, 2026-11-16, after a Lead tapped by accident): the activity goes
+ * back to the inbox, the Person's stage and relationship go back to what they were (a Person this triage created goes
+ * back to an unsorted contact, as the arrival proposed it), and a lead this triage created through the lead path is
+ * removed. A lead that already existed is left alone. Only the person who decided, or the founder, may undo, and only
+ * within TRIAGE_UNDO_WINDOW_MS. A record written before undo existed is never undone.
+ */
+export async function undoTriage(
+  store: CoreStore,
+  leads: LeadPath,
+  input: { activityId: string; actor: string; founder?: boolean; at?: string },
+): Promise<{ decision: TriageDecision; leadRemoved: boolean }> {
+  const rec = await store.getTriage(input.activityId)
+  if (!rec) throw new CoreRuleError("There is nothing to undo.", 404)
+  if (rec.by !== input.actor && input.founder !== true) throw new CoreRuleError("Only the person who decided can undo it.", 403)
+  const at = Date.parse(input.at ?? now())
+  if (!(at - Date.parse(rec.at) <= TRIAGE_UNDO_WINDOW_MS)) throw new CoreRuleError("Too late to undo. Change it on the person instead.", 409)
+  if (!rec.undo) throw new CoreRuleError("This decision was recorded before undo existed; change it on the person instead.", 409)
+  let leadRemoved = false
+  if (rec.lead_id && rec.undo.lead_created) {
+    if (!leads.removeLead) throw new CoreRuleError("The lead path cannot remove a lead.", 502)
+    await leads.removeLead(rec.lead_id)
+    leadRemoved = true
+  }
+  if (rec.person_id) {
+    const person = await store.getPerson(rec.person_id)
+    const back = rec.undo.person_before ?? (rec.undo.person_created
+      ? { lifecycle_stage: "contact" as LifecycleStage, ...relationshipAndVisibility({ relationship: rec.undo.arrival_relationship }) }
+      : undefined)
+    if (person && back) {
+      const patch: Partial<NewPerson> = {}
+      if (person.lifecycle_stage !== back.lifecycle_stage) patch.lifecycle_stage = back.lifecycle_stage
+      if (person.relationship !== back.relationship) patch.relationship = back.relationship
+      if (person.visibility !== back.visibility) patch.visibility = back.visibility
+      if (Object.keys(patch).length) await store.updatePerson(person.id, patch)
+    }
+  }
+  await store.removeTriage(input.activityId)
+  return { decision: rec.decision, leadRemoved }
 }
 
 /**

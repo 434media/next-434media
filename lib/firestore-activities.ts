@@ -106,6 +106,7 @@ export async function listTriage(): Promise<Map<string, TriageRecord>> {
       at: toIsoString(raw.at),
       person_id: typeof raw.person_id === "string" ? raw.person_id : undefined,
       lead_id: typeof raw.lead_id === "string" ? raw.lead_id : undefined,
+      ...(raw.undo && typeof raw.undo === "object" ? { undo: raw.undo as TriageRecord["undo"] } : {}),
     })
   }
   triageCache = { data, ts: Date.now() }
@@ -116,7 +117,15 @@ export async function getTriage(activityId: string): Promise<TriageRecord | null
   const doc = await getDb().collection(TRIAGE).doc(safeDocId(activityId)).get()
   if (!doc.exists) return null
   const raw = doc.data() as FirebaseFirestore.DocumentData
-  return { id: activityId, decision: raw.decision, by: raw.by, at: toIsoString(raw.at), person_id: raw.person_id, lead_id: raw.lead_id }
+  return {
+    id: activityId,
+    decision: raw.decision,
+    by: raw.by,
+    at: toIsoString(raw.at),
+    person_id: raw.person_id,
+    lead_id: raw.lead_id,
+    ...(raw.undo && typeof raw.undo === "object" ? { undo: raw.undo as TriageRecord["undo"] } : {}),
+  }
 }
 
 /** One record per activity. `create` refuses a second, so two people triaging at once cannot both win. */

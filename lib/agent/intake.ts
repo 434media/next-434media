@@ -162,12 +162,20 @@ export interface IntakeDeps {
   submission: (formId: string) => Promise<IntakeSubmission | null>
   /** Decision memory for the person and their company, already summarized and bounded (lib/core-model/decisions.ts). */
   decisions: (email: string) => Promise<string>
+  /**
+   * Whether the arrival is marked spam, or duplicates one already drafted. Either refuses the run before the model is
+   * called (the decision of 2026-11-16: "no draft is generated for an arrival marked spam or duplicate"), so no tokens
+   * are spent on it.
+   */
+  arrivalMark: (formId: string, email: string) => Promise<ArrivalMark>
   /** A model from its slug: the guarded Gateway in production; a scripted model in tests. */
   model: (slug: string) => LanguageModel
   sandbox?: SandboxFactory
   now: () => string
   runId: string
 }
+
+export type ArrivalMark = "spam" | "duplicate" | null
 
 export type IntakeOutcome =
   | { ok: true; approvalId: string; outcome: IntakeResult["outcome"] }
@@ -219,6 +227,10 @@ export async function runIntake(taskId: string, deps: IntakeDeps): Promise<Intak
   const submission = await deps.submission(formId)
   if (!submission) return refuse("no-submission", "The submission is gone")
   if (skillMode(controls, INTAKE_SKILL) === "proof" && !TEST_SINK_RECIPIENTS.includes(addressOf(submission.email))) return refuse("proof-only", "Intake is in proof mode and this arrival is not the test sink", "cancelled")
+  // The token guard: an arrival marked spam, or a duplicate of one already drafted, gets no model call.
+  const mark = await deps.arrivalMark(formId, submission.email)
+  if (mark === "spam") return refuse("arrival-spam", "The arrival is marked spam; no draft is made", "cancelled")
+  if (mark === "duplicate") return refuse("arrival-duplicate", "A draft for this person is already waiting or was decided recently; no second draft is made", "cancelled")
 
   let result: IntakeResult | null = null
   const submit_intake = tool({
