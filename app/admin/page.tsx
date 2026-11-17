@@ -1,8 +1,6 @@
-import { AdminOverview } from "@/components/admin/AdminOverview"
+import { redirect } from "next/navigation"
 
-// /admin is the shared home for every admin role — a one-glance map of the
-// pipeline (Audiences + Inbox → Leads → Clients) with live counts, instead of
-// dropping newcomers straight into the CRM dashboard.
+// /admin lands on To do, the first screen after sign-in (founder, 2026-11-17). The pipeline map is /admin/overview.
 export default function AdminIndexPage() {
-  return <AdminOverview />
+  redirect("/admin/todo")
 }
