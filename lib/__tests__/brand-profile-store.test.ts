@@ -237,3 +237,9 @@ test("Firestore: Save, Publish and Restore refuse a draft another person saved s
   const fresh = draftToken((await store.get(id))!.draft)
   assert.ok((await store.publish(id, BY, AT, fresh)).ok)
 })
+
+test("an example may name its series; an invalid series is refused", () => {
+  const withExamples = (approved: unknown[]) => publishProblems({ ...docWith(published.milcity), draft: { profile: published.milcity, examples: { approved, rejected: [] } as never, updated_by: BY, updated_at: AT } })
+  assert.deepEqual(withExamples([{ text: "An approved news card.", series: "news", at: AT }]).filter(p => p.startsWith("examples")), [])
+  assert.ok(withExamples([{ text: "An approved news card.", series: "News Card!" }]).some(p => p.startsWith("examples.approved[0]")))
+})

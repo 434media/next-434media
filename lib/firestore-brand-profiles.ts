@@ -132,7 +132,7 @@ export async function readPublishedProfile(id: string, db?: FirebaseFirestore.Fi
   if (!doc?.published) return { problems: [`no published brand profile for ${id}`] }
   const problems = profileProblems(id, { [id]: doc.published.profile })
   if (problems.length) return { problems }
-  return { active: { profile: doc.published.profile as BrandProfile, versionId: doc.published.version_id } }
+  return { active: { profile: doc.published.profile as BrandProfile, versionId: doc.published.version_id, examples: doc.published.examples } }
 }
 
 /**

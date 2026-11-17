@@ -54,6 +54,8 @@ export interface Story {
   title: string
   primaryUrl: string
   publisher: string
+  /** Research's one line on why the story fits the brand (the morning story list shows it, story-list.ts). */
+  why?: string
   publishedAt?: string
   /**
    * News dated by an outlet's report (founder, 2026-10-18): the report's date, which the card prints. The outlet is
