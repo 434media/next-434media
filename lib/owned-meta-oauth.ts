@@ -29,6 +29,8 @@ export interface OAuthDeps {
   sendCapable(email: string, role: AdminRole): Promise<boolean>
   nowSeconds(): number
   onRefuse?(reason: string): void
+  /** The scopes this connector accepts. Defaults to the publisher's; the 434 connector passes its own (lib/connector-434). */
+  scopes?: readonly string[]
 }
 
 const b64json = (part: string): Record<string, unknown> | null => { try { const v = JSON.parse(Buffer.from(part, "base64url").toString("utf8")); return v && typeof v === "object" && !Array.isArray(v) ? v : null } catch { return null } }
@@ -56,7 +58,8 @@ export async function verifyConnectorToken(token: string | undefined, deps: OAut
   if (payload.nbf !== undefined && (typeof payload.nbf !== "number" || payload.nbf > now)) return refuse("nbf")
   if (typeof payload.iat !== "number" || typeof payload.sub !== "string" || !payload.sub) return refuse("claims")
   if (payload.azp !== c.clientId || payload.client_id !== undefined && payload.client_id !== c.clientId) return refuse("client")
-  const scopes = [...new Set(typeof payload.scope === "string" ? payload.scope.split(" ").filter((s): s is ConnectorScope => (CONNECTOR_SCOPES as readonly string[]).includes(s)) : [])]
+  const accepted: readonly string[] = deps.scopes ?? CONNECTOR_SCOPES
+  const scopes = [...new Set(typeof payload.scope === "string" ? payload.scope.split(" ").filter(s => accepted.includes(s)) : [])]
   if (!scopes.length) return refuse("scope")
   const caller = c.callers.find(x => x.subject === payload.sub)
   if (!caller) return refuse("subject_not_mapped")
@@ -66,20 +69,20 @@ export async function verifyConnectorToken(token: string | undefined, deps: OAut
 }
 
 /** Strict, fail-closed configuration. Returns null with problem names (never values) when incomplete. */
-export function loadConnectorConfig(env: Record<string, string | undefined>): { config: ConnectorConfig | null; problems: string[] } {
+export function loadConnectorConfig(env: Record<string, string | undefined>, prefix = "OWNED_META_CONNECTOR"): { config: ConnectorConfig | null; problems: string[] } {
   const problems: string[] = []
   const https = (v: string | undefined) => { try { const u = new URL(v || ""); return u.protocol === "https:" && !u.username && !u.password && !u.search && !u.hash } catch { return false } }
-  const issuer = env.OWNED_META_CONNECTOR_ISSUER, audience = env.OWNED_META_CONNECTOR_AUDIENCE, clientId = env.OWNED_META_CONNECTOR_CLIENT_ID, jwksUrl = env.OWNED_META_CONNECTOR_JWKS_URL
-  if (!https(issuer) || !issuer!.endsWith("/")) problems.push("OWNED_META_CONNECTOR_ISSUER")
-  if (!https(audience)) problems.push("OWNED_META_CONNECTOR_AUDIENCE")
-  if (!clientId || !/^[A-Za-z0-9_-]{8,128}$/.test(clientId)) problems.push("OWNED_META_CONNECTOR_CLIENT_ID")
-  if (!https(jwksUrl) || issuer && https(issuer) && new URL(jwksUrl!).origin !== new URL(issuer).origin) problems.push("OWNED_META_CONNECTOR_JWKS_URL")
+  const issuer = env[`${prefix}_ISSUER`], audience = env[`${prefix}_AUDIENCE`], clientId = env[`${prefix}_CLIENT_ID`], jwksUrl = env[`${prefix}_JWKS_URL`]
+  if (!https(issuer) || !issuer!.endsWith("/")) problems.push(`${prefix}_ISSUER`)
+  if (!https(audience)) problems.push(`${prefix}_AUDIENCE`)
+  if (!clientId || !/^[A-Za-z0-9_-]{8,128}$/.test(clientId)) problems.push(`${prefix}_CLIENT_ID`)
+  if (!https(jwksUrl) || issuer && https(issuer) && new URL(jwksUrl!).origin !== new URL(issuer).origin) problems.push(`${prefix}_JWKS_URL`)
   let callers: ConnectorCaller[] = []
   try {
-    const raw = JSON.parse(env.OWNED_META_CONNECTOR_CALLERS || "null")
+    const raw = JSON.parse(env[`${prefix}_CALLERS`] || "null")
     if (!Array.isArray(raw) || !raw.length || raw.length > 8 || !raw.every(x => x && typeof x.subject === "string" && x.subject.length > 3 && typeof x.email === "string" && /^[^\s@]+@434media\.com$/i.test(x.email) && Object.keys(x).length === 2) || new Set(raw.map(x => x.subject)).size !== raw.length) throw new Error()
     callers = raw.map(x => ({ subject: x.subject, email: x.email.toLowerCase() }))
-  } catch { problems.push("OWNED_META_CONNECTOR_CALLERS") }
+  } catch { problems.push(`${prefix}_CALLERS`) }
   return problems.length ? { config: null, problems } : { config: { issuer: issuer!, audience: audience!, clientId: clientId!, jwksUrl: jwksUrl!, callers }, problems }
 }
 
