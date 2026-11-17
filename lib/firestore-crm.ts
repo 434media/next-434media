@@ -1,4 +1,4 @@
-import { runtimePublishingEnabled, guardedContentUpdate, sendBackPlan, draftBatch, manifestHash, isExcludedPostId, MetaBlocked, type MetaManifest, type MetaBatch, type MetaStore, type MetaRecord, type MetaBrand } from "./owned-meta-publisher"
+import { runtimePublishingEnabled, publishedAtOf, guardedContentUpdate, sendBackPlan, draftBatch, manifestHash, isExcludedPostId, MetaBlocked, type MetaManifest, type MetaBatch, type MetaStore, type MetaRecord, type MetaBrand } from "./owned-meta-publisher"
 import { getDb, admin } from "./firebase-admin"
 import { createHash } from "node:crypto"
 import { normalizeAssigneeName } from "../components/crm/types"
@@ -1754,7 +1754,7 @@ export function ownedMetaStore(): MetaStore {
           if (next.batch.hash!==oldHash || manifestHash(next.batch.manifest)!==oldManifest || JSON.stringify(next.batch.approval)!==oldApproval) throw new MetaBlocked("Immutable batch changed")
           tx.set(bRef,next.batch)
           const complete=Object.values(next.batch.jobs).every(j=>j.status==="verified"||j.status==="operator_confirmed")
-          tx.update(ref,{ "owned_meta.started":data.owned_meta.started || !!next.batch.claim, ...(complete?{status:"posted",posted_at:data.posted_at || new Date().toISOString()}:{}),updated_at:admin.firestore.FieldValue.serverTimestamp() })
+          tx.update(ref,{ "owned_meta.started":data.owned_meta.started || !!next.batch.claim, ...(complete?{status:"posted",posted_at:data.posted_at || publishedAtOf(next.batch) || new Date().toISOString()}:{}),updated_at:admin.firestore.FieldValue.serverTimestamp() })
         }
         return result
       })

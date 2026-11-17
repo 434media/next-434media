@@ -19,6 +19,7 @@ interface GraphResponse {
   error?: { code?: number }; status_code?: string
   status?: { video_status?: string; uploading_phase?: { status?: string }; processing_phase?: { status?: string }; publishing_phase?: { status?: string } }
   data?: PublishedItem[]; is_ai_generated?: boolean
+  published?: boolean; permalink_url?: string; from?: { id?: string }
   paging?: { next?: string; cursors?: { after?: string } }
 }
 const reelState = (s: GraphResponse["status"]) => [s?.video_status, s?.uploading_phase?.status, s?.processing_phase?.status, s?.publishing_phase?.status]
@@ -145,14 +146,26 @@ export function createMetaProvider(args: { accessToken: string; evidence: MetaPu
       // Membership in the destination's published collection is state AND ownership evidence.
       // A direct media lookup/permalink alone can describe an unpublished upload.
       const listing = await graph(`${d === "instagram" ? m.destinations.instagramId : m.destinations.pageId}/${d === "instagram" ? "media" : "published_posts"}`, { fields: d === "instagram" ? "id,permalink" : "id,permalink_url,attachments{target{id}}", limit: 100 })
-      const published = (listing.data || []).find((item) => item.id === remoteId || d === "facebook" && item.attachments?.data?.some((a) => a.target?.id === remoteId))
+      let published = (listing.data || []).find((item) => item.id === remoteId || d === "facebook" && item.attachments?.data?.some((a) => a.target?.id === remoteId))
       if (!published) {
         // A Reel is processed and published after finish: while Meta is still working on it, the publisher checks again.
         if (d === "facebook" && m.format === "video" && m.placements.facebook === "reels") {
           const s = (await graph(remoteId,{ fields:"status" })).status, phases = reelState(s)
           if (s && !phases.includes("error") && s.publishing_phase?.status !== "complete") return { verified:false,pending:true,blocker:"Meta is still processing the Reel; it is checked again every 5 minutes" }
         }
-        return { verified:false,blocker:"Exact remote ID not found in the account's published collection; use operator evidence if needed" }
+        // A Page video (/videos) is processed after upload too, and its post may not list the video as an attachment
+        // target. The video itself answers: published, owned by this Page, ready. Still processing: checked again, as a
+        // Reel is. Before 2026-11-17 a Page video was read once, before Meta finished, and left for a person.
+        if (d === "facebook" && m.format === "video" && m.placements.facebook === "video") {
+          const v = await graph(remoteId,{ fields:"published,status,permalink_url,from{id}" }), phases = reelState(v.status)
+          if (phases.includes("error")) return { verified:false,blocker:"Meta reports an error on this Page video; inspect the Page" }
+          if (v.from?.id !== m.destinations.pageId) return { verified:false,blocker:"The video does not belong to this Page; inspect the Page" }
+          if (v.status?.video_status !== "ready" || v.published !== true) return { verified:false,pending:true,blocker:"Meta is still processing the Page video; it is checked again every 5 minutes" }
+          const link = typeof v.permalink_url === "string" && v.permalink_url.startsWith("/") ? `https://www.facebook.com${v.permalink_url}` : v.permalink_url
+          published = { id: remoteId, permalink_url: link } as PublishedItem
+        } else {
+          return { verified:false,blocker:"Exact remote ID not found in the account's published collection; use operator evidence if needed" }
+        }
       }
       // Read the label back only where it was sent: IG media creation and FB Reels finish.
       const labelSent = sendsAiLabel(m,d)
