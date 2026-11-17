@@ -21,7 +21,7 @@ test("a repeat inquiry with a different message stays, however soon", () => {
   assert.deepEqual(ids(deduplicateContactForms([sub("a", "default", "2026-11-17T02:14:00Z"), sub("b", "default", "2026-11-17T02:15:00Z", "Also a podcast.")])), ["a", "b"])
 })
 
-test("a double submit (same message within ten minutes) shows once, as the first", () => {
+test("a double submit (same message within a minute) shows once, as the first", () => {
   assert.deepEqual(ids(deduplicateContactForms([sub("b", "default", "2026-11-17T02:14:20Z"), sub("a", "default", "2026-11-17T02:14:00Z")])), ["a"])
 })
 
@@ -32,4 +32,8 @@ test("an AIM copy of a default submission is shown once, as the default copy", (
 test("AIM submissions with no default copy show once", () => {
   const out = deduplicateContactForms([sub("aim1", "aimsatx", "2026-11-17T02:14:00Z", "x", "AIM"), sub("aim2", "aimsatx", "2026-11-17T03:14:00Z", "x", "AIM")])
   assert.deepEqual(ids(out), ["aim1"])
+})
+
+test("a resubmission minutes later with the same message stays (the Proof Run pair, 3 min 21 s apart)", () => {
+  assert.deepEqual(ids(deduplicateContactForms([sub("a", "default", "2026-11-17T02:14:25Z"), sub("b", "default", "2026-11-17T02:17:46Z")])), ["a", "b"])
 })

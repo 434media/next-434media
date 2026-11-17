@@ -2,12 +2,12 @@
 import type { ContactFormSubmission } from "./firestore-contact-forms"
 
 /** A second identical submission this soon after the first is a double submit, not a new inquiry. */
-const DOUBLE_SUBMIT_MS = 10 * 60 * 1000
+const DOUBLE_SUBMIT_MS = 60 * 1000
 
 /**
  * Deduplicate contact form submissions by email+source+name. An AIM submission mirrored in the default database is
  * shown once, as the default copy. In the default database only a double submit collapses (the same message within
- * ten minutes); any other repeat from the same person is a new inquiry and stays. Collapsing every repeat hid a
+ * a minute); any other repeat from the same person is a new inquiry and stays. Collapsing every repeat hid a
  * second inquiry from the People Inbox (2026-11-17).
  */
 export function deduplicateContactForms(submissions: ContactFormSubmission[]): ContactFormSubmission[] {
