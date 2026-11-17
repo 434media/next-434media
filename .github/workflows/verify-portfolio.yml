@@ -244,6 +244,9 @@ jobs:
       - run: tsx --test lib/__tests__/security-sweep-2026-10-29.test.ts
       # /api/parse-event behind the admin gate (security log PSM-1): requireAdmin first, no wildcard CORS, one caller.
       - run: tsx --test lib/__tests__/parse-event-gated.test.ts
+      # The hourly Firestore -> Mailchimp push sends only new or changed contacts, all of them once a day, and stops at a
+      # time budget inside maxDuration; errored or deferred contacts are retried the next run.
+      - run: tsx --test lib/__tests__/mailchimp-push-plan.test.ts
 
       # Optional: the same suites again on MilCityUSA's real published profile, when the BRAND_PROFILE_FIXTURE Actions
       # secret holds a published version's 434-context backup record. Secrets are not given to pull requests from
