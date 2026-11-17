@@ -205,6 +205,10 @@ test("an approved draft sends once, to the test sink, and the CRM keeps the sent
 test("a real person's address is refused: in the proof slice only the test sink can receive", async () => {
   assert.equal(recipientRefusal([SINK]), null)
   assert.equal(recipientRefusal(["Dana <DELIVERED@resend.dev>"]), null)
+  // Resend's labelled test address is allowed by name only; another label, or a label on a real domain, is not.
+  assert.equal(recipientRefusal(["delivered+reject@resend.dev"]), null)
+  assert.notEqual(recipientRefusal(["delivered+other@resend.dev"]), null)
+  assert.notEqual(recipientRefusal(["dana+reject@lonestar.example"]), null)
   assert.notEqual(recipientRefusal(["dana@lonestar.example"]), null)
   assert.notEqual(recipientRefusal([SINK, "dana@lonestar.example"]), null)
   const { db, deps, sends } = await setup({ to: "dana@lonestar.example" })
