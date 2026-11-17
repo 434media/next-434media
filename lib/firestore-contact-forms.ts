@@ -1,4 +1,5 @@
 import { getDb, getNamedDb, COLLECTIONS, NAMED_DATABASES } from "./firebase-admin"
+import { deduplicateContactForms } from "./contact-form-dedupe"
 
 // Firestore contact form submission interface
 export interface ContactFormSubmission {
@@ -157,21 +158,6 @@ async function getAimsatxContactSubmissions(filters?: { source?: string }): Prom
     console.error("Error fetching aimsatx contact submissions:", error)
     return []
   }
-}
-
-/**
- * Deduplicate contact form submissions across databases by email+source+name
- */
-function deduplicateContactForms(submissions: ContactFormSubmission[]): ContactFormSubmission[] {
-  const seen = new Map<string, ContactFormSubmission>()
-  for (const sub of submissions) {
-    const key = `${sub.email.toLowerCase()}|${sub.source}|${sub.firstName}|${sub.lastName}`
-    const existing = seen.get(key)
-    if (!existing || (sub._dbSource === "default" && existing._dbSource !== "default")) {
-      seen.set(key, sub)
-    }
-  }
-  return Array.from(seen.values())
 }
 
 /**
