@@ -83,6 +83,15 @@ test("a call outside any task is still recorded, as untracked", async () => {
   assert.equal(records[0].listUsd, undefined)
 })
 
+test("a child task's calls carry its chain root, so the shared budget can be summed; a root's calls do not", async () => {
+  const records: CallCostRecord[] = []
+  const model = wrapLanguageModel({ model: textModel("anthropic/claude-sonnet-5.5"), middleware: guardMiddleware({ record: async r => { records.push(r) }, prices: async () => null }) })
+  await withTask({ task: "child", kind: "k", root: "root" }, () => generateText({ model, prompt: "hi" }))
+  await withTask({ task: "root", kind: "k", root: "root" }, () => generateText({ model, prompt: "hi" }))
+  await withTask({ task: "solo", kind: "k" }, () => generateText({ model, prompt: "hi" }))
+  assert.deepEqual(records.map(r => [r.task, r.root]), [["child", "root"], ["root", undefined], ["solo", undefined]])
+})
+
 test("the guard refuses a call once the day's global or property cap is reached", async () => {
   let called = 0
   const mk = (spend: { totalUsd: number; byProperty: Record<string, number> }) =>

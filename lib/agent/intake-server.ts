@@ -105,6 +105,7 @@ export function liveIntakeDeps(): IntakeDeps {
     arrivalMark: readArrivalMark,
     // A slug resolves through the guarded Gateway, the AI SDK's default provider (instrumentation.ts).
     model: (slug) => slug as LanguageModel,
+    taskSpend: async (root) => (await import("../engine/cost-ledger")).readTaskSpend(root),
     sandbox: vercelSandbox,
     now: () => new Date().toISOString(),
     runId: `run-${randomUUID()}`,

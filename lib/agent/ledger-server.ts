@@ -10,7 +10,7 @@
  * Ledger entries are written with `create` only: this module has no path that updates or deletes one
  * (lib/__tests__/agent-ledger.test.ts reads this file to check).
  */
-import { AGENT_LEDGER_COLLECTION, AGENT_TASKS_COLLECTION, LedgerRefused, advance, buildEntry, type AgentTask, type LedgerEntry, type LedgerFields, type TaskState } from "./ledger"
+import { AGENT_LEDGER_COLLECTION, AGENT_TASKS_COLLECTION, LedgerRefused, advance, budgetRoot, buildEntry, withinBudget, type AgentTask, type LedgerEntry, type LedgerFields, type TaskState } from "./ledger"
 
 /** One transaction. Reads first, then writes. */
 export interface AgentTx {
@@ -97,7 +97,13 @@ export interface StepInput<P> {
    * Decide from what was read: the ledger fields, the state to move to, and the CRM writes to make with them. Throwing
    * here writes nothing.
    */
-  decide: (task: AgentTask, prepared: P) => { fields: LedgerFields; to?: TaskState; write?: (tx: AgentTx) => void }
+  decide: (task: AgentTask, prepared: P) => {
+    fields: LedgerFields
+    to?: TaskState
+    write?: (tx: AgentTx) => void
+    /** The engine run the task now waits on (lib/agent/ledger.ts `engineRunOf`), or null when it no longer waits on one. */
+    engineRun?: AgentTask["engineRun"] | null
+  }
 }
 
 /** One step of a task: CRM writes, the ledger entry and the task's new head, committed together. */
@@ -106,9 +112,11 @@ export async function step<P = undefined>(db: AgentDb, s: StepInput<P>): Promise
     const task = await tx.getTask(s.taskId)
     if (!task) throw new LedgerRefused(`no task ${s.taskId}`)
     const prepared = (s.read ? await s.read(tx, task) : undefined) as P
-    const { fields, to, write } = s.decide(task, prepared)
+    const { fields, to, write, engineRun } = s.decide(task, prepared)
     const entry = buildEntry(task, fields, s.at)
-    const next = advance(task, entry, to)
+    let next = advance(task, entry, to)
+    if (engineRun) next = { ...next, engineRun }
+    else if (engineRun === null) next = withoutEngineRun(next)
     write?.(tx)
     tx.appendEntry(entry)
     tx.putTask(next)
@@ -144,4 +152,30 @@ export async function applyStop(db: AgentDb, plan: { cancel: string[]; reconcile
     }
   }
   return done
+}
+
+function withoutEngineRun(task: AgentTask): AgentTask {
+  const next = { ...task }
+  delete next.engineRun
+  return next
+}
+
+export type BudgetCheck = { ok: true; spentUsd: number; budgetUsd: number } | { ok: false; code: "budget-spent" | "budget-unreadable"; reason: string }
+
+/**
+ * The shared budget, checked at a run start: what the task's chain has spent (`spend`, the recorded model-call costs of
+ * the root and every task under it) against the root task's budget. A spend that cannot be read refuses the run: a
+ * budget that cannot be checked is not a budget (fails closed, as the guard's day cap does).
+ */
+export async function checkBudget(db: AgentDb, task: AgentTask, spend: (root: string) => Promise<number>): Promise<BudgetCheck> {
+  const rootId = budgetRoot(task)
+  try {
+    const root = rootId === task.id ? task : await db.run((tx) => tx.getTask(rootId))
+    if (!root) return { ok: false, code: "budget-unreadable", reason: `The root task ${rootId} is missing` }
+    const spentUsd = await spend(rootId)
+    if (!withinBudget(root.budgetUsd, spentUsd)) return { ok: false, code: "budget-spent", reason: `The task's chain has spent $${spentUsd.toFixed(4)} of $${root.budgetUsd}` }
+    return { ok: true, spentUsd, budgetUsd: root.budgetUsd }
+  } catch (e) {
+    return { ok: false, code: "budget-unreadable", reason: e instanceof Error ? e.message : String(e) }
+  }
 }

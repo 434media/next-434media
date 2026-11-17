@@ -6,9 +6,9 @@
  * message bodies; personal content stays in the CRM (founder ruling). The CRM write and the ledger write commit
  * together").
  *
- *  - `agent_tasks/<taskId>`: the registry. One record per business task; its `state` and `cancelled` change, nothing
- *    else does. It carries the ledger's head (`seq`, `head`) so each entry is appended in the same transaction that
- *    reads it.
+ *  - `agent_tasks/<taskId>`: the registry. One record per business task; its `state`, `cancelled` and `engineRun` (the
+ *    engine run it waits on, if any) change, nothing else does. It carries the ledger's head (`seq`, `head`) so each
+ *    entry is appended in the same transaction that reads it.
  *  - `agent_ledger/<taskId>_<seq>`: the ledger. Created once and never updated or deleted. Each entry holds the hash of
  *    the one before it, so a removed or altered entry breaks the chain (`verifyChain`).
  *
@@ -75,12 +75,26 @@ export interface AgentTask {
   objective: string
   /** The one workflow it may run, e.g. "434-intake-qualification/draft". Polí chooses among declared paths only. */
   workflow: string
-  /** The task's share of the budget, in US dollars. */
+  /**
+   * The task's budget, in US dollars. It is shared: a task another task started counts against its root's budget, and
+   * its own figure is not used (`budgetRoot`). Checked at every run start (ledger-server.ts `checkBudget`).
+   */
   budgetUsd: number
   cancelled: boolean
   state: TaskState
-  /** Back to what started it: an event id ("contact_forms:<id>") and, for a task another task started, its parent. */
-  lineage: { event: string; parent?: string }
+  /**
+   * Back to what started it: an event id ("contact_forms:<id>") and, for a task another task started, its parent and the
+   * first task of the chain (`root`), whose budget it shares. Build a child's lineage with `childLineage`.
+   */
+  lineage: { event: string; parent?: string; root?: string }
+  /** Who asked for the task, in the ledger's actor form ("founder", "member:<id>"). Never a name or an address. */
+  requestedBy?: string
+  /**
+   * The engine run the task is waiting on, when its run waits inside the engine (an approval held in a durable run).
+   * The sweep checks it against the engine, so a run the engine loses is closed, never left "waiting" (the D1 finding,
+   * 434-context#359).
+   */
+  engineRun?: { id: string; since: string }
   pins: TaskPins
   /** The ledger's head: the last entry's sequence number and hash. */
   seq: number
@@ -208,10 +222,12 @@ export function verifyChain(entries: LedgerEntry[]): { ok: boolean; problem?: st
 }
 
 /** A new task, before its first entry. */
-export function newTask(input: { id: string; property: string; objective: string; workflow: string; budgetUsd: number; lineage: { event: string; parent?: string }; pins?: TaskPins; now: string }): AgentTask {
+export function newTask(input: { id: string; property: string; objective: string; workflow: string; budgetUsd: number; lineage: AgentTask["lineage"]; requestedBy?: string; pins?: TaskPins; now: string }): AgentTask {
   if (!ID.test(input.id)) throw new LedgerRefused("a task id must be an id")
   if (!ID.test(input.lineage?.event ?? "") || input.lineage.event.includes("@")) throw new LedgerRefused("a task's lineage starts at an event id")
   if (input.lineage.parent !== undefined && !ID.test(input.lineage.parent)) throw new LedgerRefused("a parent task is an id")
+  if (input.lineage.root !== undefined && (!ID.test(input.lineage.root) || input.lineage.parent === undefined)) throw new LedgerRefused("a root task is an id, and only a task with a parent has one")
+  if (input.requestedBy !== undefined && !ACTOR.test(input.requestedBy)) throw new LedgerRefused("who asked is founder, member:<id>, skill:<name> or system")
   for (const [k, v] of [["property", input.property], ["objective", input.objective], ["workflow", input.workflow]] as const) {
     if (!/^[A-Za-z0-9][A-Za-z0-9_./:-]{0,99}$/.test(v)) throw new LedgerRefused(`a task's ${k} is an identifier`)
   }
@@ -225,12 +241,35 @@ export function newTask(input: { id: string; property: string; objective: string
     cancelled: false,
     state: "queued",
     lineage: strip(input.lineage),
+    ...(input.requestedBy !== undefined ? { requestedBy: input.requestedBy } : {}),
     pins: strip(input.pins ?? {}),
     seq: 0,
     head: GENESIS,
     createdAt: input.now,
     updatedAt: input.now,
   }
+}
+
+/** The lineage for a task that `parent` starts: it keeps the parent's root, so the whole chain shares one budget. */
+export function childLineage(parent: Pick<AgentTask, "id" | "lineage">, event: string): AgentTask["lineage"] {
+  return { event, parent: parent.id, root: parent.lineage.root ?? parent.id }
+}
+
+/** The task whose budget this task spends: the first task of its chain, or itself. */
+export function budgetRoot(task: Pick<AgentTask, "id" | "lineage">): string {
+  return task.lineage.root ?? task.lineage.parent ?? task.id
+}
+
+/** A run may start only while the chain has spent less than its budget. */
+export function withinBudget(budgetUsd: number, spentUsd: number): boolean {
+  return Number.isFinite(spentUsd) && spentUsd < budgetUsd
+}
+
+/** The engine run a task waits on, checked: an id and a time. */
+export function engineRunOf(id: string, since: string): NonNullable<AgentTask["engineRun"]> {
+  if (!ID.test(id)) throw new LedgerRefused("an engine run is an id")
+  if (!Number.isFinite(Date.parse(since))) throw new LedgerRefused("an engine run needs a time")
+  return { id, since }
 }
 
 /** The task after an entry: the head moves, and the state moves when `to` is given and allowed. */

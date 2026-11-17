@@ -65,6 +65,7 @@ export function guardMiddleware(deps: GuardDeps): LanguageModelMiddleware {
         kind: task.kind,
         ...(task.property ? { property: task.property } : {}),
         ...(task.skill ? { skill: task.skill } : {}),
+        ...(task.root && task.root !== task.task ? { root: task.root } : {}),
         model: modelId,
         ...(provider ? { provider } : {}),
         tokens,
