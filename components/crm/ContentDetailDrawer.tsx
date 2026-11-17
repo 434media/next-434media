@@ -136,6 +136,9 @@ export function ContentDetailDrawer({
   const [isPublishing, setIsPublishing] = useState(false)
   const [showPublishForm, setShowPublishForm] = useState(false)
   const [publishUrl, setPublishUrl] = useState("")
+  // The day it went out: the scheduled day when that has passed, else today (a late mark keeps its week; 2026-11-17).
+  const [postedOn, setPostedOn] = useState("")
+  const [editingPostedOn, setEditingPostedOn] = useState(false)
   const [publishError, setPublishError] = useState<string | null>(null)
   // Ingest-asset-from-URL local state (locally-generated media / large video)
   const [ingestUrl, setIngestUrl] = useState("")
@@ -429,6 +432,37 @@ export function ContentDetailDrawer({
     }
   }
 
+  const today = () => new Date().toLocaleDateString("en-CA")
+  const defaultPostedOn = () => {
+    const scheduled = post?.date_to_post ? post.date_to_post.split("T")[0] : ""
+    return scheduled && scheduled <= today() ? scheduled : today()
+  }
+
+  // Correct the posted date on a post already posted (the publish route, posted_at alone).
+  const handleChangePostedOn = async () => {
+    if (!post?.id || !postedOn) return
+    setIsPublishing(true)
+    setPublishError(null)
+    try {
+      const res = await fetch(`/api/admin/crm/content-posts/${post.id}/publish`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ posted_at: postedOn }),
+      })
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        throw new Error(data.error || "Failed to change the posted date")
+      }
+      setEditingPostedOn(false)
+      onDecided?.()
+    } catch (err) {
+      setPublishError(err instanceof Error ? err.message : "Failed to change the posted date")
+    } finally {
+      setIsPublishing(false)
+    }
+  }
+
   // Mark-as-posted. Records the live URL (optional) and flips status → posted
   // via the publish route, then reloads + closes.
   const handlePublish = async () => {
@@ -440,7 +474,7 @@ export function ContentDetailDrawer({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ published_url: publishUrl.trim() || undefined }),
+        body: JSON.stringify({ published_url: publishUrl.trim() || undefined, posted_at: postedOn || undefined }),
       })
       if (!res.ok) {
         const data = await res.json().catch(() => ({}))
@@ -968,7 +1002,40 @@ export function ContentDetailDrawer({
                         <p className="text-green-800">
                           <span className="font-medium">Posted</span>
                           {post.posted_at && <> · {formatDate(post.posted_at)}</>}
+                          {!editingPostedOn && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setPostedOn(post.posted_at ? new Date(post.posted_at).toLocaleDateString("en-CA") : defaultPostedOn())
+                                setPublishError(null)
+                                setEditingPostedOn(true)
+                              }}
+                              className="ml-2 text-xs text-green-700 underline hover:text-green-800"
+                            >
+                              Change date
+                            </button>
+                          )}
                         </p>
+                        {editingPostedOn && (
+                          <div className="mt-2 flex flex-wrap items-center gap-2">
+                            <label className="text-xs text-green-800" htmlFor="posted-on-edit">Posted on</label>
+                            <input
+                              id="posted-on-edit"
+                              type="date"
+                              value={postedOn}
+                              max={today()}
+                              onChange={(e) => setPostedOn(e.target.value)}
+                              className="px-2 py-1 rounded border border-green-200 bg-white text-sm"
+                            />
+                            <button type="button" onClick={handleChangePostedOn} disabled={isPublishing || !postedOn} className="px-3 py-1 text-xs font-medium text-white bg-green-600 hover:bg-green-700 rounded disabled:opacity-50">
+                              Save
+                            </button>
+                            <button type="button" onClick={() => setEditingPostedOn(false)} className="text-xs text-green-700 underline">
+                              Cancel
+                            </button>
+                          </div>
+                        )}
+                        {editingPostedOn && publishError && <p className="mt-1 text-xs text-red-600">{publishError}</p>}
                         {post.published_url && (
                           <a
                             href={sanitizeUrl(post.published_url) || "#"}
@@ -988,6 +1055,19 @@ export function ContentDetailDrawer({
                   {!post.owned_meta && (post.status === "approved" || post.status === "scheduled") && (
                     <div className="space-y-2">
                       {showPublishForm && (
+                        <div className="flex items-center gap-2">
+                          <label className="text-sm text-gray-600" htmlFor="posted-on">Posted on</label>
+                          <input
+                            id="posted-on"
+                            type="date"
+                            value={postedOn}
+                            max={today()}
+                            onChange={(e) => setPostedOn(e.target.value)}
+                            className="px-3 py-2 rounded-lg bg-gray-50 border border-gray-200 text-sm focus:outline-none focus:border-green-400"
+                          />
+                        </div>
+                      )}
+                      {showPublishForm && (
                         <input
                           type="text"
                           value={publishUrl}
@@ -1000,6 +1080,7 @@ export function ContentDetailDrawer({
                       <button
                         onClick={() => {
                           if (!showPublishForm) {
+                            setPostedOn(defaultPostedOn())
                             setShowPublishForm(true)
                             setPublishError(null)
                           } else {
