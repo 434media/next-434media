@@ -15,9 +15,9 @@ import { getClients } from "@/lib/firestore-crm"
 import { getContactForms } from "@/lib/firestore-contact-forms"
 import { getAllStatesForSource } from "@/lib/firestore-submission-states"
 import { listIcpCohorts } from "@/lib/firestore-icp-cohorts"
-import type { Activity, InboxItem, Organization, Person } from "@/types/core-model"
+import type { Activity, Organization, Person } from "@/types/core-model"
 import { adaptClient, adaptContactForm, adaptLead, type CoreBundle } from "./adapters"
-import { assembleCoreView, inboxOf, onPersonTimeline, type CoreView } from "./assemble"
+import { assembleCoreView, onPersonTimeline, type CoreView } from "./assemble"
 import { scoreOrganization } from "./score"
 import { filterViewFor, type Viewer } from "./view-filter"
 import { listArrivalActivities } from "@/lib/google-contacts/server"
@@ -109,16 +109,7 @@ export async function getVisibleCoreView(viewer: Viewer): Promise<BuiltCoreView>
   return filterViewFor(await getCoreView(), viewer)
 }
 
-/** The inbox: untriaged activities with their Person and Organization (fit and grade). */
-export function inboxItems(view: CoreView): InboxItem[] {
-  const people = new Map(view.people.map((p) => [p.id, p]))
-  const orgs = new Map(view.organizations.map((o) => [o.id, o]))
-  return inboxOf(view).map((activity) => ({
-    activity,
-    person: activity.person_id ? people.get(activity.person_id) : undefined,
-    organization: activity.organization_id ? orgs.get(activity.organization_id) : undefined,
-  }))
-}
+export { inboxItems } from "./waiting"
 
 /** One Person with their affiliations (and organizations) and timeline. */
 export function personDetail(view: CoreView, id: string) {

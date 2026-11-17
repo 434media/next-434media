@@ -16,6 +16,9 @@ import { adaptContactForm } from "../core-model/adapters"
 import { consentFromSource } from "../core-model/consent"
 import { TRIAGE_UNDO_WINDOW_MS, triageActivity, undoTriage } from "../core-model/service"
 import type { Activity } from "../../types/core-model"
+import type { CoreView } from "../core-model/assemble"
+import { filterViewFor } from "../core-model/view-filter"
+import { inboxItems, waitingRows } from "../core-model/waiting"
 import type { ContactFormSubmission } from "../firestore-contact-forms"
 import { MemoryAgentDb } from "./helpers/agent-db"
 import { FakeLeadPath, MemoryStore } from "./helpers/core-memory-store"
@@ -236,4 +239,47 @@ test("undo is refused for someone else's decision, after the window, with nothin
   await assert.rejects(undoTriage(store, leads, { activityId: "old", actor: FOUNDER, founder: true }), /before undo existed/)
   // The founder may undo a staff member's decision within the window.
   assert.equal((await undoTriage(store, leads, { activityId: activity.id, actor: FOUNDER, founder: true })).decision, "save")
+})
+
+// ── Waiting on you: drafts and arrivals in one list ─────────────────────────────────────────────────────────────────
+
+const viewOf = (activities: Activity[]): CoreView => ({ people: [], organizations: [], affiliations: [], activities })
+const waitingDraft = (a: StoredApproval) => reviewItem(a, at(HOUR))
+
+test("waiting on you: an arrival with a pending draft is one row, with its draft; other arrivals follow", () => {
+  const withDraft = formArrival("form-1")
+  const plain = { ...formArrival("form-9"), occurred_at: at(-HOUR) }
+  const inbox = inboxItems(viewOf([withDraft, plain]))
+  const rows = waitingRows([waitingDraft(approval("1"))], inbox)
+  assert.deepEqual(rows.map((r) => r.kind), ["draft", "arrival"])
+  assert.equal(rows.filter((r) => (r.kind === "draft" ? r.item?.activity.id : r.item.activity.id) === withDraft.id).length, 1, "never two rows")
+  assert.equal(rows[0].kind === "draft" && rows[0].item?.activity.id, withDraft.id)
+  // A decided draft is history, not waiting: the arrival is then its own row.
+  const decidedDraft = waitingDraft(decide(approval("1"), { decision: "rejected", by: "founder", at: at(1), shownHash: approval("1").hash, reasonCode: "tone", reason: "no" }) as StoredApproval)
+  assert.deepEqual(waitingRows([decidedDraft], inbox).map((r) => r.kind), ["arrival", "arrival"])
+})
+
+test("waiting on you: triaging an arrival there removes it from the Inbox and from the list", async () => {
+  const store = new MemoryStore()
+  const arrival = formArrival("form-9")
+  const before = waitingRows([], inboxItems(viewOf([arrival])))
+  assert.equal(before.length, 1)
+  // The row's actions are the Inbox's own: the same triage, recorded once.
+  await triageActivity(store, new FakeLeadPath(), { activity: arrival, decision: "save", actor: FOUNDER, founder: true }, [])
+  const triaged = { ...arrival, triaged: store.triage.has(arrival.id) }
+  const inbox = inboxItems(viewOf([triaged]))
+  assert.equal(inbox.length, 0, "gone from the Inbox")
+  assert.equal(waitingRows([], inbox).length, 0, "gone from Waiting on you")
+})
+
+test("waiting on you: a personal phone arrival reaches the founder only", () => {
+  const phone: Activity = { id: "gc:people/c9", type: "google_contact", source: "google_contacts", occurred_at: NOW, contact: { name: "A Friend", phone: "210-555-0199" }, summary: "Added on the phone", relationship: "personal", visibility: "private", read_only: true, triaged: false, created_at: NOW }
+  const view = viewOf([phone, formArrival("form-9")])
+  for (const viewer of [{ role: "crm_only" as const }, { role: "full_admin" as const }, { role: "full_admin" as const, superAdmin: true }]) {
+    const rows = waitingRows([], inboxItems(filterViewFor(view, viewer)))
+    assert.ok(!rows.some((r) => r.kind === "arrival" && r.item.activity.id === phone.id), `hidden from ${JSON.stringify(viewer)}`)
+    assert.equal(rows.length, 1)
+  }
+  const founderRows = waitingRows([], inboxItems(filterViewFor(view, { role: "full_admin", founder: true })))
+  assert.ok(founderRows.some((r) => r.kind === "arrival" && r.item.activity.id === phone.id))
 })

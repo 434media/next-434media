@@ -6,6 +6,7 @@ import { Building2, CheckCircle2, AlertCircle, Inbox, Search, UserPlus, Users, F
 import { DetailDrawer } from "@/components/admin/DetailDrawer"
 import { DraftDrawer, type DraftItem } from "@/components/admin/review/DraftDrawer"
 import { WaitingOnYou } from "@/components/admin/people/WaitingOnYou"
+import { waitingRows } from "@/lib/core-model/waiting"
 import type { Activity, Affiliation, AffiliationRole, AddressBook, CoreRole, InboxItem, LifecycleStage, Organization, Person, Relationship } from "@/types/core-model"
 import { AFFILIATION_ROLES, CORE_ROLES } from "@/types/core-model"
 
@@ -111,7 +112,6 @@ export function PeopleWorkspace() {
   const [adding, setAdding] = useState(false)
   // "Waiting on you": the approval records, founder only on the server. null until read; [] when not the founder.
   const [drafts, setDrafts] = useState<DraftItem[] | null>(null)
-  const [draftsAllowed, setDraftsAllowed] = useState<boolean | null>(null)
   const [openDraft, setOpenDraft] = useState<DraftItem | null>(null)
   const [agents, setAgents] = useState<AgentsLine | null>(null)
   // A phone arrival's dismissal is held for the undo window: once sent, nothing about it is left to restore.
@@ -160,14 +160,12 @@ export function PeopleWorkspace() {
     try {
       const res = await fetch("/api/admin/review/waiting", { cache: "no-store" })
       if (res.status === 401 || res.status === 403) {
-        setDraftsAllowed(false)
+        // Not the founder: no drafts, and Waiting on you holds their inbox arrivals only.
         setDrafts([])
-        setTab((t) => (t === "waiting" ? "inbox" : t))
         return
       }
       const body = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(body.error ?? "Waiting on you could not be read")
-      setDraftsAllowed(true)
       setDrafts(body.items ?? [])
     } catch (e) {
       setDrafts([])
@@ -221,7 +219,7 @@ export function PeopleWorkspace() {
   }, [])
 
   useEffect(() => {
-    if (tab === "inbox" && inbox === null) void loadInbox()
+    if ((tab === "inbox" || tab === "waiting") && inbox === null) void loadInbox()
     if (tab === "people" && people === null) void loadPeople()
     if (tab === "organizations" && orgs === null) void loadOrgs()
   }, [tab, inbox, people, orgs, loadInbox, loadPeople, loadOrgs])
@@ -326,9 +324,10 @@ export function PeopleWorkspace() {
     [orgs, q],
   )
 
-  const waitingCount = drafts?.filter((d) => d.status === "pending").length
+  // The combined count: one per arrival, an arrival with a draft counted once (lib/core-model/waiting.ts).
+  const waitingCount = drafts && inbox ? waitingRows(drafts, inbox).length : undefined
   const tabs: Array<{ id: Tab; label: string; icon: typeof Inbox; count?: number }> = [
-    ...(draftsAllowed === false ? [] : [{ id: "waiting" as Tab, label: "Waiting on you", icon: ClipboardCheck, count: waitingCount }]),
+    { id: "waiting", label: "Waiting on you", icon: ClipboardCheck, count: waitingCount },
     { id: "inbox", label: "Inbox", icon: Inbox, count: inbox?.length },
     { id: "people", label: "People", icon: Users, count: people?.length },
     { id: "organizations", label: "Organizations", icon: Building2, count: orgs?.length },
@@ -426,7 +425,17 @@ export function PeopleWorkspace() {
           </p>
         )}
 
-        {tab === "waiting" && <WaitingOnYou items={drafts ?? []} loading={drafts === null} onOpen={setOpenDraft} />}
+        {tab === "waiting" && (
+          <WaitingOnYou
+            drafts={drafts ?? []}
+            inbox={shownInbox}
+            loading={drafts === null || inbox === null}
+            onOpen={setOpenDraft}
+            onOpenArrival={setOpenActivity}
+            actions={(item) => <TriageButtons item={item} busy={busy === item.activity.id} founder={founder} onTriage={triage} />}
+            sourceLabel={(item) => `${SOURCE_LABEL[item.activity.source] ?? item.activity.source}${item.activity.channel ? ` · ${item.activity.channel}` : ""}`}
+          />
+        )}
         {tab === "inbox" && (
           <InboxList
             items={shownInbox}
