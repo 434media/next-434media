@@ -7,6 +7,8 @@
 import { test } from "node:test"
 import assert from "node:assert/strict"
 import { join } from "node:path"
+import { copyFileSync, mkdtempSync } from "node:fs"
+import { tmpdir } from "node:os"
 import { generateText, tool, wrapLanguageModel } from "ai"
 import { MockLanguageModelV4 } from "ai/test"
 import { z } from "zod"
@@ -225,4 +227,20 @@ test("the heartbeat goes once a day, on the first run at or after 13:00 UTC", ()
   assert.equal(heartbeatDue(new Date("2026-11-11T13:30:00Z"), null), true)
   assert.equal(heartbeatDue(new Date("2026-11-11T14:30:00Z"), "2026-11-11T13:30:00.000Z"), false)
   assert.equal(heartbeatDue(new Date("2026-11-12T13:30:00Z"), "2026-11-11T13:30:00.000Z"), true)
+})
+
+// ── cost per task across bundles ──
+test("a task set through one copy of task-context is seen by another copy (instrumentation and routes are bundled apart)", async () => {
+  const a = await import("../engine/task-context")
+  // A second copy of the file, as a separate bundle would hold it.
+  const dir = mkdtempSync(join(tmpdir(), "task-context-"))
+  copyFileSync(join(__dirname, "../engine/task-context.ts"), join(dir, "task-context.ts"))
+  const b: typeof a = await import(join(dir, "task-context.ts"))
+  assert.notEqual(a.withTask, b.withTask, "the test needs two module instances")
+  const seen = await a.withTask({ task: "intake:t1", kind: "skill:intake", property: "434" }, async () => {
+    await new Promise(r => setTimeout(r, 1))
+    return b.currentTask()
+  })
+  assert.deepEqual(seen, { task: "intake:t1", kind: "skill:intake", property: "434" })
+  assert.equal(b.currentTask(), undefined)
 })

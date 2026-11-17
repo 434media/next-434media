@@ -19,7 +19,15 @@ export interface TaskContext {
   skill?: string
 }
 
-const store = new AsyncLocalStorage<TaskContext>()
+/**
+ * One store per process, kept on globalThis. The guard is installed from instrumentation.ts, which Next.js bundles
+ * apart from the routes, so each bundle gets its own copy of this module. A module-level store would leave the guard
+ * reading a store no route ever writes to, and every call would be recorded as "untracked" (V1 item 4 proof run,
+ * 2026-11-14 and 2026-11-17). Symbol.for gives every copy the same key.
+ */
+const STORE_KEY = Symbol.for("434.engine.taskContext")
+const holder = globalThis as unknown as Record<symbol, AsyncLocalStorage<TaskContext> | undefined>
+const store = (holder[STORE_KEY] ??= new AsyncLocalStorage<TaskContext>())
 
 export function withTask<T>(ctx: TaskContext, fn: () => T): T {
   return store.run(ctx, fn)
