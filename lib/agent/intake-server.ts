@@ -13,6 +13,7 @@ import { readAgentControls } from "./controls"
 import { firestoreAgentDb } from "./ledger-server"
 import { AGENT_SKILLS_COLLECTION, INTAKE_SKILL, queueIntake, runIntake, type ArrivalMark, type IntakeDeps, type IntakeSubmission, type SkillPin } from "./intake"
 import { vercelSandbox } from "./skill-scripts"
+import { monthlyCapUsd } from "../spend-caps"
 
 const str = (v: unknown) => (typeof v === "string" ? v : undefined)
 
@@ -106,6 +107,8 @@ export function liveIntakeDeps(): IntakeDeps {
     // A slug resolves through the guarded Gateway, the AI SDK's default provider (instrumentation.ts).
     model: (slug) => slug as LanguageModel,
     taskSpend: async (root) => (await import("../engine/cost-ledger")).readTaskSpend(root),
+    monthSpend: async () => (await import("../spend-caps-server")).readMonthSpend("intake"),
+    monthlyCapUsd: monthlyCapUsd("intake"),
     sandbox: vercelSandbox,
     now: () => new Date().toISOString(),
     runId: `run-${randomUUID()}`,

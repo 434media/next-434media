@@ -234,6 +234,14 @@
 /app/api/admin/agent/                        @434media/founder
 /app/api/admin/engine/                       @434media/founder
 /lib/exam/                                   @434media/founder
+# Monthly spend caps on the paid AI paths, and the image and video generator they guard (money; 2026-11-18).
+/lib/spend-caps.ts                           @434media/founder
+/lib/spend-caps-server.ts                    @434media/founder
+/lib/__tests__/spend-caps.test.ts            @434media/founder
+/lib/ai-generate.ts                          @434media/founder
+/lib/ai-gateway-models.ts                    @434media/founder
+/app/api/admin/crm/generate-asset/           @434media/founder
+/app/api/admin/crm/content-posts/models/     @434media/founder
 /lib/__tests__/agent-intake.test.ts          @434media/founder
 # The founder-review queue: approvals and sends (V1 item 4, the proof slice). The page is code people see, but its
 # routes approve and send, so the strictest lane applies.

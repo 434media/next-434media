@@ -14,15 +14,21 @@ export const maxDuration = 800
  *
  * GET returns the newest kept reports, or one with `?id=`.
  * Body: { suite: "intake-qualification" | "admin-ask", ref?: "main" | <commit>,
- *         model?: <slug>, only?: string[] }
+ *         model?: <slug>, only?: string[], estimate?: true, confirmedOver?: true }
  * A whole suite can take longer than one function allows; `only` runs a batch of cases.
+ *
+ * Spend guards (founder, 2026-11-18; lib/spend-caps.ts): the model is Haiku 5.5 unless the body names another. With
+ * `estimate: true` the route only reads the suite and answers what the run would cost and this month's spend; nothing
+ * is called. A run estimated over $1 needs `confirmedOver: true` (the page's second confirm). Exams and smoke tests
+ * share a $5 monthly cap, checked before any model call; at or over it, or when the spend cannot be read, nothing runs.
+ * Every call is recorded under the kind `engine-exam`, so the cap can count it.
  */
 const SUITES: Record<string, string> = { "intake-qualification": "434-intake-qualification", "admin-ask": "admin-ask" }
 
 export async function POST(req: Request) {
   const auth = await requireFounder("POST /api/admin/engine/exam")
   if ("error" in auth) return NextResponse.json({ error: auth.error }, { status: auth.status })
-  let body: { suite?: unknown; ref?: unknown; model?: unknown; only?: unknown }
+  let body: { suite?: unknown; ref?: unknown; model?: unknown; only?: unknown; estimate?: unknown; confirmedOver?: unknown }
   try {
     body = await req.json()
   } catch {
@@ -32,10 +38,11 @@ export async function POST(req: Request) {
   const skill = SUITES[suiteId]
   if (!skill) return NextResponse.json({ error: `Unknown suite; one of ${Object.keys(SUITES).join(", ")}` }, { status: 400 })
   const ref = typeof body.ref === "string" && body.ref.trim() ? body.ref.trim() : "main"
-  const model = typeof body.model === "string" && body.model.trim() ? body.model.trim() : "anthropic/claude-sonnet-5.5"
+  const { EXAM_DEFAULT_MODEL, examEstimateUsd } = await import("@/lib/engine/exam-estimate")
+  const model = typeof body.model === "string" && body.model.trim() ? body.model.trim() : EXAM_DEFAULT_MODEL
   const only = Array.isArray(body.only) ? body.only.filter((x): x is string => typeof x === "string").slice(0, 50) : undefined
 
-  const [{ modelAllowed }, source, { parseSuite }, { engineExecutor, modelJudge }, { runSuite, reportMarkdown }, { skillScriptTool }, store] = await Promise.all([
+  const [{ modelAllowed }, source, { parseSuite }, { engineExecutor, modelJudge }, { runSuite, reportMarkdown }, { skillScriptTool }, store, { livePrices }, { EXAM_CONFIRM_OVER_USD, EXAM_COST_KIND }, { checkMonthCap, monthStatus }, { withTask }] = await Promise.all([
     import("@/lib/engine/models"),
     import("@/lib/skills/source"),
     import("@/lib/exam/suite"),
@@ -43,6 +50,10 @@ export async function POST(req: Request) {
     import("@/lib/exam/runner"),
     import("@/lib/agent/skill-scripts"),
     import("@/lib/agent/exam-reports"),
+    import("@/lib/engine/cost"),
+    import("@/lib/spend-caps"),
+    import("@/lib/spend-caps-server"),
+    import("@/lib/engine/task-context"),
   ])
   if (!modelAllowed(model)) return NextResponse.json({ error: `Model ${model} is not on the engine's allow-list` }, { status: 400 })
   let meta: import("@/lib/agent/exam-reports").ExamRunMeta | null = null
@@ -51,6 +62,15 @@ export async function POST(req: Request) {
     const [files, suiteFiles] = await Promise.all([source.readSkillAt(skill, commit), source.readSuiteAt(suiteId, commit)])
     const parsed = parseSuite(suiteFiles)
     if (!parsed.ok) return NextResponse.json({ error: "The suite fails its checks", problems: parsed.problems }, { status: 422 })
+    const cases = only ? parsed.suite.cases.filter((c) => only.includes(c.id)).length : parsed.suite.cases.length
+    const estimateUsd = examEstimateUsd((await livePrices())?.prices.get(model), cases)
+    if (body.estimate === true) return NextResponse.json({ model, cases, estimateUsd, confirmOverUsd: EXAM_CONFIRM_OVER_USD, month: await monthStatus("engine-exam") })
+    // An unknown estimate counts as over the line: it asks twice too.
+    if ((estimateUsd === null || estimateUsd > EXAM_CONFIRM_OVER_USD) && body.confirmedOver !== true) {
+      return NextResponse.json({ error: "This run is estimated over $1; confirm it a second time.", code: "confirm-over", estimateUsd }, { status: 409 })
+    }
+    const cap = await checkMonthCap("engine-exam")
+    if (!cap.ok) return NextResponse.json({ error: cap.message, code: cap.code, month: { spentUsd: cap.spentUsd, capUsd: cap.capUsd } }, { status: cap.code === "monthly-cap" ? 429 : 503 })
     const executor = engineExecutor({
       skill: { files, folder: skill },
       model,
@@ -64,15 +84,17 @@ export async function POST(req: Request) {
       },
     })
     const startedAt = new Date().toISOString()
-    meta = { id: `${suiteId}-${startedAt.replace(/[-:.]/g, "")}-${model.replace(/[^a-z0-9]+/gi, "-")}`, suite: suiteId, skill, model, commit, only, planned: only ? parsed.suite.cases.filter((c) => only.includes(c.id)).length : parsed.suite.cases.length, startedAt }
+    meta = { id: `${suiteId}-${startedAt.replace(/[-:.]/g, "")}-${model.replace(/[^a-z0-9]+/gi, "-")}`, suite: suiteId, skill, model, commit, only, planned: cases, startedAt }
     await store.saveExamReport(store.startedReport(meta))
     const run = meta
-    const report = await runSuite(parsed.suite, executor, {
-      judge: modelJudge({ model, modelName: model }),
-      only,
-      gitSha: commit,
-      onCase: (partial) => store.saveExamReport(store.reportDoc(run, partial, reportMarkdown(partial), "running", new Date().toISOString())),
-    })
+    const report = await withTask({ task: run.id, kind: EXAM_COST_KIND, property: "434" }, () =>
+      runSuite(parsed.suite, executor, {
+        judge: modelJudge({ model, modelName: model }),
+        only,
+        gitSha: commit,
+        onCase: (partial) => store.saveExamReport(store.reportDoc(run, partial, reportMarkdown(partial), "running", new Date().toISOString())),
+      }),
+    )
     await store.saveExamReport(store.reportDoc(run, report, reportMarkdown(report), "done", new Date().toISOString()))
     console.info(`[POST /api/admin/engine/exam] ${suiteId}@${commit.slice(0, 7)} on ${model}: ${report.totals.pass}/${report.totals.cases} pass`)
     return NextResponse.json({ id: run.id, commit, report, markdown: reportMarkdown(report) })

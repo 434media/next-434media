@@ -279,6 +279,7 @@ export async function readConsole(now = new Date().toISOString()) {
   const d = getDb()
   const watch = readWatch(new Date(now))
   const month = readAskMonth(now)
+  const months = import("../spend-caps-server").then(({ monthStatus }) => Promise.all([monthStatus("engine-exam", now), monthStatus("intake", now)]))
   const [approvalsSnap, tasksSnap, ledgerSnap, costsSnap, controls, pin, askPin] = await Promise.all([
     d.collection(SEND_APPROVALS_COLLECTION).orderBy("createdAt", "desc").limit(100).get(),
     d.collection(AGENT_TASKS_COLLECTION).where("updatedAt", ">=", since).limit(500).get(),
@@ -289,6 +290,7 @@ export async function readConsole(now = new Date().toISOString()) {
     readPin("admin-ask"),
   ])
   const askMonth = await month
+  const [examMonth, intakeMonth] = await months
   const approvals = approvalsSnap.docs.map((x) => x.data() as StoredApproval)
   const tasks = tasksSnap.docs.map((x) => x.data() as AgentTask)
   const taskById = new Map(tasks.map((t) => [t.id, t]))
@@ -302,6 +304,8 @@ export async function readConsole(now = new Date().toISOString()) {
     pin,
     askPin,
     askMonth,
+    examMonth,
+    intakeMonth,
     queue: sortQueue(approvals.map((a) => reviewItem(a, now, taskById.get(a.taskId)))),
     reasons: groupReasons(approvals, now),
     runs,

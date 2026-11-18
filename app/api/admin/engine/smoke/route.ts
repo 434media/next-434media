@@ -16,16 +16,34 @@ export const maxDuration = 300
  * one: the translator takes invented cohort rows (as its tests do), the drafts an invented lead, and the content
  * pipeline the committed fixture profile with an offline search tool, so no web search is billed. Spends a few cents of
  * Gateway credit a run, hence super-admins only. Re-run it after any change to `ai`, `@ai-sdk/gateway` or a model slug.
+ *
+ * Spend guards (founder, 2026-11-18; lib/spend-caps.ts): GET answers the run's estimate (SMOKE_ESTIMATE_USD) and this
+ * month's spend before anyone runs it. The smoke test shares the exams' $5 monthly cap, checked before any call; at or
+ * over it, or when the spend cannot be read, nothing runs. Its calls are recorded under the kind `engine-smoke`. Each
+ * check keeps its own path's model: the smoke test exists to prove the models those paths use in production.
  */
+export async function GET() {
+  const auth = await requireSuperAdmin()
+  if ("error" in auth) return NextResponse.json({ error: auth.error }, { status: auth.status })
+  const [{ SMOKE_ESTIMATE_USD }, { monthStatus }] = await Promise.all([import("@/lib/engine/exam-estimate"), import("@/lib/spend-caps-server")])
+  return NextResponse.json({ estimateUsd: SMOKE_ESTIMATE_USD, month: await monthStatus("engine-exam") })
+}
+
 export async function POST() {
   const auth = await requireSuperAdmin()
   if ("error" in auth) return NextResponse.json({ error: auth.error }, { status: auth.status })
+  const [{ checkMonthCap }, { SMOKE_COST_KIND }, { withTask }] = await Promise.all([import("@/lib/spend-caps-server"), import("@/lib/spend-caps"), import("@/lib/engine/task-context")])
+  const cap = await checkMonthCap("engine-exam")
+  if (!cap.ok) return NextResponse.json({ error: cap.message, code: cap.code, month: { spentUsd: cap.spentUsd, capUsd: cap.capUsd } }, { status: cap.code === "monthly-cap" ? 429 : 503 })
 
-  const checks = await Promise.all([translator(), outreachDraft(), leadResearch(), contentPipeline(), images()])
+  const ranAt = new Date().toISOString()
+  const checks = await withTask({ task: `smoke:${ranAt}`, kind: SMOKE_COST_KIND, property: "434" }, () =>
+    Promise.all([translator(), outreachDraft(), leadResearch(), contentPipeline(), images()]),
+  )
   const results = checks.flat()
   const ok = results.every(r => r.ok)
   console.info("[POST /api/admin/engine/smoke]", JSON.stringify({ ok, results: results.map(r => ({ path: r.path, ok: r.ok })) }))
-  return NextResponse.json({ ok, ranAt: new Date().toISOString(), results })
+  return NextResponse.json({ ok, ranAt, results })
 }
 
 interface Check { path: string; ok: boolean; ms: number; detail?: unknown; error?: string }
