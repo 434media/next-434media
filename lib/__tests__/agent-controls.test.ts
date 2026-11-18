@@ -95,7 +95,7 @@ test("a read after a write in one transaction is refused, as Firestore refuses i
 })
 
 // ── The kill switch ─────────────────────────────────────────────────────────────────────────────────────────────────
-const LIVE: AgentControls = { stopped: false, skills: { "434-intake-qualification": "proof" }, sends: { intake_reply: true } }
+const LIVE: AgentControls = { stopped: false, skills: { "434-intake-qualification": "proof" }, sends: { intake_reply: true }, ask: false }
 
 test("the kill switch fails closed: missing, malformed, unreadable or off-Production reads as stopped", async () => {
   for (const v of [undefined, null, "on", {}, { stopped: "false" }, { stopped: 0 }]) {

@@ -13,11 +13,11 @@ export const maxDuration = 800
  * written when the run starts and after every case, so a run that hits the time limit keeps what it finished.
  *
  * GET returns the newest kept reports, or one with `?id=`.
- * Body: { suite: "intake-qualification", skill: "434-intake-qualification", ref?: "main" | <commit>,
+ * Body: { suite: "intake-qualification" | "admin-ask", ref?: "main" | <commit>,
  *         model?: <slug>, only?: string[] }
  * A whole suite can take longer than one function allows; `only` runs a batch of cases.
  */
-const SUITES: Record<string, string> = { "intake-qualification": "434-intake-qualification" }
+const SUITES: Record<string, string> = { "intake-qualification": "434-intake-qualification", "admin-ask": "admin-ask" }
 
 export async function POST(req: Request) {
   const auth = await requireFounder("POST /api/admin/engine/exam")

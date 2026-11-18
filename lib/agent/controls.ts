@@ -7,7 +7,10 @@
  * `crm_meta/owned_meta_enabled` (lib/firestore-crm.ts ownedMetaRuntimeEnabled):
  *
  *   { stopped: boolean, stopped_at?, stopped_by?, skills: { "<skill>": "off" | "proof" | "draft" },
- *     sends: { "<send path>": boolean } }
+ *     sends: { "<send path>": boolean }, ask: boolean }
+ *
+ * `ask` is the Ask panel's on/off (lib/ask/; V1 item 4, Ask panel slice 1). It is a switch of its own, not a skill
+ * mode: the panel runs only when a signed-in person asks, never on an arrival. Missing reads as off.
  *
  * Fails closed: no document, a malformed one, a read that throws, or any environment but Production reads as stopped,
  * every skill off and every send refused. A stop overrides every skill mode and every send flag.
@@ -32,12 +35,14 @@ export interface AgentControls {
   stoppedBy?: string
   skills: Record<string, SkillMode>
   sends: Record<SendPath, boolean>
+  /** The Ask panel on or off. Off unless stored exactly `true`. */
+  ask: boolean
 }
 
 const allSendsOff = (): Record<SendPath, boolean> => Object.fromEntries(SEND_PATHS.map((p) => [p, false])) as Record<SendPath, boolean>
 
 /** What an unreadable, missing or malformed switch means: stopped. */
-export const STOPPED: AgentControls = Object.freeze({ stopped: true, skills: {}, sends: allSendsOff() }) as AgentControls
+export const STOPPED: AgentControls = Object.freeze({ stopped: true, skills: {}, sends: allSendsOff(), ask: false }) as AgentControls
 
 /** Reads the stored document. Anything that is not exactly the expected shape reads as stopped. */
 export function parseControls(value: unknown): AgentControls {
@@ -58,6 +63,7 @@ export function parseControls(value: unknown): AgentControls {
     ...(typeof v.stopped_by === "string" ? { stoppedBy: v.stopped_by } : {}),
     skills,
     sends,
+    ask: v.ask === true,
   }
 }
 
@@ -65,6 +71,11 @@ export function parseControls(value: unknown): AgentControls {
 export function skillMode(c: AgentControls, skill: string): SkillMode {
   if (c.stopped) return "off"
   return c.skills[skill] ?? "off"
+}
+
+/** Whether the Ask panel may run now. A stop turns it off with everything else. */
+export function askOn(c: AgentControls): boolean {
+  return !c.stopped && c.ask === true
 }
 
 /** Whether a send on this path may be dispatched now. A stop refuses every send. */

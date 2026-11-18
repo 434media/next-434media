@@ -47,7 +47,7 @@ export class MemoryAgentDb implements AgentDb {
   }
 
   private async attempt<T>(fn: (tx: AgentTx) => Promise<T>): Promise<{ ok: true; result: T } | { ok: false }> {
-    const writes: { kind: "create" | "set"; collection: string; id: string; data: unknown }[] = []
+    const writes: { kind: "create" | "set" | "merge"; collection: string; id: string; data: unknown }[] = []
     const seen = new Map<string, number>()
     let writing = false
     const read = <D,>(collection: string, id: string): D | null => {
@@ -61,6 +61,7 @@ export class MemoryAgentDb implements AgentDb {
       getDoc: async <D,>(collection: string, id: string) => read<D>(collection, id),
       createDoc: (collection, id, data) => ((writing = true), writes.push({ kind: "create", collection, id, data: structuredClone(data) })),
       setDoc: (collection, id, data) => ((writing = true), writes.push({ kind: "set", collection, id, data: structuredClone(data) })),
+      mergeDoc: (collection, id, patch, opts) => ((writing = true), writes.push({ kind: "merge", collection, id, data: structuredClone({ ...patch, ...(opts?.touchUpdatedAt ? { updated_at: "(server time)" } : {}) }) })),
       putTask: (task) => ((writing = true), writes.push({ kind: "set", collection: AGENT_TASKS_COLLECTION, id: task.id, data: structuredClone(task) })),
       appendEntry: (entry) => ((writing = true), writes.push({ kind: "create", collection: AGENT_LEDGER_COLLECTION, id: entry.id, data: structuredClone(entry) })),
     }
@@ -76,7 +77,8 @@ export class MemoryAgentDb implements AgentDb {
     for (const w of writes) if (w.kind === "create" && this.col(w.collection).has(w.id)) throw new Error(`ALREADY_EXISTS ${w.collection}/${w.id}`)
     for (const w of writes) {
       const key = `${w.collection}/${w.id}`
-      this.col(w.collection).set(w.id, JSON.parse(JSON.stringify(w.data)))
+      const prior = w.kind === "merge" ? ((this.col(w.collection).get(w.id) as Record<string, unknown> | undefined) ?? {}) : {}
+      this.col(w.collection).set(w.id, JSON.parse(JSON.stringify(w.kind === "merge" ? { ...prior, ...(w.data as object) } : w.data)))
       this.versions.set(key, (this.versions.get(key) ?? 0) + 1)
     }
     this.commits++

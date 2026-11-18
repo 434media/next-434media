@@ -31,6 +31,7 @@ import {
   Landmark,
   Bot,
   Users,
+  MessageSquareText,
 } from "lucide-react"
 import type { LucideIcon } from "lucide-react"
 import type { SquadKey } from "@/components/crm/types"
@@ -376,6 +377,8 @@ interface AdminSidebarProps {
   /** Mobile: full overlay sidebar; otherwise a fixed rail */
   isMobile?: boolean
   onNavigate?: () => void
+  /** Opens the Ask panel (V1 item 4, Ask panel slice 1). Absent when Ask is not available to this person. */
+  onAsk?: () => void
 }
 
 export function AdminSidebar({
@@ -384,6 +387,7 @@ export function AdminSidebar({
   onToggleCollapsed,
   isMobile,
   onNavigate,
+  onAsk,
 }: AdminSidebarProps) {
   const pathname = usePathname() ?? ""
   // The session's role, which the server sets from the owners setting and the roster (lib/auth.ts).
@@ -606,6 +610,29 @@ export function AdminSidebar({
           </div>
         ))}
       </nav>
+
+      {/* Ask: the panel opens over the page; ⌘J opens it from anywhere */}
+      {onAsk && (
+        <div className="px-2 pt-2 pb-1 border-t border-neutral-200">
+          <button
+            type="button"
+            onClick={() => {
+              onNavigate?.()
+              onAsk()
+            }}
+            title={!showLabels ? "Ask (⌘J)" : undefined}
+            className="flex w-full items-center gap-2.5 px-2 py-1.5 rounded-md border border-neutral-200 bg-white text-[12px] font-medium text-neutral-900 hover:bg-neutral-50 transition-colors"
+          >
+            <MessageSquareText className="w-4 h-4 shrink-0" />
+            {showLabels && (
+              <>
+                <span className="flex-1 truncate text-left">Ask</span>
+                <kbd className="font-mono text-[10px] text-neutral-400">⌘J</kbd>
+              </>
+            )}
+          </button>
+        </div>
+      )}
 
       {/* Footer-pinned items (configuration surfaces) */}
       {footerItems.length > 0 && (

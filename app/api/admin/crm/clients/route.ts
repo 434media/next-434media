@@ -8,7 +8,7 @@ import {
   deleteClient,
   getClientsByStatus,
 } from "@/lib/firestore-crm"
-import { trackOpportunityWon } from "@/lib/ga4-events"
+import { afterClientUpdate } from "@/lib/opportunity-won"
 
 // Check admin access
 async function requireAdmin() {
@@ -163,30 +163,9 @@ export async function PUT(request: NextRequest) {
 
     const client = await updateClient(id, updates)
 
-    // Fire-and-forget GA4 server-side event when an opportunity transitions
-    // to closed_won. This is the highest-value event in the whole system —
-    // it ties revenue back to the original acquisition source.
-    if (
-      client.is_opportunity &&
-      client.disposition === "closed_won" &&
-      before?.disposition !== "closed_won"
-    ) {
-      const value = typeof client.pitch_value === "number"
-        ? client.pitch_value
-        : Number(client.pitch_value) || 0
-      const primaryEmail =
-        client.email ||
-        client.contacts?.find((c) => c.is_primary)?.email ||
-        client.contacts?.[0]?.email
-      trackOpportunityWon({
-        email: primaryEmail,
-        brand: client.brand,
-        value,
-        clientId: client.id,
-      }).catch(() => {
-        /* swallowed — analytics must not break the close */
-      })
-    }
+    // Fire-and-forget GA4 server-side event when an opportunity transitions to closed_won: the highest-value event in
+    // the whole system, tying revenue back to the original acquisition source. Shared with the Ask panel's Confirm.
+    afterClientUpdate(before, client)
 
     return NextResponse.json({ success: true, client })
   } catch (error) {

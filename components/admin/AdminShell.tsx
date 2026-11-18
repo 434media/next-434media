@@ -1,10 +1,11 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useCallback, useEffect, useState } from "react"
 import { usePathname } from "next/navigation"
 import { AdminSidebar, type SidebarUser } from "./AdminSidebar"
 import { AdminTopBar } from "./AdminTopBar"
 import { CommandPalette } from "./CommandPalette"
+import { AskPanel, type AskStatus } from "./ask/AskPanel"
 
 interface AdminShellProps {
   user: SidebarUser & { picture?: string }
@@ -19,6 +20,39 @@ export function AdminShell({ user, onProfileUpdate, children }: AdminShellProps)
   const [collapsed, setCollapsed] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
   const [hydrated, setHydrated] = useState(false)
+  // The Ask panel (V1 item 4, Ask panel slice 1): offered to whoever it is on for, and to the founder so he can find the
+  // switch while it is off. Nobody else sees the button.
+  const [askOpen, setAskOpen] = useState(false)
+  const [askStatus, setAskStatus] = useState<AskStatus | null>(null)
+  const askOffered = !!askStatus && ((askStatus.on && askStatus.permitted) || askStatus.founder)
+
+  useEffect(() => {
+    let live = true
+    fetch("/api/admin/ask", { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((s: AskStatus | null) => {
+        if (live && s && typeof s.on === "boolean") setAskStatus(s)
+      })
+      .catch(() => {})
+    return () => {
+      live = false
+    }
+  }, [])
+
+  // ⌘J / Ctrl+J opens Ask; ⌘K stays the command palette.
+  useEffect(() => {
+    if (!askOffered) return
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && !e.shiftKey && !e.altKey && e.key.toLowerCase() === "j") {
+        e.preventDefault()
+        setAskOpen((o) => !o)
+      }
+    }
+    window.addEventListener("keydown", onKey)
+    return () => window.removeEventListener("keydown", onKey)
+  }, [askOffered])
+  const openAsk = useCallback(() => setAskOpen(true), [])
+  const closeAsk = useCallback(() => setAskOpen(false), [])
 
   useEffect(() => {
     try {
@@ -52,6 +86,7 @@ export function AdminShell({ user, onProfileUpdate, children }: AdminShellProps)
           user={user}
           collapsed={collapsed}
           onToggleCollapsed={() => setCollapsed((c) => !c)}
+          onAsk={askOffered ? openAsk : undefined}
         />
       </div>
 
@@ -70,6 +105,7 @@ export function AdminShell({ user, onProfileUpdate, children }: AdminShellProps)
               onToggleCollapsed={() => setCollapsed((c) => !c)}
               isMobile
               onNavigate={() => setMobileOpen(false)}
+              onAsk={askOffered ? openAsk : undefined}
             />
           </div>
         </div>
@@ -87,6 +123,9 @@ export function AdminShell({ user, onProfileUpdate, children }: AdminShellProps)
 
       {/* Cmd+K palette — global, available on every admin page */}
       <CommandPalette />
+
+      {/* Ask (⌘J): always mounted, so the conversation survives closing the panel and moving between admin pages */}
+      <AskPanel open={askOpen} onClose={closeAsk} status={askStatus} />
     </div>
   )
 }
