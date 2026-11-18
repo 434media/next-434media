@@ -14,4 +14,4 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 1
     steps:
-      - run: echo "Review on #${{ github.event.pull_request.number }}; Lanes re-judges from the default branch."
+      - run: echo "Review on pull request ${{ github.event.pull_request.number }}; Lanes re-judges from the default branch."
