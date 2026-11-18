@@ -14,6 +14,7 @@ import {
   nextSentSet,
   pendingMembers,
   pushRequests,
+  redactEmails,
   type PlannedMember,
   type PushFn,
 } from "../mailchimp-push-plan"
@@ -53,19 +54,50 @@ test("pushRequests: one tag-set per request, at most PUSH_CHUNK members", () => 
   assert.deepEqual(reqs.map((r) => [r.tags.join("|"), r.members.length]), [["a", PUSH_CHUNK], ["a", 1], ["b", 1]])
 })
 
-test("drainPending: sends with each request's tags, retries errored members next run", async () => {
+test("drainPending: sends with each request's tags; a rejected member waits, a failed request is retried", async () => {
   const calls: Array<{ emails: string[]; tags: string[] }> = []
   const push: PushFn = async (members, tags) => {
     calls.push({ emails: members.map((x) => x.email), tags })
-    return { newMembers: 1, updatedMembers: members.length - 2, errors: [{ email: "BAD@example.com" }] }
+    return {
+      newMembers: 1,
+      updatedMembers: members.length - 3,
+      errors: [
+        { email: "BAD@example.com", code: "ERROR_GENERIC", message: "bad@example.com looks fake or invalid" },
+        { email: "flaky@example.com", code: "request_failed", message: "fetch failed" },
+      ],
+    }
   }
-  const pending = [m("ok@example.com", ["a"]), m("bad@example.com", ["a"]), m("ok2@example.com", ["a"])]
+  const pending = [m("ok@example.com", ["a"]), m("bad@example.com", ["a"]), m("flaky@example.com", ["a"]), m("ok2@example.com", ["a"])]
   const r = await drainPending(pending, push, { deadline: Number.POSITIVE_INFINITY })
-  assert.deepEqual(calls, [{ emails: ["ok@example.com", "bad@example.com", "ok2@example.com"], tags: ["a"] }])
-  assert.equal(r.attempted, 3)
-  assert.equal(r.errors, 1)
+  assert.deepEqual(calls, [
+    { emails: ["ok@example.com", "bad@example.com", "flaky@example.com", "ok2@example.com"], tags: ["a"] },
+  ])
+  assert.equal(r.attempted, 4)
+  assert.equal(r.errors, 2)
+  assert.equal(r.retryable, 1)
   assert.equal(r.deferred, 0)
-  assert.deepEqual(new Set(r.accepted), new Set([fingerprint(pending[0]), fingerprint(pending[2])]))
+  // The rejected member is remembered (not resent hourly); the failed request is not.
+  assert.deepEqual(new Set(r.accepted), new Set([fingerprint(pending[0]), fingerprint(pending[1]), fingerprint(pending[3])]))
+  assert.deepEqual(r.reasons, [
+    { code: "ERROR_GENERIC", count: 1, sample: "<email> looks fake or invalid" },
+    { code: "request_failed", count: 1, sample: "fetch failed" },
+  ])
+})
+
+test("drainPending: an error with no code is grouped as unknown and not retried", async () => {
+  const push: PushFn = async () => ({ newMembers: 0, updatedMembers: 0, errors: [{ email: "x@example.com" }] })
+  const r = await drainPending([m("x@example.com")], push, { deadline: Number.POSITIVE_INFINITY })
+  assert.equal(r.retryable, 0)
+  assert.deepEqual(r.reasons, [{ code: "unknown", count: 1, sample: "" }])
+  assert.equal(r.accepted.length, 1)
+})
+
+test("redactEmails: removes addresses, keeps the rest", () => {
+  assert.equal(
+    redactEmails("Jane.Doe+news@sub.example.co is in a compliance state; contact <a@b.io>."),
+    "<email> is in a compliance state; contact <<email>>.",
+  )
+  assert.equal(redactEmails("no address here"), "no address here")
 })
 
 test("drainPending: stops at the deadline and defers the rest", async () => {
@@ -88,7 +120,7 @@ test("nextSentSet: keeps current remembered, adds accepted, drops what left the 
   const plan = [stay, fresh]
   const out = nextSentSet(plan, new Set([fingerprint(stay), fingerprint(gone)]), [fingerprint(fresh)])
   assert.deepEqual(out, [fingerprint(stay), fingerprint(fresh)].sort())
-  // After a run, members not accepted (deferred or errored) are pending again.
+  // After a run, members not accepted (deferred, or a failed request) are pending again.
   assert.deepEqual(pendingMembers(plan, new Set(out)), [])
   assert.deepEqual(pendingMembers(plan, new Set(nextSentSet(plan, new Set(), []))).length, 2)
 })

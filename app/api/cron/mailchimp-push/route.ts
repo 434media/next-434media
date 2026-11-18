@@ -28,7 +28,10 @@ export async function GET(request: NextRequest) {
         `(${result.included} included / ${result.skipped} skipped, ${result.groups.length} tag-groups)` +
         (result.push
           ? ` — ${result.push.newMembers} new, ${result.push.updatedMembers} updated, ${result.push.errors} errors` +
-            (result.push.deferred ? `, ${result.push.deferred} left for the next run` : "")
+            (result.push.deferred ? `, ${result.push.deferred} left for the next run` : "") +
+            (result.push.errorReasons.length
+              ? ` — errors: ${result.push.errorReasons.map((r) => `${r.code} ×${r.count} ("${r.sample}")`).join("; ")}`
+              : "")
           : ""),
       detail: result as unknown as Record<string, unknown>,
     }
