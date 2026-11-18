@@ -20,7 +20,8 @@ const cardName = (fields: Record<string, string>) => { const c = cardSubject(fie
  */
 export interface McuAi {
   /** drafting: stories other drafts are working on now (any job), so research picks a different subject. */
-  research(input: { kind: RequestKind; count: number; topic?: string; today: string; recentTitles: string[]; avoid?: string[]; drafting?: string[]; seeds: McuSeeds | null }): Promise<{ candidates: Candidate[]; note?: string }>
+  /** leads: the morning story list's research, where an outlet's article or an official social post may stand in for a primary page it can't find (worker.ts ResearchOptions). */
+  research(input: { kind: RequestKind; count: number; topic?: string; today: string; recentTitles: string[]; avoid?: string[]; drafting?: string[]; seeds: McuSeeds | null; leads?: boolean }): Promise<{ candidates: Candidate[]; note?: string }>
   /**
    * direction: the requester's proactive instruction from Generate (angle, emphasis), never above the rules or the
    * source. instructions: a reviewer's change to an existing draft (the drawer, Phase 2).
@@ -263,9 +264,9 @@ export function createMcuAi(deps: { models: Record<PipelineStep, string>; search
   const run = <R extends Served, T = R>(step: PipelineStep, call: (model: string) => Promise<R>, accept: (r: R) => T | Promise<T> = r => r as unknown as T): Promise<T> =>
     servedCall(step, m[step], fallbacks[step], deps.onCall, call, accept)
   return {
-    async research({ kind, count, topic, today, recentTitles, avoid, drafting, seeds }) {
+    async research({ kind, count, topic, today, recentTitles, avoid, drafting, seeds, leads }) {
       const brief = BRAND.research.kinds[kind] ?? { want: "stories", guidance: "" }, want = brief.want
-      const task = `${seedBrief(kind, seeds)}\n\nToday is ${today}. Task: find up to ${count + 2} ${want}${topic ? `, about: ${topic}` : ""}. Search the web; for each, find the ORIGINAL primary-source page (the company, agency or service's own announcement, contract notice or official article) and give its exact URL. A news outlet's article (${BRAND.research.outletExamples}) is never the primaryUrl or an alternate: use it only to find the primary page, and leave the story out if you can't find that page. Skip anything ${BRAND.shortName} already covered (recent ${BRAND.shortName} titles below) and anything listed under NEVER. ${BRAND.research.scope} ${brief.guidance}\nNever revive: ${BRAND.never.map(n => `${n.id} — ${n.what}`).join("; ")}.${avoid?.length ? `\nThese subjects were turned down or could not be sourced; pick something clearly different: ${avoid.join("; ")}.` : ""}${drafting?.length ? `\nBeing drafted now; pick a different subject, not another angle on the same program, contract or product: ${drafting.join("; ")}.` : ""}\nRecent ${BRAND.shortName} titles:\n${recentTitles.map(t => `- ${t}`).join("\n") || "- (none found)"}`
+      const task = `${seedBrief(kind, seeds)}\n\nToday is ${today}. Task: find up to ${count + 2} ${want}${topic ? `, about: ${topic}` : ""}. Search the web; for each, find the ORIGINAL primary-source page (the company, agency or service's own announcement, contract notice or official article) and give its exact URL. ${leads ? `Prefer the primary page. If you can't find it, keep the story anyway: give the news outlet's article (${BRAND.research.outletExamples}) as reportUrl, or an official social post from the company or agency as primaryUrl. Two different stories about the same company are fine.` : `A news outlet's article (${BRAND.research.outletExamples}) is never the primaryUrl or an alternate: use it only to find the primary page, and leave the story out if you can't find that page.`} Skip anything ${BRAND.shortName} already covered (recent ${BRAND.shortName} titles below) and anything listed under NEVER. ${BRAND.research.scope} ${brief.guidance}\nNever revive: ${BRAND.never.map(n => `${n.id} — ${n.what}`).join("; ")}.${avoid?.length ? `\nThese subjects were turned down or could not be sourced; pick something clearly different: ${avoid.join("; ")}.` : ""}${drafting?.length ? `\nBeing drafted now; pick a different subject, not another angle on the same program, contract or product: ${drafting.join("; ")}.` : ""}\nRecent ${BRAND.shortName} titles:\n${recentTitles.map(t => `- ${t}`).join("\n") || "- (none found)"}`
       // Two calls, because asking for structured output in the same call as the search tool makes the model answer
       // at once from memory instead of searching (production, 2026-10-17: one step, no search, guessed URLs that
       // 404'd, then zero candidates). 1) Search: only the search tool, required on the first step; the model writes
@@ -278,10 +279,10 @@ export function createMcuAi(deps: { models: Record<PipelineStep, string>; search
       }), r => ({ text: r.text, urls: searchResultUrls(r.steps), searches: r.steps.reduce((n, st) => n + st.toolCalls.length, 0), steps: r.steps.length, finishReason: r.finishReason, providerMetadata: r.providerMetadata, usage: r.usage }))
       const seen = new Set(searched.urls.map(normalizeUrl))
       const extracted = await run("research", model => generateText({
-        model, maxOutputTokens: outputBudget(model, 8_000), providerOptions: callOptions(model, "low"),
+        model, maxOutputTokens: outputBudget(model, count > 8 ? 16_000 : 8_000), providerOptions: callOptions(model, "low"),
         tools: { submit_candidates: tool({ description: "Submit the candidates found, best first.", inputSchema: candidateSchema }) }, toolChoice: { type: "tool", toolName: "submit_candidates" },
         ...withInstructions([{ role: "system", content: `From the research notes and the search-result URLs below, submit up to ${count + 2} candidates, best first. Use URLs exactly as they appear in the search results; prefer the original primary source as primaryUrl, and put other primary pages for the same subject in alternateUrls. Return no candidates, with the reason in note, only when the notes found none.` },
-          { role: "user", content: `NOTES:\n${searched.text.slice(0, 12_000) || "(none)"}\n\nSEARCH-RESULT URLS:\n${searched.urls.slice(0, 60).join("\n") || "(none)"}` }]),
+          { role: "user", content: `NOTES:\n${searched.text.slice(0, count > 8 ? 24_000 : 12_000) || "(none)"}\n\nSEARCH-RESULT URLS:\n${searched.urls.slice(0, 60).join("\n") || "(none)"}` }]),
       }), r => submitted<z.infer<typeof candidateSchema>>(r, "submit_candidates"))
       const candidates = (extracted.candidates ?? []).slice(0, count + 2)
       console.info("[content-pipeline] research", JSON.stringify({ kind, steps: searched.steps, searches: searched.searches, resultUrls: searched.urls.length, notesChars: searched.text.length, candidates: candidates.length, inResults: candidates.filter(c => seen.has(normalizeUrl(c.primaryUrl))).length, alternates: candidates.reduce((n, c) => n + (c.alternateUrls?.length ?? 0), 0), note: extracted.note?.slice(0, 300) ?? null }))

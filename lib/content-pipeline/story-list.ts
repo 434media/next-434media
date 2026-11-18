@@ -13,6 +13,11 @@ import { confirmPhoto, researchStories, storiesInFlight, type WorkerDeps } from 
  */
 export const LIST_COUNT = 5
 export const LIST_MIN = 3
+/** Research asks for about three times the list (founder, 2026-11-18), since some candidates fail their source check. */
+export const LIST_ASK = 15
+/** Another research pass starts only with this much of the budget left: one pass, with its source checks, ran 78 s live. */
+const PASS_MS = 90_000
+const MAX_PASSES = 3
 /** Stories already sent in the last few lists: research is steered away from them, and their URLs are refused. */
 export interface SentStories { titles: string[]; urls: string[] }
 export interface ListedStory {
@@ -24,7 +29,8 @@ export interface ListedStory {
   /** The licensed photo photo first confirmed for the subject, or why none was found (or checked). */
   photo: { url: string; pageUrl: string; credit: string } | { none: string }
 }
-export interface StoryList { kind: RequestKind; stories: ListedStory[]; hold?: string; calls: ModelCall[] }
+/** dropped: why each candidate tried was left off, kept with the day's run record only (never in the email). */
+export interface StoryList { kind: RequestKind; stories: ListedStory[]; hold?: string; calls: ModelCall[]; dropped: string[]; passes: number }
 
 /** The kind the list researches: News where the brand has it (the everyday story), else its first researched kind. */
 export function listKind(): RequestKind | null {
@@ -33,28 +39,44 @@ export function listKind(): RequestKind | null {
 }
 
 /**
- * Research once (and once more, steered away from what was dropped, as a job does), then photo first on each story
- * while the budget lasts. A story whose photo check runs out of time or finds nothing still goes on the list, with
- * that said: the producer finds video and photos herself today, so a lead is help, not a gate.
+ * Research asks for LIST_ASK candidates and keeps the first LIST_COUNT that pass; while fewer have passed, it searches
+ * again, steered away from everything tried, as long as the budget allows another pass (founder, 2026-11-18: "there
+ * is no lack of promotable news"). The list offers leads, not post sources, so research runs with `leads`: a story
+ * whose primary page can't be opened, read or dated may go on an outlet's article or an official social post, and
+ * Create's strict primary-source check runs when the producer picks it. Then photo first runs on every story at once,
+ * bounded by what is left of the budget. A story whose photo check runs out of time or finds nothing still goes on
+ * the list, with that said: the producer finds video and photos herself today, so a lead is help, not a gate.
  */
 export async function buildStoryList(deps: WorkerDeps, sent: SentStories, budgetMs: number): Promise<StoryList> {
-  const started = deps.nowMs(), calls: ModelCall[] = []
+  const started = deps.nowMs(), calls: ModelCall[] = [], left = () => budgetMs - (deps.nowMs() - started)
   const kind = listKind()
-  if (!kind) return { kind: "news", stories: [], hold: "the brand profile has no researched story kind", calls }
+  if (!kind) return { kind: "news", stories: [], hold: "the brand profile has no researched story kind", calls, dropped: [], passes: 0 }
   const ai = deps.ai(c => calls.push(c))
   const [posts, seeds, inFlight] = await Promise.all([deps.content.recentPosts(), deps.seeds(), storiesInFlight(deps)])
   const titles = [...posts.map(p => p.title), ...sent.titles]
-  const job = { kind, count: LIST_COUNT }
-  let found = await researchStories(deps, ai, job, titles, seeds, [], sent.urls, inFlight, LIST_COUNT)
-  if (!Array.isArray(found)) found = await researchStories(deps, ai, job, titles, seeds, found.tried ?? [], found.triedUrls ?? sent.urls, inFlight, LIST_COUNT)
-  if (!Array.isArray(found)) return { kind, stories: [], hold: found.hold, calls }
-  const stories: ListedStory[] = []
-  for (const s of found) {
-    const left = budgetMs - (deps.nowMs() - started)
-    const photo = left < 30_000 ? { none: "not checked this morning (out of time)" } : await photoLead(deps, ai, s, kind)
-    stories.push({ title: s.title, url: s.primaryUrl, publisher: s.publisher, ...(s.publishedAt ? { publishedAt: s.publishedAt } : {}), why: s.why ?? "", photo })
-  }
-  return { kind, stories, calls }
+  const job = { kind, count: LIST_ASK }
+  const log = { dropped: [] as string[], tried: [] as string[], triedUrls: [...sent.urls] }
+  const found: Story[] = []
+  let hold: string | undefined, passes = 0
+  do {
+    passes++
+    const r = await researchStories(deps, ai, job, titles, seeds, log.tried.slice(), log.triedUrls.slice(), inFlight, LIST_COUNT - found.length, { leads: true, log })
+    // What passed is tried too: a later pass is steered away from it and never lists it twice.
+    if (Array.isArray(r)) { found.push(...r); log.tried.push(...r.map(s => s.title)); log.triedUrls.push(...r.map(s => s.primaryUrl)) }
+    else hold = r.hold
+  } while (found.length < LIST_COUNT && passes < MAX_PASSES && left() >= PASS_MS)
+  if (!found.length) return { kind, stories: [], hold: hold ?? "no candidates found", calls, dropped: log.dropped, passes }
+  const remaining = left()
+  const outOfTime: ListedStory["photo"] = { none: "not checked this morning (out of time)" }
+  const photos = await Promise.all(found.map(s => remaining < 30_000 ? Promise.resolve(outOfTime) : withinMs(photoLead(deps, ai, s, kind), remaining, outOfTime)))
+  const stories = found.map((s, i): ListedStory => ({ title: s.title, url: s.primaryUrl, publisher: s.publisher, ...(s.publishedAt ? { publishedAt: s.publishedAt } : {}), why: s.why ?? "", photo: photos[i] }))
+  return { kind, stories, calls, dropped: log.dropped, passes }
+}
+
+/** The promise's value, or `fallback` once `ms` have passed (the check itself is not cancelled). */
+function withinMs<T>(p: Promise<T>, ms: number, fallback: T): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined
+  return Promise.race([p, new Promise<T>(resolve => { timer = setTimeout(() => resolve(fallback), ms) })]).finally(() => clearTimeout(timer))
 }
 
 async function photoLead(deps: WorkerDeps, ai: ReturnType<WorkerDeps["ai"]>, story: Story, kind: RequestKind): Promise<ListedStory["photo"]> {
@@ -94,9 +116,11 @@ export function storyListEmail(list: Pick<StoryList, "stories" | "hold">, p: { b
   const subject = n
     ? `${p.brand} story list · ${shortDay} · ${n} candidate${n === 1 ? "" : "s"}`
     : `${p.brand} story list · ${shortDay} · no candidates this morning`
-  const lead = n
-    ? "Stories sourced from your references to assist in creating content."
-    : `Research found no story to suggest this morning. Why: ${list.hold ?? "no candidates found"}.`
+  const lead = !n
+    ? `Research found no story to suggest this morning. Why: ${list.hold ?? "no candidates found"}.`
+    : n < LIST_MIN
+      ? `A light news day: research found only ${n === 1 ? "one story" : `${n} stories`} worth suggesting this morning.`
+      : "Stories sourced from your references to assist in creating content."
 
   const text = [
     `${p.brand} · Morning story list · ${longDay}`,

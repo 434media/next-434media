@@ -425,11 +425,22 @@ export async function closeRoundup(store: McuStore, draftId: string, by: string,
   return { ok: true }
 }
 
+/**
+ * How a research pass may be run. `leads` (the morning story list only, founder 2026-11-18): a story may be listed on
+ * a news outlet's article or an official social post when its primary page can't be opened, read or dated, since
+ * the list offers leads, not post sources; the strict primary-source check runs in Create, when the producer picks a
+ * story. `log` collects every candidate tried and why each was dropped, whether or not any story survives.
+ */
+export interface ResearchOptions { leads?: boolean; log?: { dropped: string[]; tried: string[]; triedUrls: string[] } }
+/** Hosts whose posts count as an official social post for a lead (an account's own post, never a repost site). */
+const SOCIAL = /(^|\.)(x\.com|twitter\.com|linkedin\.com|facebook\.com|instagram\.com|threads\.net)$/
+
 /** On a hold, `tried` and `triedUrls` name the candidates that were dropped, so a second pass can avoid them. */
-export async function researchStories(deps: WorkerDeps, ai: McuAi, job: Pick<McuJob, "kind" | "count" | "topic">, recentTitles: string[], seeds: McuSeeds | null, avoid: string[] = [], avoidUrls: string[] = [], inFlight: { titles: string[]; urls: Set<string> } = { titles: [], urls: new Set() }, limit = job.count): Promise<Story[] | { hold: string; tried?: string[]; triedUrls?: string[] }> {
+export async function researchStories(deps: WorkerDeps, ai: McuAi, job: Pick<McuJob, "kind" | "count" | "topic">, recentTitles: string[], seeds: McuSeeds | null, avoid: string[] = [], avoidUrls: string[] = [], inFlight: { titles: string[]; urls: Set<string> } = { titles: [], urls: new Set() }, limit = job.count, opts: ResearchOptions = {}): Promise<Story[] | { hold: string; tried?: string[]; triedUrls?: string[] }> {
   const today = iso(deps).slice(0, 10)
-  const r = await ai.research({ kind: job.kind, count: job.count, ...(job.topic ? { topic: job.topic } : {}), today, recentTitles, seeds, ...(avoid.length ? { avoid } : {}), ...(inFlight.titles.length ? { drafting: inFlight.titles } : {}) })
+  const r = await ai.research({ kind: job.kind, count: job.count, ...(job.topic ? { topic: job.topic } : {}), today, recentTitles, seeds, ...(avoid.length ? { avoid } : {}), ...(inFlight.titles.length ? { drafting: inFlight.titles } : {}), ...(opts.leads ? { leads: true } : {}) })
   const stories: Story[] = [], dropped: string[] = [], outlets = (seeds?.orgs ?? []).filter(o => o.kind === BRAND.seeds.outletKind).map(o => o.site)
+  if (opts.log) { opts.log.tried.push(...r.candidates.map(c => c.title)); opts.log.triedUrls.push(...r.candidates.map(c => c.primaryUrl)) }
   for (const c of r.candidates) {
     if (stories.length >= limit) break
     // The primary page first, then other primary pages for the same subject (product page, .mil/.gov page, press
@@ -465,6 +476,10 @@ export async function researchStories(deps: WorkerDeps, ai: McuAi, job: Pick<Mcu
       if (viaSearch) readVia.push(url)
       page = p; publishedAt = date; break
     }
+    if (!page && opts.leads) {
+      const lead = await readLead(deps, c, job.kind, outlets, misses)
+      if (lead) { page = lead.page; publishedAt = lead.publishedAt }
+    }
     if (!page) { dropped.push(`${c.title}: source page unreachable, unreadable or out of date (${misses.join("; ").slice(0, 300)})`); continue }
     let fresh: Story["fresh"]
     if (rule?.freshHours) {
@@ -488,11 +503,36 @@ export async function researchStories(deps: WorkerDeps, ai: McuAi, job: Pick<Mcu
     const story: Story = { title: c.title, primaryUrl: page.url, publisher: c.publisher || page.siteName || new URL(page.url).hostname, ...(c.why?.trim() ? { why: c.why.trim().slice(0, 400) } : {}), ...(publishedAt ? { publishedAt } : {}), ...(dating ?? {}), ...(fresh ? { fresh } : {}), ...(readVia.length ? { readViaSearch: readVia } : {}), ...(job.kind === "breaking" && c.whyNow ? { whyNow: c.whyNow } : {}), sourceTitle: page.title || c.title, sourceText, ...(supporting.length ? { supporting: supporting.map(sp => ({ url: sp.url, title: sp.title || sp.url })) } : {}) }
     stories.push(story)
   }
+  opts.log?.dropped.push(...dropped)
   // The model's note is chatter about how it chose ("Candidates selected based on relevance…", round 2) unless it is
   // the only explanation, when nothing was found.
   if (!stories.length) return { hold: [r.candidates.length ? "" : r.note, ...dropped].filter(Boolean).join("; ") || "no candidates found", tried: [...avoid, ...r.candidates.map(c => c.title)], triedUrls: [...avoidUrls, ...r.candidates.map(c => c.primaryUrl)] }
   return stories
 }
+/**
+ * A lead for the morning story list when no primary page could be used: a news outlet's article about the story (one
+ * research named, or the report that led to it) or an official social post, read and recent like any source. A
+ * social post the fetch can't open still counts when the search dated it recently. Each miss joins `misses`.
+ */
+async function readLead(deps: WorkerDeps, c: Candidate, kind: RequestKind, outlets: string[], misses: string[]): Promise<{ page: SourcePage; publishedAt?: string } | null> {
+  const social = (u: string) => { try { return SOCIAL.test(new URL(u).hostname.toLowerCase()) } catch { return false } }
+  // Primary pages were already tried; only an outlet's article, the report research named, or a social post is new.
+  const urls = [...new Set([c.primaryUrl, ...(c.alternateUrls ?? []), ...(c.reportUrl ? [c.reportUrl] : [])])]
+    .filter(u => /^https:\/\//.test(u) && (u === c.reportUrl || isOutlet(u, outlets) || social(u))).slice(0, 4)
+  const searchDate = (u: string) => normalizeDate(u === c.reportUrl ? c.reportPublishedAt : u === c.primaryUrl ? c.publishedAt : undefined)
+  for (const url of urls) {
+    let p: SourcePage | null = null
+    try { p = await deps.fetchPage(url) } catch { /* a social post may still be dated by the search, below */ }
+    const date = normalizeDate(p?.publishedAt) ?? searchDate(url)
+    const stale = staleSource(kind, date, deps.nowMs())
+    if (stale) { misses.push(`lead ${url} ${stale}`); continue }
+    if (p && p.text.length >= (social(url) ? 80 : 400)) return { page: p, ...(date ? { publishedAt: date } : {}) }
+    if (social(url)) return { page: { url, title: c.title, text: "", ...(c.publisher ? { siteName: c.publisher } : {}) }, ...(date ? { publishedAt: date } : {}) }
+    misses.push(`lead ${url} could not be read`)
+  }
+  return null
+}
+
 /** A story's source text: the primary page, then each supporting page under its own heading (the replay set builds its stories the same way). */
 export function storySourceText(page: SourcePage, supporting: SourcePage[]): string {
   return supporting.length ? [page.text.slice(0, 16_000), ...supporting.map(sp => `--- SUPPORTING SOURCE: ${sp.title || sp.url} (${sp.url}) ---\n${sp.text.slice(0, 4_000)}`)].join("\n\n") : page.text

@@ -25,7 +25,8 @@ import { candidateProblems, copyProblems, MAX_CANDIDATE_BATCHES } from "../conte
 import { sourcedFacts, MIN_FACTS, placeholderLines, unsourcedClaims } from "../content-pipeline/worker"
 import { factsBrief, FACTS_RULE } from "../content-pipeline/model"
 import { examplesFor, examplesBrief, MAX_EXAMPLES } from "../content-pipeline/examples"
-import { buildStoryList, storyListEmail, listKind } from "../content-pipeline/story-list"
+import { buildStoryList, storyListEmail, listKind, LIST_ASK, LIST_COUNT } from "../content-pipeline/story-list"
+import { researchStories } from "../content-pipeline/worker"
 import { activeProfile, withProfile } from "../content-pipeline/brand"
 import type { ProfileExamples } from "../content-pipeline/profile-store"
 
@@ -1910,7 +1911,7 @@ test("story list: research's candidates, each with its source, why it fits and a
   const mail = storyListEmail(list, { brand: "Invented Brand", day: "2026-11-18", createUrl: "https://example.test/admin/content", versionId: "fixture@v0" })
   assert.equal(mail.subject, "Invented Brand story list · Wed, Nov 18 · 2 candidates")
   for (const s of list.stories) { assert.ok(mail.text.includes(s.url)); assert.ok(mail.text.includes(`Why it fits: ${s.why}`)); assert.ok(mail.html.includes(s.url.replace(/&/g, "&amp;"))) }
-  assert.match(mail.html, /Wednesday, November 18/); assert.match(mail.html, /Stories sourced from your references to assist in creating content\./); assert.ok(!mail.html.includes("@v") && !mail.text.includes("@v"), "the profile version is not shown")
+  assert.match(mail.html, /Wednesday, November 18/); assert.match(mail.html, /A light news day: research found only 2 stories worth suggesting this morning\./); assert.ok(!mail.html.includes("@v") && !mail.text.includes("@v"), "the profile version is not shown")
   assert.match(mail.text, /Photo lead: https:\/\/commons\.wikimedia\.org/); assert.doesNotMatch(mail.html, /Open Create/)
 })
 
@@ -1921,4 +1922,47 @@ test("story list: out of time, a story still goes on the list without a photo ch
   assert.ok(list.stories.every(s => "none" in s.photo && /out of time/.test(s.photo.none)))
   const empty = storyListEmail({ stories: [], hold: "no candidates found" }, { brand: "Invented Brand", day: "2026-11-18", createUrl: "https://example.test/admin/content", versionId: "fixture@v0" })
   assert.match(empty.subject, /no candidates this morning/); assert.match(empty.text, /Why: no candidates found/)
+})
+
+test("story list: research over-asks, keeps searching until five pass, steered away from what was tried, and logs every drop", async () => {
+  const asked: { count: number; leads?: boolean; avoid?: string[] }[] = []
+  const pass = (n: number, from: number) => Array.from({ length: n }, (_, i) => ({ title: `Story ${from + i}`, primaryUrl: `https://www.army.mil/article/${from + i}`, publisher: "U.S. Army", why: `Reason ${from + i}.` }))
+  const w = world({ ai: { research: async input => {
+    asked.push({ count: input.count, leads: input.leads, avoid: input.avoid })
+    // First pass: five candidates, three of them on pages that can't be read; second pass: three more that read fine.
+    return { candidates: asked.length === 1 ? pass(5, 1) : pass(3, 10) }
+  } } })
+  const fetchPage = w.deps.fetchPage
+  w.deps.fetchPage = async url => /article\/[345]$/.test(url) ? Promise.reject(new Error("http_404")) : fetchPage(url)
+  const list = await buildStoryList(w.deps, { titles: [], urls: [] }, 1e9)
+  assert.equal(asked[0].count, LIST_ASK); assert.ok(asked.every(a => a.leads), "the list researches for leads")
+  assert.equal(list.stories.length, LIST_COUNT, "it kept searching until five passed, not only when none did")
+  assert.deepEqual(list.stories.map(s => s.url), [1, 2, 10, 11, 12].map(n => `https://www.army.mil/article/${n}`))
+  assert.equal(list.passes, 2)
+  for (const t of ["Story 1", "Story 3", "Story 5"]) assert.ok(asked[1].avoid?.includes(t), `the second pass is steered away from ${t}`)
+  assert.equal(list.dropped.length, 3); assert.ok(list.dropped.every(d => /Story [345]: source page unreachable/.test(d) && /http_404/.test(d)), "each drop keeps its reason")
+  const mail = storyListEmail(list, { brand: "Invented Brand", day: "2026-11-18", createUrl: "https://example.test/admin/content", versionId: "fixture@v0" })
+  assert.ok(!mail.text.includes("http_404") && !mail.html.includes("http_404"), "the drop log is not in the email")
+  assert.match(mail.text, /Stories sourced from your references/)
+})
+
+test("story list: a story whose primary page can't be read is listed on an outlet's article or an official social post; posts keep the strict check", async () => {
+  const candidates = [
+    { title: "Saronic ALPV award", primaryUrl: "https://www.saronic.com/news/alpv", publisher: "Saronic", why: "Local maker.", reportUrl: "https://www.defensenews.com/2026/10/15/alpv/", reportPublishedAt: "2026-10-15" },
+    { title: "Saronic shiplift", primaryUrl: "https://x.com/SaronicTech/status/1", publisher: "Saronic", publishedAt: "2026-10-15", why: "Same company, different story." },
+    { title: "Old news", primaryUrl: "https://www.saronic.com/news/old", publisher: "Saronic", why: "Too old.", reportUrl: "https://www.defensenews.com/2025/01/01/old/", reportPublishedAt: "2025-01-01" },
+  ]
+  const w = world({ ai: { research: async () => ({ candidates }) } })
+  const fetchPage = w.deps.fetchPage
+  w.deps.fetchPage = async url => {
+    if (/saronic\.com|x\.com/.test(url)) throw new Error("http_403")
+    const p = await fetchPage(url)
+    return /2025/.test(url) ? { ...p, publishedAt: "2025-01-01" } : p
+  }
+  const list = await buildStoryList(w.deps, { titles: [], urls: [] }, 0)
+  assert.deepEqual(list.stories.map(s => s.url), ["https://www.defensenews.com/2026/10/15/alpv/", "https://x.com/SaronicTech/status/1"], "two stories from the same company are both listed")
+  assert.ok(list.dropped.some(d => /^Old news:/.test(d) && /more than/.test(d)), "a lead must still be recent")
+  // Posts (no leads): the same candidates are refused, as before.
+  const strict = await researchStories(w.deps, w.deps.ai(() => {}), { kind: "news", count: 3 }, [], SEEDS)
+  assert.ok(!Array.isArray(strict), "a post's research still needs a readable, dated primary page")
 })
