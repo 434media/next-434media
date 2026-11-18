@@ -17,7 +17,8 @@ export const maxDuration = 60
  *       pin. `skill` is the intake skill (the default) or the Ask panel's `admin-ask` (Ask panel slice 1).
  * GET ?skill=<name> reads that skill's pin.
  *
- * Only these two skills can be pinned.
+ * Only these two skills can be pinned. The Ask skill is always pinned on Haiku (lib/ask/limits.ts ASK_MODEL), whatever the
+ * catalog or the body names: the founder's cost decision (2026-11-18), and the model its runs use.
  */
 const SKILLS = ["434-intake-qualification", "admin-ask"] as const
 const skillOf = (v: unknown) => ((SKILLS as readonly unknown[]).includes(v) ? (v as (typeof SKILLS)[number]) : null)
@@ -46,7 +47,8 @@ export async function POST(req: Request) {
   const SKILL = skillOf(body.skill ?? SKILLS[0])
   if (!SKILL) return NextResponse.json({ error: `skill is one of ${SKILLS.join(", ")}` }, { status: 400 })
   const ref = typeof body.ref === "string" && body.ref.trim() ? body.ref.trim() : "main"
-  const model = typeof body.model === "string" && body.model.trim() ? body.model.trim() : undefined
+  const asked = typeof body.model === "string" && body.model.trim() ? body.model.trim() : undefined
+  const model = SKILL === "admin-ask" ? (await import("@/lib/ask/limits")).ASK_MODEL : asked
 
   const [{ resolveCommit, readSkillAt, readFileAt, catalogEntry, CATALOG_PATH }, { parseSkill }, { modelAllowed }, { sha256 }, { AUTONOMY_LEVELS }, { AGENT_SKILLS_COLLECTION }, { getDb }] = await Promise.all([
     import("@/lib/skills/source"),

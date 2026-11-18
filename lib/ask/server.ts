@@ -22,6 +22,7 @@ import { ASK_SKILL, askActor, askPermitted, revisionOf, ASK_OBJECTIVE, type Stag
 import { AskRefused } from "./edits"
 import type { AskData, AskDeps, AskPerson, FindKind, TriageDecisionValue } from "./run"
 import type { ConfirmDeps } from "./confirm"
+import { askMonthlyCapUsd, askSpendOf } from "./limits"
 
 const LIMIT = 10
 const str = (v: unknown) => (typeof v === "string" ? v : "")
@@ -190,6 +191,12 @@ async function turnsToday(actor: string, day: string): Promise<number> {
   }).length
 }
 
+/** Ask's spend since the month's start, from the cost records (lib/engine/cost-ledger.ts). Throws when unreadable. */
+export async function readAskMonthSpend(monthStart: string): Promise<number> {
+  const { readCallCostsSince } = await import("../engine/cost-ledger")
+  return askSpendOf(await readCallCostsSince(monthStart), monthStart)
+}
+
 export function liveAskDeps(session: User, viewer: Viewer): AskDeps {
   return {
     db: firestoreAgentDb(),
@@ -197,6 +204,8 @@ export function liveAskDeps(session: User, viewer: Viewer): AskDeps {
     pin: () => readPin(ASK_SKILL),
     skillAt: async (commit) => (await import("../skills/source")).readSkillAt(ASK_SKILL, commit),
     turnsToday,
+    monthSpend: readAskMonthSpend,
+    monthlyCapUsd: askMonthlyCapUsd(),
     taskSpend: async (root) => (await import("../engine/cost-ledger")).readTaskSpend(root),
     // A slug resolves through the guarded Gateway, the AI SDK's default provider (instrumentation.ts).
     model: (slug) => slug as LanguageModel,

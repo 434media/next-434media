@@ -78,6 +78,16 @@ export async function readTaskSpend(root: string): Promise<number> {
 }
 
 /**
+ * The cost records since `since` (ISO), only the fields a spend sum needs. One range query on `at`, served by
+ * Firestore's automatic single-field index; the caller filters by kind. Throws when the records cannot be read; the
+ * caller fails closed.
+ */
+export async function readCallCostsSince(since: string): Promise<{ kind?: unknown; at?: unknown; usd?: unknown }[]> {
+  const snap = await getDb().collection(AI_CALL_COSTS_COLLECTION).where("at", ">=", since).select("kind", "at", "usd").get()
+  return snap.docs.map((d) => ({ kind: d.get("kind"), at: d.get("at"), usd: d.get("usd") }))
+}
+
+/**
  * Today's spend as the ledger has it. When the ledger cannot be read, the error is thrown: the guard then refuses the
  * call, because a budget that cannot be checked is not a budget (fails closed).
  */

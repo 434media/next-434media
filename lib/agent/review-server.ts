@@ -278,6 +278,7 @@ export async function readConsole(now = new Date().toISOString()) {
   const since = new Date(Date.parse(now) - WEEK_MS).toISOString()
   const d = getDb()
   const watch = readWatch(new Date(now))
+  const month = readAskMonth(now)
   const [approvalsSnap, tasksSnap, ledgerSnap, costsSnap, controls, pin, askPin] = await Promise.all([
     d.collection(SEND_APPROVALS_COLLECTION).orderBy("createdAt", "desc").limit(100).get(),
     d.collection(AGENT_TASKS_COLLECTION).where("updatedAt", ">=", since).limit(500).get(),
@@ -287,6 +288,7 @@ export async function readConsole(now = new Date().toISOString()) {
     readPin(),
     readPin("admin-ask"),
   ])
+  const askMonth = await month
   const approvals = approvalsSnap.docs.map((x) => x.data() as StoredApproval)
   const tasks = tasksSnap.docs.map((x) => x.data() as AgentTask)
   const taskById = new Map(tasks.map((t) => [t.id, t]))
@@ -299,6 +301,7 @@ export async function readConsole(now = new Date().toISOString()) {
     controls,
     pin,
     askPin,
+    askMonth,
     queue: sortQueue(approvals.map((a) => reviewItem(a, now, taskById.get(a.taskId)))),
     reasons: groupReasons(approvals, now),
     runs,
@@ -313,6 +316,21 @@ export async function readConsole(now = new Date().toISOString()) {
  * functions the hourly alert uses (app/api/cron/cron-watchdog), without its once-a-day dedupe: Today shows what is true
  * now. A read that fails is reported as unreadable rather than failing the page.
  */
+/**
+ * The Ask row's "This month: $x of $10" (lib/ask/limits.ts): Ask's spend since the month's start, against the cap in
+ * force. `spentUsd` is null when the cost records could not be read; the panel itself then refuses (fails closed).
+ */
+async function readAskMonth(now: string): Promise<{ spentUsd: number | null; capUsd: number }> {
+  const [{ askMonthlyCapUsd, monthStartOf }, { readAskMonthSpend }] = await Promise.all([import("../ask/limits"), import("../ask/server")])
+  const capUsd = askMonthlyCapUsd()
+  try {
+    return { spentUsd: await readAskMonthSpend(monthStartOf(now)), capUsd }
+  } catch (e) {
+    console.error("[agents] Ask's month spend could not be read:", e instanceof Error ? e.message : e)
+    return { spentUsd: null, capUsd }
+  }
+}
+
 async function readWatch(now: Date) {
   const { getDb } = await import("../firebase-admin")
   const { readCronHeartbeats } = await import("../cron-heartbeat")

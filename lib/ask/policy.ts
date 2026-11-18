@@ -25,8 +25,8 @@ export { ASK_SKILL }
 
 /** The same window as triage undo (lib/core-model/service.ts), so every Undo in the admin means the same thing. */
 export const UNDO_WINDOW_MS = TRIAGE_UNDO_WINDOW_MS
-/** Already on the engine's allow-list (lib/engine/models.ts). Gateway list price on 2026-11-17: $2 in, $10 out per million. */
-export const ASK_DEFAULT_MODEL = "anthropic/claude-sonnet-5.5"
+/** The model and the monthly cap live in ./limits (no imports, so the Agents page can read them). */
+export { ASK_MODEL, ASK_MONTHLY_CAP_USD } from "./limits"
 /** Generous on purpose: on Claude 5 this caps thinking plus text (CLAUDE.md, "The token trap"). */
 export const ASK_MAX_OUTPUT_TOKENS = 16_000
 export const ASK_MAX_STEPS = 10
