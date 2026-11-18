@@ -15,7 +15,7 @@ import { CAP_UNREADABLE_MESSAGE, capMessage, monthLine } from "@/lib/spend-caps"
 // route, which also persists every result to the asset library. The panel owns
 // all generation state; hosts just react to the produced Asset.
 //
-// Canva first (founder, 2026-11-18): Generate shows its estimate before the click and opens a centered dialog whose
+// Canva first (founder, 2026-11-18): the line beside Generate shows its estimate before the click and opens a centered dialog whose
 // primary action is Open Canva; the paid model is the secondary action. Video asks a second time, as a step inside the
 // same dialog. At this month's cap the paid action is off and Canva stays (lib/spend-caps.ts; the route enforces the
 // same).
@@ -625,12 +625,19 @@ export function GeneratePanel({ open, onAdd, addLabel = "Add", onGenerated, seed
             </label>
           )}
 
-          {/* Generate / Remix — at the right edge of the composer, with this click's estimate on it and the month's
-              meter beside it, so the cost is seen before the click. The row wraps rather than overflowing: when space
-              is short the meter drops to its own line under Generate (wrap-reverse), and below 640 px Generate takes
-              the full width on its own line. */}
+          {/* Generate / Remix — at the right edge of the composer, with this click's estimate and the month's meter
+              in the small line beside it ("Up to $2.50 · This month: $0.00 of $10"), so the cost is seen before the
+              click. The row wraps rather than overflowing: when space is short that line drops under Generate
+              (wrap-reverse), and below 640 px Generate takes the full width on its own line. */}
           <div className="ml-auto flex flex-wrap-reverse items-center justify-end gap-x-2 gap-y-1 min-w-0 max-sm:w-full">
-            <span className="whitespace-nowrap text-[11px] tabular-nums text-neutral-500">{meter}</span>
+            <span className="whitespace-nowrap text-[11px] tabular-nums text-neutral-500">
+              {estimate ? (
+                <>
+                  <span className="font-bold">{estimate.charAt(0).toUpperCase() + estimate.slice(1)}</span> ·{" "}
+                </>
+              ) : null}
+              {meter}
+            </span>
             <button
               ref={generateBtnRef}
               type="button"
@@ -640,7 +647,6 @@ export function GeneratePanel({ open, onAdd, addLabel = "Add", onGenerated, seed
             >
               {isGenerating ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
               {refs.length > 0 && genKind === "image" ? "Remix" : "Generate"}
-              {estimate ? <span className="tabular-nums">· <span className="font-bold">{estimate}</span></span> : null}
             </button>
           </div>
         </div>
