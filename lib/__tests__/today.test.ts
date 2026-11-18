@@ -54,6 +54,11 @@ test("every watched queue has a short name and a place to open", () => {
   }
 })
 
+test("content posts to approve open on the Content board's Review column", () => {
+  const t = todayBrief({ ...quiet, overdue: [{ queue: "founder-review", what: "", waiting: 1, oldestAt: ago(30), ageHours: 30, limitHours: 24, truncated: false }] })
+  assert.equal(t.lines[0].href, "/admin/content?column=review")
+})
+
 test("failed runs in the last 24 hours, missed jobs and unreadable queues make one 'Needs a check' line", () => {
   const t = todayBrief({
     ...quiet,

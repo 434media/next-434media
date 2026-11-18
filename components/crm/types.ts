@@ -418,6 +418,8 @@ export interface ContentPost {
   // the content pipeline created (only run.ts sets it); the pipeline adopts no other post for its request ids.
   intake?: { requestId: string; metaBrand: string; requestedBy: string; at: string; source?: "content-pipeline" }
   archived?: boolean
+  /** When Delete archived it (ISO). Undo: clear `archived`. */
+  archived_at?: string
   // Canva is the permanent creative source; the staged JPEG exports under
   // `assets` are references to it. export_fingerprint is the SHA-256 of the
   // ordered asset hashes, so an approval can name the exact files it covers.

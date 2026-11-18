@@ -254,6 +254,8 @@ export default function ContentPage() {
               headerAction={canReview ? <>{isSuperAdmin && searchParams?.get("icymiDraft") && <ContentGenerate onDraftsReady={loadContentPosts} />}<CreateTable onPostsReady={loadContentPosts} /></> : undefined}
               hideAddPost={canReview}
               onCloseOutcome={canReview ? closeNoContent : undefined}
+              // ?column=review (To do's "Content posts to approve" Open link) lands on that column.
+              initialColumn={searchParams?.get("column")}
             />
           )}
         </div>

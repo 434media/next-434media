@@ -6,7 +6,7 @@
 import { test } from "node:test"
 import assert from "node:assert/strict"
 import admin from "firebase-admin"
-import { createContentPost, getContentPostById, getContentPosts, invalidateCache } from "../firestore-crm"
+import { createContentPost, deleteContentPost, getContentPostById, getContentPosts, invalidateCache } from "../firestore-crm"
 import { CRM_COLLECTIONS } from "../../types/crm-types"
 
 test("undated drafts survive create, reload and direct lookup; date ordering and archives are preserved", {
@@ -50,6 +50,16 @@ test("undated drafts survive create, reload and direct lookup; date ordering and
     const scheduled = await createContentPost({ ...fixture("Chosen date"), date_to_post: "2026-10-12" })
     assert.equal((await collection.doc(scheduled.id).get()).data()?.date_to_post, "2026-10-12")
     assert.equal((await getContentPosts())[0].id, scheduled.id, "create invalidates the list cache")
+
+    // Delete hides, never erases: the record stays, archived, and leaves the board; clearing the flag brings it back.
+    await deleteContentPost(scheduled.id)
+    const kept = (await collection.doc(scheduled.id).get()).data()
+    assert.equal(kept?.archived, true)
+    assert.equal(kept?.title, "Chosen date")
+    assert.equal((await getContentPosts()).some(post => post.id === scheduled.id), false, "delete invalidates the list cache")
+    await collection.doc(scheduled.id).update({ archived: false })
+    invalidateCache(CRM_COLLECTIONS.CONTENT_POSTS)
+    assert.ok((await getContentPosts()).some(post => post.id === scheduled.id), "undo is clearing the flag")
   } finally {
     await db.recursiveDelete(collection)
     invalidateCache(CRM_COLLECTIONS.CONTENT_POSTS)

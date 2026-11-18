@@ -37,7 +37,7 @@ export interface Today {
 
 /** Short names for the watched queues (lib/queue-age.ts QUEUES), and where each one is worked. */
 const QUEUE_VIEW: Record<string, { label: string; href: string }> = {
-  "founder-review": { label: "Content posts to approve", href: "/admin/content" },
+  "founder-review": { label: "Content posts to approve", href: "/admin/content?column=review" },
   "content-pipeline-jobs": { label: "Content requests", href: "/admin/content" },
   "content-pipeline-drafts": { label: "Content drafts", href: "/admin/content" },
   "agent-review": { label: "Agent drafts", href: "/admin/todo" },

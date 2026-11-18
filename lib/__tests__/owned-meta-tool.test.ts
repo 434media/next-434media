@@ -663,6 +663,8 @@ test("finding 3: the pipeline adopts an existing post for its request id only wh
   assert.equal(adoptablePost(null), null)
   const ours = post({ id: "ours-1234567", intake: intakeOf(PIPELINE_SOURCE) })
   assert.equal(adoptablePost(ours), ours)
+  // A deleted (archived) post is not adopted; the run makes a new one, as it did when Delete erased posts.
+  assert.equal(adoptablePost({ ...ours, archived: true }), null)
   // A post planted under the pipeline's request id (by another caller, before the prefix was reserved) is refused.
   assert.throws(() => adoptablePost(post({ id: "planted-12345", intake: intakeOf() })), /Post planted-12345 already holds this draft's request id but was not created by the content pipeline/)
   assert.throws(() => adoptablePost(post({ id: "planted-12345", intake: intakeOf("slack") })), /not created by the content pipeline/)

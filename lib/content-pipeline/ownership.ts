@@ -20,9 +20,12 @@ export function pipelineMarked(post: Omit<ContentPost, "id" | "created_at" | "up
   return { ...post, ...(post.intake ? { intake: { ...post.intake, source: PIPELINE_SOURCE } } : {}) }
 }
 
-/** The existing post for a pipeline request id, if the pipeline created it; another caller's post is never adopted. */
-export function adoptablePost<T extends Pick<ContentPost, "id" | "intake">>(found: T | null): T | null {
-  if (!found) return null
+/**
+ * The existing post for a pipeline request id, if the pipeline created it; another caller's post is never adopted. A
+ * deleted (archived) post is not adopted either: the run makes a new one, as it did when Delete erased posts.
+ */
+export function adoptablePost<T extends Pick<ContentPost, "id" | "intake" | "archived">>(found: T | null): T | null {
+  if (!found || found.archived === true) return null
   if (found.intake?.source !== PIPELINE_SOURCE) throw new Error(`Post ${found.id} already holds this draft's request id but was not created by the content pipeline, so it is not adopted`)
   return found
 }
