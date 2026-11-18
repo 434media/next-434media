@@ -1,0 +1,17 @@
+# Wakes the lanes check when a review is submitted or dismissed. It does nothing itself:
+# a pull_request_review run uses the pull request's own copy of the workflow, so the
+# judging happens in "Lanes" on workflow_run, from the default branch.
+name: Lanes review trigger
+
+on:
+  pull_request_review:
+    types: [submitted, dismissed]
+
+permissions: {}
+
+jobs:
+  wake:
+    runs-on: ubuntu-latest
+    timeout-minutes: 1
+    steps:
+      - run: echo "Review on #${{ github.event.pull_request.number }}; Lanes re-judges from the default branch."

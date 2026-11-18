@@ -1,0 +1,99 @@
+# The lanes check (four-lane setup, step 4; master 7.6; Contributor Standard §10).
+#
+# Writes the commit status `lanes` on a pull request's head commit: pass or wait, by the
+# strictest lane of the files it changes, read from the BASE branch's .github/CODEOWNERS
+# (.github/scripts/lanes.py). The required check is that status, pinned to GitHub Actions.
+#
+# Safe by construction: every trigger here runs this file and the script from the default
+# branch (pull_request_target, issue_comment, workflow_run), so a pull request cannot
+# change the logic that judges it, and nothing checks out or runs the pull request's code.
+# Reviews arrive through "Lanes review trigger", a no-op on pull_request_review whose
+# completion re-runs this from the default branch.
+#
+# Auto-merge is turned on with the 434-agent App's token (a merge enabled by GITHUB_TOKEN
+# triggers no push workflows). It is skipped until the founder sets the variable
+# AGENT_APP_ID and the secret AGENT_APP_PRIVATE_KEY, and until "Allow auto-merge" is on.
+name: Lanes
+
+on:
+  pull_request_target:
+    types: [opened, synchronize, reopened, ready_for_review]
+  issue_comment:
+    types: [created]
+  workflow_run:
+    workflows: ["Lanes review trigger"]
+    types: [completed]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: lanes-${{ github.event.pull_request.number || github.event.issue.number || github.event.workflow_run.head_sha }}
+  cancel-in-progress: false
+
+jobs:
+  judge:
+    if: github.event_name != 'issue_comment' || github.event.issue.pull_request
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read       # the base branch's CODEOWNERS
+      pull-requests: read  # files, reviews
+      issues: read         # /seen comments
+      statuses: write      # the `lanes` status on the head commit
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          sparse-checkout: .github/scripts
+          persist-credentials: false
+      - name: Judge
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number || github.event.issue.number || github.event.workflow_run.pull_requests[0].number }}
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+          FOUNDER_LOGINS: ${{ vars.FOUNDER_LOGINS || '434mediamgr' }}
+          REVIEW_LOGIN: 434-review[bot]
+          TRIPWIRE: "1"
+        run: python3 -I .github/scripts/lanes.py
+
+  auto-merge:
+    if: >-
+      github.event_name == 'pull_request_target' && vars.AGENT_APP_ID != '' &&
+      (github.event.action == 'opened' || github.event.action == 'ready_for_review') &&
+      !github.event.pull_request.draft && github.event.pull_request.user.login != 'dependabot[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    continue-on-error: true
+    steps:
+      - name: 434-agent token
+        id: app
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          app-id: ${{ vars.AGENT_APP_ID }}
+          private-key: ${{ secrets.AGENT_APP_PRIVATE_KEY }}
+          repositories: ${{ github.event.repository.name }}
+          permission-pull-requests: write
+          permission-contents: write
+      - name: Turn on auto-merge
+        env:
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+        run: gh pr merge --auto --squash "${{ github.event.pull_request.number }}" --repo "${{ github.repository }}"
+
+  # Dependabot runs get no secrets, so they cannot mint the App token. In this repository
+  # nothing but Vercel (its own webhook) acts on a push to main, so GITHUB_TOKEN is enough.
+  dependabot-auto-merge:
+    if: >-
+      github.event_name == 'pull_request_target' && github.event.action == 'opened' &&
+      github.event.pull_request.user.login == 'dependabot[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    continue-on-error: true
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - name: Turn on auto-merge
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh pr merge --auto --squash "${{ github.event.pull_request.number }}" --repo "${{ github.repository }}"
