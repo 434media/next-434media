@@ -4,7 +4,8 @@
  *
  * In order, refusing at the first that fails:
  *  1. money and sends are refused before anything else, with a link (lib/ask/policy.ts classifyAsk), at no cost;
- *  2. the switch (lib/agent/controls.ts askOn), then the person's permission (askPermitted), then today's turn cap;
+ *  2. the switch (lib/agent/controls.ts askOn), then the person's permission (askPermitted), then the month's spend
+ *     cap (lib/ask/limits.ts), then today's turn cap;
  *  3. the founder's pin of `admin-ask` and the skill at it (fingerprint checked by the loader);
  *  4. a task in the ledger, requested by the person (`requestedBy`), so cost lands per task and the turn is on record;
  *  5. the run on the engine (lib/engine/run.ts), at the `approval` level under the catalog's ceiling, with exactly the
@@ -27,7 +28,6 @@ import { AskRefused, applyTaskEdit, recordTriage, TASK_STATUSES, type TaskPatch 
 import {
   ASK_DAILY_TURNS,
   ASK_DECLARATIONS,
-  ASK_DEFAULT_MODEL,
   ASK_MAX_OUTPUT_TOKENS,
   ASK_MAX_STEPS,
   ASK_OBJECTIVE,
@@ -45,6 +45,7 @@ import {
   type AskRefusal,
   type StageProposal,
 } from "./policy"
+import { ASK_MODEL, askCapMessage, monthStartOf } from "./limits"
 
 /** Writes one turn may make. A request for more is done in more turns, each with its own Undo. */
 export const ASK_EDITS_PER_TURN = 5
@@ -82,6 +83,10 @@ export interface AskDeps {
   skillAt: (commit: string) => Promise<SkillFiles>
   /** Ask turns this actor started today (UTC). Throwing refuses the turn. */
   turnsToday: (actor: string, day: string) => Promise<number>
+  /** Ask's spend, in US dollars, since `monthStart` (all people). Throwing refuses the turn. */
+  monthSpend: (monthStart: string) => Promise<number>
+  /** The monthly cap in force (lib/ask/limits.ts askMonthlyCapUsd). */
+  monthlyCapUsd: number
   taskSpend: (root: string) => Promise<number>
   model: (slug: string) => LanguageModel
   data: AskData
@@ -121,6 +126,12 @@ export async function runAskTurn(input: { question: string; history: AskMessage[
   const offered = toolsFor(caller).map((t) => t.name)
 
   const now = deps.now()
+  // The month's cap, before anything is created or called: at or over it, nothing runs and nothing is spent.
+  try {
+    if ((await deps.monthSpend(monthStartOf(now))) >= deps.monthlyCapUsd) return { ok: false, code: "monthly-cap", message: askCapMessage(deps.monthlyCapUsd), ...(person.founder ? { link: OFF_LINK } : {}) }
+  } catch {
+    return { ok: false, code: "cap-unreadable", message: "This month's Ask spend could not be checked, so nothing ran. Try again." }
+  }
   try {
     if ((await deps.turnsToday(actor, now.slice(0, 10))) >= ASK_DAILY_TURNS) return { ok: false, code: "daily-cap", message: `That's ${ASK_DAILY_TURNS} questions today, the daily limit. It resets at midnight UTC.` }
   } catch {
@@ -175,7 +186,8 @@ export async function runAskTurn(input: { question: string; history: AskMessage[
       ceiling: pin.ceiling as never,
       tools: runTools,
       declarations: ASK_DECLARATIONS,
-      model: deps.model(pin.model ?? ASK_DEFAULT_MODEL),
+      // Always Haiku (lib/ask/limits.ts), whatever the pin or the catalog names: the founder's cost decision.
+      model: deps.model(ASK_MODEL),
       task: { task: taskId, kind: `skill:${ASK_SKILL}`, property: "434" },
       maxSteps: ASK_MAX_STEPS,
       maxOutputTokens: ASK_MAX_OUTPUT_TOKENS,

@@ -23,6 +23,7 @@ import {
 } from "lucide-react"
 import { DetailDrawer } from "@/components/admin/DetailDrawer"
 import type { StoredExamReport } from "@/lib/agent/exam-reports"
+import { ASK_MODEL, usd as dollars } from "@/lib/ask/limits"
 import type { CostSummary, HandoffWait, ReasonGroup, ReviewItem, RunSummary } from "@/lib/agent/review"
 
 type Mode = "off" | "proof" | "draft"
@@ -31,6 +32,7 @@ interface Console {
   controls: { stopped: boolean; stoppedAt?: string; skills: Record<string, Mode>; sends: Record<string, boolean>; ask?: boolean }
   pin: { commit: string; sha256: string; model?: string; ceiling: string; pinnedAt: string } | null
   askPin?: { commit: string; sha256: string; model?: string; ceiling: string; pinnedAt: string } | null
+  askMonth?: { spentUsd: number | null; capUsd: number }
   queue: ReviewItem[]
   reasons: ReasonGroup[]
   runs: RunSummary
@@ -40,7 +42,8 @@ interface Console {
 
 const SKILL = "434-intake-qualification"
 const ASK_SKILL = "admin-ask"
-const ASK_EXAM_MODEL = "anthropic/claude-sonnet-5.5"
+/** The Ask panel runs on Haiku, so its exam does too (lib/ask/limits.ts). */
+const ASK_EXAM_MODEL = ASK_MODEL
 const EXAM_STATE = { running: "Running", done: "Done", failed: "Failed", "timed-out": "Timed out" } as const
 type StoredExam = Omit<StoredExamReport, "state"> & { state: keyof typeof EXAM_STATE }
 interface ExamView {
@@ -296,6 +299,11 @@ function AskBar({ data, busy, onControls, onPin, onExam }: { data: Console; busy
           Ask {on ? "on" : "off"}
         </button>
         <span className="text-xs text-neutral-500">Reads, triage and task edits with Undo; stage changes by Confirm; never sends or touches money.</span>
+        {data.askMonth && (
+          <span className={`text-xs tabular-nums ${data.askMonth.spentUsd !== null && data.askMonth.spentUsd >= data.askMonth.capUsd ? "font-medium text-red-700" : "text-neutral-700"}`} title="Ask's model spend this calendar month (UTC). At the limit the panel stops until the 1st.">
+            This month: {data.askMonth.spentUsd === null ? "unavailable" : `$${data.askMonth.spentUsd.toFixed(2)}`} of {dollars(data.askMonth.capUsd)}
+          </span>
+        )}
       </div>
       <div className="flex flex-wrap items-center gap-2">
         <span className="text-xs text-neutral-500" title={data.askPin ? `Fingerprint ${data.askPin.sha256.slice(0, 12)}, ceiling ${data.askPin.ceiling}` : undefined}>

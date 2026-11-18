@@ -18,6 +18,8 @@ import { confirmStageChange, parseConfirm, type ConfirmDeps } from "../ask/confi
 import { runAskTurn, type AskData, type AskDeps, type AskPerson } from "../ask/run"
 import type { SkillPin } from "../agent/intake"
 import { MemoryAgentDb } from "./helpers/agent-db"
+import { ASK_COST_KIND, ASK_MODEL, ASK_MONTHLY_CAP_USD, askCapMessage, askMonthlyCapUsd, askSpendOf, monthStartOf } from "../ask/limits"
+import { modelAllowed } from "../engine/models"
 
 const NOW = "2026-11-18T15:00:00.000Z"
 const at = (ms = 0) => new Date(Date.parse(NOW) + ms).toISOString()
@@ -241,7 +243,7 @@ function scriptedModel(steps: { tool?: string; input?: unknown; text?: string }[
   return { model, calls }
 }
 
-function turnSetup(opts: { controls?: AgentControls; pin?: SkillPin | null; steps?: { tool?: string; input?: unknown; text?: string }[]; turns?: number } = {}) {
+function turnSetup(opts: { controls?: AgentControls; pin?: SkillPin | null; steps?: { tool?: string; input?: unknown; text?: string }[]; turns?: number; monthSpend?: () => Promise<number> } = {}) {
   const db = new MemoryAgentDb()
   db.col(TASKS_COLLECTION).set("task9", { title: "Deck for Riverwalk", status: "in_progress", assigned_to: "Barb", due_date: "2026-11-20" })
   const { model, calls } = scriptedModel(opts.steps ?? [{ text: "Nothing is waiting." }])
@@ -253,19 +255,29 @@ function turnSetup(opts: { controls?: AgentControls; pin?: SkillPin | null; step
     stageTarget: async () => ({ name: "Riverwalk Events", from: "proposal", revision: "r1" }),
   }
   let clock = 0, n = 0
+  const slugs: string[] = []
+  const monthStarts: string[] = []
   const deps: AskDeps = {
     db,
     controls: async () => opts.controls ?? ON,
     pin: async () => (opts.pin === undefined ? PIN : opts.pin),
     skillAt: async () => SKILL,
     turnsToday: async () => opts.turns ?? 0,
+    monthSpend: async (start) => {
+      monthStarts.push(start)
+      return opts.monthSpend ? opts.monthSpend() : 0
+    },
+    monthlyCapUsd: ASK_MONTHLY_CAP_USD,
     taskSpend: async () => 0,
-    model: () => model,
+    model: (slug) => {
+      slugs.push(slug)
+      return model
+    },
     data,
     now: () => at(clock++ * 1000),
     newId: () => `id${++n}`,
   }
-  return { db, deps, calls }
+  return { db, deps, calls, slugs, monthStarts }
 }
 
 test("a turn runs on the engine as a task requested by the person, applies a task edit with Undo, and proposes a stage change", async () => {
@@ -309,4 +321,58 @@ test("the browser's history is bounded and malformed messages are dropped", () =
   assert.equal(h.length, 12)
   assert.ok(h.every((m) => m.role === "user" || m.role === "assistant"))
   assert.ok(boundedHistory([{ role: "user", content: "x".repeat(10_000) }])[0].content.length <= 4_000)
+})
+
+// ── Cheap and capped (founder, 2026-11-18: "go cheap + cap") ────────────────────────────────────────────────────────
+test("every turn runs on Haiku 5.5, which is on the engine's allow-list, even when the pin names Sonnet", async () => {
+  assert.equal(ASK_MODEL, "anthropic/claude-haiku-5.5")
+  assert.ok(modelAllowed(ASK_MODEL))
+  const { deps, slugs } = turnSetup({ pin: { ...PIN, model: "anthropic/claude-sonnet-5.5" } })
+  const out = await runAskTurn({ question: "What's waiting?", history: [] }, FOUNDER, deps)
+  assert.ok(out.ok, JSON.stringify(out))
+  assert.deepEqual(slugs, [ASK_MODEL])
+})
+
+test("at or over the month's $10, the turn is refused with one plain line, before any task or model call", async () => {
+  for (const spent of [10, 10.01, 42]) {
+    const s = turnSetup({ monthSpend: async () => spent })
+    const out = await runAskTurn({ question: "What's waiting?", history: [] }, MEMBER, s.deps)
+    assert.equal(!out.ok && out.code, "monthly-cap")
+    assert.equal(!out.ok && out.message, "The Ask panel reached this month's $10 limit; it resumes on the 1st.")
+    assert.equal(s.calls.length, 0)
+    assert.equal(s.slugs.length, 0)
+    assert.equal(s.db.col("agent_tasks").size, 0)
+  }
+  const under = turnSetup({ monthSpend: async () => 9.99 })
+  assert.ok((await runAskTurn({ question: "What's waiting?", history: [] }, MEMBER, under.deps)).ok)
+  assert.deepEqual(under.monthStarts, ["2026-11-01T00:00:00.000Z"])
+})
+
+test("a month's spend that cannot be read refuses the turn (fails closed)", async () => {
+  const s = turnSetup({ monthSpend: async () => { throw new Error("ledger down") } })
+  const out = await runAskTurn({ question: "What's waiting?", history: [] }, FOUNDER, s.deps)
+  assert.equal(!out.ok && out.code, "cap-unreadable")
+  assert.equal(s.calls.length, 0)
+  assert.equal(s.db.col("agent_tasks").size, 0)
+})
+
+test("Ask's month spend counts only Ask's records from the 1st (UTC), and the cap override cannot be lifted by a typo", () => {
+  const since = monthStartOf("2026-11-18T15:00:00.000Z")
+  assert.equal(since, "2026-11-01T00:00:00.000Z")
+  const total = askSpendOf(
+    [
+      { kind: ASK_COST_KIND, at: "2026-11-01T00:00:00.000Z", usd: 1.25 },
+      { kind: ASK_COST_KIND, at: "2026-11-17T09:00:00.000Z", usd: 0.5 },
+      { kind: ASK_COST_KIND, at: "2026-10-31T23:59:59.999Z", usd: 100 },
+      { kind: "content-pipeline", at: "2026-11-10T00:00:00.000Z", usd: 100 },
+      { kind: ASK_COST_KIND, at: "2026-11-10T00:00:00.000Z", usd: Number.NaN },
+      { kind: ASK_COST_KIND, at: "2026-11-10T00:00:00.000Z" },
+    ],
+    since,
+  )
+  assert.equal(total, 1.75)
+  assert.equal(askMonthlyCapUsd({}), 10)
+  assert.equal(askMonthlyCapUsd({ ASK_MONTHLY_CAP_USD: "25" }), 25)
+  for (const bad of ["", "ten", "0", "-5", "Infinity"]) assert.equal(askMonthlyCapUsd({ ASK_MONTHLY_CAP_USD: bad }), 10)
+  assert.equal(askCapMessage(12.5), "The Ask panel reached this month's $12.50 limit; it resumes on the 1st.")
 })
