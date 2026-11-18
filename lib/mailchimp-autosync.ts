@@ -15,6 +15,7 @@ import {
   isFullPassDue,
   nextSentSet,
   pendingMembers,
+  type ErrorReason,
   type PlannedMember,
 } from "./mailchimp-push-plan"
 
@@ -55,7 +56,15 @@ export interface AutoSyncResult {
   /** Members new or changed since the last successful push: what this run sends. */
   pending: number
   /** Present only on a live (non-dry-run) pass. `deferred` carry over to the next run. */
-  push?: { attempted: number; newMembers: number; updatedMembers: number; errors: number; deferred: number }
+  push?: {
+    attempted: number
+    newMembers: number
+    updatedMembers: number
+    errors: number
+    /** Errors by Mailchimp error code, with one redacted example each. */
+    errorReasons: ErrorReason[]
+    deferred: number
+  }
 }
 
 /**
@@ -159,10 +168,10 @@ export async function runAutoSync(
       sent: nextSentSet(planned, remembered, drained.accepted),
       lastFullPassAt: fullPass ? startedAt.toISOString() : state.lastFullPassAt!,
       updatedAt: new Date().toISOString(),
-      pending: drained.deferred + drained.errors,
+      pending: drained.deferred + drained.retryable,
     })
-    const { attempted, newMembers, updatedMembers, errors, deferred } = drained
-    result.push = { attempted, newMembers, updatedMembers, errors, deferred }
+    const { attempted, newMembers, updatedMembers, errors, reasons, deferred } = drained
+    result.push = { attempted, newMembers, updatedMembers, errors, errorReasons: reasons, deferred }
   }
 
   return result

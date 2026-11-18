@@ -67,26 +67,58 @@ export function pushRequests(members: PlannedMember[]): Array<{ tags: string[]; 
   return out
 }
 
+/** One member Mailchimp did not take. `code` is Mailchimp's error_code, or "request_failed" when the whole request failed. */
+export interface PushError {
+  email: string
+  code?: string
+  message?: string
+}
+
 export type PushFn = (
   members: MailchimpPushMember[],
   tags: string[],
-) => Promise<{ newMembers: number; updatedMembers: number; errors: Array<{ email: string }> }>
+) => Promise<{ newMembers: number; updatedMembers: number; errors: PushError[] }>
+
+/**
+ * Errors worth retrying on the next hourly run: the request itself failed, so
+ * Mailchimp never judged the member. Any other error is Mailchimp rejecting the
+ * member (an invalid or forgotten address, a compliance state), which the same
+ * data will hit again every hour; those wait for the member to change or for the
+ * daily full pass.
+ */
+export const RETRYABLE_ERROR_CODES: ReadonlySet<string> = new Set(["request_failed"])
+
+/** Error counts by code, with one example message (addresses removed), for the run log. */
+export interface ErrorReason {
+  code: string
+  count: number
+  sample: string
+}
+
+/** Removes email addresses from a message so it can go in a log. */
+export function redactEmails(text: string): string {
+  return text.replace(/[^\s@<>"'(),;:]+@[^\s@<>"'(),;:]+\.[a-z]{2,}/gi, "<email>")
+}
 
 export interface DrainResult {
   attempted: number
   newMembers: number
   updatedMembers: number
   errors: number
+  /** Of `errors`, those retried next run (RETRYABLE_ERROR_CODES). */
+  retryable: number
+  /** `errors` grouped by code, most frequent first. */
+  reasons: ErrorReason[]
   /** Members left for the next run because the time budget ran out. */
   deferred: number
-  /** Fingerprints of members Mailchimp accepted this run. */
+  /** Fingerprints not to send again until they change: accepted, or rejected for a reason a retry won't fix. */
   accepted: string[]
 }
 
 /**
  * Sends the pending members, one request at a time, until done or until the
- * budget is spent. A member Mailchimp reports an error for is not accepted, so
- * it is tried again next run.
+ * budget is spent. A member whose request failed is tried again next run; a
+ * member Mailchimp rejected is not, until it changes or the daily full pass.
  */
 export async function drainPending(
   pending: PlannedMember[],
@@ -94,7 +126,17 @@ export async function drainPending(
   opts: { deadline: number; now?: () => number },
 ): Promise<DrainResult> {
   const now = opts.now ?? Date.now
-  const res: DrainResult = { attempted: 0, newMembers: 0, updatedMembers: 0, errors: 0, deferred: 0, accepted: [] }
+  const res: DrainResult = {
+    attempted: 0,
+    newMembers: 0,
+    updatedMembers: 0,
+    errors: 0,
+    retryable: 0,
+    reasons: [],
+    deferred: 0,
+    accepted: [],
+  }
+  const reasons = new Map<string, ErrorReason>()
   const requests = pushRequests(pending)
   for (let i = 0; i < requests.length; i++) {
     if (now() >= opts.deadline) {
@@ -110,9 +152,20 @@ export async function drainPending(
     res.newMembers += r.newMembers
     res.updatedMembers += r.updatedMembers
     res.errors += r.errors.length
-    const failed = new Set(r.errors.map((e) => e.email.trim().toLowerCase()))
-    for (const m of members) if (!failed.has(m.email.trim().toLowerCase())) res.accepted.push(fingerprint(m))
+    const retry = new Set<string>()
+    for (const e of r.errors) {
+      const code = e.code || "unknown"
+      if (RETRYABLE_ERROR_CODES.has(code)) {
+        retry.add(e.email.trim().toLowerCase())
+        res.retryable++
+      }
+      const reason = reasons.get(code) ?? { code, count: 0, sample: redactEmails(e.message ?? "").slice(0, 200) }
+      reason.count++
+      reasons.set(code, reason)
+    }
+    for (const m of members) if (!retry.has(m.email.trim().toLowerCase())) res.accepted.push(fingerprint(m))
   }
+  res.reasons = [...reasons.values()].sort((a, b) => b.count - a.count || a.code.localeCompare(b.code))
   return res
 }
 
