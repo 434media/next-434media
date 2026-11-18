@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { Loader2, X, Send, AlertCircle, Mail, MessageSquare } from "lucide-react"
 
 // Compose modal for answering a website inquiry by hand via Resend. Opens from
@@ -47,9 +47,9 @@ function defaultSubject(submission: ContactFormSubmissionLite | null): string {
 function defaultBody(submission: ContactFormSubmissionLite | null): string {
   if (!submission) return ""
   const first = submission.firstName?.trim() || "there"
-  // Two blank lines between greeting and signoff so the cursor lands in
-  // the middle on focus and the rep can start typing immediately.
-  return `Hi ${first},\n\n\n\n`
+  // Greeting, one blank line, then the cursor: focus puts the caret at the
+  // end of this text, so the rep can start typing immediately.
+  return `Hi ${first},\n\n`
 }
 
 // Stage 5c — starter templates for the three most common reply patterns.
@@ -101,6 +101,7 @@ export function InboxReplyModal({
   const [body, setBody] = useState("")
   const [isSending, setIsSending] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const bodyRef = useRef<HTMLTextAreaElement>(null)
 
   // Reset form whenever the modal opens for a new submission.
   useEffect(() => {
@@ -109,6 +110,14 @@ export function InboxReplyModal({
     setBody(defaultBody(submission))
     setError(null)
     setIsSending(false)
+    // Put the caret at the end of the starter text (some browsers leave it at the start).
+    const raf = requestAnimationFrame(() => {
+      const el = bodyRef.current
+      if (!el) return
+      el.focus()
+      el.setSelectionRange(el.value.length, el.value.length)
+    })
+    return () => cancelAnimationFrame(raf)
   }, [open, submission])
 
   // Esc to close (when not sending — don't lose draft mid-send)
@@ -280,6 +289,7 @@ export function InboxReplyModal({
             </div>
             <textarea
               id="reply-body"
+              ref={bodyRef}
               value={body}
               onChange={(e) => setBody(e.target.value)}
               disabled={isSending}
