@@ -48,6 +48,8 @@ export async function GET(request: NextRequest) {
       today, kind: list.kind, profile: active.versionId, stories: list.stories.length,
       photoLeads: list.stories.filter(s => "pageUrl" in s.photo).length, hold: list.hold?.slice(0, 300) ?? null,
       calls: list.calls.length, outputTokens: list.calls.reduce((n, c) => n + (c.outputTokens ?? 0), 0),
+      // Why each candidate was left off, so "why was the list short" is answered from the run record (never emailed).
+      passes: list.passes, dropped: list.dropped.slice(0, 40).map(d => d.slice(0, 400)),
     }
     if (error) return { message: `Story list not sent: ${error.message}`, detail, status: "error" as const }
     await saveStoryListSent(BRAND_ID, today, list.stories.map(s => ({ title: s.title, url: s.url })), sent)
