@@ -517,7 +517,7 @@ export function GeneratePanel({ open, onAdd, addLabel = "Add", onGenerated, seed
         )}
 
         {/* Toolbar */}
-        <div className="flex items-center gap-2 px-2 pb-2">
+        <div className="flex flex-wrap items-center gap-2 px-2 pb-2 min-w-0">
           {/* "+" attach menu — reference images (upload / library) */}
           {showRefs && (
             <div className="relative">
@@ -625,20 +625,24 @@ export function GeneratePanel({ open, onAdd, addLabel = "Add", onGenerated, seed
             </label>
           )}
 
-          {/* Generate / Remix — lives at the right edge of the composer, with this click's estimate on it and the
-              month's meter beside it, so the cost is seen before the click. */}
-          <span className="ml-auto shrink-0 text-[11px] tabular-nums text-neutral-500">{meter}</span>
-          <button
-            ref={generateBtnRef}
-            type="button"
-            onClick={openNudge}
-            disabled={isGenerating || !genPrompt.trim() || !genModelId}
-            className="shrink-0 inline-flex items-center gap-2 px-4 h-8 text-sm font-medium text-white bg-neutral-900 hover:bg-neutral-800 rounded-lg transition-colors disabled:opacity-50"
-          >
-            {isGenerating ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
-            {refs.length > 0 && genKind === "image" ? "Remix" : "Generate"}
-            {estimate ? <span className="tabular-nums">· <span className="font-bold">{estimate}</span></span> : null}
-          </button>
+          {/* Generate / Remix — at the right edge of the composer, with this click's estimate on it and the month's
+              meter beside it, so the cost is seen before the click. The row wraps rather than overflowing: when space
+              is short the meter drops to its own line under Generate (wrap-reverse), and below 640 px Generate takes
+              the full width on its own line. */}
+          <div className="ml-auto flex flex-wrap-reverse items-center justify-end gap-x-2 gap-y-1 min-w-0 max-sm:w-full">
+            <span className="whitespace-nowrap text-[11px] tabular-nums text-neutral-500">{meter}</span>
+            <button
+              ref={generateBtnRef}
+              type="button"
+              onClick={openNudge}
+              disabled={isGenerating || !genPrompt.trim() || !genModelId}
+              className="inline-flex items-center justify-center gap-2 px-4 h-8 whitespace-nowrap text-sm font-medium text-white bg-neutral-900 hover:bg-neutral-800 rounded-lg transition-colors disabled:opacity-50 max-sm:w-full"
+            >
+              {isGenerating ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+              {refs.length > 0 && genKind === "image" ? "Remix" : "Generate"}
+              {estimate ? <span className="tabular-nums">· <span className="font-bold">{estimate}</span></span> : null}
+            </button>
+          </div>
         </div>
       </div>
 
