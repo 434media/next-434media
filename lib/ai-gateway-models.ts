@@ -101,6 +101,34 @@ export interface GatewayModel {
   available: boolean
   /** Video models: accepted aspect ratios + durations (null = use global options). */
   video: VideoConstraints | null
+  /** What one click costs, for the estimate shown before it (lib/spend-caps.ts). */
+  cost: AssetCost
+}
+
+/**
+ * The cost basis of one generation: dollars per image, per second of video, or per video. `fallback` is true when the
+ * Gateway lists no clean unit price for the model (token-priced, or no price at all) and a deliberately high figure
+ * stands in, so the estimate errs over rather than under.
+ */
+export interface AssetCost {
+  usd: number
+  per: "image" | "second" | "video"
+  fallback: boolean
+}
+
+/** Stand-ins when the Gateway gives no unit price (2026-11-18: GPT Image 2 and Seedance are token-priced, Flux lists none). */
+export const IMAGE_FALLBACK_USD = 0.25
+export const VIDEO_FALLBACK_PER_SECOND_USD = 0.5
+
+/** The model ids treated as video: the curated kind, or any slug naming Veo or video (founder, 2026-11-18). */
+export function isVideoModel(id: string): boolean {
+  return curatedKind(id) === "video" || /veo|video/i.test(id)
+}
+
+/** The estimate for one click, in US dollars: per-second costs times the clip's length. */
+export function assetEstimateUsd(cost: AssetCost, durationSec?: number): number {
+  const usd = cost.per === "second" ? cost.usd * Math.max(1, durationSec ?? 8) : cost.usd
+  return Math.round(usd * 100) / 100
 }
 
 // The Gateway exposes several pricing shapes depending on the model. We read the
@@ -111,6 +139,28 @@ interface GatewayPricing {
   request?: string
   image_dimension_quality_pricing?: Array<{ size?: string; cost?: string }>
   video_duration_pricing?: Array<{ cost_per_second?: string }>
+}
+
+/**
+ * The cost basis from the Gateway's pricing. Images: the flat or default-size price. Video: the highest per-second
+ * price listed (audio and the largest resolution), so the estimate is an "up to"; else a per-video price. Otherwise the
+ * stand-in above.
+ */
+export function assetCostFor(pricing: GatewayPricing | undefined, kind: GenModelKind): AssetCost {
+  const n = (v: string | undefined) => {
+    const x = Number(v)
+    return v !== undefined && Number.isFinite(x) && x > 0 ? x : undefined
+  }
+  if (kind === "image") {
+    const dim = pricing?.image_dimension_quality_pricing
+    const flat = n(pricing?.image) ?? n((dim?.find((d) => d.size === "default") ?? dim?.[0])?.cost)
+    return flat !== undefined ? { usd: flat, per: "image", fallback: false } : { usd: IMAGE_FALLBACK_USD, per: "image", fallback: true }
+  }
+  const perSecond = (pricing?.video_duration_pricing ?? []).map((d) => n(d.cost_per_second)).filter((x): x is number => x !== undefined)
+  if (perSecond.length) return { usd: Math.max(...perSecond), per: "second", fallback: false }
+  const perVideo = n(pricing?.video) ?? n(pricing?.request)
+  if (perVideo !== undefined) return { usd: perVideo, per: "video", fallback: false }
+  return { usd: VIDEO_FALLBACK_PER_SECOND_USD, per: "second", fallback: true }
 }
 interface GatewayListEntry {
   id: string
@@ -191,6 +241,7 @@ export async function getGatewayModels(): Promise<GatewayModel[]> {
       priceLabel: priceLabelFor(entry, c.kind),
       available: live ? live.has(c.id) : true,
       video: c.video ?? null,
+      cost: assetCostFor(entry?.pricing, c.kind),
     }
   })
 

@@ -211,7 +211,7 @@ function scriptedModel(steps: { tool?: string; input?: unknown; text?: string }[
   return { model, calls }
 }
 
-async function intakeSetup(opts: { controls?: AgentControls; pin?: SkillPin | null; email?: string; mark?: ArrivalMark; spend?: number | Error; steps?: { tool?: string; input?: unknown; text?: string }[]; skill?: SkillFiles } = {}) {
+async function intakeSetup(opts: { controls?: AgentControls; pin?: SkillPin | null; email?: string; mark?: ArrivalMark; spend?: number | Error; month?: number | Error; steps?: { tool?: string; input?: unknown; text?: string }[]; skill?: SkillFiles } = {}) {
   const db = new MemoryAgentDb()
   const sb = fakeSandbox()
   const { model, calls } = scriptedModel(opts.steps ?? [
@@ -233,6 +233,11 @@ async function intakeSetup(opts: { controls?: AgentControls; pin?: SkillPin | nu
       if (opts.spend instanceof Error) throw opts.spend
       return opts.spend ?? 0
     },
+    monthSpend: async () => {
+      if (opts.month instanceof Error) throw opts.month
+      return opts.month ?? 0
+    },
+    monthlyCapUsd: 5,
     sandbox: sb.factory,
     now: () => at(clock++ * 1000),
     runId: "run-1",
@@ -388,6 +393,24 @@ test("a spend that cannot be read refuses the run (fails closed)", async () => {
   const id = await queued(db)
   const out = await runIntake(id, deps)
   assert.deepEqual([out.ok, (out as { code: string }).code], [false, "budget-unreadable"])
+  assert.equal(calls.length, 0)
+})
+
+test("intake's month at or over its $5 cap refuses the run before any model call", async () => {
+  const { db, deps, calls } = await intakeSetup({ month: 5 })
+  const id = await queued(db)
+  const out = await runIntake(id, deps)
+  assert.deepEqual([out.ok, (out as { code: string }).code], [false, "monthly-cap"])
+  assert.match((out as { reason: string }).reason, /\$5 limit; it resumes on the 1st/)
+  assert.equal(calls.length, 0)
+  assert.equal(db.entries(id).at(-1)?.reasonCode, "monthly-cap")
+})
+
+test("intake's month that cannot be read refuses the run (fails closed)", async () => {
+  const { db, deps, calls } = await intakeSetup({ month: new Error("firestore down") })
+  const id = await queued(db)
+  const out = await runIntake(id, deps)
+  assert.deepEqual([out.ok, (out as { code: string }).code], [false, "cap-unreadable"])
   assert.equal(calls.length, 0)
 })
 

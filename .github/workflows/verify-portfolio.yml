@@ -175,6 +175,8 @@ jobs:
       - run: tsx --test lib/__tests__/connector-434.test.ts
       # The Ask panel, slice 1 (2026-11-18): tools per person, money and send refusals, Undo, the hash-bound Confirm, a turn.
       - run: tsx --test lib/__tests__/ask-panel.test.ts
+      # Monthly spend caps on exams, image and video, and intake (2026-11-18): the caps, what counts, fails closed, estimates.
+      - run: tsx --test lib/__tests__/spend-caps.test.ts
       # Owned Meta service entry for the shared Slack app: pilot identity and acting-person checks.
       - run: tsx --test lib/__tests__/owned-meta-service.test.ts
       # Canva brand-template fill for the Slack app, including the photo crop (sharp runs for real here).

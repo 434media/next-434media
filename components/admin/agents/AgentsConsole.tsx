@@ -24,6 +24,7 @@ import {
 import { DetailDrawer } from "@/components/admin/DetailDrawer"
 import type { StoredExamReport } from "@/lib/agent/exam-reports"
 import { ASK_MODEL, usd as dollars } from "@/lib/ask/limits"
+import { monthLine } from "@/lib/spend-caps"
 import type { CostSummary, HandoffWait, ReasonGroup, ReviewItem, RunSummary } from "@/lib/agent/review"
 
 type Mode = "off" | "proof" | "draft"
@@ -33,6 +34,9 @@ interface Console {
   pin: { commit: string; sha256: string; model?: string; ceiling: string; pinnedAt: string } | null
   askPin?: { commit: string; sha256: string; model?: string; ceiling: string; pinnedAt: string } | null
   askMonth?: { spentUsd: number | null; capUsd: number }
+  /** Exams and smoke tests, and intake drafts, against their monthly caps (lib/spend-caps.ts). */
+  examMonth?: { spentUsd: number | null; capUsd: number }
+  intakeMonth?: { spentUsd: number | null; capUsd: number }
   queue: ReviewItem[]
   reasons: ReasonGroup[]
   runs: RunSummary
@@ -56,7 +60,19 @@ interface ExamView {
   outputs?: StoredExam["cases"]
 }
 const examView = (r: StoredExam): ExamView => ({ model: r.model, markdown: r.markdown, pass: r.totals?.pass ?? 0, cases: r.planned, state: r.state, error: r.error, outputs: r.cases })
-const EXAM_MODELS = ["anthropic/claude-sonnet-5.5", "anthropic/claude-opus-5.5"]
+/** Haiku first: the default (founder, 2026-11-18). The others stay, for a run picked on purpose. */
+const EXAM_MODELS = ["anthropic/claude-haiku-5.5", "anthropic/claude-sonnet-5.5", "anthropic/claude-opus-5.5"]
+
+/** A month meter, red at or over its cap (as Ask's is). */
+function MonthMeter({ month, title }: { month?: { spentUsd: number | null; capUsd: number }; title: string }) {
+  if (!month) return null
+  const over = month.spentUsd !== null && month.spentUsd >= month.capUsd
+  return (
+    <span className={`text-xs tabular-nums ${over ? "font-medium text-red-700" : "text-neutral-700"}`} title={title}>
+      {monthLine(month.spentUsd, month.capUsd)}
+    </span>
+  )
+}
 
 function duration(ms: number | null): string {
   if (ms === null) return "—"
@@ -145,8 +161,25 @@ export function AgentsConsole() {
 
   async function runExam(model: string, suite = "intake-qualification") {
     const what = suite === "admin-ask" ? "the Ask exam" : "the intake exam"
-    if (!window.confirm(`Run ${what} on ${model}? It spends Gateway credit${suite === "admin-ask" ? "" : " and runs the skill's scripts in a sandbox"}. Every tool is a mock: it sends and changes nothing.`)) return
-    const r = await post("/api/admin/engine/exam", { suite, model })
+    // The estimate first: the route reads the suite and the prices and calls no model.
+    const est = await post("/api/admin/engine/exam", { suite, model, estimate: true })
+    if (!est.ok) {
+      say("error", String(est.body.error ?? "The exam's cost could not be estimated, so it did not run."))
+      return
+    }
+    const estimateUsd = typeof est.body.estimateUsd === "number" ? est.body.estimateUsd : null
+    const cases = Number(est.body.cases ?? 0)
+    const month = est.body.month as { spentUsd: number | null; capUsd: number } | undefined
+    const cost = estimateUsd === null ? "an unknown amount (no list price)" : `about ${dollars(estimateUsd)}`
+    if (month && month.spentUsd !== null && month.spentUsd >= month.capUsd) {
+      say("error", `Exams reached this month's ${dollars(month.capUsd)} limit; they resume on the 1st.`)
+      return
+    }
+    const meter = month ? ` ${monthLine(month.spentUsd, month.capUsd)}.` : ""
+    if (!window.confirm(`Run ${what} on ${model.replace("anthropic/", "")}? ${cases} cases, estimated ${cost}.${meter} It spends Gateway credit${suite === "admin-ask" ? "" : " and runs the skill's scripts in a sandbox"}. Every tool is a mock: it sends and changes nothing.`)) return
+    const over = estimateUsd === null || estimateUsd > Number(est.body.confirmOverUsd ?? 1)
+    if (over && !window.confirm(`Confirm again: this run is estimated at ${cost}, over $1. Haiku 5.5 runs the same exam for much less. Run it on ${model.replace("anthropic/", "")} anyway?`)) return
+    const r = await post("/api/admin/engine/exam", { suite, model, ...(over ? { confirmedOver: true } : {}) })
     void loadExams()
     if (!r.ok) {
       say("error", String(r.body.error ?? "The exam could not run. Any cases it finished are kept under Exam reports in the Console."))
@@ -249,6 +282,10 @@ function ControlsBar({ data, busy, onControls, onPin, onExam }: { data: Console;
         <button disabled={busy} onClick={() => onControls({ intakeSends: !sends }, sends ? "Intake sends are off." : "Intake sends are on. Each still needs your approval.")} className={`rounded-md px-2.5 py-1.5 text-xs font-medium disabled:opacity-40 ${sends ? "bg-neutral-900 text-white" : "border border-neutral-200 text-neutral-700 hover:bg-neutral-50"}`}>
           Sends {sends ? "on" : "off"}
         </button>
+        <span className="text-[10px] uppercase tracking-[0.16em] font-mono text-neutral-400 ml-1">Drafts</span>
+        <MonthMeter month={data.intakeMonth} title="Intake drafts' model spend this calendar month (UTC). At the limit no draft is made until the 1st." />
+        <span className="text-[10px] uppercase tracking-[0.16em] font-mono text-neutral-400 ml-1">Exams</span>
+        <MonthMeter month={data.examMonth} title="Exams' and smoke tests' model spend this calendar month (UTC). At the limit none runs until the 1st." />
       </div>
       <div className="flex flex-wrap items-center gap-2">
         <span className="text-xs text-neutral-500" title={data.pin ? `Fingerprint ${data.pin.sha256.slice(0, 12)}, ceiling ${data.pin.ceiling}` : undefined}>

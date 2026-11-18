@@ -1,17 +1,25 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Loader2, Plus, Download, Upload, Images, X, RefreshCw } from "lucide-react"
+import { Loader2, Plus, Download, Upload, Images, X, RefreshCw, ExternalLink } from "lucide-react"
 import type { Asset } from "./types"
 import { sanitizeAssetUrl as sanitizeUrl, toDownloadUrl } from "@/lib/asset-url"
 import { ProviderLogo } from "./ProviderLogo"
 import { AssetLibraryPicker } from "./AssetLibraryPicker"
+import { CAP_UNREADABLE_MESSAGE, capMessage, monthLine } from "@/lib/spend-caps"
 
 // Shared "Generate with AI" panel — used both inside the content-post drawer
 // (with onAdd → attach to the post) and on the Studio page (onGenerated →
 // refresh the library). Generation goes through the decoupled generate-asset
 // route, which also persists every result to the asset library. The panel owns
 // all generation state; hosts just react to the produced Asset.
+//
+// Canva first (founder, 2026-11-18): Generate opens a nudge whose primary action is Open Canva; the paid model is the
+// secondary action and shows what this click is estimated to cost. Video asks a second time. At this month's cap the
+// paid action is off and Canva stays (lib/spend-caps.ts; the route enforces the same).
+
+/** Where the nudge sends people: Canva's home, signed in or not. */
+const CANVA_URL = "https://www.canva.com"
 
 export interface GenModel {
   id: string
@@ -32,6 +40,18 @@ export interface GenModel {
     durations?: number[]
     durationRange?: { min: number; max: number; default: number }
   } | null
+  /** One click's cost basis (lib/ai-gateway-models.ts AssetCost). */
+  cost?: { usd: number; per: "image" | "second" | "video"; fallback: boolean }
+}
+
+type Month = { spentUsd: number | null; capUsd: number }
+
+/** "about $0.03" for a listed per-image price; "up to $3.20" for video and stand-in prices, which are ceilings. */
+function clickEstimate(m: GenModel | null, durationSec: number): string | null {
+  if (!m?.cost) return null
+  const usd = Math.round((m.cost.per === "second" ? m.cost.usd * Math.max(1, durationSec) : m.cost.usd) * 100) / 100
+  const exact = !m.cost.fallback && m.cost.per !== "second"
+  return `${exact ? "about" : "up to"} $${usd.toFixed(2)}`
 }
 
 // Fallback option sets — used for image models and for video models whose
@@ -76,8 +96,13 @@ export function GeneratePanel({ open, onAdd, addLabel = "Add", onGenerated, seed
   const [genOutOfCredits, setGenOutOfCredits] = useState(false)
   const [genPreview, setGenPreview] = useState<Asset | null>(null)
   const [genStatus, setGenStatus] = useState<"idle" | "working" | "ready">("idle")
+  // The Canva-first nudge: closed, its first step, or the video's second confirm.
+  const [nudge, setNudge] = useState<null | "canva" | "video">(null)
+  const [month, setMonth] = useState<Month | null>(null)
+  const [rosterNonce, setRosterNonce] = useState(0)
 
-  // Load the curated model roster (live pricing/availability) when opened.
+  // Load the curated model roster (live pricing/availability) and this month's spend when opened, and again after a
+  // generation so the meter moves.
   useEffect(() => {
     if (!open) return
     let cancelled = false
@@ -88,6 +113,7 @@ export function GeneratePanel({ open, onAdd, addLabel = "Add", onGenerated, seed
         const models = data.models as GenModel[]
         setGenModels(models)
         setGenModelId((cur) => cur || models[0]?.id || "")
+        setMonth((data.month as Month | null | undefined) ?? null)
       })
       .catch(() => {
         /* leave roster empty — panel hides itself when there are no models */
@@ -95,7 +121,7 @@ export function GeneratePanel({ open, onAdd, addLabel = "Add", onGenerated, seed
     return () => {
       cancelled = true
     }
-  }, [open])
+  }, [open, rosterNonce])
 
   // When locked to one kind, keep the toggle state pinned there.
   useEffect(() => {
@@ -220,11 +246,22 @@ export function GeneratePanel({ open, onAdd, addLabel = "Add", onGenerated, seed
     setGenStatus("idle")
   }
 
-  const handleGenerate = async () => {
+  // Generate opens the nudge; only "Use the paid model" (and, for video, its second confirm) reaches the route.
+  const openNudge = () => {
     if (!genPrompt.trim()) {
       setGenError("A prompt is required.")
       return
     }
+    setGenError(null)
+    setNudge("canva")
+  }
+
+  const handleGenerate = async (confirmedVideo = false) => {
+    if (!genPrompt.trim()) {
+      setGenError("A prompt is required.")
+      return
+    }
+    setNudge(null)
     setIsGenerating(true)
     setGenError(null)
     setGenOutOfCredits(false)
@@ -242,9 +279,11 @@ export function GeneratePanel({ open, onAdd, addLabel = "Add", onGenerated, seed
           image_urls: imageRefs.length > 0 ? imageRefs : undefined,
           aspect_ratio: genAspectRatio,
           duration: genKind === "video" ? genDuration : undefined,
+          ...(confirmedVideo ? { confirmedVideo: true } : {}),
         }),
       })
       const data = await res.json().catch(() => ({}))
+      if (data.month) setMonth(data.month as Month)
       if (!res.ok) {
         if (data.code === "out_of_credits") setGenOutOfCredits(true)
         else setGenError(data.error || "Generation failed")
@@ -266,6 +305,7 @@ export function GeneratePanel({ open, onAdd, addLabel = "Add", onGenerated, seed
       setGenStatus("idle")
     } finally {
       setIsGenerating(false)
+      setRosterNonce((n) => n + 1)
     }
   }
 
@@ -287,6 +327,12 @@ export function GeneratePanel({ open, onAdd, addLabel = "Add", onGenerated, seed
   }
 
   if (!open || genModels.length === 0) return null
+
+  const estimate = clickEstimate(selectedModel, genDuration)
+  // Fails closed: a month that could not be read keeps the paid action off, as the route would refuse it.
+  const capReached = !month || month.spentUsd === null || month.spentUsd >= month.capUsd
+  const capNote = !month || month.spentUsd === null ? CAP_UNREADABLE_MESSAGE : `${capMessage("asset-generate", month.capUsd)} Canva is still available.`
+  const meter = month ? monthLine(month.spentUsd, month.capUsd) : "This month: unavailable"
 
   const refLabel = genKind === "video" ? "Source image" : "Reference images"
   const refHint =
@@ -538,7 +584,7 @@ export function GeneratePanel({ open, onAdd, addLabel = "Add", onGenerated, seed
           {/* Generate / Remix — lives at the right edge of the composer */}
           <button
             type="button"
-            onClick={handleGenerate}
+            onClick={openNudge}
             disabled={isGenerating || !genPrompt.trim() || !genModelId}
             className="ml-auto shrink-0 inline-flex items-center gap-2 px-4 h-8 text-sm font-medium text-white bg-neutral-900 hover:bg-neutral-800 rounded-lg transition-colors disabled:opacity-50"
           >
@@ -547,6 +593,66 @@ export function GeneratePanel({ open, onAdd, addLabel = "Add", onGenerated, seed
           </button>
         </div>
       </div>
+
+      {nudge === "canva" && (
+        <div role="group" aria-label="Try Canva first" className="rounded-lg border border-neutral-200 bg-neutral-50 p-3 space-y-2.5">
+          <div>
+            <p className="text-sm font-medium text-neutral-900">Try Canva first</p>
+            <p className="text-xs text-neutral-600 leading-snug">
+              Canva makes most graphics and short clips at no extra cost. Use the paid model only when Canva can&apos;t do it.
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <a
+              href={CANVA_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={() => setNudge(null)}
+              className="inline-flex items-center gap-1.5 px-3 h-8 text-sm font-medium text-white bg-neutral-900 hover:bg-neutral-800 rounded-lg transition-colors"
+            >
+              <ExternalLink className="w-4 h-4" />
+              Open Canva
+            </a>
+            <button
+              type="button"
+              disabled={capReached}
+              onClick={() => (genKind === "video" ? setNudge("video") : void handleGenerate())}
+              className="inline-flex items-center gap-1.5 px-3 h-8 text-sm font-medium text-neutral-700 ring-1 ring-neutral-300 hover:bg-white rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              Use the paid model
+              {estimate ? <span className="tabular-nums text-neutral-500">· {estimate}</span> : null}
+            </button>
+            <button type="button" onClick={() => setNudge(null)} className="ml-auto text-xs text-neutral-500 hover:text-neutral-800">
+              Cancel
+            </button>
+          </div>
+          <p className="text-[11px] tabular-nums text-neutral-500">{meter}</p>
+          {capReached && <p className="text-[11px] text-red-700 leading-snug">{capNote}</p>}
+        </div>
+      )}
+
+      {nudge === "video" && (
+        <div role="group" aria-label="Confirm the video" className="rounded-lg border border-neutral-200 bg-neutral-50 p-3 space-y-2.5">
+          <p className="text-sm text-neutral-900 leading-snug">
+            Video costs the most. Generate a {genDuration}s clip on {selectedModel?.label ?? genModelId}
+            {estimate ? <> for <span className="tabular-nums">{estimate}</span></> : null}?
+          </p>
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              disabled={capReached}
+              onClick={() => void handleGenerate(true)}
+              className="inline-flex items-center gap-1.5 px-3 h-8 text-sm font-medium text-white bg-neutral-900 hover:bg-neutral-800 rounded-lg transition-colors disabled:opacity-40"
+            >
+              Generate the video
+            </button>
+            <button type="button" onClick={() => setNudge("canva")} className="inline-flex items-center px-3 h-8 text-sm font-medium text-neutral-700 ring-1 ring-neutral-300 hover:bg-white rounded-lg transition-colors">
+              Back
+            </button>
+          </div>
+          <p className="text-[11px] tabular-nums text-neutral-500">{meter}</p>
+        </div>
+      )}
 
       {videoCaps && (
         <p className="text-[11px] text-neutral-400 leading-snug">

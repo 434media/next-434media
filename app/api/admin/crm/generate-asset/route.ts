@@ -2,13 +2,16 @@ import { NextResponse, after } from "next/server"
 import type { NextRequest } from "next/server"
 import { getSession, isAuthorizedAdmin } from "@/lib/auth"
 import { generateAsset } from "@/lib/ai-generate"
-import { isCuratedModel, curatedKind, videoConstraints } from "@/lib/ai-gateway-models"
+import { isCuratedModel, curatedKind, curatedModel, videoConstraints, getGatewayModels, assetCostFor, assetEstimateUsd, isVideoModel } from "@/lib/ai-gateway-models"
 import {
   createGenerationJob,
   getGenerationJob,
   finishGenerationJob,
 } from "@/lib/firestore-generation-jobs"
 import { createAsset } from "@/lib/firestore-assets"
+import { ASSET_COST_KIND } from "@/lib/spend-caps"
+import { checkMonthCap } from "@/lib/spend-caps-server"
+import { withTask } from "@/lib/engine/task-context"
 
 // Decoupled AI generation — does NOT create a content post. Produces an Asset
 // the caller can download or attach wherever (content post, and later blog/feed).
@@ -18,6 +21,13 @@ import { createAsset } from "@/lib/firestore-assets"
 //   video → returns { jobId, status: "pending" }; generation runs in after()
 //           and writes the result to the job. Client polls GET ?jobId=.
 // GET   ?jobId=<id> → { status, asset?, error? }
+//
+// Spend guards (founder, 2026-11-18; lib/spend-caps.ts). The panel asks Canva first; this route is the paid path.
+// Image and video share a $10 monthly cap, checked before the call: at or over it, or when the spend cannot be read,
+// nothing is generated. A video needs `confirmedVideo: true` (the panel's second confirm). Every model stays available.
+// The cost is recorded under the kind `asset-generate`: a language-model image (Nano Banana) by the engine guard,
+// with what the Gateway billed; a dedicated image or video model, which the guard does not see, by its estimate here,
+// once it succeeds.
 
 export const runtime = "nodejs"
 // Video generation runs in the after() callback below, which is bounded by this
@@ -42,6 +52,20 @@ interface GenerateBody {
   image_urls?: string[]
   aspect_ratio?: string
   duration?: number
+  /** A video's second confirm, from the panel. */
+  confirmedVideo?: boolean
+}
+
+/**
+ * Records a dedicated image or video model's estimated cost against the month (the guard records language-model
+ * images itself). Production only, as the guard records; never throws.
+ */
+async function recordAssetCost(task: string, modelId: string, usd: number): Promise<void> {
+  if (curatedModel(modelId)?.viaLanguage) return
+  const rec = { at: new Date().toISOString(), task, kind: ASSET_COST_KIND, property: "434", model: modelId, tokens: {}, listUsd: usd, usd }
+  if (process.env.VERCEL_ENV !== "production") return console.info("[engine:cost]", JSON.stringify(rec))
+  const { recordCallCost } = await import("@/lib/engine/cost-ledger")
+  await recordCallCost(rec)
 }
 
 async function requireAdmin() {
@@ -136,11 +160,25 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     }
   }
 
+  // Video asks twice (founder, 2026-11-18): the panel sends this only after its second confirm.
+  if (isVideoModel(modelId) && body.confirmedVideo !== true) {
+    return NextResponse.json({ error: "Video needs a second confirm.", code: "confirm-video" }, { status: 409 })
+  }
+  // The month's cap, before any call (fails closed).
+  const cap = await checkMonthCap("asset-generate")
+  if (!cap.ok) {
+    return NextResponse.json({ error: cap.message, code: cap.code, month: { spentUsd: cap.spentUsd, capUsd: cap.capUsd } }, { status: cap.code === "monthly-cap" ? 429 : 503 })
+  }
+  const live = (await getGatewayModels().catch(() => [])).find((m) => m.id === modelId)
+  const estimateUsd = assetEstimateUsd(live?.cost ?? assetCostFor(undefined, kind), duration)
+
   const createdBy = auth.session.name || auth.session.email
 
   // ── Image: synchronous — persist to the library + return the asset. ──
   if (kind === "image") {
-    const result = await generateAsset({ modelId, prompt, sourceImageUrls, aspectRatio })
+    const task = `asset:${crypto.randomUUID()}`
+    const result = await withTask({ task, kind: ASSET_COST_KIND, property: "434" }, () => generateAsset({ modelId, prompt, sourceImageUrls, aspectRatio }))
+    if (result.ok) await recordAssetCost(task, modelId, estimateUsd)
     if (!result.ok) {
       const code =
         result.status === 402 ? "out_of_credits" : result.status === 429 ? "rate_limited" : undefined
@@ -169,8 +207,10 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
   after(async () => {
     try {
-      const result = await generateAsset({ modelId, prompt, sourceImageUrls, aspectRatio, duration })
+      const task = `asset:${job.id}`
+      const result = await withTask({ task, kind: ASSET_COST_KIND, property: "434" }, () => generateAsset({ modelId, prompt, sourceImageUrls, aspectRatio, duration }))
       if (result.ok) {
+        await recordAssetCost(task, modelId, estimateUsd)
         // Persist to the library, then mark the job complete.
         await createAsset({ asset: result.asset, created_by: createdBy }).catch((err) =>
           console.error("[generate-asset] library save failed:", err),

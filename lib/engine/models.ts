@@ -16,7 +16,7 @@ export const ENGINE_LANGUAGE_MODELS: Record<string, { usedBy: string; checked: s
   "anthropic/claude-sonnet-5": { usedBy: "prospecting translator (lib/ai-gateway-text.ts)", checked: "2026-11-11" },
   "anthropic/claude-opus-5.5": { usedBy: "intake qualification on the engine, a D3 candidate (lib/agent/intake.ts; checked live 2026-11-14)", checked: "2026-11-14" },
   "anthropic/claude-sonnet-5.5": { usedBy: "lead research; content pipeline vision steps and fallback", checked: "2026-11-11" },
-  "anthropic/claude-haiku-5.5": { usedBy: "content pipeline text steps (lib/content-pipeline/models.ts); the Ask panel and its exam (lib/ask/limits.ts; checked live 2026-11-18)", checked: "2026-11-18" },
+  "anthropic/claude-haiku-5.5": { usedBy: "content pipeline text steps (lib/content-pipeline/models.ts); the Ask panel and its exam (lib/ask/limits.ts; checked live 2026-11-18); the default exam model (lib/engine/exam-estimate.ts)", checked: "2026-11-18" },
   "meta/llama-3.3-70b": { usedBy: "content pipeline text fallback", checked: "2026-11-11" },
   "meta/llama-4-scout": { usedBy: "content pipeline, kept for moving a vision step back", checked: "2026-11-11" },
   "nvidia/nemotron-3.5-lightning": { usedBy: "content pipeline, kept for moving a text step back", checked: "2026-11-11" },

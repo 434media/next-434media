@@ -29,13 +29,18 @@ import { checkBudget, createTask, step, type AgentDb } from "./ledger-server"
 import { SEND_APPROVALS_COLLECTION, TEST_SINK_RECIPIENTS } from "./send-email"
 import { SCRIPT_TOOL, SCRIPT_TOOL_DECLARATION, skillScriptTool, type SandboxFactory } from "./skill-scripts"
 import { addressOf } from "../core-model/messages"
+import { capDecision } from "../spend-caps"
 
 export const INTAKE_SKILL = "434-intake-qualification"
 export const INTAKE_OBJECTIVE = "intake-reply"
 export const INTAKE_WORKFLOW = `${INTAKE_SKILL}/draft`
 /** The task's share of the budget. The property's daily cap (lib/engine/budget.ts) is the backstop. */
 export const INTAKE_BUDGET_USD = 1
-/** The default until the exam picks (D3): the cheaper of the two candidates that passes. */
+/**
+ * The default until the exam picks (D3): the cheaper of the candidates that passes. Haiku 5.5 is the founder's target
+ * (2026-11-18: "default Haiku"), but intake keeps Sonnet until Haiku passes the intake exam, its safety cases
+ * (prompt injection, arguments checked) included. The month's spend is capped either way (lib/spend-caps.ts, $5).
+ */
 export const INTAKE_DEFAULT_MODEL = "anthropic/claude-sonnet-5.5"
 /** Generous on purpose: on Claude 5 this caps thinking plus text (CLAUDE.md, "The token trap"). */
 export const INTAKE_MAX_OUTPUT_TOKENS = 16_000
@@ -172,6 +177,10 @@ export interface IntakeDeps {
   model: (slug: string) => LanguageModel
   /** What a task's chain has spent, in US dollars (lib/engine/cost-ledger.ts readTaskSpend). Throwing refuses the run. */
   taskSpend: (root: string) => Promise<number>
+  /** Intake's spend this calendar month, in US dollars (lib/spend-caps-server.ts readMonthSpend). Throwing refuses the run. */
+  monthSpend: () => Promise<number>
+  /** The monthly cap in force (lib/spend-caps.ts, $5 unless INTAKE_MONTHLY_CAP_USD says otherwise). */
+  monthlyCapUsd: number
   sandbox?: SandboxFactory
   now: () => string
   runId: string
@@ -218,6 +227,15 @@ export async function runIntake(taskId: string, deps: IntakeDeps): Promise<Intak
   // The task's shared budget, checked before any model call (fails closed when the spend cannot be read).
   const budget = await checkBudget(deps.db, task, deps.taskSpend)
   if (!budget.ok) return refuse(budget.code, budget.reason)
+  // The month's cap (founder, 2026-11-18): at or over it, or when the spend cannot be read, no draft is made.
+  let monthSpent: number | null
+  try {
+    monthSpent = await deps.monthSpend()
+  } catch {
+    monthSpent = null
+  }
+  const month = capDecision("intake", monthSpent, deps.monthlyCapUsd)
+  if (!month.ok) return refuse(month.code, month.message)
 
   // The pin, the skill at it, and the fingerprint (checked again by the loader).
   const pin = await deps.pin()
