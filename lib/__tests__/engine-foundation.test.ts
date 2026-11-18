@@ -231,6 +231,23 @@ test("queue age: the oldest item past its queue's limit is reported; timestamps 
   assert.equal(timeOf("not a date"), null)
 })
 
+test("queue age: the founder-review queue skips archived posts, as the board does; other queues count every item", () => {
+  const now = new Date("2026-11-18T12:00:00Z")
+  const review = QUEUES.find(q => q.name === "founder-review")!
+  const r = readQueue(review, [
+    { updated_at: "2026-10-26T06:00:00Z", archived: true },
+    { updated_at: "2026-11-17T06:00:00Z" },
+    { updated_at: "2026-11-18T06:00:00Z", archived: false },
+  ])
+  assert.equal(r.waiting, 2)
+  assert.equal(r.oldestAt, "2026-11-17T06:00:00.000Z")
+  assert.equal(overdueQueues([r], now)[0].ageHours, 30)
+  // Only archived items waiting: nothing is late.
+  assert.equal(overdueQueues([readQueue(review, [{ updated_at: "2026-10-26T06:00:00Z", archived: true }])], now).length, 0)
+  const queued = QUEUES.find(q => q.name === "agent-tasks-queued")!
+  assert.equal(readQueue(queued, [{ updatedAt: "2026-11-18T06:00:00Z", archived: true }]).waiting, 1)
+})
+
 test("the heartbeat goes once a day, on the first run at or after 13:00 UTC", () => {
   assert.equal(heartbeatDue(new Date("2026-11-11T12:30:00Z"), null), false)
   assert.equal(heartbeatDue(new Date("2026-11-11T13:30:00Z"), null), true)

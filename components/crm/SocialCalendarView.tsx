@@ -40,6 +40,8 @@ interface SocialCalendarViewProps {
   headerAction?: React.ReactNode
   /** The Create table replaces the header's Add post for the people who run it (plan v11 Step 2). */
   hideAddPost?: boolean
+  /** A Board column to open on and pulse (its label, any case), e.g. "review" from To do's Open link. */
+  initialColumn?: string | null
   // Closes a content-pipeline "no new content" card ("Confirm no new content"), for super-admins.
   onCloseOutcome?: (post: ContentPost) => void
 }
@@ -294,7 +296,7 @@ function FilterSection({ title, options, selectedValues, onToggle, renderOption 
   )
 }
 
-export function SocialCalendarView({ contentPosts, onOpenPost, onAddPost, onMovePost, onSendBack, onBulkDelete, headerAction, hideAddPost, onCloseOutcome }: SocialCalendarViewProps) {
+export function SocialCalendarView({ contentPosts, onOpenPost, onAddPost, onMovePost, onSendBack, onBulkDelete, headerAction, hideAddPost, onCloseOutcome, initialColumn }: SocialCalendarViewProps) {
   // Top-level surface: "board" is the pipeline kanban (where date-less drafts &
   // in-review work live), "calendar" is the date grid (scheduled/posted only).
   // The pipeline belongs on the board, not as a filter over a date grid — a
@@ -315,7 +317,10 @@ export function SocialCalendarView({ contentPosts, onOpenPost, onAddPost, onMove
   const [showFilters, setShowFilters] = useState(false)
   const filtersRef = useRef<HTMLDivElement>(null)
   // Board column to briefly highlight (e.g. jumped-to from the approval chip).
-  const [highlightColumn, setHighlightColumn] = useState<string | null>(null)
+  const [highlightColumn, setHighlightColumn] = useState<string | null>(() => {
+    const want = initialColumn?.trim().toLowerCase()
+    return (want && ["Produce", "Review", "Schedule", "Live"].find(l => l.toLowerCase() === want)) || null
+  })
   const highlightRef = useRef<HTMLDivElement>(null)
   // Drag-and-drop (Board): the card being dragged + the column it came from, and
   // the column currently hovered as a drop target (for the ring highlight).
@@ -413,7 +418,7 @@ export function SocialCalendarView({ contentPosts, onOpenPost, onAddPost, onMove
   }
   const handleBulkDelete = async () => {
     if (selectedIds.size === 0 || !onBulkDelete) return
-    if (!window.confirm(`Delete ${selectedIds.size} selected post${selectedIds.size === 1 ? "" : "s"}? This can't be undone.`)) return
+    if (!window.confirm(`Delete ${selectedIds.size} selected post${selectedIds.size === 1 ? "" : "s"}? They leave the board, and an admin can bring them back.`)) return
     setIsBulkDeleting(true)
     try {
       await onBulkDelete([...selectedIds])

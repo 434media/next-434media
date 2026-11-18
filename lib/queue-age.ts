@@ -18,6 +18,11 @@ export interface QueueSpec {
   /** The field holding the time the item started waiting: an ISO string or a Firestore Timestamp. */
   ageField: string
   limitMs: number
+  /**
+   * Items with `archived: true` are not waiting: the board hides them (getContentPosts), so the queue does too. Filtered
+   * in code, not in the query: most docs have no `archived` field, and a `!=` filter would drop them and need an index.
+   */
+  skipArchived?: boolean
 }
 
 const HOUR = 60 * 60_000
@@ -32,6 +37,7 @@ export const QUEUES: QueueSpec[] = [
     where: { field: "status", equals: "needs_approval" },
     ageField: "updated_at",
     limitMs: 24 * HOUR,
+    skipArchived: true,
   },
   {
     // A job the content pipeline has not finished researching. The pipeline runs every minute; a job due for six
@@ -86,14 +92,18 @@ export function timeOf(v: unknown): number | null {
   return typeof s === "number" ? s * 1000 : null
 }
 
-/** The oldest waiting time among a queue's items; items with no readable time are counted but not aged. */
-export function readQueue(queue: QueueSpec, items: Record<string, unknown>[]): QueueReading {
+/**
+ * The oldest waiting time among a queue's items; items with no readable time are counted but not aged. `truncated`
+ * looks at the raw read, so a full read still says so even when archived items were skipped from it.
+ */
+export function readQueue(queue: QueueSpec, read: Record<string, unknown>[]): QueueReading {
+  const items = queue.skipArchived ? read.filter((it) => it.archived !== true) : read
   let oldest: number | null = null
   for (const it of items) {
     const t = timeOf(it[queue.ageField])
     if (t !== null && (oldest === null || t < oldest)) oldest = t
   }
-  return { queue, waiting: items.length, oldestAt: oldest === null ? null : new Date(oldest).toISOString(), truncated: items.length >= QUEUE_READ_LIMIT }
+  return { queue, waiting: items.length, oldestAt: oldest === null ? null : new Date(oldest).toISOString(), truncated: read.length >= QUEUE_READ_LIMIT }
 }
 
 /** Queues whose oldest item has waited past the queue's limit. */

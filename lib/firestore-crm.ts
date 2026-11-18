@@ -1432,6 +1432,11 @@ export async function updateContentPost(id: string, updates: Partial<ContentPost
   }
 }
 
+/**
+ * Delete hides a post; it never erases one. Every post is archived (`archived: true`): the board, the founder-review
+ * queue and the pipeline's adopt path skip it, edits are refused, and the record stays, so a mistaken delete is undone
+ * by clearing the flag.
+ */
 export async function deleteContentPost(id: string): Promise<void> {
   try {
     const db = getDb()
@@ -1440,11 +1445,10 @@ export async function deleteContentPost(id: string): Promise<void> {
       const snap = await tx.get(ref)
       if (!snap.exists) return
       if (snap.data()!.owned_meta_history && process.env.VERCEL_ENV !== "production") throw new MetaBlocked("Preview cannot archive publisher records")
-      if (snap.data()!.owned_meta_history) tx.update(ref, { archived: true, updated_at: admin.firestore.FieldValue.serverTimestamp() })
-      else tx.delete(ref)
+      tx.update(ref, { archived: true, archived_at: new Date().toISOString(), updated_at: admin.firestore.FieldValue.serverTimestamp() })
     })
     invalidateCache(CRM_COLLECTIONS.CONTENT_POSTS)
-    console.log("[Firestore] Deleted content post:", id)
+    console.log("[Firestore] Archived content post:", id)
   } catch (error) {
     console.error("Error deleting content post:", id, error)
     throw new Error("Failed to delete content post")
@@ -1853,11 +1857,14 @@ export async function takeCanvaConnectState(stateHash: string, nowMs: number): P
     return typeof d.verifier === "string" && typeof d.expiresAtMs === "number" && d.expiresAtMs > nowMs ? { verifier: d.verifier, by: String(d.by) } : null
   })
 }
-/** The post an intake request already created, if any (idempotency for repeated requests). */
+/**
+ * The post an intake request already created, if any (idempotency for repeated requests). A live post wins over an
+ * archived (deleted) one: once the pipeline re-creates a deleted post, both carry the request id.
+ */
 export async function findContentPostByIntakeRequest(requestId: string): Promise<ContentPost | null> {
-  const snap = await getDb().collection(CRM_COLLECTIONS.CONTENT_POSTS).where("intake.requestId", "==", requestId).limit(1).get()
+  const snap = await getDb().collection(CRM_COLLECTIONS.CONTENT_POSTS).where("intake.requestId", "==", requestId).limit(20).get()
   if (snap.empty) return null
-  const doc = snap.docs[0], data = doc.data()
+  const doc = snap.docs.find(d => d.data().archived !== true) ?? snap.docs[0], data = doc.data()
   return { ...data, id: doc.id, assets: normalizeAssets(data.assets), created_at: convertTimestamp(data.created_at), updated_at: convertTimestamp(data.updated_at) } as ContentPost
 }
 /** The stored files still are the ones export_fingerprint names (an asset list written by another path may not be). */
