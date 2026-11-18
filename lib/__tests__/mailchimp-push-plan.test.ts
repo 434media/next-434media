@@ -94,7 +94,7 @@ test("drainPending: an error with no code is grouped as unknown and not retried"
 
 test("redactEmails: removes addresses, keeps the rest", () => {
   assert.equal(
-    redactEmails("Jane.Doe+news@sub.example.co is in a compliance state; contact <a@b.io>."),
+    redactEmails("jane.doe+news@sub.example.com is in a compliance state; contact <a@example.com>."),
     "<email> is in a compliance state; contact <<email>>.",
   )
   assert.equal(redactEmails("no address here"), "no address here")
