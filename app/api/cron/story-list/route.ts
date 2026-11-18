@@ -19,6 +19,7 @@ const DEFAULT_TO = "audrey@434media.com"
  * so no audience, consent or jurisdiction gate applies; recipients are held to 434 addresses. At most one list a day:
  * a second firing on the same Central day sends nothing. Model calls are recorded against the task
  * `story-list:<day>` and the brand (lib/engine/task-context.ts).
+ * Unscheduled (founder 2026-11-18): the research moved to the producer's own AI account; re-add the vercel.json entry to switch it back on.
  */
 export async function GET(request: NextRequest) {
   return runCronJob("story-list", request, async () => {
