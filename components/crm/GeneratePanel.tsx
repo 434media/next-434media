@@ -1,6 +1,7 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
+import { createPortal } from "react-dom"
 import { Loader2, Plus, Download, Upload, Images, X, RefreshCw, ExternalLink } from "lucide-react"
 import type { Asset } from "./types"
 import { sanitizeAssetUrl as sanitizeUrl, toDownloadUrl } from "@/lib/asset-url"
@@ -14,9 +15,10 @@ import { CAP_UNREADABLE_MESSAGE, capMessage, monthLine } from "@/lib/spend-caps"
 // route, which also persists every result to the asset library. The panel owns
 // all generation state; hosts just react to the produced Asset.
 //
-// Canva first (founder, 2026-11-18): Generate opens a nudge whose primary action is Open Canva; the paid model is the
-// secondary action and shows what this click is estimated to cost. Video asks a second time. At this month's cap the
-// paid action is off and Canva stays (lib/spend-caps.ts; the route enforces the same).
+// Canva first (founder, 2026-11-18): Generate shows its estimate before the click and opens a centered dialog whose
+// primary action is Open Canva; the paid model is the secondary action. Video asks a second time, as a step inside the
+// same dialog. At this month's cap the paid action is off and Canva stays (lib/spend-caps.ts; the route enforces the
+// same).
 
 /** Where the nudge sends people: Canva's home, signed in or not. */
 const CANVA_URL = "https://www.canva.com"
@@ -100,6 +102,48 @@ export function GeneratePanel({ open, onAdd, addLabel = "Add", onGenerated, seed
   const [nudge, setNudge] = useState<null | "canva" | "video">(null)
   const [month, setMonth] = useState<Month | null>(null)
   const [rosterNonce, setRosterNonce] = useState(0)
+  const dialogRef = useRef<HTMLDivElement>(null)
+  const canvaRef = useRef<HTMLAnchorElement>(null)
+  const backRef = useRef<HTMLButtonElement>(null)
+  const generateBtnRef = useRef<HTMLButtonElement>(null)
+
+  // The Canva-first dialog: focus lands on Open Canva (Back on the video step), Tab stays inside, Esc closes it and
+  // spends nothing. Listening in the capture phase keeps Esc from also closing a drawer or modal behind it.
+  useEffect(() => {
+    if (!nudge) return
+    ;(nudge === "canva" ? canvaRef.current : backRef.current)?.focus()
+    const onKey = (e: KeyboardEvent) => {
+      const panel = dialogRef.current
+      if (e.key === "Escape") {
+        e.stopPropagation()
+        e.preventDefault()
+        setNudge(null)
+        return
+      }
+      if (e.key !== "Tab" || !panel) return
+      e.stopPropagation()
+      const focusables = Array.from(panel.querySelectorAll<HTMLElement>("a[href], button:not([disabled])"))
+      if (focusables.length === 0) return
+      const first = focusables[0]
+      const last = focusables[focusables.length - 1]
+      const active = document.activeElement
+      if (!panel.contains(active) || (e.shiftKey && active === first)) {
+        e.preventDefault()
+        ;(e.shiftKey ? last : first).focus()
+      } else if (!e.shiftKey && active === last) {
+        e.preventDefault()
+        first.focus()
+      }
+    }
+    window.addEventListener("keydown", onKey, true)
+    return () => window.removeEventListener("keydown", onKey, true)
+  }, [nudge])
+
+  // Closing the dialog without generating hands focus back to Generate.
+  const closeNudge = () => {
+    setNudge(null)
+    generateBtnRef.current?.focus()
+  }
 
   // Load the curated model roster (live pricing/availability) and this month's spend when opened, and again after a
   // generation so the meter moves.
@@ -581,78 +625,103 @@ export function GeneratePanel({ open, onAdd, addLabel = "Add", onGenerated, seed
             </label>
           )}
 
-          {/* Generate / Remix — lives at the right edge of the composer */}
+          {/* Generate / Remix — lives at the right edge of the composer, with this click's estimate on it and the
+              month's meter beside it, so the cost is seen before the click. */}
+          <span className="ml-auto shrink-0 text-[11px] tabular-nums text-neutral-500">{meter}</span>
           <button
+            ref={generateBtnRef}
             type="button"
             onClick={openNudge}
             disabled={isGenerating || !genPrompt.trim() || !genModelId}
-            className="ml-auto shrink-0 inline-flex items-center gap-2 px-4 h-8 text-sm font-medium text-white bg-neutral-900 hover:bg-neutral-800 rounded-lg transition-colors disabled:opacity-50"
+            className="shrink-0 inline-flex items-center gap-2 px-4 h-8 text-sm font-medium text-white bg-neutral-900 hover:bg-neutral-800 rounded-lg transition-colors disabled:opacity-50"
           >
             {isGenerating ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
             {refs.length > 0 && genKind === "image" ? "Remix" : "Generate"}
+            {estimate ? <span className="tabular-nums">· <span className="font-bold">{estimate}</span></span> : null}
           </button>
         </div>
       </div>
 
-      {nudge === "canva" && (
-        <div role="group" aria-label="Try Canva first" className="rounded-lg border border-neutral-200 bg-neutral-50 p-3 space-y-2.5">
-          <div>
-            <p className="text-sm font-medium text-neutral-900">Try Canva first</p>
-            <p className="text-xs text-neutral-600 leading-snug">
-              Canva makes most graphics and short clips at no extra cost. Use the paid model only when Canva can&apos;t do it.
-            </p>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <a
-              href={CANVA_URL}
-              target="_blank"
-              rel="noopener noreferrer"
-              onClick={() => setNudge(null)}
-              className="inline-flex items-center gap-1.5 px-3 h-8 text-sm font-medium text-white bg-neutral-900 hover:bg-neutral-800 rounded-lg transition-colors"
+      {nudge &&
+        createPortal(
+          <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/40" onClick={(e) => { e.stopPropagation(); closeNudge() }}>
+            <div
+              ref={dialogRef}
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="canva-first-title"
+              onClick={(e) => e.stopPropagation()}
+              className="w-full max-w-md rounded-xl bg-white shadow-xl p-5 space-y-3"
             >
-              <ExternalLink className="w-4 h-4" />
-              Open Canva
-            </a>
-            <button
-              type="button"
-              disabled={capReached}
-              onClick={() => (genKind === "video" ? setNudge("video") : void handleGenerate())}
-              className="inline-flex items-center gap-1.5 px-3 h-8 text-sm font-medium text-neutral-700 ring-1 ring-neutral-300 hover:bg-white rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-            >
-              Use the paid model
-              {estimate ? <span className="tabular-nums text-neutral-500">· {estimate}</span> : null}
-            </button>
-            <button type="button" onClick={() => setNudge(null)} className="ml-auto text-xs text-neutral-500 hover:text-neutral-800">
-              Cancel
-            </button>
-          </div>
-          <p className="text-[11px] tabular-nums text-neutral-500">{meter}</p>
-          {capReached && <p className="text-[11px] text-red-700 leading-snug">{capNote}</p>}
-        </div>
-      )}
-
-      {nudge === "video" && (
-        <div role="group" aria-label="Confirm the video" className="rounded-lg border border-neutral-200 bg-neutral-50 p-3 space-y-2.5">
-          <p className="text-sm text-neutral-900 leading-snug">
-            Video costs the most. Generate a {genDuration}s clip on {selectedModel?.label ?? genModelId}
-            {estimate ? <> for <span className="tabular-nums">{estimate}</span></> : null}?
-          </p>
-          <div className="flex flex-wrap items-center gap-2">
-            <button
-              type="button"
-              disabled={capReached}
-              onClick={() => void handleGenerate(true)}
-              className="inline-flex items-center gap-1.5 px-3 h-8 text-sm font-medium text-white bg-neutral-900 hover:bg-neutral-800 rounded-lg transition-colors disabled:opacity-40"
-            >
-              Generate the video
-            </button>
-            <button type="button" onClick={() => setNudge("canva")} className="inline-flex items-center px-3 h-8 text-sm font-medium text-neutral-700 ring-1 ring-neutral-300 hover:bg-white rounded-lg transition-colors">
-              Back
-            </button>
-          </div>
-          <p className="text-[11px] tabular-nums text-neutral-500">{meter}</p>
-        </div>
-      )}
+              {nudge === "canva" ? (
+                <>
+                  <div className="space-y-1">
+                    <p id="canva-first-title" className="text-sm font-medium text-neutral-900">Try Canva first</p>
+                    <p className="text-xs text-neutral-600 leading-snug">
+                      Canva makes most graphics and short clips at no extra cost. Use the paid model only when Canva can&apos;t do it.
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <a
+                      ref={canvaRef}
+                      href={CANVA_URL}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={() => setNudge(null)}
+                      className="inline-flex items-center gap-1.5 px-3 h-8 text-sm font-medium text-white bg-neutral-900 hover:bg-neutral-800 rounded-lg transition-colors"
+                    >
+                      <ExternalLink className="w-4 h-4" />
+                      Open Canva
+                    </a>
+                    <button
+                      type="button"
+                      disabled={capReached}
+                      onClick={() => (genKind === "video" ? setNudge("video") : void handleGenerate())}
+                      className="inline-flex items-center gap-1.5 px-3 h-8 text-sm font-medium text-neutral-700 ring-1 ring-neutral-300 hover:bg-neutral-50 rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                    >
+                      Use the paid model
+                      {estimate ? <span className="tabular-nums text-neutral-900">· <span className="font-bold">{estimate}</span></span> : null}
+                    </button>
+                    <button type="button" onClick={closeNudge} className="ml-auto text-xs text-neutral-500 hover:text-neutral-800">
+                      Cancel
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <p id="canva-first-title" className="text-sm text-neutral-900 leading-snug">
+                    Video costs the most. Generate a {genDuration}s clip on {selectedModel?.label ?? genModelId}
+                    {estimate ? <> for <span className="tabular-nums font-bold">{estimate}</span></> : null}?
+                  </p>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <button
+                      type="button"
+                      disabled={capReached}
+                      onClick={() => void handleGenerate(true)}
+                      className="inline-flex items-center gap-1.5 px-3 h-8 text-sm font-medium text-white bg-neutral-900 hover:bg-neutral-800 rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                    >
+                      Generate the video
+                    </button>
+                    <button
+                      ref={backRef}
+                      type="button"
+                      onClick={() => setNudge("canva")}
+                      className="inline-flex items-center px-3 h-8 text-sm font-medium text-neutral-700 ring-1 ring-neutral-300 hover:bg-neutral-50 rounded-lg transition-colors"
+                    >
+                      Back
+                    </button>
+                    <button type="button" onClick={closeNudge} className="ml-auto text-xs text-neutral-500 hover:text-neutral-800">
+                      Cancel
+                    </button>
+                  </div>
+                </>
+              )}
+              <p className="text-[11px] tabular-nums text-neutral-500">{meter}</p>
+              {capReached && <p className="text-[11px] text-red-700 leading-snug">{capNote}</p>}
+            </div>
+          </div>,
+          document.body,
+        )}
 
       {videoCaps && (
         <p className="text-[11px] text-neutral-400 leading-snug">
