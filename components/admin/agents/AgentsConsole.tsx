@@ -14,6 +14,7 @@ import {
   AlertCircle,
   CheckCircle2,
   FlaskConical,
+  MessageSquareText,
   Pin,
   Play,
   Power,
@@ -27,8 +28,9 @@ import type { CostSummary, HandoffWait, ReasonGroup, ReviewItem, RunSummary } fr
 type Mode = "off" | "proof" | "draft"
 interface Console {
   now: string
-  controls: { stopped: boolean; stoppedAt?: string; skills: Record<string, Mode>; sends: Record<string, boolean> }
+  controls: { stopped: boolean; stoppedAt?: string; skills: Record<string, Mode>; sends: Record<string, boolean>; ask?: boolean }
   pin: { commit: string; sha256: string; model?: string; ceiling: string; pinnedAt: string } | null
+  askPin?: { commit: string; sha256: string; model?: string; ceiling: string; pinnedAt: string } | null
   queue: ReviewItem[]
   reasons: ReasonGroup[]
   runs: RunSummary
@@ -37,6 +39,8 @@ interface Console {
 }
 
 const SKILL = "434-intake-qualification"
+const ASK_SKILL = "admin-ask"
+const ASK_EXAM_MODEL = "anthropic/claude-sonnet-5.5"
 const EXAM_STATE = { running: "Running", done: "Done", failed: "Failed", "timed-out": "Timed out" } as const
 type StoredExam = Omit<StoredExamReport, "state"> & { state: keyof typeof EXAM_STATE }
 interface ExamView {
@@ -129,16 +133,17 @@ export function AgentsConsole() {
     await load()
   }
 
-  async function pinLatest() {
-    const r = await post("/api/admin/agent/skills/pin", { ref: "main" })
-    if (r.ok) say("success", `Pinned the intake skill at ${String((r.body.pin as { commit?: string })?.commit ?? "").slice(0, 7)}.`)
+  async function pinLatest(skill = SKILL) {
+    const r = await post("/api/admin/agent/skills/pin", { skill, ref: "main" })
+    if (r.ok) say("success", `Pinned ${skill === SKILL ? "the intake skill" : "the Ask skill"} at ${String((r.body.pin as { commit?: string })?.commit ?? "").slice(0, 7)}.`)
     else say("error", String(r.body.error ?? "The pin failed"))
     await load()
   }
 
-  async function runExam(model: string) {
-    if (!window.confirm(`Run the intake exam on ${model}? It spends Gateway credit and runs the skill's scripts in a sandbox. It sends nothing.`)) return
-    const r = await post("/api/admin/engine/exam", { suite: "intake-qualification", model })
+  async function runExam(model: string, suite = "intake-qualification") {
+    const what = suite === "admin-ask" ? "the Ask exam" : "the intake exam"
+    if (!window.confirm(`Run ${what} on ${model}? It spends Gateway credit${suite === "admin-ask" ? "" : " and runs the skill's scripts in a sandbox"}. Every tool is a mock: it sends and changes nothing.`)) return
+    const r = await post("/api/admin/engine/exam", { suite, model })
     void loadExams()
     if (!r.ok) {
       say("error", String(r.body.error ?? "The exam could not run. Any cases it finished are kept under Exam reports in the Console."))
@@ -181,7 +186,8 @@ export function AgentsConsole() {
 
         {data && (
           <>
-            <ControlsBar data={data} busy={busy} onControls={controls} onPin={pinLatest} onExam={runExam} />
+            <ControlsBar data={data} busy={busy} onControls={controls} onPin={() => pinLatest()} onExam={runExam} />
+            <AskBar data={data} busy={busy} onControls={controls} onPin={() => pinLatest(ASK_SKILL)} onExam={(m) => runExam(m, "admin-ask")} />
 
             <ConsoleView data={data} exams={examReports} onLoadExams={loadExams} onOpenExam={(r) => setExam(examView(r))} />
           </>
@@ -189,7 +195,7 @@ export function AgentsConsole() {
       </main>
 
       {exam && (
-        <DetailDrawer open onClose={() => setExam(null)} title="Intake exam" subtitle={`${exam.model}: ${exam.pass} of ${exam.cases} cases pass${exam.state && exam.state !== "done" ? ` · ${EXAM_STATE[exam.state]}` : ""}`} width="xl">
+        <DetailDrawer open onClose={() => setExam(null)} title="Exam" subtitle={`${exam.model}: ${exam.pass} of ${exam.cases} cases pass${exam.state && exam.state !== "done" ? ` · ${EXAM_STATE[exam.state]}` : ""}`} width="xl">
           {exam.error && <p className="mb-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-800">{exam.error}</p>}
           <pre className="whitespace-pre-wrap font-mono text-[11px] leading-relaxed text-neutral-700">{exam.markdown || "No case finished yet."}</pre>
           {exam.outputs?.map((o) => (
@@ -260,6 +266,54 @@ function ControlsBar({ data, busy, onControls, onPin, onExam }: { data: Console;
             <FlaskConical className="w-3.5 h-3.5" /> Exam: {m.replace("anthropic/claude-", "")}
           </button>
         ))}
+      </div>
+    </div>
+  )
+}
+
+/**
+ * The Ask panel's row (V1 item 4, Ask panel slice 1): its on/off, its pin and its exam. Off at merge. On, the panel
+ * runs for the founder and for anyone he grants `skill:admin-ask` on the roster; a stop turns it off with the rest.
+ */
+function AskBar({ data, busy, onControls, onPin, onExam }: { data: Console; busy: boolean; onControls: (c: Record<string, unknown>, done: string) => void; onPin: () => void; onExam: (model: string) => void }) {
+  const on = data.controls.ask === true
+  return (
+    <div className="mb-4 rounded-xl border border-neutral-200 bg-white px-4 py-3 flex flex-col gap-3 lg:flex-row lg:items-center">
+      <div className="flex items-center gap-2 lg:w-56">
+        <MessageSquareText className="w-4 h-4 text-neutral-500" />
+        <div>
+          <div className="text-sm font-medium">Ask panel</div>
+          <div className="text-xs text-neutral-500">{data.controls.stopped ? "Off while agents are stopped" : on ? "On for you and anyone you grant" : "Off for everyone"}</div>
+        </div>
+      </div>
+      <div className="flex flex-wrap items-center gap-2 flex-1">
+        <button
+          disabled={busy || (!on && !data.askPin)}
+          title={!on && !data.askPin ? "Pin the Ask skill first" : undefined}
+          onClick={() => onControls({ ask: !on }, on ? "Ask is off for everyone." : "Ask is on. Open it from the sidebar or with ⌘J.")}
+          className={`rounded-md px-2.5 py-1.5 text-xs font-medium disabled:opacity-40 ${on ? "bg-neutral-900 text-white" : "border border-neutral-200 text-neutral-700 hover:bg-neutral-50"}`}
+        >
+          Ask {on ? "on" : "off"}
+        </button>
+        <span className="text-xs text-neutral-500">Reads, triage and task edits with Undo; stage changes by Confirm; never sends or touches money.</span>
+      </div>
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="text-xs text-neutral-500" title={data.askPin ? `Fingerprint ${data.askPin.sha256.slice(0, 12)}, ceiling ${data.askPin.ceiling}` : undefined}>
+          {data.askPin ? (
+            <>
+              Skill <span className="font-mono">{data.askPin.commit.slice(0, 7)}</span>
+              {data.askPin.model ? ` · ${data.askPin.model.replace("anthropic/", "")}` : ""}
+            </>
+          ) : (
+            "Skill not pinned"
+          )}
+        </span>
+        <button disabled={busy} onClick={onPin} className="inline-flex items-center gap-1 rounded-md border border-neutral-200 px-2.5 py-1.5 text-xs font-medium text-neutral-700 hover:bg-neutral-50 disabled:opacity-40">
+          <Pin className="w-3.5 h-3.5" /> Pin latest
+        </button>
+        <button disabled={busy} onClick={() => onExam(ASK_EXAM_MODEL)} className="inline-flex items-center gap-1 rounded-md border border-neutral-200 px-2.5 py-1.5 text-xs font-medium text-neutral-700 hover:bg-neutral-50 disabled:opacity-40">
+          <FlaskConical className="w-3.5 h-3.5" /> Exam: {ASK_EXAM_MODEL.replace("anthropic/claude-", "")}
+        </button>
       </div>
     </div>
   )

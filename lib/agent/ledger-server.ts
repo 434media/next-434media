@@ -19,6 +19,12 @@ export interface AgentTx {
   /** Fails the transaction when the document exists. */
   createDoc(collection: string, id: string, data: object): void
   setDoc(collection: string, id: string, data: object): void
+  /**
+   * Merges `patch` into the document, leaving every other field as it is (a CRM record's timestamps keep their type).
+   * A `null` value removes the field, as the CRM's task updater does. `touchUpdatedAt` stamps `updated_at` with the
+   * server time, as the CRM's own updaters do.
+   */
+  mergeDoc(collection: string, id: string, patch: Record<string, unknown>, opts?: { touchUpdatedAt?: boolean }): void
   putTask(task: AgentTask): void
   /** Fails the transaction when the entry exists. */
   appendEntry(entry: LedgerEntry): void
@@ -36,6 +42,7 @@ export function firestoreAgentDb(): AgentDb {
   return {
     async run(fn) {
       const { getDb } = await import("../firebase-admin")
+      const { FieldValue } = await import("firebase-admin/firestore")
       const db = getDb()
       return db.runTransaction(async (t) => {
         let writing = false
@@ -60,6 +67,15 @@ export function firestoreAgentDb(): AgentDb {
           setDoc(collection, id, data) {
             writing = true
             t.set(db.collection(collection).doc(id), plain(data))
+          },
+          mergeDoc(collection, id, patch, opts) {
+            // The ledger and the registry are written only through appendEntry and putTask.
+            if (collection === AGENT_LEDGER_COLLECTION || collection === AGENT_TASKS_COLLECTION) throw new LedgerRefused("mergeDoc never writes the ledger or the task registry")
+            writing = true
+            const data: Record<string, unknown> = plain(patch)
+            for (const [k, v] of Object.entries(data)) if (v === null) data[k] = FieldValue.delete()
+            if (opts?.touchUpdatedAt) data.updated_at = FieldValue.serverTimestamp()
+            t.set(db.collection(collection).doc(id), data, { merge: true })
           },
           putTask(task) {
             writing = true

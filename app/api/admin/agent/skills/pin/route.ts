@@ -12,16 +12,21 @@ export const maxDuration = 60
  *
  * GET  → the current pin, or null, and the source's coverage: the repositories the App's installation covers and its
  *        permissions, read live with a short-lived Metadata: read token that is revoked at once (lib/skills/source.ts).
- * POST { ref?: "main" | <commit>, model?: <slug> } → reads the skill and the catalog at that commit, checks the skill
- *       (lib/skills/loader.ts parseSkill), takes the autonomy ceiling from the catalog, and stores the pin.
+ * POST { skill?: <name>, ref?: "main" | <commit>, model?: <slug> } → reads the skill and the catalog at that commit,
+ *       checks the skill (lib/skills/loader.ts parseSkill), takes the autonomy ceiling from the catalog, and stores the
+ *       pin. `skill` is the intake skill (the default) or the Ask panel's `admin-ask` (Ask panel slice 1).
+ * GET ?skill=<name> reads that skill's pin.
  *
- * Only the intake skill can be pinned in this slice.
+ * Only these two skills can be pinned.
  */
-const SKILL = "434-intake-qualification"
+const SKILLS = ["434-intake-qualification", "admin-ask"] as const
+const skillOf = (v: unknown) => ((SKILLS as readonly unknown[]).includes(v) ? (v as (typeof SKILLS)[number]) : null)
 
-export async function GET() {
+export async function GET(req: Request) {
   const auth = await requireFounder("GET /api/admin/agent/skills/pin")
   if ("error" in auth) return NextResponse.json({ error: auth.error }, { status: auth.status })
+  const SKILL = skillOf(new URL(req.url).searchParams.get("skill") ?? SKILLS[0])
+  if (!SKILL) return NextResponse.json({ error: `skill is one of ${SKILLS.join(", ")}` }, { status: 400 })
   const { readPin } = await import("@/lib/agent/intake-server")
   const { installationCoverage } = await import("@/lib/skills/source")
   // The source's coverage, read live: which repositories the App's installation covers and what it may do there.
@@ -32,12 +37,14 @@ export async function GET() {
 export async function POST(req: Request) {
   const auth = await requireFounder("POST /api/admin/agent/skills/pin")
   if ("error" in auth) return NextResponse.json({ error: auth.error }, { status: auth.status })
-  let body: { ref?: unknown; model?: unknown }
+  let body: { skill?: unknown; ref?: unknown; model?: unknown }
   try {
     body = await req.json()
   } catch {
     body = {}
   }
+  const SKILL = skillOf(body.skill ?? SKILLS[0])
+  if (!SKILL) return NextResponse.json({ error: `skill is one of ${SKILLS.join(", ")}` }, { status: 400 })
   const ref = typeof body.ref === "string" && body.ref.trim() ? body.ref.trim() : "main"
   const model = typeof body.model === "string" && body.model.trim() ? body.model.trim() : undefined
 

@@ -238,8 +238,8 @@ export async function readStoredControls(): Promise<AgentControls> {
   return parseControls((await (await controlsRef()).get()).data())
 }
 
-/** Sets intake's mode and its send flag, and resumes after a stop. A stop goes through `stopAgents`. */
-export async function setControls(change: { intakeMode?: SkillMode; intakeSends?: boolean; resume?: boolean }, now = new Date().toISOString()): Promise<AgentControls> {
+/** Sets intake's mode and its send flag, the Ask panel's on/off, and resumes after a stop. A stop goes through `stopAgents`. */
+export async function setControls(change: { intakeMode?: SkillMode; intakeSends?: boolean; ask?: boolean; resume?: boolean }, now = new Date().toISOString()): Promise<AgentControls> {
   if (change.intakeMode !== undefined && !(SKILL_MODES as readonly string[]).includes(change.intakeMode)) throw new Error("Unknown mode")
   const ref = await controlsRef()
   const { getDb } = await import("../firebase-admin")
@@ -251,7 +251,8 @@ export async function setControls(change: { intakeMode?: SkillMode; intakeSends?
     if (change.intakeSends !== undefined) sends.intake_reply = change.intakeSends
     // A document that never existed starts stopped (fails closed); only an explicit resume clears it.
     const stopped = change.resume ? false : typeof cur?.stopped === "boolean" ? cur.stopped : true
-    t.set(ref, { ...(cur ?? {}), stopped, skills, sends, updated_at: now, updated_by: "founder", ...(change.resume ? { resumed_at: now } : {}) })
+    const ask = change.ask !== undefined ? change.ask : cur?.ask === true
+    t.set(ref, { ...(cur ?? {}), stopped, skills, sends, ask, updated_at: now, updated_by: "founder", ...(change.resume ? { resumed_at: now } : {}) })
   })
   return readStoredControls()
 }
@@ -277,13 +278,14 @@ export async function readConsole(now = new Date().toISOString()) {
   const since = new Date(Date.parse(now) - WEEK_MS).toISOString()
   const d = getDb()
   const watch = readWatch(new Date(now))
-  const [approvalsSnap, tasksSnap, ledgerSnap, costsSnap, controls, pin] = await Promise.all([
+  const [approvalsSnap, tasksSnap, ledgerSnap, costsSnap, controls, pin, askPin] = await Promise.all([
     d.collection(SEND_APPROVALS_COLLECTION).orderBy("createdAt", "desc").limit(100).get(),
     d.collection(AGENT_TASKS_COLLECTION).where("updatedAt", ">=", since).limit(500).get(),
     d.collection(AGENT_LEDGER_COLLECTION).where("at", ">=", since).limit(3000).get(),
     d.collection(AI_CALL_COSTS_COLLECTION).where("at", ">=", since).limit(5000).get(),
     readStoredControls(),
     readPin(),
+    readPin("admin-ask"),
   ])
   const approvals = approvalsSnap.docs.map((x) => x.data() as StoredApproval)
   const tasks = tasksSnap.docs.map((x) => x.data() as AgentTask)
@@ -296,6 +298,7 @@ export async function readConsole(now = new Date().toISOString()) {
     now,
     controls,
     pin,
+    askPin,
     queue: sortQueue(approvals.map((a) => reviewItem(a, now, taskById.get(a.taskId)))),
     reasons: groupReasons(approvals, now),
     runs,

@@ -34,13 +34,15 @@ export const TASK_STATES = [
   "failed",
   "cancelled",
   "needs_reconciliation",
+  /** A run that finished on its own with nothing left to wait on (an Ask panel turn, lib/ask/). */
+  "done",
 ] as const
 export type TaskState = (typeof TASK_STATES)[number]
 
 /** Where a task may go from each state. A finished task goes nowhere. */
 const NEXT: Record<TaskState, readonly TaskState[]> = {
   queued: ["running", "failed", "cancelled"],
-  running: ["awaiting_review", "failed", "cancelled"],
+  running: ["awaiting_review", "done", "failed", "cancelled"],
   awaiting_review: ["approved", "rejected", "failed", "cancelled"],
   approved: ["sending", "failed", "cancelled"],
   sending: ["sent", "failed", "needs_reconciliation", "cancelled"],
@@ -49,6 +51,7 @@ const NEXT: Record<TaskState, readonly TaskState[]> = {
   failed: [],
   cancelled: [],
   needs_reconciliation: ["sent", "failed"],
+  done: [],
 }
 export const OPEN_STATES: readonly TaskState[] = ["queued", "running", "awaiting_review", "approved", "sending"]
 
@@ -120,6 +123,13 @@ export const LEDGER_KINDS = [
   "kill_blocked",
   "cancelled",
   "reconciled",
+  /**
+   * A change the Ask panel made to a CRM record (lib/ask/): a triage, a task edit, or a stage change the person
+   * confirmed. `refs.record` names the record, `refs.activity` the `record_edit` Activity or the triaged arrival.
+   */
+  "edit_applied",
+  /** That change put back by its Undo, within the window, by the person who made it or the founder. */
+  "edit_undone",
 ] as const
 export type LedgerKind = (typeof LEDGER_KINDS)[number]
 
@@ -132,7 +142,7 @@ export interface LedgerFields {
   /** "system", "founder", "skill:<name>" or "member:<team member id>". Never an address or a name. */
   actor: string
   /** Ids of what the entry is about. */
-  refs?: { activity?: string; approval?: string; run?: string; message?: string; decision?: string; event?: string }
+  refs?: { activity?: string; approval?: string; run?: string; message?: string; decision?: string; event?: string; record?: string }
   /** sha256 hex of what was approved, drafted, sent, read. */
   hashes?: { input?: string; draft?: string; approval?: string; sent?: string }
   outcome?: RoutingOutcome
@@ -165,7 +175,7 @@ const ID = /^[A-Za-z0-9][A-Za-z0-9_.:~-]{0,199}$/
 const HEX64 = /^[a-f0-9]{64}$/
 const ACTOR = /^(system|founder|skill:[a-z0-9-]{1,64}|member:[A-Za-z0-9_-]{1,64})$/
 const CODE = /^[a-z0-9][a-z0-9-]{1,39}$/
-const REF_KEYS = ["activity", "approval", "run", "message", "decision", "event"] as const
+const REF_KEYS = ["activity", "approval", "run", "message", "decision", "event", "record"] as const
 const HASH_KEYS = ["input", "draft", "approval", "sent"] as const
 const FIELD_KEYS = new Set(["kind", "actor", "refs", "hashes", "outcome", "reasonCode", "costUsd"])
 
