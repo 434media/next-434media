@@ -873,7 +873,7 @@ export interface MailchimpPushResult {
   /** Members already in the audience whose tags/merge fields were updated. */
   updatedMembers: number
   /** Per-email errors returned by Mailchimp's batch endpoint. */
-  errors: Array<{ email: string; code: string; message: string }>
+  errors: Array<{ email: string; code: string; message: string; field?: string; fieldMessage?: string }>
 }
 
 const PUSH_CHUNK_SIZE = 500 // Mailchimp's per-request cap on batch operations
@@ -931,7 +931,8 @@ export async function pushMembersToMailchimp(
       interface BatchResponse {
         new_members?: Array<{ email_address: string }>
         updated_members?: Array<{ email_address: string }>
-        errors?: Array<{ email_address: string; error: string; error_code?: string }>
+        // `field` / `field_message` name the merge field a merge-field refusal is about.
+        errors?: Array<{ email_address: string; error: string; error_code?: string; field?: string; field_message?: string }>
       }
       const data = await makeMailchimpRequest<BatchResponse>(`/lists/${audienceId}`, {
         method: "POST",
@@ -944,6 +945,8 @@ export async function pushMembersToMailchimp(
           email: err.email_address,
           code: err.error_code || "unknown",
           message: err.error || "Unknown error",
+          ...(err.field ? { field: err.field } : {}),
+          ...(err.field_message ? { fieldMessage: err.field_message } : {}),
         })
       }
     } catch (err) {

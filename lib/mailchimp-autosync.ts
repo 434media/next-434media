@@ -8,13 +8,16 @@ import {
   type MailchimpIntent,
 } from "./mailchimp-intent"
 import { getSuppressedEmails } from "./firestore-suppression"
+import { getMailchimpRemoved, markMailchimpRemoved } from "./firestore-mailchimp-removed"
 import { readMailchimpPushState, writeMailchimpPushState } from "./firestore-mailchimp-push-state"
 import {
   PUSH_BUDGET_MS,
+  cleanMergeText,
   drainPending,
   isFullPassDue,
   nextSentSet,
   pendingMembers,
+  stillRemoved,
   type ErrorReason,
   type PlannedMember,
 } from "./mailchimp-push-plan"
@@ -43,6 +46,11 @@ export interface AutoSyncResult {
   skipped: number
   /** Consent-bearing contacts excluded because they're on the suppression list. */
   excludedSuppressed: number
+  /**
+   * Contacts skipped because Mailchimp permanently deleted them and refuses them back
+   * (lib/firestore-mailchimp-removed.ts). Counted in `uniqueContacts`, never pushed.
+   */
+  excludedRemoved: number
   /** Unique contacts after dedupe across sources. */
   uniqueContacts: number
   /** Members grouped by identical canonical tag-set (one push per group). */
@@ -61,9 +69,11 @@ export interface AutoSyncResult {
     newMembers: number
     updatedMembers: number
     errors: number
-    /** Errors by Mailchimp error code, with one redacted example each. */
+    /** Errors by Mailchimp error code (and merge field, when named), with one redacted example each. */
     errorReasons: ErrorReason[]
     deferred: number
+    /** Addresses newly refused as permanently deleted this run, now marked and skipped from the next run on. */
+    markedRemoved: number
   }
 }
 
@@ -79,10 +89,11 @@ export async function runAutoSync(
   const audienceId = getDefaultAudienceId()
   if (!audienceId) throw new Error("No Mailchimp audience configured")
 
-  const [signups, regs, suppressed, state] = await Promise.all([
+  const [signups, regs, suppressed, removed, state] = await Promise.all([
     getEmailSignups(),
     getEventRegistrations(),
     getSuppressedEmails(),
+    getMailchimpRemoved(),
     readMailchimpPushState(),
   ])
 
@@ -101,22 +112,27 @@ export async function runAutoSync(
 
   // Dedupe + merge canonical tags by email (a person in both newsletter and an
   // event gets the union of their tags, pushed once).
+  // Names go through cleanMergeText, so a value Mailchimp's text merge fields refuse (over-long, control
+  // characters, blank) is corrected or left out rather than refused.
   const merged = new Map<
     string,
-    { email: string; tags: Set<string>; firstName?: string; lastName?: string }
+    { email: string; tags: Set<string>; firstName?: string; lastName?: string; consentAt?: string }
   >()
+  const later = (a?: string, b?: string) => (!a ? b : !b ? a : Date.parse(b) > Date.parse(a) ? b : a)
   for (const i of included) {
     const cur = merged.get(i.email)
     if (cur) {
       i.tags.forEach((t) => cur.tags.add(t))
-      cur.firstName ??= i.firstName
-      cur.lastName ??= i.lastName
+      cur.firstName ??= cleanMergeText(i.firstName)
+      cur.lastName ??= cleanMergeText(i.lastName)
+      cur.consentAt = later(cur.consentAt, i.consentAt)
     } else {
       merged.set(i.email, {
         email: i.email,
         tags: new Set(i.tags),
-        firstName: i.firstName,
-        lastName: i.lastName,
+        firstName: cleanMergeText(i.firstName),
+        lastName: cleanMergeText(i.lastName),
+        consentAt: i.consentAt,
       })
     }
   }
@@ -126,14 +142,27 @@ export async function runAutoSync(
   const groups = new Map<string, { tags: string[]; count: number }>()
   const byTag: Record<string, number> = {}
   const planned: PlannedMember[] = []
+  let excludedRemoved = 0
   for (const m of merged.values()) {
+    // Mailchimp permanently deleted this address: skip it on every pass, the full pass included, until the
+    // person gives consent again after the refusal was recorded.
+    const removedAt = removed.get(m.email)
+    if (removedAt !== undefined && stillRemoved(removedAt, m.consentAt)) {
+      excludedRemoved++
+      continue
+    }
     const tags = [...m.tags].sort()
     for (const t of tags) byTag[t] = (byTag[t] ?? 0) + 1
     const key = tags.join("|")
     const g = groups.get(key) ?? { tags, count: 0 }
     g.count++
     groups.set(key, g)
-    planned.push({ email: m.email, firstName: m.firstName, lastName: m.lastName, tags })
+    planned.push({
+      email: m.email,
+      ...(m.firstName ? { firstName: m.firstName } : {}),
+      ...(m.lastName ? { lastName: m.lastName } : {}),
+      tags,
+    })
   }
 
   const fullPass = isFullPassDue(state.lastFullPassAt, startedAt)
@@ -147,6 +176,7 @@ export async function runAutoSync(
     included: included.length,
     skipped: skippedCount,
     excludedSuppressed,
+    excludedRemoved,
     uniqueContacts: merged.size,
     groups: [...groups.values()].sort((a, b) => b.count - a.count),
     byTag,
@@ -164,6 +194,8 @@ export async function runAutoSync(
       (members, tags) => pushMembersToMailchimp(audienceId, members, "subscribed", tags),
       { deadline: startedAt.getTime() + PUSH_BUDGET_MS },
     )
+    // Record permanent-deletion refusals before the state, so a failed state write never loses them.
+    if (drained.removed.length) await markMailchimpRemoved(drained.removed, new Date().toISOString())
     await writeMailchimpPushState({
       sent: nextSentSet(planned, remembered, drained.accepted),
       lastFullPassAt: fullPass ? startedAt.toISOString() : state.lastFullPassAt!,
@@ -171,7 +203,15 @@ export async function runAutoSync(
       pending: drained.deferred + drained.retryable,
     })
     const { attempted, newMembers, updatedMembers, errors, reasons, deferred } = drained
-    result.push = { attempted, newMembers, updatedMembers, errors, errorReasons: reasons, deferred }
+    result.push = {
+      attempted,
+      newMembers,
+      updatedMembers,
+      errors,
+      errorReasons: reasons,
+      deferred,
+      markedRemoved: new Set(drained.removed).size,
+    }
   }
 
   return result

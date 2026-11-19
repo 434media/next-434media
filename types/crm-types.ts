@@ -564,6 +564,9 @@ export const CRM_COLLECTIONS = {
   ASSETS: "crm_assets",
   DECKS: "crm_decks",
   LEADS: "leads",
+  // Addresses Mailchimp permanently deleted and refuses to take back, keyed by lowercased email
+  // (lib/firestore-mailchimp-removed.ts). The hourly push skips them; consent given again clears the mark.
+  MAILCHIMP_REMOVED: "mailchimp_removed",
   // Outbound ICP cohorts — system-of-record rows (master §5.6–5.10), written by
   // the 434-context sor-sync loader, read-only here. Not the Digital Canvas
   // cohorts below.

@@ -67,11 +67,16 @@ export function pushRequests(members: PlannedMember[]): Array<{ tags: string[]; 
   return out
 }
 
-/** One member Mailchimp did not take. `code` is Mailchimp's error_code, or "request_failed" when the whole request failed. */
+/**
+ * One member Mailchimp did not take. `code` is Mailchimp's error_code, or "request_failed" when the whole request
+ * failed. `field` and `fieldMessage` are the merge field a merge-field refusal names, when Mailchimp says which.
+ */
 export interface PushError {
   email: string
   code?: string
   message?: string
+  field?: string
+  fieldMessage?: string
 }
 
 export type PushFn = (
@@ -88,11 +93,47 @@ export type PushFn = (
  */
 export const RETRYABLE_ERROR_CODES: ReadonlySet<string> = new Set(["request_failed"])
 
-/** Error counts by code, with one example message (addresses removed), for the run log. */
+/** Error counts by code (and merge field, when one is named), with one example message (addresses removed), for the run log. */
 export interface ErrorReason {
   code: string
+  /** The merge field Mailchimp named, e.g. "FNAME". Absent when the refusal names none. */
+  field?: string
   count: number
   sample: string
+}
+
+/**
+ * Mailchimp's refusal of an address it permanently deleted (2026-11-18: 61 a full pass). It will not take the
+ * address back through the API; the person must re-subscribe. The batch call says "was permanently deleted and
+ * cannot be re-imported"; the single-member call titles it "Forgotten Email Not Subscribed".
+ */
+export function isPermanentlyDeletedRefusal(message: string | undefined): boolean {
+  return !!message && /permanently deleted|forgotten email/i.test(message)
+}
+
+/**
+ * Whether an address Mailchimp permanently deleted is still to be skipped. It stays skipped until the person gives
+ * consent again after the refusal was recorded: a consent record (signup or opted-in registration) dated later.
+ * A missing or unreadable date never clears the mark.
+ */
+export function stillRemoved(removedAt: string, latestConsentAt: string | undefined): boolean {
+  const r = Date.parse(removedAt)
+  const c = latestConsentAt ? Date.parse(latestConsentAt) : NaN
+  if (!Number.isFinite(c)) return true
+  return !Number.isFinite(r) || c <= r
+}
+
+/** Mailchimp's limit for a text merge field. */
+export const MERGE_TEXT_MAX = 255
+
+/**
+ * A name as a text merge field takes it: a string, control characters removed, whitespace collapsed, at most
+ * MERGE_TEXT_MAX characters. Empty becomes undefined, so the field is left out rather than sent blank.
+ */
+export function cleanMergeText(v: unknown): string | undefined {
+  if (typeof v !== "string") return undefined
+  const s = v.replace(/[\u0000-\u001f\u007f]/g, " ").replace(/\s+/g, " ").trim()
+  return s ? [...s].slice(0, MERGE_TEXT_MAX).join("") : undefined
 }
 
 /** Removes email addresses from a message so it can go in a log. */
@@ -113,6 +154,8 @@ export interface DrainResult {
   deferred: number
   /** Fingerprints not to send again until they change: accepted, or rejected for a reason a retry won't fix. */
   accepted: string[]
+  /** Addresses Mailchimp refused as permanently deleted (isPermanentlyDeletedRefusal), lowercased. */
+  removed: string[]
 }
 
 /**
@@ -135,6 +178,7 @@ export async function drainPending(
     reasons: [],
     deferred: 0,
     accepted: [],
+    removed: [],
   }
   const reasons = new Map<string, ErrorReason>()
   const requests = pushRequests(pending)
@@ -159,13 +203,17 @@ export async function drainPending(
         retry.add(e.email.trim().toLowerCase())
         res.retryable++
       }
-      const reason = reasons.get(code) ?? { code, count: 0, sample: redactEmails(e.message ?? "").slice(0, 200) }
+      if (isPermanentlyDeletedRefusal(e.message)) res.removed.push(e.email.trim().toLowerCase())
+      const field = e.field?.trim() || undefined
+      const key = field ? `${code}|${field}` : code
+      const text = [e.message ?? "", e.fieldMessage ?? ""].filter(Boolean).join(" ")
+      const reason = reasons.get(key) ?? { code, ...(field ? { field } : {}), count: 0, sample: redactEmails(text).slice(0, 200) }
       reason.count++
-      reasons.set(code, reason)
+      reasons.set(key, reason)
     }
     for (const m of members) if (!retry.has(m.email.trim().toLowerCase())) res.accepted.push(fingerprint(m))
   }
-  res.reasons = [...reasons.values()].sort((a, b) => b.count - a.count || a.code.localeCompare(b.code))
+  res.reasons = [...reasons.values()].sort((a, b) => b.count - a.count || a.code.localeCompare(b.code) || (a.field ?? "").localeCompare(b.field ?? ""))
   return res
 }
 
