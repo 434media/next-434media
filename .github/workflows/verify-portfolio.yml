@@ -175,6 +175,9 @@ jobs:
       - run: tsx --test lib/__tests__/connector-434.test.ts
       # The Ask panel, slice 1 (2026-11-18): tools per person, money and send refusals, Undo, the hash-bound Confirm, a turn.
       - run: tsx --test lib/__tests__/ask-panel.test.ts
+      # Short references on records (2026-11-19): TSK-/OPP- format, one counter per type, taken with the record, never
+      # reused, safe under racing creates; the backfill's selection (rule proposed, awaiting the founder) and idempotence.
+      - run: tsx --test lib/__tests__/record-refs.test.ts
       # Monthly spend caps on exams, image and video, and intake (2026-11-18): the caps, what counts, fails closed, estimates.
       - run: tsx --test lib/__tests__/spend-caps.test.ts
       # Owned Meta service entry for the shared Slack app: pilot identity and acting-person checks.

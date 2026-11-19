@@ -70,7 +70,7 @@ export const ASK_TOOLS: Tool434[] = [
   {
     name: "find",
     title: "Find",
-    description: "Find people, organizations, opportunities and tasks by words in a name, company, email, title or task title. Returns ids with a few fields each, only what the person asking may see.",
+    description: "Find people, organizations, opportunities and tasks by words in a name, company, email, title or task title, or by a short reference (TSK-142, OPP-1045). Returns ids, and each task's and opportunity's reference, with a few fields each, only what the person asking may see.",
     readOnly: true,
     class: "read",
   },
@@ -84,14 +84,14 @@ export const ASK_TOOLS: Tool434[] = [
   {
     name: "update_task",
     title: "Update a task",
-    description: "Change one task's due date, status or assignee. Applies at once; the value before is kept, and the person gets Undo for two minutes.",
+    description: "Change one task's due date, status or assignee, by its id or reference (TSK-142). Applies at once; the value before is kept, and the person gets Undo for two minutes.",
     readOnly: false,
     class: "write",
   },
   {
     name: "propose_stage_change",
     title: "Propose a stage change",
-    description: "Propose moving an opportunity's stage (discovery, proposal, closed_won, closed_lost) or a person's lifecycle stage (contact, lead, customer). Changes nothing: the person sees a Confirm card and decides.",
+    description: "Propose moving an opportunity's stage (discovery, proposal, closed_won, closed_lost), by its id or reference (OPP-1045), or a person's lifecycle stage (contact, lead, customer). Changes nothing: the person sees a Confirm card and decides.",
     readOnly: true,
     class: "draft",
   },

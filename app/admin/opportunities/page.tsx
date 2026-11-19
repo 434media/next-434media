@@ -1015,6 +1015,8 @@ function SalesCRMPageInner() {
         onClose={closeOpportunityDrawer}
         onArchive={opportunityForm.existing_company_id ? () => handleArchiveOpportunity(opportunityForm.existing_company_id!) : undefined}
         onDelete={opportunityForm.existing_company_id ? () => handleDeleteOpportunity(opportunityForm.existing_company_id!) : undefined}
+        recordRef={clients.find((c) => c.id === opportunityForm.existing_company_id)?.ref}
+        fromRef={clients.find((c) => c.id === opportunityForm.existing_company_id)?.from_ref}
         onViewCustomer360={(clientId) => {
           const client = clients.find((c) => c.id === clientId)
           if (!client) return

@@ -43,8 +43,10 @@ import {
   stageMoveProblem,
   type AskMessage,
   type AskRefusal,
+  type AskSelection,
   type StageProposal,
 } from "./policy"
+import { parseRef } from "../record-refs"
 import { ASK_MODEL, askCapMessage, monthStartOf } from "./limits"
 
 /** Writes one turn may make. A request for more is done in more turns, each with its own Undo. */
@@ -69,6 +71,8 @@ export interface AskData {
   find(query: string, kinds: FindKind[]): Promise<unknown>
   /** Triage through the core service, as this person. Returns the activity id the undo names. */
   triage(activityId: string, decision: TriageDecisionValue): Promise<{ activityId: string; label: string }>
+  /** The task or opportunity a short reference names, as this person may see it; null when they cannot or it is none. */
+  resolveRef(ref: string): Promise<{ kind: "task" | "opportunity"; id: string } | null>
   /** The record a stage change would move, as this person may see it; null when they cannot. */
   stageTarget(kind: StageProposal["kind"], id: string): Promise<{ name: string; from: string | null; revision: string } | null>
 }
@@ -107,13 +111,24 @@ export interface AskProposal extends StageProposal {
   label: string
 }
 
+/** One record on a "which one?" card: a name that matched more than one record the person meant to change. */
+export interface AskChoice {
+  kind: "task" | "opportunity"
+  id: string
+  ref?: string
+  name: string
+}
+
+/** At most this many records on a "which one?" card. */
+export const ASK_CHOICES_SHOWN = 5
+
 export type AskOutcome =
-  | { ok: true; taskId: string; answer: string; edits: AskEdit[]; proposals: AskProposal[]; truncated?: boolean }
+  | { ok: true; taskId: string; answer: string; edits: AskEdit[]; proposals: AskProposal[]; choices?: AskChoice[]; truncated?: boolean }
   | { ok: false; code: string; message: string; link?: AskRefusal["link"] }
 
 const OFF_LINK = { href: "/admin/agents", label: "Open Agents" }
 
-export async function runAskTurn(input: { question: string; history: AskMessage[]; page?: string }, person: AskPerson, deps: AskDeps): Promise<AskOutcome> {
+export async function runAskTurn(input: { question: string; history: AskMessage[]; page?: string; selected?: AskSelection | null }, person: AskPerson, deps: AskDeps): Promise<AskOutcome> {
   const question = input.question.trim()
   if (!question) return { ok: false, code: "empty", message: "Ask a question." }
   const refusal = classifyAsk(question)
@@ -173,7 +188,8 @@ export async function runAskTurn(input: { question: string; history: AskMessage[
 
   const edits: AskEdit[] = []
   const proposals: AskProposal[] = []
-  const tools = askTools({ person, actor, taskId, deps, edits, proposals })
+  const choices: AskChoice[] = []
+  const tools = askTools({ person, actor, taskId, deps, edits, proposals, choices })
   const runTools: ToolSet = Object.fromEntries(Object.entries(tools).filter(([name]) => offered.includes(name)))
 
   let answer = ""
@@ -194,7 +210,7 @@ export async function runAskTurn(input: { question: string; history: AskMessage[
       providerOptions: { anthropic: { output_config: { effort: "low" } } },
     })
     if (run.refused.length) return fail("tools-refused", "Ask is not set up to make changes at its current level. Nothing ran.")
-    const out = await run.generate(renderAskPrompt({ question, history: input.history, today: now.slice(0, 10), page: input.page, founder: person.founder }))
+    const out = await run.generate(renderAskPrompt({ question, history: input.history, today: now.slice(0, 10), page: input.page, founder: person.founder, selected: input.selected ?? null }))
     answer = out.text.trim()
     truncated = out.finishReason === "length"
     costUsd = gatewayCost(out.steps)
@@ -205,12 +221,22 @@ export async function runAskTurn(input: { question: string; history: AskMessage[
   }
 
   await step(deps.db, { taskId, at: deps.now(), decide: () => ({ fields: { kind: "run_finished", actor: `skill:${ASK_SKILL}`, ...(costUsd !== undefined ? { costUsd } : {}), ...(truncated ? { reasonCode: "truncated" } : {}) }, to: "done" }) })
-  return { ok: true, taskId, answer: answer || (edits.length || proposals.length ? "Done." : "I don't have an answer for that."), edits, proposals, ...(truncated ? { truncated } : {}) }
+  // A "which one?" card stands only when nothing was changed or proposed: once a record was picked, the card is moot.
+  const which = choices.length > 1 && !edits.length && !proposals.length ? choices.slice(0, ASK_CHOICES_SHOWN) : []
+  return { ok: true, taskId, answer: answer || (edits.length || proposals.length ? "Done." : which.length ? "Which one?" : "I don't have an answer for that."), edits, proposals, ...(which.length ? { choices: which } : {}), ...(truncated ? { truncated } : {}) }
 }
 
 /** The run's tools, one per registry entry. Each returns `{ ok: false, error }` to the model instead of throwing. */
-function askTools(c: { person: AskPerson; actor: string; taskId: string; deps: AskDeps; edits: AskEdit[]; proposals: AskProposal[] }): ToolSet {
-  const { deps, edits, proposals } = c
+function askTools(c: { person: AskPerson; actor: string; taskId: string; deps: AskDeps; edits: AskEdit[]; proposals: AskProposal[]; choices: AskChoice[] }): ToolSet {
+  const { deps, edits, proposals, choices } = c
+  /** A tool's id may be a short reference (TSK-142, OPP-1045): resolve it to the record's id, as this person may see it. */
+  const idOf = async (value: string, kind: "task" | "opportunity"): Promise<string> => {
+    const parsed = parseRef(value)
+    if (!parsed) return value
+    const found = await deps.data.resolveRef(parsed.ref)
+    if (!found || found.kind !== kind) throw new AskRefused(`${parsed.ref} was not found.`)
+    return found.id
+  }
   const guard = async <T,>(fn: () => Promise<T>) => {
     try {
       return await fn()
@@ -238,12 +264,21 @@ function askTools(c: { person: AskPerson; actor: string; taskId: string; deps: A
       execute: () => guard(() => deps.data.waiting()),
     }),
     find: tool({
-      description: "Find people, organizations, opportunities and tasks by words in a name, company, email, title or task title. Only what the person asking may see.",
+      description: "Find people, organizations, opportunities and tasks by words in a name, company, email, title or task title, or by a short reference (TSK-142, OPP-1045). Each task and opportunity carries its reference. Only what the person asking may see.",
       inputSchema: z.object({
         query: z.string().min(1).max(200),
         kinds: z.array(z.enum(FIND_KINDS)).optional().describe("which kinds of record to search; all when omitted"),
+        for_change: z.boolean().optional().describe("true when you are looking up a task or opportunity in order to change it"),
       }),
-      execute: ({ query, kinds }) => guard(() => deps.data.find(query, kinds?.length ? kinds : [...FIND_KINDS])),
+      execute: ({ query, kinds, for_change }) =>
+        guard(async () => {
+          const found = await deps.data.find(query, kinds?.length ? kinds : [...FIND_KINDS])
+          if (!for_change) return found
+          const matched = choicesIn(found)
+          if (matched.length < 2) return found
+          for (const m of matched) if (!choices.some((x) => x.kind === m.kind && x.id === m.id)) choices.push(m)
+          return { ...(found as object), which_one: "More than one record matches. The person is shown a \"which one?\" card listing them by reference. Change nothing this turn; ask them to pick one." }
+        }),
     }),
     triage_arrival: tool({
       description: "Decide one untriaged inbox arrival by its activity id: promote (make a lead), save (keep as a contact) or dismiss. Applies at once with a two-minute Undo.",
@@ -258,7 +293,7 @@ function askTools(c: { person: AskPerson; actor: string; taskId: string; deps: A
         }),
     }),
     update_task: tool({
-      description: "Change one task's due date (YYYY-MM-DD), status or assignee, by its task id. Applies at once with a two-minute Undo.",
+      description: "Change one task's due date (YYYY-MM-DD), status or assignee, by its task id or reference (TSK-142). Applies at once with a two-minute Undo.",
       inputSchema: z.object({
         task_id: z.string().min(1).max(200),
         due_date: z.string().optional(),
@@ -268,17 +303,18 @@ function askTools(c: { person: AskPerson; actor: string; taskId: string; deps: A
       execute: ({ task_id, ...patch }) =>
         guard(async () => {
           writesLeft()
-          const applied = await applyTaskEdit({ db: deps.db, turnTaskId: c.taskId, n: edits.length + 1, taskId: task_id, patch: patch as TaskPatch, by: c.person.email, actor: c.actor, now: deps.now() })
+          const applied = await applyTaskEdit({ db: deps.db, turnTaskId: c.taskId, n: edits.length + 1, taskId: await idOf(task_id, "task"), patch: patch as TaskPatch, by: c.person.email, actor: c.actor, now: deps.now() })
           const label = `${applied.title}: ${applied.changes.map((x) => `${x.field.replace(/_/g, " ")} ${fmt(x.before)} → ${fmt(x.after)}`).join(", ")}`
           edits.push({ kind: "task", id: applied.activityId, label, undoUntil: undoUntil() })
           return { ok: true, applied: label, undo: "The person has Undo for two minutes." }
         }),
     }),
     propose_stage_change: tool({
-      description: "Propose moving an opportunity's stage (discovery, proposal, closed_won, closed_lost) or a person's lifecycle stage (contact, lead, customer). Changes nothing: the person sees a Confirm card.",
+      description: "Propose moving an opportunity's stage (discovery, proposal, closed_won, closed_lost), by its id or reference (OPP-1045), or a person's lifecycle stage (contact, lead, customer). Changes nothing: the person sees a Confirm card.",
       inputSchema: z.object({ kind: z.enum(["opportunity", "person"]), id: z.string().min(1).max(200), to: z.enum([...OPPORTUNITY_STAGES, ...PERSON_STAGES]) }),
-      execute: ({ kind, id, to }) =>
+      execute: ({ kind, id: rawId, to }) =>
         guard(async () => {
+          const id = kind === "opportunity" ? await idOf(rawId, "opportunity") : rawId
           const target = await deps.data.stageTarget(kind, id)
           if (!target) return { ok: false, error: "That record was not found." }
           const problem = stageMoveProblem(kind, target.from, to)
@@ -290,6 +326,22 @@ function askTools(c: { person: AskPerson; actor: string; taskId: string; deps: A
         }),
     }),
   }
+}
+
+/** The tasks and opportunities in a find result, as "which one?" choices. */
+export function choicesIn(found: unknown): AskChoice[] {
+  const f = (found ?? {}) as { opportunities?: unknown; tasks?: unknown }
+  const out: AskChoice[] = []
+  const str = (v: unknown) => (typeof v === "string" ? v : "")
+  for (const o of Array.isArray(f.opportunities) ? f.opportunities : []) {
+    const r = o as Record<string, unknown>
+    if (str(r.id)) out.push({ kind: "opportunity", id: str(r.id), ...(parseRef(r.ref) ? { ref: parseRef(r.ref)!.ref } : {}), name: str(r.name) || str(r.company) || str(r.id) })
+  }
+  for (const t of Array.isArray(f.tasks) ? f.tasks : []) {
+    const r = t as Record<string, unknown>
+    if (str(r.id)) out.push({ kind: "task", id: str(r.id), ...(parseRef(r.ref) ? { ref: parseRef(r.ref)!.ref } : {}), name: str(r.title) || str(r.id) })
+  }
+  return out
 }
 
 const fmt = (v: unknown) => (v === null || v === undefined || v === "" ? "none" : String(v).replace(/_/g, " "))

@@ -74,6 +74,10 @@ export interface ClientContact {
 }
 
 export interface ClientRecord extends BaseRecord {
+  /** Short reference for people (lib/record-refs.ts): display and lookup only; the Firestore id stays the key. */
+  ref?: string
+  /** Where a promoted record came from, e.g. "PRJ-205". */
+  from_ref?: string
   // Basic Info
   name: string
   company_name?: string
@@ -142,6 +146,10 @@ export interface ClientRecord extends BaseRecord {
 // OPPORTUNITIES
 // ============================================
 export interface Opportunity extends BaseRecord {
+  /** Short reference for people (lib/record-refs.ts): display and lookup only; the Firestore id stays the key. */
+  ref?: string
+  /** Where a promoted record came from, e.g. "PRJ-205". */
+  from_ref?: string
   // Basic Info
   name: string
   description?: string
@@ -343,6 +351,10 @@ export interface TaskComment {
 }
 
 export interface Task extends BaseRecord {
+  /** Short reference for people (lib/record-refs.ts): display and lookup only; the Firestore id stays the key. */
+  ref?: string
+  /** Where a promoted record came from, e.g. "PRJ-205". */
+  from_ref?: string
   // Basic Info
   title: string
   description?: string

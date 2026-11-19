@@ -27,6 +27,7 @@ import {
   Users,
 } from "lucide-react"
 import type { LucideIcon } from "lucide-react"
+import { parseRef } from "@/lib/record-refs"
 
 interface CommandItem {
   id: string
@@ -297,8 +298,8 @@ const STATIC_ITEMS: CommandItem[] = [
 
 interface EntityCache {
   clients: Array<{ id: string; name: string; company_name?: string; brand?: string }>
-  opportunities: Array<{ id: string; name: string; client_name?: string; stage?: string; value?: number }>
-  tasks: Array<{ id: string; title: string; assigned_to?: string; status?: string; due_date?: string }>
+  opportunities: Array<{ id: string; name: string; client_name?: string; stage?: string; value?: number; ref?: string }>
+  tasks: Array<{ id: string; title: string; assigned_to?: string; status?: string; due_date?: string; ref?: string }>
   leads: Array<{ id: string; name: string; company?: string; email?: string; score?: number; status?: string; priority?: string }>
   fetchedAt: number
 }
@@ -324,6 +325,12 @@ async function loadEntities(): Promise<EntityCache> {
     fetchedAt: Date.now(),
   }
   return entityCache
+}
+
+/** A reference as the palette's token match sees it: "TSK-142" plus "tsk142" and "tsk 142", so each typed form matches. */
+function refSearchText(ref: unknown): string {
+  const parsed = parseRef(ref)
+  return parsed ? `${parsed.ref} ${parsed.type}${parsed.n} ${parsed.type}#${parsed.n} ${parsed.type} ${parsed.n}` : ""
 }
 
 interface CommandPaletteProps {
@@ -384,6 +391,10 @@ export function CommandPalette({ disabled }: CommandPaletteProps) {
     [router, close],
   )
 
+  // A query that is a short reference (TSK-142, OPP-1045) also reaches records past the first 30 of each kind.
+  const refQuery = parseRef(query)?.ref ?? null
+  const firstOrRef = <T extends { ref?: string }>(list: T[]) => list.filter((x, i) => i < 30 || (refQuery !== null && x.ref === refQuery))
+
   // Build entity items lazily — they require the loaded data.
   const entityItems = useMemo<CommandItem[]>(() => {
     if (!entities) return []
@@ -415,7 +426,7 @@ export function CommandPalette({ disabled }: CommandPaletteProps) {
       })
     }
 
-    for (const o of entities.opportunities.slice(0, 30)) {
+    for (const o of firstOrRef(entities.opportunities)) {
       const label = pickString(o.name, o.client_name) || "Unnamed opportunity"
       const stage = pickString(o.stage)
       const clientName = pickString(o.client_name)
@@ -425,25 +436,25 @@ export function CommandPalette({ disabled }: CommandPaletteProps) {
       items.push({
         id: `opportunity-${o.id}`,
         label,
-        hint: [stage, valueHint].filter(Boolean).join(" · "),
+        hint: [pickString(o.ref), stage, valueHint].filter(Boolean).join(" · "),
         icon: Target,
         section: "Opportunities",
-        search: `${label} ${clientName} ${stage}`.toLowerCase(),
+        search: `${label} ${clientName} ${stage} ${refSearchText(o.ref)}`.toLowerCase(),
         run: (router) => router.push(`/admin/opportunities?tab=pipeline&openOpportunity=${o.id}`),
       })
     }
 
-    for (const t of entities.tasks.slice(0, 30)) {
+    for (const t of firstOrRef(entities.tasks)) {
       const label = pickString(t.title) || "Untitled task"
       const assignee = pickString(t.assigned_to)
       const status = pickString(t.status)
       items.push({
         id: `task-${t.id}`,
         label,
-        hint: [assignee, status].filter(Boolean).join(" · "),
+        hint: [pickString(t.ref), assignee, status].filter(Boolean).join(" · "),
         icon: CheckCircle2,
         section: "Tasks",
-        search: `${label} ${assignee} ${status}`.toLowerCase(),
+        search: `${label} ${assignee} ${status} ${refSearchText(t.ref)}`.toLowerCase(),
         run: (router) => router.push(`/admin/opportunities?tab=tasks&openTask=${t.id}`),
       })
     }
@@ -466,7 +477,8 @@ export function CommandPalette({ disabled }: CommandPaletteProps) {
     }
 
     return items
-  }, [entities])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [entities, refQuery])
 
   const allItems = useMemo(() => [...STATIC_ITEMS, ...entityItems], [entityItems])
 

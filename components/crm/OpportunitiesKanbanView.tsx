@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useCallback } from "react"
+import { RecordRef } from "./RecordRef"
 import { motion, AnimatePresence } from "motion/react"
 import { 
   GripVertical, 
@@ -40,6 +41,8 @@ interface KanbanItem {
   id: string
   type: "client" | "task"
   name: string  // This will be the title for display
+  refId?: string  // Short reference (OPP-1045 / TSK-142), display only
+  fromRef?: string
   companyName?: string  // Company name to show below title
   brand?: Brand
   value?: number
@@ -316,6 +319,9 @@ function KanbanCard({
               </span>
             </div>
           )}
+
+          {/* Short reference (OPP-/TSK-), Display Standard 3.20 */}
+          {item.refId && <RecordRef value={item.refId} from={item.fromRef} className="mb-1" />}
 
           {/* Title (opportunity title) */}
           <p className="text-sm font-medium text-neutral-900 truncate leading-snug">
@@ -643,6 +649,8 @@ export function OpportunitiesKanbanView({
       id: client.id,
       type: "client" as const,
       name: client.title || client.company_name || client.name,  // Show title first, then company name
+      refId: client.ref,
+      fromRef: client.from_ref,
       companyName: client.title ? (client.company_name || client.name) : undefined,  // Show company below if title exists
       brand: client.brand,
       value: client.pitch_value,
@@ -658,6 +666,7 @@ export function OpportunitiesKanbanView({
       id: task.id,
       type: "task" as const,
       name: task.title,
+      refId: task.ref,
       companyName: task.client_name,
       brand: task.brand,
       value: undefined,
