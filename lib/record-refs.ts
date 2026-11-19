@@ -32,11 +32,16 @@ export function formatRef(type: RefType, n: number): string {
 }
 
 const REF_PATTERN = /^\s*(TSK|OPP|PRJ)[\s#-]?0*(\d{1,9})\s*$/i
+const STRICT_REF_PATTERN = /^\s*(TSK|OPP|PRJ)[\s#-]0*(\d{1,9})\s*$/i
 
-/** Reads a reference as people type it: `TSK-142`, `tsk 142`, `TSK#142`, `opp-0045`. Null when it isn't one. */
-export function parseRef(input: unknown): { type: RefType; n: number; ref: string } | null {
+/**
+ * Reads a reference as people type it: `TSK-142`, `tsk 142`, `TSK#142`, `opp-0045`, and in a search box `TSK142`.
+ * Null when it isn't one. `strict` requires the separator: where a value may also be a record id (a tool's id, a
+ * lookup), `opp1` stays an id and only `OPP-1` is a reference.
+ */
+export function parseRef(input: unknown, opts: { strict?: boolean } = {}): { type: RefType; n: number; ref: string } | null {
   if (typeof input !== "string") return null
-  const m = REF_PATTERN.exec(input)
+  const m = (opts.strict ? STRICT_REF_PATTERN : REF_PATTERN).exec(input)
   if (!m) return null
   const type = m[1].toUpperCase() as RefType
   const n = Number(m[2])

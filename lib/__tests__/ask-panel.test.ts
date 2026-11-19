@@ -403,6 +403,10 @@ test("a tool's id may be a reference: update_task by TSK-9 edits that task; an u
   const out = await runAskTurn({ question: "move TSK-9 to the 22nd", history: [] }, MEMBER, deps)
   assert.ok(out.ok && out.edits.length === 1, JSON.stringify(out))
   assert.equal(db.get<Record<string, unknown>>(TASKS_COLLECTION, "task9")!.due_date, "2026-11-22")
+  // A record id that only looks like a reference ("opp1", "task9") is used as the id, never resolved.
+  const plain = turnSetup({ steps: [{ tool: "update_task", input: { task_id: "task9", status: "completed" } }, { text: "Done." }] })
+  const byId = await runAskTurn({ question: "close the deck task", history: [] }, MEMBER, plain.deps)
+  assert.ok(byId.ok && byId.edits.length === 1, JSON.stringify(byId))
   const missing = turnSetup({ steps: [{ tool: "update_task", input: { task_id: "TSK-404", status: "completed" } }, { text: "Not found." }] })
   const none = await runAskTurn({ question: "close TSK-404", history: [] }, MEMBER, missing.deps)
   assert.ok(none.ok && none.edits.length === 0)

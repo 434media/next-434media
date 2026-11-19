@@ -231,7 +231,7 @@ function askTools(c: { person: AskPerson; actor: string; taskId: string; deps: A
   const { deps, edits, proposals, choices } = c
   /** A tool's id may be a short reference (TSK-142, OPP-1045): resolve it to the record's id, as this person may see it. */
   const idOf = async (value: string, kind: "task" | "opportunity"): Promise<string> => {
-    const parsed = parseRef(value)
+    const parsed = parseRef(value, { strict: true })
     if (!parsed) return value
     const found = await deps.data.resolveRef(parsed.ref)
     if (!found || found.kind !== kind) throw new AskRefused(`${parsed.ref} was not found.`)

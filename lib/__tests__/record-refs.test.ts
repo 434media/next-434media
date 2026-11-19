@@ -62,6 +62,10 @@ test("format and parse: people type references loosely; the canonical form is PR
   assert.deepEqual(parseRef("opp-1045"), { type: "OPP", n: 1045, ref: "OPP-1045" })
   for (const s of ["TSK-0", "TSK-", "ABC-12", "TSK-12x", "my TSK-12", "", 12, null, undefined]) assert.equal(parseRef(s), null, String(s))
   assert.throws(() => formatRef("OPP", 0))
+  // Strict, where a value may be a record id: the separator is required, so "opp1" stays an id.
+  assert.equal(parseRef("opp1", { strict: true }), null)
+  assert.equal(parseRef("TSK142", { strict: true }), null)
+  for (const s of ["OPP-1", "opp 1", "OPP#1"]) assert.equal(parseRef(s, { strict: true })?.ref, "OPP-1", s)
   assert.deepEqual(refsInText("respond to tsk-142, then OPP-7 and TSK-142 again"), ["TSK-142", "OPP-7"])
 })
 

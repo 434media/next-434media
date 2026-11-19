@@ -103,7 +103,7 @@ export function liveAskData(session: User, viewer: Viewer): AskData {
       const q = query.trim().toLowerCase()
       const out: Record<string, unknown> = {}
       // A short reference (TSK-142, OPP-1045) is an exact lookup of that one record.
-      const asRef = parseRef(query)
+      const asRef = parseRef(query, { strict: true })
       if (asRef) {
         if (!crm) return { note: "References name tasks and opportunities, which this person cannot see." }
         if (asRef.type === "OPP") {
