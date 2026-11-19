@@ -246,11 +246,11 @@ test("dismissing a draft rejects it as a solicitation, sends nothing, marks the 
 
 test("dismissing an arrival held with no draft records the decision; a free-mail sender is recorded without a domain", async () => {
   const db = new MemoryAgentDb()
-  const { deps, calls } = dismissDeps(ARRIVAL({ contact: { email: "pat.vendor@gmail.com" } } as Partial<Activity>))
+  const { deps, calls } = dismissDeps(ARRIVAL({ contact: { email: "x@gmail.com" } } as Partial<Activity>))
   const out = await dismissSolicitation({ activityId: "contact_forms:f1", reason: "SEO pitch", actor: "founder@example.test" }, deps, at(HOUR), db)
   assert.equal(out.draftRejected, false)
   assert.deepEqual(calls.decisions.map((d) => [d.id, d.chosen]), [["dec-dismiss-f1", "Dismissed the arrival as spam or a solicitation; no reply was sent"]])
-  assert.deepEqual(calls.senders.map((r) => [r.email, r.domain]), [["pat.vendor@gmail.com", ""]])
+  assert.deepEqual(calls.senders.map((r) => [r.email, r.domain]), [["x@gmail.com", ""]])
   assert.deepEqual(calls.spam, ["f1"])
   assert.deepEqual(calls.triaged, ["contact_forms:f1"])
 })

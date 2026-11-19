@@ -555,7 +555,7 @@ test("the pre-check holds a seller's pitch and a dismissed sender or domain, and
   const byDomain = precheckArrival({ email: "sam@gurus.example", message: "Hello" }, { emails: new Set(), domains: new Set(["gurus.example"]) })
   assert.equal(byDomain.hold && byDomain.why, "dismissed-domain")
   // A free-mail domain is never blocked as a domain.
-  assert.equal(precheckArrival({ email: "new@gmail.com", message: "Hello" }, { emails: new Set(), domains: new Set(["gmail.com"]) }).hold, false)
+  assert.equal(precheckArrival({ email: "x@gmail.com", message: "Hello" }, { emails: new Set(), domains: new Set(["gmail.com"]) }).hold, false)
 })
 
 test("a held arrival gets no model call and no draft: the hold is recorded for To do and the ledger says why", async () => {
