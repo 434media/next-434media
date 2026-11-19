@@ -258,9 +258,9 @@ export function TasksView({
       {/* Header with Quick Stats */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <h3 className="text-lg font-medium text-neutral-900">Tasks</h3>
+          <h1 className="text-lg font-semibold text-neutral-900">Tasks</h1>
           <p className="text-sm text-neutral-500 mt-1">
-            Manage and track CRM-related tasks. Sorted by urgency.
+            Every task, not only deals. Sorted by urgency.
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">

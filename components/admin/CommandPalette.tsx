@@ -70,7 +70,7 @@ const STATIC_ITEMS: CommandItem[] = [
     icon: CheckCircle2,
     section: "Quick actions",
     search: "create new task todo",
-    run: (router) => router.push("/admin/opportunities?tab=tasks&new=task"),
+    run: (router) => router.push("/admin/tasks?new=task"),
   },
   {
     id: "create-content-post",
@@ -104,10 +104,10 @@ const STATIC_ITEMS: CommandItem[] = [
   {
     id: "nav-crm",
     label: "CRM",
-    hint: "Dashboard, pipeline, clients, tasks",
+    hint: "Dashboard, pipeline, clients",
     icon: Rocket,
     section: "Navigate",
-    search: "crm dashboard pipeline clients tasks",
+    search: "crm opportunities dashboard pipeline clients deals",
     run: (router) => router.push("/admin/opportunities"),
   },
   {
@@ -136,6 +136,15 @@ const STATIC_ITEMS: CommandItem[] = [
     section: "Navigate",
     search: "to do todo waiting approvals drafts review queue",
     run: (router) => router.push("/admin/todo"),
+  },
+  {
+    id: "nav-tasks",
+    label: "Tasks",
+    hint: "Every task, with its owner, brand and due date",
+    icon: CheckCircle2,
+    section: "Navigate",
+    search: "tasks task list assignments due",
+    run: (router) => router.push("/admin/tasks"),
   },
   {
     id: "nav-people",
@@ -455,7 +464,7 @@ export function CommandPalette({ disabled }: CommandPaletteProps) {
         icon: CheckCircle2,
         section: "Tasks",
         search: `${label} ${assignee} ${status} ${refSearchText(t.ref)}`.toLowerCase(),
-        run: (router) => router.push(`/admin/opportunities?tab=tasks&openTask=${t.id}`),
+        run: (router) => router.push(`/admin/tasks?openTask=${encodeURIComponent(t.id)}`),
       })
     }
 

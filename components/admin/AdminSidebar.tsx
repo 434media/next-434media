@@ -27,6 +27,7 @@ import {
   Globe,
   LayoutDashboard,
   ListTodo,
+  ListChecks,
   Palette,
   Landmark,
   Bot,
@@ -139,6 +140,18 @@ const TODO_ITEM: SidebarLink = {
   href: "/admin/todo",
   matchPrefix: "/admin/todo",
   description: "Everything waiting on you: drafts to approve and arrivals to decide",
+  roles: ["full_admin", "crm_only", "intern"],
+}
+
+// Tasks: every task as one list (founder, 2026-11-19: "approve list for Tasks"), pinned after To do and Overview
+// because tasks are not only deals. Same reach as Opportunities, where the list used to be a tab.
+const TASKS_ITEM: SidebarLink = {
+  id: "tasks",
+  label: "Tasks",
+  icon: ListChecks,
+  href: "/admin/tasks",
+  matchPrefix: "/admin/tasks",
+  description: "Every task, with its owner, brand and due date",
   roles: ["full_admin", "crm_only", "intern"],
 }
 
@@ -420,6 +433,7 @@ export function AdminSidebar({
 
   const overviewVisible = canSee(OVERVIEW_ITEM)
   const todoVisible = canSee(TODO_ITEM)
+  const tasksVisible = canSee(TASKS_ITEM)
   // Filter each section's items by role, then drop any section left empty.
   const sections = SIDEBAR_SECTIONS.map((s) => ({
     ...s,
@@ -558,10 +572,11 @@ export function AdminSidebar({
 
       {/* Items */}
       <nav className="flex-1 overflow-y-auto py-2 px-2">
-        {(todoVisible || overviewVisible) && (
+        {(todoVisible || overviewVisible || tasksVisible) && (
           <div className="space-y-0.5">
             {todoVisible && renderEntry(TODO_ITEM)}
             {overviewVisible && renderEntry(OVERVIEW_ITEM)}
+            {tasksVisible && renderEntry(TASKS_ITEM)}
           </div>
         )}
 

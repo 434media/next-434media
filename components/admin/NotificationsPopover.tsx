@@ -114,9 +114,8 @@ export function NotificationsPopover() {
         // straight to the post via ?openContent= (the page reads it on load).
         router.push(`/admin/content?openContent=${encodeURIComponent(n.task_id)}`)
       } else {
-        // Tasks still open on the CRM page via the sessionStorage handoff.
-        sessionStorage.setItem("openTaskId", n.task_id)
-        window.location.href = "/admin/opportunities"
+        // Tasks open on their own page, /admin/tasks, which reads ?openTask= on load.
+        router.push(`/admin/tasks?openTask=${encodeURIComponent(n.task_id)}`)
       }
     }
     markAsRead([n.id])

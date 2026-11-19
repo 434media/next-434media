@@ -12,7 +12,6 @@ import type {
   Brand,
   Disposition,
   DOC,
-  ViewMode,
   Toast as ToastType,
 } from "../components/crm/types"
 
@@ -82,8 +81,6 @@ interface UseTaskHandlersProps {
   currentOpportunityForLinked: { id: string } | null
   setLinkedTasks: Dispatch<SetStateAction<Task[]>>
   setShowLinkedTasksPanel: Dispatch<SetStateAction<boolean>>
-  // View state
-  setViewMode: Dispatch<SetStateAction<ViewMode>>
 }
 
 export function useTaskHandlers({
@@ -110,7 +107,6 @@ export function useTaskHandlers({
   currentOpportunityForLinked,
   setLinkedTasks,
   setShowLinkedTasksPanel,
-  setViewMode,
 }: UseTaskHandlersProps) {
   const [isSavingTask, setIsSavingTask] = useState(false)
   const [isUploadingFile, setIsUploadingFile] = useState(false)
@@ -207,7 +203,6 @@ export function useTaskHandlers({
       if (task) {
         openTaskModal(task)
       } else {
-        setViewMode("tasks")
         setToast({ message: "Could not find the task", type: "error" })
       }
     } catch (err) {

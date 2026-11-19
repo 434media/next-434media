@@ -23,6 +23,7 @@ const ROUTE_LABELS: Array<{ match: string | RegExp; label: string }> = [
   { match: "/admin/leads", label: "Leads" },
   { match: "/admin/people", label: "People" },
   { match: "/admin/todo", label: "To do" },
+  { match: "/admin/tasks", label: "Tasks" },
   { match: "/admin/overview", label: "Overview" },
   { match: "/admin/audiences", label: "Audiences" },
   { match: "/admin/analytics-web", label: "Analytics · Web" },
