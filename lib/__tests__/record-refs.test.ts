@@ -11,7 +11,7 @@ import {
   REF_COUNTER_COLLECTION, assignRefIfMissing, createWithRef, formatRef, nextNumberFrom, parseRef, refCounterDocId, refsInText,
   type RefStore, type RefTx,
 } from "../record-refs"
-import { TRIAGE_RULE_STATUS, planBackfill, survivesTriage, type BackfillCandidate } from "../record-refs-backfill"
+import { TRIAGE_RULE_STATUS, numberOnUpdate, planBackfill, summarizePlan, survivesTriage, type BackfillCandidate } from "../record-refs-backfill"
 
 class MemoryRefStore implements RefStore {
   docs = new Map<string, Record<string, unknown>>()
@@ -127,20 +127,54 @@ test("assignRefIfMissing: numbers a record once; a record that has one keeps it;
 
 const cand = (type: "TSK" | "OPP", collection: string, id: string, data: Record<string, unknown>): BackfillCandidate => ({ type, collection, id, data })
 
-test("backfill rule: proposed and awaiting the founder, so the script cannot write", () => {
-  assert.equal(TRIAGE_RULE_STATUS, "proposed")
+test("backfill rule: decided by the founder (2026-11-19)", () => {
+  assert.equal(TRIAGE_RULE_STATUS, "approved")
 })
 
-test("backfill rule (proposed): live tasks in crm_tasks and open or won opportunities survive; the rest do not", () => {
+test("backfill rule (decided): open tasks and opportunities not archived and not lost survive; the rest do not", () => {
   assert.deepEqual(survivesTriage(cand("TSK", "crm_tasks", "t", { status: "in_progress" })), { keep: true })
+  // Before the unified-tasks migration the CRM reads the per-person collections, so an open task there survives too.
+  assert.deepEqual(survivesTriage(cand("TSK", "crm_tasks_jake", "t", { status: "not_started" })), { keep: true })
   assert.equal(survivesTriage(cand("TSK", "crm_tasks", "t", { status: "completed" })).keep, false)
   assert.equal(survivesTriage(cand("TSK", "crm_tasks", "t", { status: "not_started", is_archived: true })).keep, false)
-  assert.equal(survivesTriage(cand("TSK", "crm_tasks_jake", "t", { status: "not_started" })).keep, false)
   assert.deepEqual(survivesTriage(cand("OPP", "crm_clients", "o", { is_opportunity: true, disposition: "proposal" })), { keep: true })
   assert.deepEqual(survivesTriage(cand("OPP", "crm_clients", "o", { is_opportunity: true, disposition: "closed_won" })), { keep: true })
   assert.equal(survivesTriage(cand("OPP", "crm_clients", "o", { is_opportunity: true, disposition: "closed_lost" })).keep, false)
   assert.equal(survivesTriage(cand("OPP", "crm_clients", "o", { is_opportunity: true, is_archived: true })).keep, false)
   assert.equal(survivesTriage(cand("OPP", "crm_clients", "o", { is_opportunity: false })).keep, false)
+})
+
+test("backfill rule reads archived and opportunity as the pipeline does: truthy, not === true (#347)", () => {
+  assert.equal(survivesTriage(cand("OPP", "crm_clients", "o", { is_opportunity: "true", disposition: "discovery" })).keep, true)
+  assert.equal(survivesTriage(cand("OPP", "crm_clients", "o", { is_opportunity: 1, is_archived: "true" })).keep, false)
+  assert.equal(survivesTriage(cand("TSK", "crm_tasks", "t", { status: "not_started", is_archived: 1 })).keep, false)
+  assert.equal(survivesTriage(cand("OPP", "crm_clients", "o", { is_opportunity: true, is_archived: false })).keep, true)
+})
+
+test("a closed or archived record gets a reference when it is reopened; an open one without a reference is left to the backfill", () => {
+  const opp = (data: Record<string, unknown>) => cand("OPP", "crm_clients", "o", { is_opportunity: true, ...data })
+  const task = (data: Record<string, unknown>) => cand("TSK", "crm_tasks", "t", data)
+  assert.equal(numberOnUpdate(opp({ is_archived: true }), opp({ is_archived: false })), true, "un-archived")
+  assert.equal(numberOnUpdate(opp({ disposition: "closed_lost" }), opp({ disposition: "discovery" })), true, "moved off lost")
+  assert.equal(numberOnUpdate(task({ status: "completed" }), task({ status: "in_progress" })), true, "task reopened")
+  assert.equal(numberOnUpdate(cand("OPP", "crm_clients", "o", { is_opportunity: false }), opp({})), true, "became an opportunity")
+  assert.equal(numberOnUpdate(opp({ disposition: "proposal" }), opp({ disposition: "closed_won" })), false, "open stays open")
+  assert.equal(numberOnUpdate(opp({}), opp({ disposition: "closed_lost" })), false, "closed now")
+  assert.equal(numberOnUpdate(opp({ is_archived: true }), opp({ is_archived: false, ref: "OPP-4" })), false, "already numbered")
+  assert.equal(numberOnUpdate(task({ status: "completed" }), task({ status: "completed", title: "x" })), false, "still closed")
+})
+
+test("the plan summary gives each type its count, first and last reference from the counter, and why records were left out", () => {
+  const plan = planBackfill([
+    cand("TSK", "crm_tasks", "a", { status: "not_started", created_at: "2025-02-01T00:00:00Z" }),
+    cand("TSK", "crm_tasks", "b", { status: "in_progress", created_at: "2025-01-01T00:00:00Z" }),
+    cand("TSK", "crm_tasks", "c", { status: "completed" }),
+    cand("TSK", "crm_tasks", "d", { status: "not_started", ref: "TSK-1" }),
+    cand("OPP", "crm_clients", "o", { is_opportunity: true, disposition: "closed_lost" }),
+  ])
+  const sum = summarizePlan(plan, { TSK: { next: 3 }, OPP: null })
+  assert.deepEqual(sum.TSK, { count: 2, first: "TSK-3", last: "TSK-4", oldest: "2025-01-01T00:00:00.000Z", newest: "2025-02-01T00:00:00.000Z", counterNext: 3, alreadyNumbered: 1, leftOut: { completed: 1 } })
+  assert.deepEqual(sum.OPP, { count: 0, first: null, last: null, oldest: null, newest: null, counterNext: 1, alreadyNumbered: 0, leftOut: { "closed as lost": 1 } })
 })
 
 test("backfill plan: oldest first, skips records that already have a reference, and says why each is left out", () => {

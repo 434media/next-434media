@@ -10,6 +10,8 @@ import { join, relative } from "node:path"
 
 const ROOT = join(__dirname, "..", "..")
 const DIR = join(ROOT, "app", "api", "admin", "finance")
+// The reference backfill's routes are founder only too (short references on records; founder, 2026-11-19).
+const REFS_DIR = join(ROOT, "app", "api", "admin", "refs")
 const METHODS = "GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS"
 
 function routeFiles(dir: string): string[] {
@@ -43,7 +45,11 @@ test("the finance API has at least one route", () => {
   assert.ok(routeFiles(DIR).length > 0)
 })
 
-for (const file of routeFiles(DIR)) {
+test("the reference backfill API has at least one route", () => {
+  assert.ok(routeFiles(REFS_DIR).length > 0)
+})
+
+for (const file of [...routeFiles(DIR), ...routeFiles(REFS_DIR)]) {
   const name = relative(ROOT, file)
   test(`${name}: every handler calls requireFounder first`, () => {
     const found = handlers(readFileSync(file, "utf8"))

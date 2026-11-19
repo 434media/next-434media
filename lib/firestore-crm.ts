@@ -24,6 +24,7 @@ import type {
 } from "../types/crm-types"
 import { CRM_COLLECTIONS } from "../types/crm-types"
 import { assignRefIfMissing, createWithRef, firestoreRefStore, parseRef, type RefType } from "./record-refs"
+import { numberOnUpdate } from "./record-refs-backfill"
 
 // Re-export collection names
 export { CRM_COLLECTIONS } from "../types/crm-types"
@@ -426,12 +427,13 @@ export async function updateClient(
   updates: Partial<ClientRecord>
 ): Promise<ClientRecord> {
   const rest = stripRefFields(updates)
-  // A record that becomes an opportunity by this update gets its OPP reference. One that already was an opportunity
-  // is left as it is: an older opportunity without a reference gets one only through the backfill, which waits on the
-  // founder's rule for what survives the CRM triage (scripts/refs/backfill.ts).
-  const becomesOpportunity = rest.is_opportunity === true && !(await getById<Record<string, unknown>>(CLIENTS_COLLECTION, id))?.is_opportunity
+  // A record that this update makes a live opportunity gets its OPP reference: one that has just become an
+  // opportunity, or a closed or archived one reopened (lib/record-refs-backfill.ts numberOnUpdate, the founder's rule
+  // of 2026-11-19). An open opportunity that merely lacks a reference is left to the backfill.
+  const before = await getById<Record<string, unknown>>(CLIENTS_COLLECTION, id)
   const updated = await updateDocument<ClientRecord>(CLIENTS_COLLECTION, id, rest)
-  if (!becomesOpportunity) return updated
+  const asCandidate = (data: Record<string, unknown>) => ({ collection: CLIENTS_COLLECTION, id, type: "OPP" as const, data })
+  if (!numberOnUpdate(before ? asCandidate(before) : null, asCandidate(updated as unknown as Record<string, unknown>))) return updated
   const assigned = await assignRefIfMissing(firestoreRefStore(getDb()), CLIENTS_COLLECTION, id, "OPP", { now: admin.firestore.FieldValue.serverTimestamp() })
   invalidateCache(CLIENTS_COLLECTION)
   return assigned ? { ...updated, ref: assigned.ref } : updated
@@ -828,6 +830,9 @@ const TASK_COLLECTIONS = {
 
 type TaskOwner = keyof typeof TASK_COLLECTIONS
 
+/** The per-person task collections the CRM reads before the unified-tasks migration has run. */
+export const LEGACY_TASK_COLLECTIONS: readonly string[] = Object.values(TASK_COLLECTIONS)
+
 export async function getTasks(owner: TaskOwner): Promise<Task[]> {
   return getAllFromCollection<Task>(TASK_COLLECTIONS[owner])
 }
@@ -851,7 +856,9 @@ export async function updateTask(
   id: string,
   updates: Partial<Task>
 ): Promise<Task> {
-  const result = await updateDocument<Task>(TASK_COLLECTIONS[owner], id, stripRefFields(updates))
+  const before = await getById<Record<string, unknown>>(TASK_COLLECTIONS[owner], id)
+  let result = await updateDocument<Task>(TASK_COLLECTIONS[owner], id, stripRefFields(updates))
+  result = await numberReopenedTask(TASK_COLLECTIONS[owner], id, before, result)
   // Also invalidate combined tasks cache
   cache.delete("all_tasks_combined")
   return result
@@ -1613,6 +1620,16 @@ export async function getUnifiedTasks(filters?: UnifiedTaskFilters): Promise<Tas
   return tasks
 }
 
+/** A task this update reopened (moved off completed, or un-archived) gets its TSK reference (numberOnUpdate). */
+async function numberReopenedTask(collection: string, id: string, before: Record<string, unknown> | null, after: Task): Promise<Task> {
+  const asCandidate = (data: Record<string, unknown>) => ({ collection, id, type: "TSK" as const, data })
+  if (!numberOnUpdate(before ? asCandidate(before) : null, asCandidate(after as unknown as Record<string, unknown>))) return after
+  const assigned = await assignRefIfMissing(firestoreRefStore(getDb()), collection, id, "TSK", { now: admin.firestore.FieldValue.serverTimestamp() })
+  invalidateCache(collection)
+  cache.delete("all_tasks_combined")
+  return assigned ? { ...after, ref: assigned.ref } : after
+}
+
 /** `ref` and `from_ref` are the store's to write: a caller cannot set or change them on a task or an opportunity. */
 function stripRefFields<T extends object>(data: T): T {
   return Object.fromEntries(Object.entries(data).filter(([k]) => k !== "ref" && k !== "from_ref")) as T
@@ -1680,11 +1697,12 @@ export async function updateUnifiedTask(id: string, updates: Partial<Task>): Pro
       else if (value !== undefined) cleanUpdates[key] = value
     }
     cleanUpdates.updated_at = FieldValue.serverTimestamp()
+    const beforeSnap = await db.collection(UNIFIED_TASKS).doc(id).get()
     await db.collection(UNIFIED_TASKS).doc(id).update(cleanUpdates)
     invalidateCache(UNIFIED_TASKS)
     cache.delete("all_tasks_combined")
     const snap = await db.collection(UNIFIED_TASKS).doc(id).get()
-    return { id: snap.id, ...snap.data() } as Task
+    return numberReopenedTask(UNIFIED_TASKS, id, beforeSnap.exists ? (beforeSnap.data() ?? null) : null, { id: snap.id, ...snap.data() } as Task)
   }
   // Legacy path: locate task across collections, then update in place
   const found = await findTaskInAnyCollection(id)

@@ -435,3 +435,15 @@ test("a name matching two records for a change gets a \"which one?\" card listin
   const listed = await runAskTurn({ question: "which decks are there?", history: [] }, MEMBER, look.deps)
   assert.ok(listed.ok && listed.choices === undefined)
 })
+
+test("a task Ask moves off completed is reopened: it gets its reference; other status changes do not ask for one", async () => {
+  const numbered: string[] = []
+  const reopen = turnSetup({ data: { numberReopenedTask: async (id) => { numbered.push(id) } }, steps: [{ tool: "update_task", input: { task_id: "task9", status: "in_progress" } }, { text: "Reopened." }] })
+  reopen.db.col(TASKS_COLLECTION).set("task9", { title: "Deck for Riverwalk", status: "completed", assigned_to: "Barb" })
+  const out = await runAskTurn({ question: "reopen the deck task", history: [] }, MEMBER, reopen.deps)
+  assert.ok(out.ok && out.edits.length === 1, JSON.stringify(out))
+  assert.deepEqual(numbered, ["task9"])
+  const close = turnSetup({ data: { numberReopenedTask: async (id) => { numbered.push(`closed:${id}`) } }, steps: [{ tool: "update_task", input: { task_id: "task9", status: "completed" } }, { text: "Closed." }] })
+  await runAskTurn({ question: "close the deck task", history: [] }, MEMBER, close.deps)
+  assert.deepEqual(numbered, ["task9"])
+})
