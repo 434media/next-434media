@@ -18,6 +18,8 @@ import {
 import { getDueDateStatus, formatDate, BRANDS, normalizeAssigneeName, isValidAssigneeName, parseLocalDate } from "./types"
 import type { Task } from "./types"
 import { useSelection, BulkActionBar } from "@/components/admin/SubmissionStateUI"
+import { RecordRef } from "./RecordRef"
+import { refMatches } from "@/lib/record-refs"
 
 type UrgencyFilter = "all" | "overdue" | "due-soon" | "on-track"
 
@@ -148,6 +150,7 @@ export function TasksView({
       : ""
     const matchesSearch =
       task.title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      refMatches(task.ref, searchQuery) ||
       task.client_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       task.assigned_to?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       secondaryAssigneesStr.toLowerCase().includes(searchQuery.toLowerCase())
@@ -180,6 +183,7 @@ export function TasksView({
         : ""
       const matchesSearch =
         t.title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        refMatches(t.ref, searchQuery) ||
         t.client_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
         t.assigned_to?.toLowerCase().includes(searchQuery.toLowerCase()) ||
         secondaryStr.toLowerCase().includes(searchQuery.toLowerCase())
@@ -463,9 +467,12 @@ export function TasksView({
                             aria-hidden="true"
                           />
                           <div className="min-w-0">
-                            <p className={`font-medium text-sm line-clamp-1 ${task.status === "completed" ? "text-neutral-500 line-through" : "text-neutral-900"}`}>
-                              {task.title || "Untitled task"}
-                            </p>
+                            <div className="flex items-center gap-2 min-w-0">
+                              <RecordRef value={task.ref} className="shrink-0" />
+                              <p className={`font-medium text-sm line-clamp-1 ${task.status === "completed" ? "text-neutral-500 line-through" : "text-neutral-900"}`}>
+                                {task.title || "Untitled task"}
+                              </p>
+                            </div>
                             {task.client_name && (
                               <p className="text-xs text-neutral-500 mt-0.5 line-clamp-1">
                                 {task.client_name}

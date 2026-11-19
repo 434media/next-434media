@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useCallback } from "react"
+import { RecordRef } from "./RecordRef"
 import { motion, AnimatePresence } from "motion/react"
 import { 
   GripVertical, 
@@ -40,6 +41,8 @@ interface KanbanItem {
   id: string
   type: "client" | "task"
   name: string  // This will be the title for display
+  refId?: string  // Short reference (OPP-1045 / TSK-142), display only
+  fromRef?: string
   companyName?: string  // Company name to show below title
   brand?: Brand
   value?: number
@@ -307,13 +310,16 @@ function KanbanCard({
             </div>
           )}
 
-          {/* DOC pill */}
-          {docLabel && (
-            <div className="flex items-center gap-2 mb-1.5">
-              <span className="inline-flex items-center gap-1.5 px-1.5 py-0.5 text-[10px] font-medium rounded-full bg-neutral-100 text-neutral-700 tabular-nums">
-                <span className="inline-block h-1 w-1 rounded-full bg-amber-500" aria-hidden="true" />
-                DOC · {docLabel}
-              </span>
+          {/* Top row: the short reference chip (OPP-/TSK-, Display Standard 3.20), then the DOC pill */}
+          {(item.refId || docLabel) && (
+            <div className="flex flex-wrap items-center gap-2 mb-1.5">
+              {item.refId && <RecordRef value={item.refId} from={item.fromRef} />}
+              {docLabel && (
+                <span className="inline-flex items-center gap-1.5 px-1.5 py-0.5 text-[10px] font-medium rounded-full bg-neutral-100 text-neutral-700 tabular-nums">
+                  <span className="inline-block h-1 w-1 rounded-full bg-amber-500" aria-hidden="true" />
+                  DOC · {docLabel}
+                </span>
+              )}
             </div>
           )}
 
@@ -331,12 +337,12 @@ function KanbanCard({
 
           {/* Meta info */}
           <div className="flex items-center gap-2 mt-2">
-            {item.value && item.value > 0 && (
+            {!!item.value && item.value > 0 && (
               <span className="inline-flex items-center gap-1 text-xs font-medium tabular-nums text-neutral-900">
                 {formatCurrency(item.value, true)}
               </span>
             )}
-            {item.value && item.value > 0 && item.brand && (
+            {!!item.value && item.value > 0 && item.brand && (
               <span className="text-neutral-300" aria-hidden="true">·</span>
             )}
             {item.brand && (
@@ -643,6 +649,8 @@ export function OpportunitiesKanbanView({
       id: client.id,
       type: "client" as const,
       name: client.title || client.company_name || client.name,  // Show title first, then company name
+      refId: client.ref,
+      fromRef: client.from_ref,
       companyName: client.title ? (client.company_name || client.name) : undefined,  // Show company below if title exists
       brand: client.brand,
       value: client.pitch_value,
@@ -658,6 +666,7 @@ export function OpportunitiesKanbanView({
       id: task.id,
       type: "task" as const,
       name: task.title,
+      refId: task.ref,
       companyName: task.client_name,
       brand: task.brand,
       value: undefined,

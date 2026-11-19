@@ -43,6 +43,10 @@ export interface PipelineColumn {
 }
 
 export interface Opportunity {
+  /** Short reference for people, e.g. "OPP-1045" (lib/record-refs.ts). Display and lookup only. */
+  ref?: string
+  /** Where a promoted record came from, e.g. "PRJ-205". */
+  from_ref?: string
   id: string
   name: string
   description?: string
@@ -75,6 +79,10 @@ export interface ClientContact {
 }
 
 export interface Client {
+  /** Short reference for people, e.g. "OPP-1045" (lib/record-refs.ts). Display and lookup only. */
+  ref?: string
+  /** Where a promoted record came from, e.g. "PRJ-205". */
+  from_ref?: string
   id: string
   name: string  // Primary contact name (for backwards compatibility)
   company_name?: string
@@ -205,6 +213,10 @@ export interface CurrentUser {
 
 export interface Task {
   id: string
+  /** Short reference for people, e.g. "OPP-1045" (lib/record-refs.ts). Display and lookup only. */
+  ref?: string
+  /** Where a promoted record came from, e.g. "PRJ-205". */
+  from_ref?: string
   title: string
   description?: string
   assigned_to: string

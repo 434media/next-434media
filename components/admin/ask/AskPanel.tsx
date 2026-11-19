@@ -10,6 +10,7 @@ import { useCallback, useEffect, useRef, useState } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { AlertCircle, ArrowRight, Check, Loader2, Undo2, X } from "lucide-react"
+import { selectRecord, useSelectedRecord, type SelectedRecord } from "@/lib/selected-record"
 
 const UNDO_SHOWN_MS = 6_000
 
@@ -28,9 +29,15 @@ interface Proposal {
   hash: string
   label: string
 }
+interface Choice {
+  kind: "task" | "opportunity"
+  id: string
+  ref?: string
+  name: string
+}
 type Turn =
-  | { role: "user"; text: string }
-  | { role: "assistant"; text: string; taskId?: string; edits?: Edit[]; proposals?: Proposal[]; link?: { href: string; label: string }; error?: boolean }
+  | { role: "user"; text: string; selected?: SelectedRecord | null }
+  | { role: "assistant"; text: string; taskId?: string; edits?: Edit[]; proposals?: Proposal[]; choices?: Choice[]; question?: string; link?: { href: string; label: string }; error?: boolean }
 
 export interface AskStatus {
   on: boolean
@@ -40,6 +47,8 @@ export interface AskStatus {
 
 export function AskPanel({ open, onClose, status }: { open: boolean; onClose: () => void; status: AskStatus | null }) {
   const pathname = usePathname() ?? ""
+  // The task or opportunity open on screen: "this" in a question means it (Display Standard 3.17).
+  const selected = useSelectedRecord()
   const [turns, setTurns] = useState<Turn[]>([])
   const [draft, setDraft] = useState("")
   const [busy, setBusy] = useState(false)
@@ -62,18 +71,17 @@ export function AskPanel({ open, onClose, status }: { open: boolean; onClose: ()
 
   const lastTask = [...turns].reverse().find((t): t is Extract<Turn, { role: "assistant" }> => t.role === "assistant" && !!t.taskId)?.taskId
 
-  const ask = useCallback(async () => {
-    const question = draft.trim()
+  const send = useCallback(async (question: string, pick: SelectedRecord | null) => {
     if (!question || busy) return
     const history = turns.map((t) => ({ role: t.role, content: t.text }))
-    setTurns((ts) => [...ts, { role: "user", text: question }])
+    setTurns((ts) => [...ts, { role: "user", text: question, selected: pick }])
     setDraft("")
     setBusy(true)
     try {
-      const res = await fetch("/api/admin/ask", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ question, history, page: pathname }) })
+      const res = await fetch("/api/admin/ask", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ question, history, page: pathname, ...(pick ? { selected: pick } : {}) }) })
       const body = await res.json().catch(() => ({}))
       if (body?.ok) {
-        setTurns((ts) => [...ts, { role: "assistant", text: body.answer, taskId: body.taskId, edits: body.edits, proposals: body.proposals }])
+        setTurns((ts) => [...ts, { role: "assistant", text: body.answer, taskId: body.taskId, edits: body.edits, proposals: body.proposals, choices: body.choices, question }])
       } else {
         setTurns((ts) => [...ts, { role: "assistant", text: body?.message ?? body?.error ?? "Ask could not answer. Try again.", link: body?.link, error: !res.ok }])
       }
@@ -82,7 +90,16 @@ export function AskPanel({ open, onClose, status }: { open: boolean; onClose: ()
     } finally {
       setBusy(false)
     }
-  }, [draft, busy, turns, pathname])
+  }, [busy, turns, pathname])
+
+  const ask = useCallback(() => send(draft.trim(), selected), [send, draft, selected])
+
+  // A pick on a "which one?" card: that record becomes "this", and the same question goes again.
+  const pickChoice = useCallback((c: Choice, question: string) => {
+    const pick: SelectedRecord = { kind: c.kind, id: c.id, ref: c.ref, name: c.name }
+    selectRecord(pick)
+    void send(question, pick)
+  }, [send])
 
   if (!open) return null
   const ready = status?.on && status.permitted
@@ -121,9 +138,12 @@ export function AskPanel({ open, onClose, status }: { open: boolean; onClose: ()
         )}
         {turns.map((t, i) =>
           t.role === "user" ? (
-            <div key={i} className="max-w-[320px] self-end whitespace-pre-wrap rounded-xl bg-neutral-100 px-3 py-2.5">{t.text}</div>
+            <div key={i} className="flex max-w-[320px] flex-col items-end gap-1 self-end">
+              <div className="whitespace-pre-wrap rounded-xl bg-neutral-100 px-3 py-2.5">{t.text}</div>
+              {t.selected && <span className="font-mono text-[10px] text-neutral-400">about {t.selected.ref ?? t.selected.name}</span>}
+            </div>
           ) : (
-            <AssistantTurn key={i} turn={t} onNavigate={onClose} />
+            <AssistantTurn key={i} turn={t} onNavigate={onClose} onPick={busy ? undefined : pickChoice} />
           ),
         )}
         {busy && (
@@ -135,6 +155,14 @@ export function AskPanel({ open, onClose, status }: { open: boolean; onClose: ()
       </div>
 
       <footer className="flex flex-col gap-2 border-t border-neutral-200 px-5 pb-4 pt-3">
+        {ready && selected && (
+          <div className="flex items-center gap-2 text-xs text-neutral-600" aria-live="polite">
+            <span className="font-mono text-[11px] text-neutral-900">{selected.ref ?? (selected.kind === "task" ? "Task" : "Opportunity")}</span>
+            <span>selected</span>
+            <span className="min-w-0 flex-1 truncate text-neutral-500" title={selected.name}>{selected.name}</span>
+            <span className="shrink-0 text-[11px] text-neutral-400">&ldquo;this&rdquo; means it</span>
+          </div>
+        )}
         <form
           className="flex items-end gap-2"
           onSubmit={(e) => {
@@ -172,7 +200,7 @@ export function AskPanel({ open, onClose, status }: { open: boolean; onClose: ()
   )
 }
 
-function AssistantTurn({ turn, onNavigate }: { turn: Extract<Turn, { role: "assistant" }>; onNavigate: () => void }) {
+function AssistantTurn({ turn, onNavigate, onPick }: { turn: Extract<Turn, { role: "assistant" }>; onNavigate: () => void; onPick?: (c: Choice, question: string) => void }) {
   return (
     <div className="flex flex-col gap-2">
       <div className={`whitespace-pre-wrap ${turn.error ? "text-neutral-700" : ""}`}>
@@ -186,6 +214,38 @@ function AssistantTurn({ turn, onNavigate }: { turn: Extract<Turn, { role: "assi
       )}
       {turn.edits?.map((e) => <EditCard key={e.id} edit={e} taskId={turn.taskId} />)}
       {turn.proposals?.map((p) => <ConfirmCard key={`${p.kind}:${p.id}:${p.to}`} proposal={p} taskId={turn.taskId} />)}
+      {turn.choices && turn.choices.length > 1 && turn.question && (
+        <WhichOneCard choices={turn.choices} onPick={onPick ? (c) => onPick(c, turn.question!) : undefined} />
+      )}
+    </div>
+  )
+}
+
+/** A name that matched more than one record: the person picks one, and the question runs again about it. */
+function WhichOneCard({ choices, onPick }: { choices: Choice[]; onPick?: (c: Choice) => void }) {
+  const [picked, setPicked] = useState<string | null>(null)
+  return (
+    <div className="flex flex-col gap-2 rounded-[10px] border border-neutral-200 px-3 py-2.5">
+      <div className="text-[10px] font-medium uppercase tracking-[0.08em] text-neutral-500">Which one?</div>
+      <ul className="flex flex-col gap-1">
+        {choices.map((c) => (
+          <li key={`${c.kind}:${c.id}`}>
+            <button
+              type="button"
+              disabled={!onPick || picked !== null}
+              onClick={() => {
+                setPicked(c.id)
+                onPick?.(c)
+              }}
+              className={`flex min-h-11 w-full items-center gap-2.5 rounded-lg px-2.5 text-left text-[13px] hover:bg-neutral-100 disabled:hover:bg-transparent ${picked === c.id ? "bg-neutral-100" : ""} ${picked !== null && picked !== c.id ? "opacity-50" : ""}`}
+            >
+              <span className="w-[72px] shrink-0 font-mono text-[11px] text-neutral-900">{c.ref ?? (c.kind === "task" ? "Task" : "Opp.")}</span>
+              <span className="min-w-0 flex-1 truncate">{c.name}</span>
+              <span className="shrink-0 text-[11px] text-neutral-400">{c.kind === "task" ? "task" : "opportunity"}</span>
+            </button>
+          </li>
+        ))}
+      </ul>
     </div>
   )
 }

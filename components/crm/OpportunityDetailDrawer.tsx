@@ -30,6 +30,8 @@ import type { Brand, Disposition, DOC, Client } from "./types"
 import { DetailDrawer } from "@/components/admin/DetailDrawer"
 import { useTeamMembers } from "@/hooks/useTeamMembers"
 import { Combobox } from "./Combobox"
+import { RecordRef } from "./RecordRef"
+import { useSelectRecordWhileOpen } from "@/lib/selected-record"
 
 interface ContactFormData {
   id: string
@@ -80,6 +82,9 @@ interface OpportunityDetailDrawerProps {
   onDelete?: () => void   // Delete permanently — for removing QA/test records
   /** Jump to the parent client's Customer 360 (only when the opp is linked). */
   onViewCustomer360?: (clientId: string) => void
+  /** The opportunity's short reference (OPP-1045) and, if it was promoted, where it came from. Display only. */
+  recordRef?: string
+  fromRef?: string
 }
 
 // Generate unique ID for new contacts
@@ -99,6 +104,8 @@ export function OpportunityDetailDrawer({
   onArchive,
   onDelete,
   onViewCustomer360,
+  recordRef,
+  fromRef,
 }: OpportunityDetailDrawerProps) {
   const [expandedContacts, setExpandedContacts] = useState<Set<string>>(new Set())
 
@@ -343,6 +350,10 @@ export function OpportunityDetailDrawer({
   const drawerSubtitle = isEditing
     ? "Get that money and close that business"
     : "Add a new opportunity"
+  // While it is open, this opportunity is what the Ask panel's "this" means.
+  useSelectRecordWhileOpen(open && isEditing && formData.existing_company_id
+    ? { kind: "opportunity", id: formData.existing_company_id, ref: recordRef, name: formData.title || formData.company_name || "Opportunity" }
+    : null)
   // Archive is available for ANY opportunity when editing (including never-closed
   // ones that just went dormant) — it's recoverable, so no need to gate it to
   // closed deals.
@@ -354,6 +365,7 @@ export function OpportunityDetailDrawer({
       open={open}
       onClose={onClose}
       title={drawerTitle}
+      lead={isEditing && recordRef ? <RecordRef value={recordRef} from={fromRef} /> : undefined}
       subtitle={drawerSubtitle}
       width="lg"
       footer={

@@ -17,6 +17,8 @@ interface DetailDrawerProps {
   open: boolean
   onClose: () => void
   title: ReactNode
+  /** Shown before the title on its line, e.g. the record's reference chip (Display Standard 3.20). */
+  lead?: ReactNode
   subtitle?: ReactNode
   badge?: ReactNode
   width?: DrawerWidth
@@ -41,6 +43,7 @@ export function DetailDrawer({
   open,
   onClose,
   title,
+  lead,
   subtitle,
   badge,
   width = "lg",
@@ -147,6 +150,7 @@ export function DetailDrawer({
             <header className="shrink-0 flex items-start justify-between gap-3 px-4 sm:px-5 py-3 sm:py-4 border-b border-neutral-200 bg-white">
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2 min-w-0">
+                  {lead && <div className="shrink-0">{lead}</div>}
                   <h2 className="text-base font-semibold text-neutral-900 truncate">{title}</h2>
                   {badge && <div className="shrink-0">{badge}</div>}
                 </div>

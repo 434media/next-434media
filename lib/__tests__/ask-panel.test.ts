@@ -12,10 +12,10 @@ import { askOn, parseControls, type AgentControls } from "../agent/controls"
 import { checkFields, newTask, verifyChain } from "../agent/ledger"
 import { createTask } from "../agent/ledger-server"
 import { refusal } from "../engine/tool-policy"
-import { ASK_DECLARATIONS, UNDO_WINDOW_MS, askActor, askPermitted, classifyAsk, proposalHash, stageMoveProblem, boundedHistory } from "../ask/policy"
+import { ASK_DECLARATIONS, UNDO_WINDOW_MS, askActor, askPermitted, askSelectionOf, classifyAsk, proposalHash, renderAskPrompt, stageMoveProblem, boundedHistory } from "../ask/policy"
 import { AskRefused, TASKS_COLLECTION, applyTaskEdit, undoTaskEdit } from "../ask/edits"
 import { confirmStageChange, parseConfirm, type ConfirmDeps } from "../ask/confirm"
-import { runAskTurn, type AskData, type AskDeps, type AskPerson } from "../ask/run"
+import { choicesIn, runAskTurn, type AskData, type AskDeps, type AskPerson } from "../ask/run"
 import type { SkillPin } from "../agent/intake"
 import { MemoryAgentDb } from "./helpers/agent-db"
 import { ASK_COST_KIND, ASK_MODEL, ASK_MONTHLY_CAP_USD, askCapMessage, askMonthlyCapUsd, askSpendOf, monthStartOf } from "../ask/limits"
@@ -243,7 +243,7 @@ function scriptedModel(steps: { tool?: string; input?: unknown; text?: string }[
   return { model, calls }
 }
 
-function turnSetup(opts: { controls?: AgentControls; pin?: SkillPin | null; steps?: { tool?: string; input?: unknown; text?: string }[]; turns?: number; monthSpend?: () => Promise<number> } = {}) {
+function turnSetup(opts: { controls?: AgentControls; pin?: SkillPin | null; steps?: { tool?: string; input?: unknown; text?: string }[]; turns?: number; monthSpend?: () => Promise<number>; data?: Partial<AskData> } = {}) {
   const db = new MemoryAgentDb()
   db.col(TASKS_COLLECTION).set("task9", { title: "Deck for Riverwalk", status: "in_progress", assigned_to: "Barb", due_date: "2026-11-20" })
   const { model, calls } = scriptedModel(opts.steps ?? [{ text: "Nothing is waiting." }])
@@ -253,6 +253,8 @@ function turnSetup(opts: { controls?: AgentControls; pin?: SkillPin | null; step
     find: async () => ({ tasks: [{ id: "task9", title: "Deck for Riverwalk" }] }),
     triage: async (id) => ({ activityId: id, label: "Lee: made a lead" }),
     stageTarget: async () => ({ name: "Riverwalk Events", from: "proposal", revision: "r1" }),
+    resolveRef: async (ref) => (ref === "TSK-9" ? { kind: "task", id: "task9" } : ref === "OPP-1045" ? { kind: "opportunity", id: "opp1" } : null),
+    ...opts.data,
   }
   let clock = 0, n = 0
   const slugs: string[] = []
@@ -375,4 +377,61 @@ test("Ask's month spend counts only Ask's records from the 1st (UTC), and the ca
   assert.equal(askMonthlyCapUsd({ ASK_MONTHLY_CAP_USD: "25" }), 25)
   for (const bad of ["", "ten", "0", "-5", "Infinity"]) assert.equal(askMonthlyCapUsd({ ASK_MONTHLY_CAP_USD: bad }), 10)
   assert.equal(askCapMessage(12.5), "The Ask panel reached this month's $12.50 limit; it resumes on the 1st.")
+})
+
+// ── Short references, "this" and "which one?" (build sequence V1 item 4, short references) ──────────────────────────
+test("the selected record is shape-checked; its name is bounded data and its reference must match its kind", () => {
+  assert.deepEqual(askSelectionOf({ kind: "opportunity", id: "abc_1", ref: "opp 1045", name: "Riverwalk <b>\nEvents</b>" }), { kind: "opportunity", id: "abc_1", ref: "OPP-1045", name: "Riverwalk b Events /b" })
+  assert.deepEqual(askSelectionOf({ kind: "task", id: "t1", name: "Deck" }), { kind: "task", id: "t1", name: "Deck" })
+  for (const bad of [null, "x", { kind: "person", id: "p1" }, { kind: "task", id: "../x" }, { kind: "task", id: "t1", ref: "OPP-3" }]) assert.equal(askSelectionOf(bad), null)
+  const prompt = renderAskPrompt({ question: "mark this won", history: [], today: "2026-11-19", founder: true, selected: { kind: "opportunity", id: "opp1", ref: "OPP-1045", name: "Riverwalk" } })
+  assert.match(prompt, /"this" .* opportunity OPP-1045, id opp1/)
+  assert.match(prompt, /<selected>Riverwalk<\/selected>/)
+  assert.doesNotMatch(renderAskPrompt({ question: "hi", history: [], today: "2026-11-19", founder: true }), /<selected>/)
+})
+
+test("choicesIn reads tasks and opportunities from a find result, with their references", () => {
+  assert.deepEqual(choicesIn({ opportunities: [{ id: "o1", ref: "OPP-3", name: "Riverwalk" }], tasks: [{ id: "t1", title: "Deck" }, { title: "no id" }], people: [{ id: "p1" }] }), [
+    { kind: "opportunity", id: "o1", ref: "OPP-3", name: "Riverwalk" },
+    { kind: "task", id: "t1", name: "Deck" },
+  ])
+  assert.deepEqual(choicesIn(null), [])
+})
+
+test("a tool's id may be a reference: update_task by TSK-9 edits that task; an unknown reference changes nothing", async () => {
+  const { db, deps } = turnSetup({ steps: [{ tool: "update_task", input: { task_id: "tsk-9", due_date: "2026-11-22" } }, { text: "Moved TSK-9." }] })
+  const out = await runAskTurn({ question: "move TSK-9 to the 22nd", history: [] }, MEMBER, deps)
+  assert.ok(out.ok && out.edits.length === 1, JSON.stringify(out))
+  assert.equal(db.get<Record<string, unknown>>(TASKS_COLLECTION, "task9")!.due_date, "2026-11-22")
+  // A record id that only looks like a reference ("opp1", "task9") is used as the id, never resolved.
+  const plain = turnSetup({ steps: [{ tool: "update_task", input: { task_id: "task9", status: "completed" } }, { text: "Done." }] })
+  const byId = await runAskTurn({ question: "close the deck task", history: [] }, MEMBER, plain.deps)
+  assert.ok(byId.ok && byId.edits.length === 1, JSON.stringify(byId))
+  const missing = turnSetup({ steps: [{ tool: "update_task", input: { task_id: "TSK-404", status: "completed" } }, { text: "Not found." }] })
+  const none = await runAskTurn({ question: "close TSK-404", history: [] }, MEMBER, missing.deps)
+  assert.ok(none.ok && none.edits.length === 0)
+  assert.equal(missing.db.get<Record<string, unknown>>(TASKS_COLLECTION, "task9")!.status, "in_progress")
+})
+
+test("a stage change may name the opportunity by reference, and \"this\" reaches the model as the selected record", async () => {
+  const { deps, calls } = turnSetup({ steps: [{ tool: "propose_stage_change", input: { kind: "opportunity", id: "OPP-1045", to: "closed_won" } }, { text: "Confirm below." }] })
+  const out = await runAskTurn({ question: "mark this won", history: [], selected: { kind: "opportunity", id: "opp1", ref: "OPP-1045", name: "Riverwalk" } }, FOUNDER, deps)
+  assert.ok(out.ok && out.proposals.length === 1, JSON.stringify(out))
+  assert.equal(out.ok && out.proposals[0].id, "opp1")
+  assert.match(JSON.stringify(calls[0]), /OPP-1045, id opp1/)
+})
+
+test("a name matching two records for a change gets a \"which one?\" card listing both references, and nothing changes", async () => {
+  const two = { tasks: [{ id: "task9", ref: "TSK-9", title: "Deck for Riverwalk" }, { id: "task10", ref: "TSK-10", title: "Deck for Riverwalk (v2)" }] }
+  const { db, deps } = turnSetup({ data: { find: async () => two }, steps: [{ tool: "find", input: { query: "deck", kinds: ["tasks"], for_change: true } }, { text: "Two tasks match. Which one?" }] })
+  const out = await runAskTurn({ question: "mark the Riverwalk deck done", history: [] }, MEMBER, deps)
+  assert.ok(out.ok, JSON.stringify(out))
+  if (!out.ok) return
+  assert.deepEqual(out.choices?.map((c) => c.ref), ["TSK-9", "TSK-10"])
+  assert.equal(out.edits.length, 0)
+  assert.equal(db.get<Record<string, unknown>>(TASKS_COLLECTION, "task9")!.status, "in_progress")
+  // A plain lookup (not for a change) lists without a card.
+  const look = turnSetup({ data: { find: async () => two }, steps: [{ tool: "find", input: { query: "deck" } }, { text: "Two decks." }] })
+  const listed = await runAskTurn({ question: "which decks are there?", history: [] }, MEMBER, look.deps)
+  assert.ok(listed.ok && listed.choices === undefined)
 })

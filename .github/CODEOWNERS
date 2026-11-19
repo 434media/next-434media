@@ -104,6 +104,11 @@
 /lib/core-model/route-helpers.ts             @434media/founder
 /lib/core-model/lifecycle.ts                 @434media/founder
 /lib/core-model/address-book.ts              @434media/founder
+# Short references on records (V1 item 4): the counters, the backfill and its triage rule (proposed, awaiting the founder).
+/lib/record-refs.ts                          @434media/founder
+/lib/record-refs-backfill.ts                 @434media/founder
+/lib/__tests__/record-refs.test.ts           @434media/founder
+/scripts/refs/                               @434media/founder
 /lib/firestore-people.ts                     @434media/founder
 /lib/firestore-activities.ts                 @434media/founder
 /app/api/admin/core/                         @434media/founder

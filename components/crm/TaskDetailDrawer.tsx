@@ -34,6 +34,8 @@ import {
 import type { Task, TaskAttachment, CurrentUser, Brand } from "./types"
 import type { TaskFormData } from "@/hooks/useTaskHandlers"
 import { DetailDrawer } from "@/components/admin/DetailDrawer"
+import { RecordRef } from "./RecordRef"
+import { useSelectRecordWhileOpen } from "@/lib/selected-record"
 import { useTeamMembers } from "@/hooks/useTeamMembers"
 import { Combobox } from "./Combobox"
 
@@ -151,6 +153,9 @@ export function TaskDetailDrawer({
       ),
   ].sort((a, b) => a.name.localeCompare(b.name))
 
+  // While it is open, this task is what the Ask panel's "this" means. (Before the early return: it is a hook.)
+  useSelectRecordWhileOpen(open && task?.id ? { kind: "task", id: task.id, ref: task.ref, name: task.title || "Task" } : null)
+
   if (!task) return null
 
   // Create vs. detail mode. A brand-new task has no id; collaboration/metadata
@@ -179,6 +184,7 @@ export function TaskDetailDrawer({
       open={open}
       onClose={onClose}
       title={drawerTitle}
+      lead={task.id && task.ref ? <RecordRef value={task.ref} /> : undefined}
       subtitle={task.id ? "Edit task" : "Create a new task"}
       badge={dueBadge}
       width="xl"

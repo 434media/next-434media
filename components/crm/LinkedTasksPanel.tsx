@@ -2,6 +2,7 @@
 
 import { Target, Users, CheckCircle2 } from "lucide-react"
 import type { Client, Task } from "./types"
+import { RecordRef } from "./RecordRef"
 
 interface LinkedTasksPanelProps {
   linkedTasks: Task[]
@@ -148,6 +149,7 @@ export default function LinkedTasksPanel({
                           {task.title}
                         </p>
                         <div className="flex items-center gap-2 mt-1 flex-wrap">
+                          <RecordRef value={task.ref} />
                           {task.brand && (
                             <span className="inline-flex items-center px-2 py-0.5 text-[10px] font-medium rounded bg-gray-100 text-gray-600">
                               {task.brand}

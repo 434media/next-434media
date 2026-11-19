@@ -23,6 +23,7 @@ import { AskRefused } from "./edits"
 import type { AskData, AskDeps, AskPerson, FindKind, TriageDecisionValue } from "./run"
 import type { ConfirmDeps } from "./confirm"
 import { askMonthlyCapUsd, askSpendOf } from "./limits"
+import { parseRef } from "../record-refs"
 
 const LIMIT = 10
 const str = (v: unknown) => (typeof v === "string" ? v : "")
@@ -101,6 +102,23 @@ export function liveAskData(session: User, viewer: Viewer): AskData {
     async find(query, kinds: FindKind[]) {
       const q = query.trim().toLowerCase()
       const out: Record<string, unknown> = {}
+      // A short reference (TSK-142, OPP-1045) is an exact lookup of that one record.
+      const asRef = parseRef(query, { strict: true })
+      if (asRef) {
+        if (!crm) return { note: "References name tasks and opportunities, which this person cannot see." }
+        if (asRef.type === "OPP") {
+          const { getOpportunityByRef } = await import("../firestore-crm")
+          const c = await getOpportunityByRef(asRef.ref)
+          out.opportunities = c ? [{ id: c.id, ref: c.ref, name: c.title || c.company_name || c.name, company: c.company_name || c.name, stage: c.disposition ?? null, brand: c.brand, archived: c.is_archived || undefined, from_ref: c.from_ref }] : []
+        } else if (asRef.type === "TSK") {
+          const { getTaskByRef } = await import("../firestore-crm")
+          const t = await getTaskByRef(asRef.ref)
+          out.tasks = t ? [{ id: t.id, ref: t.ref, title: t.title, assigned_to: t.assigned_to, status: t.status, due_date: t.due_date || null }] : []
+        } else {
+          out.note = "Projections do not exist yet."
+        }
+        return out
+      }
       if (kinds.includes("people") || kinds.includes("organizations")) {
         const { getVisibleCoreView } = await import("../core-model/read")
         const view = await getVisibleCoreView(viewer)
@@ -116,14 +134,28 @@ export function liveAskData(session: User, viewer: Viewer): AskData {
       if (crm && kinds.includes("opportunities")) {
         const { getClients } = await import("../firestore-crm")
         out.opportunities = (await getClients()).filter((c) => c.is_opportunity && !c.is_archived && has(q, c.name, c.company_name, c.title)).slice(0, LIMIT)
-          .map((c) => ({ id: c.id, name: c.title || c.company_name || c.name, company: c.company_name || c.name, stage: c.disposition ?? null, brand: c.brand }))
+          .map((c) => ({ id: c.id, ref: c.ref, name: c.title || c.company_name || c.name, company: c.company_name || c.name, stage: c.disposition ?? null, brand: c.brand }))
       }
       if (crm && kinds.includes("tasks")) {
         const { getUnifiedTasks } = await import("../firestore-crm")
         out.tasks = (await getUnifiedTasks()).filter((t) => has(q, t.title, t.assigned_to, t.client_name)).slice(0, LIMIT)
-          .map((t) => ({ id: t.id, title: t.title, assigned_to: t.assigned_to, status: t.status, due_date: t.due_date || null }))
+          .map((t) => ({ id: t.id, ref: t.ref, title: t.title, assigned_to: t.assigned_to, status: t.status, due_date: t.due_date || null }))
       }
       return out
+    },
+
+    async resolveRef(ref: string) {
+      const parsed = parseRef(ref)
+      if (!crm || !parsed) return null
+      if (parsed.type === "OPP") {
+        const c = await (await import("../firestore-crm")).getOpportunityByRef(parsed.ref)
+        return c && c.is_opportunity ? { kind: "opportunity" as const, id: c.id } : null
+      }
+      if (parsed.type === "TSK") {
+        const t = await (await import("../firestore-crm")).getTaskByRef(parsed.ref)
+        return t ? { kind: "task" as const, id: t.id } : null
+      }
+      return null
     },
 
     async triage(activityId: string, decision: TriageDecisionValue) {

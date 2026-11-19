@@ -23,6 +23,7 @@ import type {
   TaskComment,
 } from "../types/crm-types"
 import { CRM_COLLECTIONS } from "../types/crm-types"
+import { assignRefIfMissing, createWithRef, firestoreRefStore, parseRef, type RefType } from "./record-refs"
 
 // Re-export collection names
 export { CRM_COLLECTIONS } from "../types/crm-types"
@@ -174,6 +175,26 @@ async function createDocument<T>(
     return result
   } catch (error) {
     console.error("Error creating document in collection:", collectionName, error)
+    throw new Error("Failed to create in collection: " + String(collectionName))
+  }
+}
+
+// Create a document and give it a short reference (TSK-/OPP-) in the same transaction (lib/record-refs.ts).
+async function createDocumentWithRef<T>(
+  collectionName: string,
+  type: RefType,
+  data: Omit<T, "id" | "created_at" | "updated_at">,
+): Promise<T> {
+  try {
+    const db = getDb()
+    const now = admin.firestore.FieldValue.serverTimestamp()
+    const { id } = await createWithRef(firestoreRefStore(db), collectionName, type, { ...(data as Record<string, unknown>), created_at: now, updated_at: now }, { now })
+    invalidateCache(collectionName)
+    const result = docToData<T>(await db.collection(collectionName).doc(id).get())
+    if (!result) throw new Error("Failed to retrieve created document")
+    return result
+  } catch (error) {
+    console.error("Error creating document with a reference in collection:", collectionName, error)
     throw new Error("Failed to create in collection: " + String(collectionName))
   }
 }
@@ -361,6 +382,8 @@ function normalizeClientData(rawData: Record<string, unknown>): ClientRecord {
     pitch_value: (rawData.pitch_value || rawData.deal_value || 0) as number,
     source: (rawData.source || rawData.lead_source || "") as string,
     is_opportunity: (rawData.is_opportunity || false) as boolean,
+    ref: parseRef(rawData.ref)?.ref,
+    from_ref: parseRef(rawData.from_ref)?.ref,
     client_id: (rawData.client_id || undefined) as string | undefined,
     disposition: (rawData.disposition || undefined) as ClientRecord["disposition"],
     doc: (rawData.doc || undefined) as ClientRecord["doc"],
@@ -387,17 +410,40 @@ export async function getClientById(id: string): Promise<ClientRecord | null> {
   return rawClient ? normalizeClientData(rawClient) : null
 }
 
+// An opportunity gets an OPP reference when it is created. A client is never given one. `ref` and `from_ref` are the
+// store's to write: a caller cannot set or change them.
 export async function createClient(
   data: Omit<ClientRecord, "id" | "created_at" | "updated_at">
 ): Promise<ClientRecord> {
-  return createDocument<ClientRecord>(CLIENTS_COLLECTION, data)
+  const rest = stripRefFields(data)
+  return data.is_opportunity
+    ? createDocumentWithRef<ClientRecord>(CLIENTS_COLLECTION, "OPP", rest)
+    : createDocument<ClientRecord>(CLIENTS_COLLECTION, rest)
 }
 
 export async function updateClient(
   id: string,
   updates: Partial<ClientRecord>
 ): Promise<ClientRecord> {
-  return updateDocument<ClientRecord>(CLIENTS_COLLECTION, id, updates)
+  const rest = stripRefFields(updates)
+  // A record that becomes an opportunity by this update gets its OPP reference. One that already was an opportunity
+  // is left as it is: an older opportunity without a reference gets one only through the backfill, which waits on the
+  // founder's rule for what survives the CRM triage (scripts/refs/backfill.ts).
+  const becomesOpportunity = rest.is_opportunity === true && !(await getById<Record<string, unknown>>(CLIENTS_COLLECTION, id))?.is_opportunity
+  const updated = await updateDocument<ClientRecord>(CLIENTS_COLLECTION, id, rest)
+  if (!becomesOpportunity) return updated
+  const assigned = await assignRefIfMissing(firestoreRefStore(getDb()), CLIENTS_COLLECTION, id, "OPP", { now: admin.firestore.FieldValue.serverTimestamp() })
+  invalidateCache(CLIENTS_COLLECTION)
+  return assigned ? { ...updated, ref: assigned.ref } : updated
+}
+
+/** The opportunity a reference names (`OPP-1045`), or null. */
+export async function getOpportunityByRef(input: string): Promise<ClientRecord | null> {
+  const parsed = parseRef(input)
+  if (!parsed || parsed.type !== "OPP") return null
+  const snap = await getDb().collection(CLIENTS_COLLECTION).where("ref", "==", parsed.ref).limit(1).get()
+  const doc = snap.docs[0]
+  return doc ? normalizeClientData({ ...doc.data(), id: doc.id }) : null
 }
 
 export async function deleteClient(id: string): Promise<void> {
@@ -601,6 +647,8 @@ function clientOpportunityToOpportunity(c: ClientRecord): Opportunity {
     // The opportunity's FK to its parent client row. Previously this was set to
     // c.id (self), which made getOpportunitiesByClient never match a real client.
     name: c.title || c.company_name || c.name || "Untitled opportunity",
+    ref: c.ref,
+    from_ref: c.from_ref,
     client_id: c.client_id || "",
     client_name: c.company_name || c.name,
     stage,
@@ -792,7 +840,7 @@ export async function createTask(
   owner: TaskOwner,
   data: Omit<Task, "id" | "created_at" | "updated_at">
 ): Promise<Task> {
-  const result = await createDocument<Task>(TASK_COLLECTIONS[owner], data)
+  const result = await createDocumentWithRef<Task>(TASK_COLLECTIONS[owner], "TSK", stripRefFields(data))
   // Also invalidate combined tasks cache
   cache.delete("all_tasks_combined")
   return result
@@ -803,7 +851,7 @@ export async function updateTask(
   id: string,
   updates: Partial<Task>
 ): Promise<Task> {
-  const result = await updateDocument<Task>(TASK_COLLECTIONS[owner], id, updates)
+  const result = await updateDocument<Task>(TASK_COLLECTIONS[owner], id, stripRefFields(updates))
   // Also invalidate combined tasks cache
   cache.delete("all_tasks_combined")
   return result
@@ -1565,6 +1613,25 @@ export async function getUnifiedTasks(filters?: UnifiedTaskFilters): Promise<Tas
   return tasks
 }
 
+/** `ref` and `from_ref` are the store's to write: a caller cannot set or change them on a task or an opportunity. */
+function stripRefFields<T extends object>(data: T): T {
+  return Object.fromEntries(Object.entries(data).filter(([k]) => k !== "ref" && k !== "from_ref")) as T
+}
+
+/** The task a reference names (`TSK-142`), or null. Before the unified-tasks migration it looks in each legacy collection. */
+export async function getTaskByRef(input: string): Promise<Task | null> {
+  const parsed = parseRef(input)
+  if (!parsed || parsed.type !== "TSK") return null
+  const db = getDb()
+  const collections = (await isTaskMigrationCompleted()) ? [UNIFIED_TASKS] : Object.values(TASK_COLLECTIONS)
+  for (const name of collections) {
+    const snap = await db.collection(name).where("ref", "==", parsed.ref).limit(1).get()
+    const doc = snap.docs[0]
+    if (doc) return { id: doc.id, ...doc.data() } as Task
+  }
+  return null
+}
+
 export async function getUnifiedTaskById(id: string): Promise<Task | null> {
   const migrated = await isTaskMigrationCompleted()
   if (migrated) {
@@ -1590,14 +1657,10 @@ export async function createUnifiedTask(
     const db = getDb()
     const FieldValue = admin.firestore.FieldValue
     const now = FieldValue.serverTimestamp()
-    const docRef = await db.collection(UNIFIED_TASKS).add({
-      ...data,
-      created_at: now,
-      updated_at: now,
-    })
+    const { id } = await createWithRef(firestoreRefStore(db), UNIFIED_TASKS, "TSK", { ...stripRefFields(data), created_at: now, updated_at: now }, { now })
     invalidateCache(UNIFIED_TASKS)
     cache.delete("all_tasks_combined")
-    const snap = await docRef.get()
+    const snap = await db.collection(UNIFIED_TASKS).doc(id).get()
     return { id: snap.id, ...snap.data() } as Task
   }
   // Legacy path: route to per-rep collection based on assigned_to
@@ -1611,7 +1674,7 @@ export async function updateUnifiedTask(id: string, updates: Partial<Task>): Pro
     const db = getDb()
     const FieldValue = admin.firestore.FieldValue
     const cleanUpdates: Record<string, unknown> = {}
-    for (const [key, value] of Object.entries(updates)) {
+    for (const [key, value] of Object.entries(stripRefFields(updates))) {
       if (key === "id" || key === "created_at") continue
       if (value === null) cleanUpdates[key] = FieldValue.delete()
       else if (value !== undefined) cleanUpdates[key] = value
