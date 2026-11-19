@@ -89,7 +89,9 @@ export async function GET() {
           date: c.next_followup_date.split("T")[0],
           bucket: b,
           detail: `Opportunity · ${c.disposition ?? "discovery"}`,
-          href: `/admin/opportunities?tab=pipeline`,
+          // Open this exact record: the pipeline's owner filter defaults to the
+          // signed-in user, so a bare ?tab=pipeline hides other owners' deals.
+          href: `/admin/opportunities?tab=pipeline&openOpportunity=${encodeURIComponent(c.id)}`,
         })
     }
 

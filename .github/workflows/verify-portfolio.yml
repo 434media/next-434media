@@ -256,6 +256,10 @@ jobs:
       # The hourly Firestore -> Mailchimp push sends only new or changed contacts, all of them once a day, and stops at a
       # time budget inside maxDuration; errored or deferred contacts are retried the next run.
       - run: tsx --test lib/__tests__/mailchimp-push-plan.test.ts
+      # Opportunities page (founder report 2026-11-19): saving a deal (Closed Lost included) closes its drawer for
+      # good and reloads past the list cache; a failed save stays open with the server's error; a follow-up card opens
+      # its exact deal whatever the pipeline's owner filter says.
+      - run: tsx --test lib/__tests__/opportunity-save-navigation.test.ts
 
       # Optional: the same suites again on MilCityUSA's real published profile, when the BRAND_PROFILE_FIXTURE Actions
       # secret holds a published version's 434-context backup record. Secrets are not given to pull requests from

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { useSearchParams, useRouter, usePathname } from "next/navigation"
 import { AdminRoleGuard } from "@/components/AdminRoleGuard"
 import { HowItWorks } from "@/components/admin/HowItWorks"
@@ -262,9 +262,9 @@ function SalesCRMPageInner() {
     }
   }
 
-  const loadClients = async () => {
+  const loadClients = async (options?: { fresh?: boolean }) => {
     try {
-      const response = await fetch("/api/admin/crm/clients")
+      const response = await fetch(options?.fresh ? "/api/admin/crm/clients?fresh=1" : "/api/admin/crm/clients")
       if (!response.ok) throw new Error("Failed to fetch clients")
       const data = await response.json()
       const allClients = data.clients || []
@@ -450,6 +450,21 @@ function SalesCRMPageInner() {
     setViewMode,
   })
 
+  // Remember a drawer whose deep link was just closed or saved, until the URL
+  // catches up, so a list reload cannot reopen it (same guard as /admin/content).
+  const dismissedClientIdRef = useRef<string | null>(null)
+  const dismissedOpportunityIdRef = useRef<string | null>(null)
+  const dropParam = (key: "open" | "openOpportunity") => {
+    const current = searchParams?.get(key)
+    if (!current) return
+    if (key === "open") dismissedClientIdRef.current = current
+    else dismissedOpportunityIdRef.current = current
+    const params = new URLSearchParams(searchParams?.toString() ?? "")
+    params.delete(key)
+    const qs = params.toString()
+    router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false })
+  }
+
   // ---- Hook: Client/Opportunity/Content handlers ----
   const {
     isSaving,
@@ -485,6 +500,8 @@ function SalesCRMPageInner() {
     setLinkedTasks,
     setLinkedClientForPanel,
     setShowLinkedTasksPanel,
+    onClientSaved: () => dropParam("open"),
+    onOpportunitySaved: () => dropParam("openOpportunity"),
   })
 
   // ======== useEffects ========
@@ -530,6 +547,7 @@ function SalesCRMPageInner() {
   const openClientId = searchParams?.get("open") ?? null
   useEffect(() => {
     if (!openClientId) {
+      dismissedClientIdRef.current = null
       // URL says no drawer should be open. If our local state is open, close it.
       if (showClientForm) {
         setShowClientForm(false)
@@ -539,6 +557,8 @@ function SalesCRMPageInner() {
     }
     // URL has ?open= but the matching client may not be loaded yet. Wait.
     if (clients.length === 0) return
+    // A reload after Save/Close must not reopen it while ?open= waits on router.replace.
+    if (dismissedClientIdRef.current === openClientId) return
     const target = clients.find((c) => c.id === openClientId)
     if (!target) return // client doesn't exist or isn't visible to this user
     if (editingClient?.id === openClientId && showClientForm) return // already open on this client
@@ -551,12 +571,7 @@ function SalesCRMPageInner() {
     setShowClientForm(false)
     setEditingClient(null)
     setClientInitialTab("edit")  // reset so the next normal open lands on Edit
-    if (searchParams?.get("open")) {
-      const params = new URLSearchParams(searchParams.toString())
-      params.delete("open")
-      const qs = params.toString()
-      router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false })
-    }
+    dropParam("open")
   }
 
   // Keep ?open= in sync when the drawer opens via direct interaction
@@ -665,6 +680,7 @@ function SalesCRMPageInner() {
   const openOpportunityId = searchParams?.get("openOpportunity") ?? null
   useEffect(() => {
     if (!openOpportunityId) {
+      dismissedOpportunityIdRef.current = null
       if (showOpportunityForm) {
         setShowOpportunityForm(false)
         setIsEditingOpportunity(false)
@@ -672,6 +688,8 @@ function SalesCRMPageInner() {
       return
     }
     if (clients.length === 0) return
+    // A reload after Save/Close must not reopen it while the param waits on router.replace.
+    if (dismissedOpportunityIdRef.current === openOpportunityId) return
     const target = clients.find((c) => c.id === openOpportunityId && c.is_opportunity)
     if (!target) return
     if (opportunityForm.existing_company_id === openOpportunityId && showOpportunityForm) return
@@ -682,12 +700,7 @@ function SalesCRMPageInner() {
   const closeOpportunityDrawer = () => {
     setShowOpportunityForm(false)
     setIsEditingOpportunity(false)
-    if (searchParams?.get("openOpportunity")) {
-      const params = new URLSearchParams(searchParams.toString())
-      params.delete("openOpportunity")
-      const qs = params.toString()
-      router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false })
-    }
+    dropParam("openOpportunity")
   }
 
   useEffect(() => {

@@ -58,8 +58,12 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ success: true, clients })
     }
 
-    // Get all clients
-    const clients = await getClients()
+    // Get all clients. ?fresh=1 skips the 30s list cache: that cache lives in
+    // one server instance's memory, so the instance that served a save clears
+    // it but another instance can still answer the reload after the save with
+    // the pre-save record. The page asks for a fresh read right after a write.
+    const fresh = searchParams.get("fresh") === "1"
+    const clients = await getClients(fresh ? { fresh: true } : undefined)
     return NextResponse.json({ success: true, clients })
   } catch (error) {
     console.error("Error fetching clients:", error)
