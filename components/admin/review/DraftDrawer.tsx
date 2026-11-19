@@ -10,7 +10,7 @@
 import { useEffect, useState } from "react"
 import { AlertTriangle, Pencil } from "lucide-react"
 import { DetailDrawer } from "@/components/admin/DetailDrawer"
-import type { ReviewItem } from "@/lib/agent/review"
+import { shortFlag, type ReviewItem } from "@/lib/agent/review"
 
 /** One draft as "Waiting on you" reads it (lib/agent/review-server.ts WaitingItem). */
 export type DraftItem = ReviewItem & {
@@ -86,7 +86,32 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   )
 }
 
+function FlagNote({ flag }: { flag: string }) {
+  const [open, setOpen] = useState(false)
+  const { short, truncated } = shortFlag(flag)
+  return (
+    <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+      <AlertTriangle className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+      <p className="min-w-0">
+        {open ? flag : short}
+        {truncated && (
+          <button onClick={() => setOpen((v) => !v)} className="ml-1 font-medium underline underline-offset-2 hover:text-amber-950">
+            {open ? "Less" : "More"}
+          </button>
+        )}
+      </p>
+    </div>
+  )
+}
+
 export type DraftOutcome = { type: "success" | "error"; message: string; changed: boolean }
+
+/** The toast after a dismissal, from POST /api/admin/review/dismiss. */
+export function dismissOutcome(body: Record<string, unknown>): DraftOutcome {
+  const warnings = Array.isArray(body.warnings) ? (body.warnings as string[]) : []
+  if (warnings.length) return { type: "error", message: `Dismissed; nothing was sent. But: ${warnings.join("; ")}`, changed: true }
+  return { type: "success", message: "Dismissed as spam or a solicitation. Nothing was sent, and this sender's next arrivals get no draft.", changed: true }
+}
 
 async function call(url: string, method: "POST" | "PATCH", body: unknown): Promise<{ ok: boolean; body: Record<string, unknown> }> {
   const res = await fetch(url, { method, headers: { "content-type": "application/json" }, body: JSON.stringify(body) })
@@ -104,6 +129,8 @@ export function DraftDrawer({ item, onClose, onDone, onEdited }: { item: DraftIt
   // Reject confirms on the page, not with window.confirm: a browser that silences dialogs made the click do nothing
   // (proof run, 2026-11-17).
   const [confirmingReject, setConfirmingReject] = useState(false)
+  // Dismiss: spam or solicitation (founder, 2026-11-19) asks once, on the page, like Reject.
+  const [confirmingDismiss, setConfirmingDismiss] = useState(false)
 
   // A new draft opened: start clean. An edited one defaults to "Edited, then approved".
   useEffect(() => {
@@ -113,6 +140,8 @@ export function DraftDrawer({ item, onClose, onDone, onEdited }: { item: DraftIt
     setReason("")
     setError(null)
     setShowRecord(false)
+    setConfirmingReject(false)
+    setConfirmingDismiss(false)
   }, [item?.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!item) return <DetailDrawer open={false} onClose={onClose} title="">{null}</DetailDrawer>
@@ -169,6 +198,28 @@ export function DraftDrawer({ item, onClose, onDone, onEdited }: { item: DraftIt
     }
   }
 
+  async function dismissNow() {
+    if (!item?.activityId) return
+    if (!confirmingDismiss) {
+      setConfirmingReject(false)
+      setConfirmingDismiss(true)
+      return
+    }
+    setConfirmingDismiss(false)
+    setBusy(true)
+    setError(null)
+    try {
+      const r = await call("/api/admin/review/dismiss", "POST", { activityId: item.activityId, approvalId: item.id, shownHash: item.hash, ...(reason.trim() ? { reason } : {}) })
+      if (!r.ok) {
+        setError(String(r.body.error ?? "The dismissal was not recorded"))
+        return
+      }
+      onDone(dismissOutcome(r.body))
+    } finally {
+      setBusy(false)
+    }
+  }
+
   const a = item.arrival
   return (
     <DetailDrawer
@@ -202,6 +253,8 @@ export function DraftDrawer({ item, onClose, onDone, onEdited }: { item: DraftIt
             <div className="flex flex-wrap items-center justify-end gap-2">
               <span className="mr-auto text-xs text-neutral-500">{editing
                   ? "Save or cancel the edit first."
+                  : confirmingDismiss
+                    ? "Dismiss as spam or a solicitation? Nothing is sent, the arrival leaves To do, and this sender's next arrivals get no draft."
                   : confirmingReject
                     ? "Reject this draft? It will never be sent; a new draft is needed to reply."
                     : !reason.trim()
@@ -209,10 +262,25 @@ export function DraftDrawer({ item, onClose, onDone, onEdited }: { item: DraftIt
                       : decision === "approved"
                         ? "Sends to the address above once you approve. To reject, pick a reason under “Reject because”."
                         : "A rejected draft never sends."}</span>
+              {item.activityId && (
+                <button
+                  disabled={!pending || busy || editing}
+                  title="Sends nothing. Closes the arrival and skips drafts for this sender from now on."
+                  onClick={() => void dismissNow()}
+                  className="rounded-md border border-neutral-300 bg-white px-3 py-2 text-xs font-medium text-neutral-900 hover:bg-neutral-50 disabled:opacity-40"
+                >
+                  {confirmingDismiss ? "Confirm dismiss" : "Dismiss: spam or solicitation"}
+                </button>
+              )}
+              {confirmingDismiss && (
+                <button onClick={() => setConfirmingDismiss(false)} className="rounded-md px-3 py-1.5 text-xs font-medium text-neutral-500 hover:bg-neutral-100">
+                  Cancel
+                </button>
+              )}
               <button
                 disabled={!ready || decision !== "rejected"}
                 title={decision !== "rejected" ? "Pick a reason under “Reject because” to reject" : undefined}
-                onClick={() => void decideNow("rejected")}
+                onClick={() => { setConfirmingDismiss(false); void decideNow("rejected") }}
                 className="rounded-md border border-neutral-300 bg-white px-3 py-2 text-xs font-medium text-neutral-900 hover:bg-neutral-50 disabled:opacity-40"
               >
                 {confirmingReject ? "Confirm reject" : "Reject"}
@@ -238,7 +306,8 @@ export function DraftDrawer({ item, onClose, onDone, onEdited }: { item: DraftIt
         ) : undefined
       }
     >
-      <div className="space-y-5">
+      {/* The body's inset matches the header's (DetailDrawer: px-4, sm:px-5); the shared drawer leaves padding to its users. */}
+      <div className="space-y-5 px-4 py-4 sm:px-5 sm:py-5">
         <div className="grid grid-cols-2 gap-3">
           <Field label="Arrived">{when(item.receivedAt ?? a?.occurredAt)}</Field>
           <Field label="Routing">{item.outcome ? OUTCOME_LABEL[item.outcome] ?? item.outcome : null}</Field>
@@ -251,11 +320,8 @@ export function DraftDrawer({ item, onClose, onDone, onEdited }: { item: DraftIt
           <div className="text-[10px] font-medium uppercase tracking-wide text-neutral-400">Why this is here</div>
           <p className="mt-0.5 text-sm text-neutral-800">{item.reviewReason}</p>
         </div>
-        {item.flag && (
-          <p className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
-            <AlertTriangle className="w-3.5 h-3.5 mt-0.5 shrink-0" /> {item.flag}
-          </p>
-        )}
+        {item.flag && <FlagNote flag={item.flag} />}
+        {item.precheck && <p className="rounded-lg border border-neutral-200 bg-neutral-50 px-3 py-2 text-xs text-neutral-600">{item.precheck}</p>}
         <div>
           <div className="text-[10px] font-medium uppercase tracking-wide text-neutral-400">Their message</div>
           <p className="mt-1 whitespace-pre-wrap text-sm text-neutral-800">{a?.body || "—"}</p>

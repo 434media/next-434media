@@ -14,6 +14,7 @@ import { firestoreAgentDb } from "./ledger-server"
 import { AGENT_SKILLS_COLLECTION, INTAKE_SKILL, queueIntake, runIntake, type ArrivalMark, type IntakeDeps, type IntakeSubmission, type SkillPin } from "./intake"
 import { vercelSandbox } from "./skill-scripts"
 import { monthlyCapUsd } from "../spend-caps"
+import { DISMISSED_SENDERS_COLLECTION, type DismissedSenders } from "./solicitation"
 
 const str = (v: unknown) => (typeof v === "string" ? v : undefined)
 
@@ -95,6 +96,19 @@ export async function readArrivalMark(formId: string, email: string): Promise<Ar
   }
 }
 
+/** Every sender and company domain the founder dismissed (small: one row per dismissal). Throws on a read error. */
+export async function readDismissedSenders(): Promise<DismissedSenders> {
+  const { getDb } = await import("../firebase-admin")
+  const snap = await getDb().collection(DISMISSED_SENDERS_COLLECTION).limit(5000).get()
+  const emails = new Set<string>(), domains = new Set<string>()
+  for (const d of snap.docs) {
+    const x = d.data() as { email?: unknown; domain?: unknown }
+    if (typeof x.email === "string" && x.email) emails.add(x.email)
+    if (typeof x.domain === "string" && x.domain) domains.add(x.domain)
+  }
+  return { emails, domains }
+}
+
 export function liveIntakeDeps(): IntakeDeps {
   return {
     db: firestoreAgentDb(),
@@ -104,6 +118,7 @@ export function liveIntakeDeps(): IntakeDeps {
     submission: readSubmission,
     decisions: readDecisionMemory,
     arrivalMark: readArrivalMark,
+    dismissedSenders: readDismissedSenders,
     // A slug resolves through the guarded Gateway, the AI SDK's default provider (instrumentation.ts).
     model: (slug) => slug as LanguageModel,
     taskSpend: async (root) => (await import("../engine/cost-ledger")).readTaskSpend(root),

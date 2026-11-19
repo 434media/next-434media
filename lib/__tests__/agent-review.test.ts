@@ -8,8 +8,9 @@ import assert from "node:assert/strict"
 import { readFileSync } from "node:fs"
 import { join } from "node:path"
 import { CRM_COLLECTIONS } from "../../types/crm-types"
-import { REVIEW_WAIT_LIMIT_MS, costSummary, groupReasons, handoffWaits, reviewItem, runSummary, sortQueue, type StoredApproval } from "../agent/review"
-import { decideApproval } from "../agent/review-server"
+import { FLAG_SHORT, REVIEW_WAIT_LIMIT_MS, shortFlag, costSummary, groupReasons, handoffWaits, reviewItem, runSummary, sortQueue, type StoredApproval } from "../agent/review"
+import { DISMISS_DEFAULT_REASON, decideApproval, dismissSolicitation, type DismissDeps, type DismissedSender } from "../agent/review-server"
+import type { Activity } from "../../types/core-model"
 import { SEND_APPROVALS_COLLECTION, TEST_SINK_RECIPIENTS, sendApprovedEmail } from "../agent/send-email"
 import { createTask, step } from "../agent/ledger-server"
 import { buildEntry, newTask, verifyChain, type AgentTask, type LedgerEntry } from "../agent/ledger"
@@ -176,6 +177,7 @@ test("every queue, switch, pin and exam route runs the founder guard first, and 
     "app/api/admin/review/route.ts",
     "app/api/admin/review/[id]/route.ts",
     "app/api/admin/review/waiting/route.ts",
+    "app/api/admin/review/dismiss/route.ts",
     "app/api/admin/review/[id]/send/route.ts",
     "app/api/admin/agent/controls/route.ts",
     "app/api/admin/agent/skills/pin/route.ts",
@@ -193,4 +195,77 @@ test("every queue, switch, pin and exam route runs the founder guard first, and 
   assert.match(page, /founderPageAccess\("\/admin\/agents"\)/)
   assert.match(page, /forbidden\(\)/)
   assert.match(readFileSync(join(root, "app/admin/review/page.tsx"), "utf8"), /redirect\("\/admin\/todo"\)/)
+})
+
+// ── The flag, short (founder, 2026-11-19) ───────────────────────────────────────────────────────────────────────────
+test("a flag shows its first sentence, at most 160 characters, with the rest one tap away", () => {
+  assert.deepEqual(shortFlag("Agency asks for white-label work; decide whether to waive credit."), { short: "Agency asks for white-label work; decide whether to waive credit.", truncated: false })
+  const long = "Online Marketing Gurus offers a referral partnership; decide whether to answer. They describe commissions, a portfolio of clients and a long pitch about results."
+  assert.deepEqual(shortFlag(long), { short: "Online Marketing Gurus offers a referral partnership; decide whether to answer.", truncated: true })
+  const run = shortFlag("word ".repeat(80))
+  assert.ok(run.truncated && run.short.length <= FLAG_SHORT + 1 && run.short.endsWith("…"))
+})
+
+// ── Dismiss: spam or solicitation (founder, 2026-11-19) ─────────────────────────────────────────────────────────────
+const ARRIVAL = (over: Partial<Activity> = {}) =>
+  ({ id: "contact_forms:f1", type: "form", source: "website_form", occurred_at: NOW, contact: { name: "Pat Vendor", email: "Pat@Gurus.example", company: "Gurus" }, triaged: false, ...over }) as unknown as Activity
+
+function dismissDeps(activity: Activity | null, fail: Partial<Record<keyof DismissDeps, boolean>> = {}) {
+  const calls = { triaged: [] as string[], spam: [] as string[], senders: [] as DismissedSender[], decisions: [] as { id: string; chosen: string }[] }
+  const boom = (k: keyof DismissDeps) => { if (fail[k]) throw new Error(`${k} down`) }
+  const deps: DismissDeps = {
+    activity: async () => activity,
+    triage: async (a) => (boom("triage"), void calls.triaged.push(a.id)),
+    markSpam: async (id) => (boom("markSpam"), void calls.spam.push(id)),
+    recordSender: async (row) => (boom("recordSender"), void calls.senders.push(row)),
+    recordDecision: async (m) => (boom("recordDecision"), void calls.decisions.push(m)),
+  }
+  return { deps, calls }
+}
+
+test("dismissing a draft rejects it as a solicitation, sends nothing, marks the submission spam, records the sender and closes the arrival", async () => {
+  const { db, a: plain } = await drafted()
+  const a = { ...plain, arrival: { formId: "f1", receivedAt: NOW } }
+  await step(db, { taskId: a.taskId, at: at(3), decide: () => ({ fields: { kind: "draft_queued", actor: "system", refs: { approval: a.id } }, write: (tx) => tx.setDoc(SEND_APPROVALS_COLLECTION, a.id, a) }) })
+  const { deps, calls } = dismissDeps(ARRIVAL())
+  const out = await dismissSolicitation({ activityId: "contact_forms:f1", approvalId: a.id, shownHash: a.hash, actor: "founder@example.test" }, deps, at(HOUR), db)
+  assert.deepEqual(out, { dismissed: true, activityId: "contact_forms:f1", draftRejected: true, leftInbox: true, warnings: [] })
+  const stored = db.get<StoredApproval>(SEND_APPROVALS_COLLECTION, a.id)!
+  assert.equal(stored.rejection?.reasonCode, "solicitation")
+  assert.equal(stored.rejection?.reason, DISMISS_DEFAULT_REASON)
+  assert.equal(db.task(a.taskId)!.state, "rejected")
+  assert.match(db.get<{ chosen: string }>(CRM_COLLECTIONS.DECISIONS, `dec-${a.id}`)!.chosen, /Dismissed the arrival as spam or a solicitation; no reply/)
+  assert.deepEqual(calls.spam, ["f1"])
+  assert.deepEqual(calls.senders.map((r) => [r.email, r.domain, r.formId]), [["pat@gurus.example", "gurus.example", "f1"]])
+  assert.deepEqual(calls.triaged, ["contact_forms:f1"])
+  assert.equal(calls.decisions.length, 0, "the rejection wrote the decision memory")
+  // Nothing sends: the rejected draft is refused by the send path.
+  const r = await sendApprovedEmail(a.id, { db, controls: async () => parseControls({ stopped: false, sends: { intake_reply: true } }), dispatch: async () => ({ messageId: "x" }), now: () => at(2 * HOUR), runId: "r", actor: "founder" })
+  assert.equal(r.sent, false)
+})
+
+test("dismissing an arrival held with no draft records the decision; a free-mail sender is recorded without a domain", async () => {
+  const db = new MemoryAgentDb()
+  const { deps, calls } = dismissDeps(ARRIVAL({ contact: { email: "x@gmail.com" } } as Partial<Activity>))
+  const out = await dismissSolicitation({ activityId: "contact_forms:f1", reason: "SEO pitch", actor: "founder@example.test" }, deps, at(HOUR), db)
+  assert.equal(out.draftRejected, false)
+  assert.deepEqual(calls.decisions.map((d) => [d.id, d.chosen]), [["dec-dismiss-f1", "Dismissed the arrival as spam or a solicitation; no reply was sent"]])
+  assert.deepEqual(calls.senders.map((r) => [r.email, r.domain]), [["x@gmail.com", ""]])
+  assert.deepEqual(calls.spam, ["f1"])
+  assert.deepEqual(calls.triaged, ["contact_forms:f1"])
+})
+
+test("a dismissal is refused for another kind of arrival, a draft for a different arrival, or a changed draft; a later step that fails is a warning", async () => {
+  const { db, a: plain } = await drafted()
+  const a = { ...plain, arrival: { formId: "other", receivedAt: NOW } }
+  await step(db, { taskId: a.taskId, at: at(3), decide: () => ({ fields: { kind: "draft_queued", actor: "system", refs: { approval: a.id } }, write: (tx) => tx.setDoc(SEND_APPROVALS_COLLECTION, a.id, a) }) })
+  await assert.rejects(dismissSolicitation({ activityId: "phone:1", actor: "f" }, dismissDeps(ARRIVAL()).deps, at(HOUR), db), /website-form arrival/)
+  await assert.rejects(dismissSolicitation({ activityId: "contact_forms:f1", approvalId: a.id, shownHash: a.hash, actor: "f" }, dismissDeps(ARRIVAL()).deps, at(HOUR), db), /different arrival/)
+  await assert.rejects(dismissSolicitation({ activityId: "contact_forms:other", approvalId: a.id, shownHash: "0".repeat(64), actor: "f" }, dismissDeps(ARRIVAL({ id: "contact_forms:other" } as Partial<Activity>)).deps, at(HOUR), db), /changed since it was shown/)
+  await assert.rejects(dismissSolicitation({ activityId: "contact_forms:f9", actor: "f" }, dismissDeps(null).deps, at(HOUR), db), /not in the inbox/)
+  const { deps, calls } = dismissDeps(ARRIVAL(), { markSpam: true, triage: true })
+  const out = await dismissSolicitation({ activityId: "contact_forms:f1", actor: "f" }, deps, at(HOUR), new MemoryAgentDb())
+  assert.equal(out.leftInbox, false)
+  assert.equal(out.warnings.length, 2)
+  assert.equal(calls.senders.length, 1, "the sender is still recorded")
 })
