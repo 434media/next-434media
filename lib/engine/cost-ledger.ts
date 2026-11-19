@@ -57,7 +57,7 @@ export async function recordCallCost(rec: CallCostRecord): Promise<void> {
     )
     await batch.commit()
   } catch (e) {
-    console.error(`[engine:cost] Failed to record a call's cost (task ${rec.task}, ${rec.model}):`, e)
+    console.error("[engine:cost] Failed to record a call's cost (task %s, %s):", rec.task, rec.model, e)
   }
 }
 
