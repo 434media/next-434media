@@ -109,6 +109,8 @@
 /lib/record-refs-backfill.ts                 @434media/founder
 /lib/__tests__/record-refs.test.ts           @434media/founder
 /scripts/refs/                               @434media/founder
+/lib/record-refs-backfill-server.ts          @434media/founder
+/app/api/admin/refs/                         @434media/founder
 /lib/firestore-people.ts                     @434media/founder
 /lib/firestore-activities.ts                 @434media/founder
 /app/api/admin/core/                         @434media/founder

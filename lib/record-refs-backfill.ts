@@ -1,21 +1,19 @@
 /**
- * Which existing records the reference backfill numbers (scripts/refs/backfill.ts).
+ * Which existing records get a short reference (TSK-/OPP-) without being created anew: the backfill
+ * (scripts/refs/backfill.ts, GET /api/admin/refs/backfill-plan) and a record reopened later.
  *
- * The founder, 2026-10-27: "a reference backfill applies only to what survives the triage". Canon does not yet say
- * what surviving the CRM triage means, so the rule below is PROPOSED, AWAITING THE FOUNDER. It lives in one function,
- * `survivesTriage`, so changing it is one edit, and the backfill refuses to write while `TRIAGE_RULE_STATUS` is
- * "proposed".
- *
- * Proposed rule: a record survives when it is live in the store the new model reads.
- * - a task: in the unified `crm_tasks` collection, not completed and not archived;
- * - an opportunity: a `crm_clients` record marked `is_opportunity`, not archived and not closed as lost.
- * Everything else (completed tasks, archived or lost opportunities, the legacy per-person task collections) gets no
- * number from the backfill.
+ * The rule, DECIDED by the founder on 2026-11-19 ("yes"; run log `05 Run Logs/2026-11-19-1524-short-references.md`):
+ * - a task survives the CRM triage when it is open: not completed and not archived, in the task store the CRM reads
+ *   (the unified `crm_tasks` once its migration has run, the per-person collections before);
+ * - an opportunity survives when it is not archived and not closed as lost;
+ * - a closed or archived record gets a reference only if it is reopened (`numberOnUpdate`).
+ * "Archived" and "an opportunity" are read as the pipeline reads them (next-434media#347): truthy, not `=== true`.
+ * The rule lives in `survivesTriage`, one function, so changing it is one edit.
  */
-import { parseRef, type RefType } from "./record-refs"
+import { formatRef, nextNumberFrom, parseRef, type RefType } from "./record-refs"
 
-/** "proposed" until the founder decides the rule; the backfill writes nothing while it is. */
-export const TRIAGE_RULE_STATUS: "proposed" | "approved" = "proposed"
+/** The founder decided the rule on 2026-11-19; the backfill's write still needs his separate go. */
+export const TRIAGE_RULE_STATUS: "proposed" | "approved" = "approved"
 
 export interface BackfillCandidate {
   collection: string
@@ -26,21 +24,33 @@ export interface BackfillCandidate {
 
 export type Verdict = { keep: true } | { keep: false; reason: string }
 
-/** THE RULE. Proposed, awaiting the founder (see the header). */
+const CLOSED_TASK_STATUSES = new Set(["completed", "done"])
+
+/** THE RULE (decided; see the header). */
 export function survivesTriage(c: BackfillCandidate): Verdict {
   const d = c.data
-  if (d.is_archived === true) return { keep: false, reason: "archived" }
+  if (d.is_archived) return { keep: false, reason: "archived" }
   if (c.type === "TSK") {
-    if (c.collection !== "crm_tasks") return { keep: false, reason: "not in the unified task store" }
-    if (d.status === "completed" || d.status === "done") return { keep: false, reason: "completed" }
+    if (typeof d.status === "string" && CLOSED_TASK_STATUSES.has(d.status)) return { keep: false, reason: "completed" }
     return { keep: true }
   }
   if (c.type === "OPP") {
-    if (c.collection !== "crm_clients" || d.is_opportunity !== true) return { keep: false, reason: "not an opportunity record" }
+    if (c.collection !== "crm_clients" || !d.is_opportunity) return { keep: false, reason: "not an opportunity record" }
     if (d.disposition === "closed_lost") return { keep: false, reason: "closed as lost" }
     return { keep: true }
   }
   return { keep: false, reason: `no backfill for ${c.type}` }
+}
+
+/**
+ * Whether an update should give a record its reference: it has none, it did not survive the rule before the update,
+ * and it does after. That is a reopened record (un-archived, moved off closed-lost, a task moved off completed) or a
+ * client that has just become an opportunity. An open record that merely lacks a reference is left to the backfill.
+ */
+export function numberOnUpdate(before: BackfillCandidate | null, after: BackfillCandidate): boolean {
+  if (parseRef(after.data.ref)) return false
+  if (!survivesTriage(after).keep) return false
+  return !before || !survivesTriage(before).keep
 }
 
 /** Milliseconds for ordering; a Firestore Timestamp, an ISO string, or anything else (sorted last). */
@@ -52,6 +62,11 @@ function createdMs(v: unknown): number {
   const ts = v as { toMillis?: () => number } | null
   if (ts && typeof ts.toMillis === "function") return ts.toMillis()
   return Number.MAX_SAFE_INTEGER
+}
+
+function createdIso(v: unknown): string | null {
+  const ms = createdMs(v)
+  return ms === Number.MAX_SAFE_INTEGER ? null : new Date(ms).toISOString()
 }
 
 /**
@@ -75,4 +90,49 @@ export function planBackfill(candidates: BackfillCandidate[]): {
   }
   assign.sort((a, b) => createdMs(a.data.created_at) - createdMs(b.data.created_at) || a.id.localeCompare(b.id))
   return { assign, skipped }
+}
+
+export interface PlanTypeSummary {
+  /** Records the backfill would number. */
+  count: number
+  /** The reference the first (oldest) would get and the last (newest), from the counter as it stands. */
+  first: string | null
+  last: string | null
+  oldest: string | null
+  newest: string | null
+  /** The counter's next number now (1 when it does not exist yet). */
+  counterNext: number
+  /** Records that already have a reference (made since the code went live). */
+  alreadyNumbered: number
+  /** Why records were left out, by reason. */
+  leftOut: Record<string, number>
+}
+
+/** What the founder sees before the write: per type, the count, the first and last reference, and what was left out. */
+export function summarizePlan(
+  plan: ReturnType<typeof planBackfill>,
+  counters: Partial<Record<RefType, unknown>>,
+): Record<"TSK" | "OPP", PlanTypeSummary> {
+  const out = {} as Record<"TSK" | "OPP", PlanTypeSummary>
+  for (const t of ["TSK", "OPP"] as const) {
+    const list = plan.assign.filter((c) => c.type === t)
+    const start = nextNumberFrom(counters[t] ?? null)
+    const leftOut: Record<string, number> = {}
+    let alreadyNumbered = 0
+    for (const s of plan.skipped.filter((x) => x.candidate.type === t)) {
+      if (s.reason === "already has a reference") alreadyNumbered++
+      else leftOut[s.reason] = (leftOut[s.reason] ?? 0) + 1
+    }
+    out[t] = {
+      count: list.length,
+      first: list.length ? formatRef(t, start) : null,
+      last: list.length ? formatRef(t, start + list.length - 1) : null,
+      oldest: list.length ? createdIso(list[0].data.created_at) : null,
+      newest: list.length ? createdIso(list[list.length - 1].data.created_at) : null,
+      counterNext: start,
+      alreadyNumbered,
+      leftOut,
+    }
+  }
+  return out
 }

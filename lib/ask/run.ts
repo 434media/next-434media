@@ -71,6 +71,8 @@ export interface AskData {
   find(query: string, kinds: FindKind[]): Promise<unknown>
   /** Triage through the core service, as this person. Returns the activity id the undo names. */
   triage(activityId: string, decision: TriageDecisionValue): Promise<{ activityId: string; label: string }>
+  /** Gives a task its TSK reference if it has none: after Ask reopened it (the founder's rule; numberOnUpdate). */
+  numberReopenedTask?(taskId: string): Promise<void>
   /** The task or opportunity a short reference names, as this person may see it; null when they cannot or it is none. */
   resolveRef(ref: string): Promise<{ kind: "task" | "opportunity"; id: string } | null>
   /** The record a stage change would move, as this person may see it; null when they cannot. */
@@ -305,6 +307,15 @@ function askTools(c: { person: AskPerson; actor: string; taskId: string; deps: A
           writesLeft()
           const applied = await applyTaskEdit({ db: deps.db, turnTaskId: c.taskId, n: edits.length + 1, taskId: await idOf(task_id, "task"), patch: patch as TaskPatch, by: c.person.email, actor: c.actor, now: deps.now() })
           const label = `${applied.title}: ${applied.changes.map((x) => `${x.field.replace(/_/g, " ")} ${fmt(x.before)} → ${fmt(x.after)}`).join(", ")}`
+          // A task Ask moved off completed is reopened: it gets its reference, as an update anywhere else would give it.
+          const status = applied.changes.find((x) => x.field === "status")
+          if (status && status.before === "completed" && status.after !== "completed" && deps.data.numberReopenedTask) {
+            try {
+              await deps.data.numberReopenedTask(applied.taskId)
+            } catch (e) {
+              console.error(`[ask] could not number reopened task ${applied.taskId}:`, e instanceof Error ? e.message : e)
+            }
+          }
           edits.push({ kind: "task", id: applied.activityId, label, undoUntil: undoUntil() })
           return { ok: true, applied: label, undo: "The person has Undo for two minutes." }
         }),

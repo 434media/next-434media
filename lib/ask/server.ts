@@ -144,6 +144,11 @@ export function liveAskData(session: User, viewer: Viewer): AskData {
       return out
     },
 
+    async numberReopenedTask(taskId: string) {
+      const [{ getDb, admin }, { assignRefIfMissing, firestoreRefStore }, { TASKS_COLLECTION }] = await Promise.all([import("../firebase-admin"), import("../record-refs"), import("./edits")])
+      await assignRefIfMissing(firestoreRefStore(getDb()), TASKS_COLLECTION, taskId, "TSK", { now: admin.firestore.FieldValue.serverTimestamp() })
+    },
+
     async resolveRef(ref: string) {
       const parsed = parseRef(ref)
       if (!crm || !parsed) return null
