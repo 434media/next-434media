@@ -109,12 +109,15 @@ export default function TravelSignIn({
           <span className="h-px flex-1 bg-white/20" />
         </div>
         {/* Staff read itineraries through the admin session; the Google sign-in returns here (lib/travel/return-path.ts). */}
-        <a
-          href={`/api/auth/signin/google?next=${encodeURIComponent(nextPath)}`}
-          className="mt-6 flex w-full items-center justify-center rounded-xl border border-white/30 px-5 py-3 font-bold text-white hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-white/40"
-        >
-          434 staff: sign in with Google
-        </a>
+        <div className="mt-4 flex justify-center">
+          <a
+            href={`/api/auth/signin/google?next=${encodeURIComponent(nextPath)}`}
+            aria-label="434 staff: sign in with Google"
+            className="inline-flex items-center rounded-lg border border-white/30 px-3 py-1.5 text-sm font-semibold text-white hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-white/40"
+          >
+            434-Admin
+          </a>
+        </div>
         <p className="mt-6 text-center text-xs text-neutral-400">Access is granted by 434 Media to authorized emails only.</p>
       </div>
     </div>
