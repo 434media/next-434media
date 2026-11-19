@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 import { googleSignInAllowed } from '@/lib/preview-auth'
 import { setSession, isVerifiedWorkspaceGoogleAccount, authorizeAdminSignIn, workspaceDomain } from '@/lib/auth'
+import { OAUTH_RETURN_COOKIE, postSignInPath } from '@/lib/travel/return-path'
 
 interface GoogleTokenResponse {
   access_token: string
@@ -133,10 +134,13 @@ export async function GET(request: NextRequest) {
       emailVerified: userInfo.verified_email === true && userInfo.hd === workspaceDomain(),
     })
 
-    // Clear OAuth state cookie
-    const response = NextResponse.redirect(`${request.nextUrl.origin}/admin`)
+    // Back to the travel itinerary the sign-in started from, if its path is still valid; otherwise /admin
+    // (lib/travel/return-path.ts). Then clear both OAuth cookies.
+    const landing = postSignInPath(request.cookies.get(OAUTH_RETURN_COOKIE)?.value)
+    const response = NextResponse.redirect(`${request.nextUrl.origin}${landing}`)
     response.cookies.delete('oauth_state')
-    
+    response.cookies.delete(OAUTH_RETURN_COOKIE)
+
     return response
   } catch (error) {
     console.error('OAuth callback error:', error)

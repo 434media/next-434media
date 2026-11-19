@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 import { googleSignInAllowed } from '@/lib/preview-auth'
+import { OAUTH_RETURN_COOKIE, safeTravelReturnPath } from '@/lib/travel/return-path'
 
 export async function GET(request: NextRequest) {
   // A preview signs in only with a staging test account (lib/preview-auth.ts): Google sign-in would bring a production
@@ -45,6 +46,21 @@ export async function GET(request: NextRequest) {
     maxAge: 600, // 10 minutes
     path: '/',
   })
-  
+
+  // Started from a travel itinerary's sign-in page: return there after sign-in (lib/travel/return-path.ts). Only an
+  // itinerary path is kept; anything else is dropped, and a stale value from an earlier attempt is cleared.
+  const returnPath = safeTravelReturnPath(searchParams.get('next'))
+  if (returnPath) {
+    response.cookies.set(OAUTH_RETURN_COOKIE, returnPath, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 600, // 10 minutes, as oauth_state
+      path: '/',
+    })
+  } else {
+    response.cookies.delete(OAUTH_RETURN_COOKIE)
+  }
+
   return response
 }

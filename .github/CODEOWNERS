@@ -71,6 +71,9 @@
 /lib/travel/access-id.ts                     @434media/founder
 /lib/travel/staff-access.ts                  @434media/founder
 /lib/__tests__/travel-staff-access.test.ts   @434media/founder
+/lib/travel/return-path.ts                   @434media/founder
+/lib/__tests__/travel-return-path.test.ts    @434media/founder
+/app/travel/sign-in/                         @434media/founder
 /app/api/travel/auth/                        @434media/founder
 /scripts/add-team-member.ts                  @434media/founder
 /scripts/backfill-team-roles.ts              @434media/founder
