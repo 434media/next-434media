@@ -177,3 +177,61 @@ test("a follow-up card links to its exact opportunity, whoever owns it", async (
   const item = body.items.find((i) => i.type === "opportunity")
   assert.equal(item?.href, "/admin/opportunities?tab=pipeline&openOpportunity=deal-1")
 })
+
+test("the dashboard's Active Opportunities leaves out archived deals, whatever stage they still carry", async () => {
+  globalThis.fetch = async () => response({})
+  const { DashboardView } = load("../../components/crm/DashboardView") as typeof import("../../components/crm/DashboardView")
+  const open = { ...deal("proposal"), id: "open-1", title: "Open deal", is_archived: false } as Client
+  // Production, 2026-11-19: archived on Jul 5 but still at Proposal.
+  const archived = { ...deal("proposal"), id: "arch-1", title: "Archived deal", is_archived: true, archived_at: "2026-07-05T23:53:29.316Z" } as Client
+  const container = document.createElement("div")
+  document.body.append(container)
+  const root = createRoot(container)
+  roots.push(root)
+  const props = {
+    stats: null, pipeline: [], clients: [open, archived], tasks: [],
+    onViewChange: () => {}, onShowClientForm: () => {}, onClientClick: () => {}, onOpportunityClick: () => {}, onTaskClick: () => {},
+    currentUser: null,
+  } as unknown as Parameters<typeof DashboardView>[0]
+  await act(async () => root.render(createElement(DashboardView, props)))
+  await settle()
+  const text = container.textContent ?? ""
+  assert.match(text, /Active Opportunities\(1\)/)
+  assert.match(text, /Open deal/)
+  assert.doesNotMatch(text, /Archived deal/)
+})
+
+// ---- /api/admin/crm: the quota warning needs a quota error, not an empty store ----
+async function crmDashboard(reads: { clients?: () => Promise<unknown[]>; tasks?: () => Promise<unknown[]> }) {
+  mockModule("../../lib/auth", { getSession: async () => ({ email: "me@example.com" }), isAuthorizedAdmin: () => true })
+  mockModule("../../lib/firestore-crm", {
+    getClients: reads.clients ?? (async () => []),
+    getOpportunities: async () => [],
+    getSalesReps: async () => [],
+    getAllTasks: reads.tasks ?? (async () => []),
+  })
+  const route = load.resolve("../../app/api/admin/crm/route")
+  delete load.cache[route]
+  const { GET } = load(route) as { GET: () => Promise<Response> }
+  return await (await GET()).json() as { success?: boolean; warning?: string }
+}
+
+test("an empty store is not a quota error", async () => {
+  const body = await crmDashboard({})
+  assert.equal(body.success, true)
+  assert.equal(body.warning, undefined)
+})
+
+test("a RESOURCE_EXHAUSTED read shows the quota warning; another failure says data may be incomplete", async () => {
+  const quiet = console.error
+  console.error = () => {}
+  try {
+    const quota = Object.assign(new Error("8 RESOURCE_EXHAUSTED: Quota exceeded."), { code: 8 })
+    const exhausted = await crmDashboard({ clients: async () => { throw quota } })
+    assert.match(exhausted.warning ?? "", /quota exceeded/i)
+    const other = await crmDashboard({ tasks: async () => { throw Object.assign(new Error("14 UNAVAILABLE"), { code: 14 }) } })
+    assert.ok(other.warning && !/quota/i.test(other.warning), "a non-quota failure is not called a quota error")
+  } finally {
+    console.error = quiet
+  }
+})

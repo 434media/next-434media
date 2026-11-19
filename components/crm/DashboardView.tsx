@@ -64,8 +64,9 @@ function ActiveOpportunitiesList({
   onTaskClick: (task: Task) => void
   onViewAll: () => void
 }) {
-  // Get opportunity clients only (not tasks)
-  const opportunityClients = clients.filter(c => c.is_opportunity)
+  // Active = the pipeline board's rule: an opportunity that is not archived.
+  // Archived deals can still carry an open stage (e.g. Proposal); they are not active.
+  const opportunityClients = clients.filter(c => c.is_opportunity && !c.is_archived)
 
   // Combine clients that are active opportunities (exclude closed)
   const activeOpportunities: Array<{
@@ -229,7 +230,7 @@ function PlatformGoalsProgress({ clients }: { clients: Client[] }) {
             .filter(c => c.disposition === "closed_won")
             .reduce((sum, c) => sum + (c.pitch_value || 0), 0)
           const pipelineValue = brandClients
-            .filter(c => c.disposition !== "closed_won" && c.disposition !== "closed_lost")
+            .filter(c => !c.is_archived && c.disposition !== "closed_won" && c.disposition !== "closed_lost")
             .reduce((sum, c) => sum + (c.pitch_value || 0), 0)
           const progress = Math.min(100, (wonRevenue / goal.annualGoal) * 100)
 
