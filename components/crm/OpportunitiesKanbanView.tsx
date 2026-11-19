@@ -310,18 +310,18 @@ function KanbanCard({
             </div>
           )}
 
-          {/* DOC pill */}
-          {docLabel && (
-            <div className="flex items-center gap-2 mb-1.5">
-              <span className="inline-flex items-center gap-1.5 px-1.5 py-0.5 text-[10px] font-medium rounded-full bg-neutral-100 text-neutral-700 tabular-nums">
-                <span className="inline-block h-1 w-1 rounded-full bg-amber-500" aria-hidden="true" />
-                DOC · {docLabel}
-              </span>
+          {/* Top row: the short reference chip (OPP-/TSK-, Display Standard 3.20), then the DOC pill */}
+          {(item.refId || docLabel) && (
+            <div className="flex flex-wrap items-center gap-2 mb-1.5">
+              {item.refId && <RecordRef value={item.refId} from={item.fromRef} />}
+              {docLabel && (
+                <span className="inline-flex items-center gap-1.5 px-1.5 py-0.5 text-[10px] font-medium rounded-full bg-neutral-100 text-neutral-700 tabular-nums">
+                  <span className="inline-block h-1 w-1 rounded-full bg-amber-500" aria-hidden="true" />
+                  DOC · {docLabel}
+                </span>
+              )}
             </div>
           )}
-
-          {/* Short reference (OPP-/TSK-), Display Standard 3.20 */}
-          {item.refId && <RecordRef value={item.refId} from={item.fromRef} className="mb-1" />}
 
           {/* Title (opportunity title) */}
           <p className="text-sm font-medium text-neutral-900 truncate leading-snug">

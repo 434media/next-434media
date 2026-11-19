@@ -184,9 +184,8 @@ export function TaskDetailDrawer({
       open={open}
       onClose={onClose}
       title={drawerTitle}
-      subtitle={task.id
-        ? (task.ref ? <span className="inline-flex items-center gap-2"><RecordRef value={task.ref} /><span>Edit task</span></span> : "Edit task")
-        : "Create a new task"}
+      lead={task.id && task.ref ? <RecordRef value={task.ref} /> : undefined}
+      subtitle={task.id ? "Edit task" : "Create a new task"}
       badge={dueBadge}
       width="xl"
       footer={

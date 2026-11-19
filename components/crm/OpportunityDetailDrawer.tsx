@@ -348,9 +348,7 @@ export function OpportunityDetailDrawer({
     ? formData.company_name || "Opportunity"
     : "New Opportunity"
   const drawerSubtitle = isEditing
-    ? (recordRef
-        ? <span className="inline-flex items-center gap-2"><RecordRef value={recordRef} from={fromRef} /><span>Get that money and close that business</span></span>
-        : "Get that money and close that business")
+    ? "Get that money and close that business"
     : "Add a new opportunity"
   // While it is open, this opportunity is what the Ask panel's "this" means.
   useSelectRecordWhileOpen(open && isEditing && formData.existing_company_id
@@ -367,6 +365,7 @@ export function OpportunityDetailDrawer({
       open={open}
       onClose={onClose}
       title={drawerTitle}
+      lead={isEditing && recordRef ? <RecordRef value={recordRef} from={fromRef} /> : undefined}
       subtitle={drawerSubtitle}
       width="lg"
       footer={

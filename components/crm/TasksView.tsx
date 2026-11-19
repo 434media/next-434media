@@ -467,13 +467,15 @@ export function TasksView({
                             aria-hidden="true"
                           />
                           <div className="min-w-0">
-                            <p className={`font-medium text-sm line-clamp-1 ${task.status === "completed" ? "text-neutral-500 line-through" : "text-neutral-900"}`}>
-                              {task.title || "Untitled task"}
-                            </p>
-                            {(task.ref || task.client_name) && (
-                              <p className="flex items-center gap-2 text-xs text-neutral-500 mt-0.5 min-w-0">
-                                <RecordRef value={task.ref} className="shrink-0" />
-                                {task.client_name && <span className="line-clamp-1">{task.client_name}</span>}
+                            <div className="flex items-center gap-2 min-w-0">
+                              <RecordRef value={task.ref} className="shrink-0" />
+                              <p className={`font-medium text-sm line-clamp-1 ${task.status === "completed" ? "text-neutral-500 line-through" : "text-neutral-900"}`}>
+                                {task.title || "Untitled task"}
+                              </p>
+                            </div>
+                            {task.client_name && (
+                              <p className="text-xs text-neutral-500 mt-0.5 line-clamp-1">
+                                {task.client_name}
                               </p>
                             )}
                           </div>
