@@ -20,6 +20,8 @@ export interface MailchimpIntent {
   tags: string[]
   firstName?: string
   lastName?: string
+  /** When this record's consent was given (signup or registration time), ISO; blank when unknown. */
+  consentAt?: string
   /** Human-readable why — surfaced in the dry-run report for transparency. */
   reason: string
 }
@@ -59,6 +61,7 @@ export function mailchimpIntentForEmailSignup(s: FirestoreEmailSignup): Mailchim
     email,
     status: "subscribed",
     tags: tagsForSource("email_signups", { brand }),
+    consentAt: s.created_at || undefined,
     reason: `newsletter signup (${s.source || "unknown"})`,
   }
 }
@@ -80,6 +83,7 @@ export function mailchimpIntentForEventRegistration(r: EventRegistration): Mailc
     tags: mailchimpTagsFromInternal(r.tags),
     firstName: r.firstName || undefined,
     lastName: r.lastName || undefined,
+    consentAt: r.registeredAt || undefined,
     reason: `event registrant opted in (${r.eventName || r.event})`,
   }
 }

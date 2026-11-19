@@ -7,6 +7,10 @@ import { test } from "node:test"
 import assert from "node:assert/strict"
 import {
   FULL_PASS_EVERY_MS,
+  MERGE_TEXT_MAX,
+  cleanMergeText,
+  isPermanentlyDeletedRefusal,
+  stillRemoved,
   PUSH_CHUNK,
   drainPending,
   fingerprint,
@@ -123,4 +127,63 @@ test("nextSentSet: keeps current remembered, adds accepted, drops what left the 
   // After a run, members not accepted (deferred, or a failed request) are pending again.
   assert.deepEqual(pendingMembers(plan, new Set(out)), [])
   assert.deepEqual(pendingMembers(plan, new Set(nextSentSet(plan, new Set(), []))).length, 2)
+})
+
+const DELETED = "a@example.com was permanently deleted and cannot be re-imported. The contact must re-subscribe to get back on the list."
+
+test("isPermanentlyDeletedRefusal: the batch message and the single-member title; nothing else", () => {
+  assert.ok(isPermanentlyDeletedRefusal(DELETED))
+  assert.ok(isPermanentlyDeletedRefusal("Forgotten Email Not Subscribed"))
+  assert.ok(!isPermanentlyDeletedRefusal("Your merge fields were invalid."))
+  assert.ok(!isPermanentlyDeletedRefusal(undefined))
+})
+
+test("drainPending: a permanently deleted refusal is reported for marking and not retried", async () => {
+  const push: PushFn = async (members) => ({
+    newMembers: 0,
+    updatedMembers: members.length - 1,
+    errors: [{ email: "Gone@Example.com", code: "ERROR_GENERIC", message: DELETED.replace("a@example.com", "Gone@Example.com") }],
+  })
+  const r = await drainPending([m("gone@example.com"), m("ok@example.com")], push, { deadline: Number.POSITIVE_INFINITY })
+  assert.deepEqual(r.removed, ["gone@example.com"])
+  assert.equal(r.retryable, 0)
+  assert.equal(r.accepted.length, 2)
+  assert.equal(r.reasons[0].sample.includes("@"), false)
+})
+
+test("drainPending: merge-field refusals are grouped by the field Mailchimp names, with no address", async () => {
+  const push: PushFn = async () => ({
+    newMembers: 0,
+    updatedMembers: 0,
+    errors: [
+      { email: "a@example.com", code: "ERROR_GENERIC", message: "Your merge fields were invalid.", field: "PHONE", fieldMessage: "Please enter a valid phone for a@example.com" },
+      { email: "b@example.com", code: "ERROR_GENERIC", message: "Your merge fields were invalid.", field: "PHONE", fieldMessage: "Please enter a valid phone" },
+      { email: "c@example.com", code: "ERROR_GENERIC", message: "Your merge fields were invalid.", field: "FNAME" },
+    ],
+  })
+  const r = await drainPending([m("a@example.com"), m("b@example.com"), m("c@example.com")], push, { deadline: Number.POSITIVE_INFINITY })
+  assert.deepEqual(r.reasons.map((x) => [x.code, x.field, x.count]), [["ERROR_GENERIC", "PHONE", 2], ["ERROR_GENERIC", "FNAME", 1]])
+  assert.match(r.reasons[0].sample, /merge fields were invalid\. Please enter a valid phone/)
+  assert.equal(r.reasons[0].sample.includes("@"), false)
+  assert.deepEqual(r.removed, [])
+})
+
+test("stillRemoved: skipped until consent is dated after the refusal; unknown dates keep the mark", () => {
+  const at = "2026-11-19T00:00:00.000Z"
+  assert.ok(stillRemoved(at, undefined))
+  assert.ok(stillRemoved(at, "2026-11-01T00:00:00Z"))
+  assert.ok(stillRemoved(at, at))
+  assert.ok(stillRemoved(at, "not a date"))
+  assert.ok(!stillRemoved(at, "2026-11-20T00:00:00Z"))
+  assert.ok(stillRemoved("", "2026-11-20T00:00:00Z"))
+})
+
+test("cleanMergeText: strings only, control characters and extra space removed, capped, blank left out", () => {
+  assert.equal(cleanMergeText("  Ana \n  María\t"), "Ana María")
+  assert.equal(cleanMergeText("   "), undefined)
+  assert.equal(cleanMergeText(""), undefined)
+  assert.equal(cleanMergeText(42), undefined)
+  assert.equal(cleanMergeText(["Ana"]), undefined)
+  assert.equal(cleanMergeText("x".repeat(400))!.length, MERGE_TEXT_MAX)
+  assert.equal(cleanMergeText("Zoë"), "Zoë")
 })

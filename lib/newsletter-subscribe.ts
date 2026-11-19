@@ -1,6 +1,8 @@
 import crypto from "crypto"
 import { saveEmailSignup } from "@/lib/firestore-email-signups"
 import { normalizeTags } from "@/lib/mailchimp-tags"
+import { clearMailchimpRemoved } from "@/lib/firestore-mailchimp-removed"
+import { isPermanentlyDeletedRefusal } from "@/lib/mailchimp-push-plan"
 
 // Shared newsletter/email-capture handler — the single write path that lands a
 // public email signup in both Firestore and the one Mailchimp audience.
@@ -148,7 +150,27 @@ export async function subscribeEmail(opts: SubscribeEmailOpts): Promise<Subscrib
     }
   }
 
+  // A consented signup ("subscribed") clears a "permanently deleted in Mailchimp" mark, so the hourly push tries
+  // the address again (lib/firestore-mailchimp-removed.ts). Not when Mailchimp has just refused it again for that
+  // reason: the mark stays and the push keeps skipping it. A failure here never fails the signup.
+  if (status === "subscribed" && !refusedAsPermanentlyDeleted(mailchimpResult)) {
+    try {
+      await clearMailchimpRemoved(email)
+    } catch (err) {
+      console.error("[subscribeEmail] Could not clear the Mailchimp-removed mark:", err)
+    }
+  }
+
   return { ok: warnings.length === 0, warnings, mailchimpEnabled, droppedTags }
+}
+
+/** Whether the inline Mailchimp call came back as Mailchimp's permanent-deletion refusal. */
+function refusedAsPermanentlyDeleted(r: PromiseSettledResult<unknown> | null): boolean {
+  if (!r || r.status !== "fulfilled") return false
+  const { status, data } = r.value as { status: number; data?: unknown }
+  if (status < 400 || !data || typeof data !== "object") return false
+  const d = data as { title?: string; detail?: string }
+  return isPermanentlyDeletedRefusal(`${d.title ?? ""} ${d.detail ?? ""}`)
 }
 
 /**
