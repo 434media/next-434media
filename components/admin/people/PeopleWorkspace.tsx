@@ -4,9 +4,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import Link from "next/link"
 import { Building2, CheckCircle2, AlertCircle, Inbox, Search, UserPlus, Users, Flag, Bookmark, X, Lock, Briefcase, RefreshCw, Contact, Pencil, Plus, Power, FileText, Reply } from "lucide-react"
 import { DetailDrawer } from "@/components/admin/DetailDrawer"
-import { DraftDrawer, type DraftItem } from "@/components/admin/review/DraftDrawer"
+import { DraftDrawer, dismissOutcome, type DraftItem } from "@/components/admin/review/DraftDrawer"
 import { InboxReplyModal } from "@/components/admin/people/InboxReplyModal"
-import { WaitingOnYou } from "@/components/admin/people/WaitingOnYou"
+import { WaitingOnYou, type HeldArrival } from "@/components/admin/people/WaitingOnYou"
 import { TodayCard } from "@/components/admin/people/TodayCard"
 import { waitingRows } from "@/lib/core-model/waiting"
 import type { Activity, Affiliation, AffiliationRole, AddressBook, CoreRole, InboxItem, LifecycleStage, Organization, Person, Relationship } from "@/types/core-model"
@@ -122,6 +122,9 @@ export function PeopleWorkspace({ view = "records" }: { view?: "todo" | "records
   // "Waiting on you": the approval records, founder only on the server. null until read; [] when not the founder.
   const [drafts, setDrafts] = useState<DraftItem[] | null>(null)
   const [openDraft, setOpenDraft] = useState<DraftItem | null>(null)
+  // The solicitation pre-check's holds (founder only), and Dismiss: spam or solicitation on an arrival row.
+  const [holds, setHolds] = useState<Map<string, HeldArrival>>(new Map())
+  const [confirmingDismiss, setConfirmingDismiss] = useState<string | null>(null)
   const [agents, setAgents] = useState<AgentsLine | null>(null)
   // A phone arrival's dismissal is held for the undo window: once sent, nothing about it is left to restore.
   const pendingOpen = useRef<string | null>(null)
@@ -185,6 +188,7 @@ export function PeopleWorkspace({ view = "records" }: { view?: "todo" | "records
       const body = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(body.error ?? "To do could not be read")
       setDrafts(body.items ?? [])
+      setHolds(new Map(((body.holds ?? []) as HeldArrival[]).map((h) => [h.activityId, h])))
     } catch (e) {
       setDrafts([])
       setToast({ type: "error", message: (e as Error).message })
@@ -274,6 +278,28 @@ export function PeopleWorkspace({ view = "records" }: { view?: "todo" | "records
       setToast({ type: "success", message: `Undone. ${whoOf(item)} is back in the inbox.` })
     } catch (e) {
       setToast({ type: "error", message: (e as Error).message })
+    }
+  }
+
+  /** Dismiss: spam or solicitation, on an arrival with no draft: asks once, then sends nothing and closes it. */
+  const dismissSolicitation = async (item: InboxItem) => {
+    const id = item.activity.id
+    if (confirmingDismiss !== id) return setConfirmingDismiss(id)
+    setConfirmingDismiss(null)
+    setBusy(id)
+    try {
+      const res = await fetch("/api/admin/review/dismiss", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ activityId: id }) })
+      const body = (await res.json().catch(() => ({}))) as Record<string, unknown>
+      if (!res.ok) throw new Error(String(body.error ?? "The dismissal was not recorded"))
+      setInbox((cur) => (cur ?? []).filter((i) => i.activity.id !== id))
+      setOpenActivity(null)
+      const o = dismissOutcome(body)
+      setToast({ type: o.type, message: o.message })
+      void loadDrafts()
+    } catch (e) {
+      setToast({ type: "error", message: (e as Error).message })
+    } finally {
+      setBusy(null)
     }
   }
 
@@ -467,6 +493,10 @@ export function PeopleWorkspace({ view = "records" }: { view?: "todo" | "records
             onOpenArrival={setOpenActivity}
             actions={(item) => <TriageButtons item={item} busy={busy === item.activity.id} founder={founder} onTriage={triage} />}
             sourceLabel={(item) => `${SOURCE_LABEL[item.activity.source] ?? item.activity.source}${item.activity.channel ? ` · ${item.activity.channel}` : ""}`}
+            holds={holds}
+            {...(founder ? { onDismissSolicitation: (item: InboxItem) => void dismissSolicitation(item) } : {})}
+            dismissing={busy}
+            confirmingDismiss={confirmingDismiss}
           />
         )}
         {tab === "inbox" && (

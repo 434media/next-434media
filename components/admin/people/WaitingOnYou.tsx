@@ -20,6 +20,14 @@ function duration(ms: number | null): string {
   return h < 48 ? `${h} h` : `${Math.round(h / 24)} d`
 }
 
+/** An arrival the solicitation pre-check held with no draft (lib/agent/review-server.ts HeldArrival). */
+export interface HeldArrival {
+  activityId: string
+  why: string
+  summary: string
+  at: string
+}
+
 export function WaitingOnYou({
   drafts,
   inbox,
@@ -28,6 +36,10 @@ export function WaitingOnYou({
   onOpenArrival,
   actions,
   sourceLabel,
+  holds,
+  onDismissSolicitation,
+  dismissing,
+  confirmingDismiss,
 }: {
   drafts: DraftItem[]
   inbox: InboxItem[]
@@ -37,6 +49,13 @@ export function WaitingOnYou({
   /** The Inbox's own triage buttons for an arrival row (Lead / Save / Dismiss, or the phone arrival's four). */
   actions: (i: InboxItem) => React.ReactNode
   sourceLabel: (i: InboxItem) => string
+  /** The pre-check's holds, by the arrival's Activity id. Founder only. */
+  holds?: Map<string, HeldArrival>
+  /** Dismiss: spam or solicitation, for a website-form arrival with no draft. Founder only. */
+  onDismissSolicitation?: (i: InboxItem) => void
+  dismissing?: string | null
+  /** The arrival whose Dismiss is waiting for its confirming second click. */
+  confirmingDismiss?: string | null
 }) {
   const [view, setView] = useState<"waiting" | "decided">("waiting")
   const rows = useMemo(() => waitingRows(drafts, inbox), [drafts, inbox])
@@ -73,12 +92,29 @@ export function WaitingOnYou({
                       <span className="text-sm font-medium text-neutral-900">{r.item.person?.name || r.item.activity.contact.name || r.item.activity.contact.email || "Unknown"}</span>
                       {r.item.activity.contact.company && <span className="text-xs text-neutral-500">{r.item.activity.contact.company}</span>}
                       <Pill>To triage</Pill>
+                      {holds?.get(r.item.activity.id) && <Pill tone="amber"><AlertTriangle className="w-2.5 h-2.5" /> Likely solicitation</Pill>}
                       <Pill>{sourceLabel(r.item)}</Pill>
                     </div>
-                    <p className="mt-0.5 truncate text-xs text-neutral-500">{r.item.activity.summary}</p>
+                    {holds?.get(r.item.activity.id) ? (
+                      <p className="mt-0.5 truncate text-xs text-amber-800">{holds.get(r.item.activity.id)!.summary} No draft was made.</p>
+                    ) : (
+                      <p className="mt-0.5 truncate text-xs text-neutral-500">{r.item.activity.summary}</p>
+                    )}
                   </button>
                   <span className="text-xs text-neutral-500 md:w-28">{when(r.item.activity.occurred_at)}</span>
-                  {actions(r.item)}
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    {onDismissSolicitation && r.item.activity.id.startsWith("contact_forms:") && (
+                      <button
+                        disabled={dismissing === r.item.activity.id}
+                        title="Sends nothing. Closes the arrival and skips drafts for this sender from now on."
+                        onClick={() => onDismissSolicitation(r.item)}
+                        className={`rounded-md border px-2.5 py-1.5 text-xs font-medium disabled:opacity-40 ${holds?.get(r.item.activity.id) ? "border-neutral-900 bg-neutral-900 text-white hover:bg-neutral-800" : "border-neutral-200 text-neutral-700 hover:bg-neutral-50"}`}
+                      >
+                        {confirmingDismiss === r.item.activity.id ? "Confirm dismiss" : "Dismiss: spam or solicitation"}
+                      </button>
+                    )}
+                    {actions(r.item)}
+                  </div>
                 </li>
               ),
             )}

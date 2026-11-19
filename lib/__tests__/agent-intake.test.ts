@@ -18,6 +18,8 @@ import { LedgerRefused, budgetRoot, childLineage, engineRunOf, newTask, verifyCh
 import { approvalStatus, type SendApproval } from "../send-approval"
 import { ENGINE_RETENTION_MS, ENGINE_WAIT_CAP_MS, sweepAgentTasks, type EngineRunStatus } from "../agent/sweep"
 import { MemoryAgentDb } from "./helpers/agent-db"
+import { INTAKE_HOLDS_COLLECTION, type IntakeHold } from "../agent/intake"
+import { precheckArrival, type DismissedSenders } from "../agent/solicitation"
 
 const NOW = "2026-11-14T12:00:00.000Z"
 const at = (ms = 0) => new Date(Date.parse(NOW) + ms).toISOString()
@@ -211,7 +213,7 @@ function scriptedModel(steps: { tool?: string; input?: unknown; text?: string }[
   return { model, calls }
 }
 
-async function intakeSetup(opts: { controls?: AgentControls; pin?: SkillPin | null; email?: string; mark?: ArrivalMark; spend?: number | Error; month?: number | Error; steps?: { tool?: string; input?: unknown; text?: string }[]; skill?: SkillFiles } = {}) {
+async function intakeSetup(opts: { controls?: AgentControls; pin?: SkillPin | null; email?: string; message?: string; dismissed?: DismissedSenders | Error; mark?: ArrivalMark; spend?: number | Error; month?: number | Error; steps?: { tool?: string; input?: unknown; text?: string }[]; skill?: SkillFiles } = {}) {
   const db = new MemoryAgentDb()
   const sb = fakeSandbox()
   const { model, calls } = scriptedModel(opts.steps ?? [
@@ -225,9 +227,13 @@ async function intakeSetup(opts: { controls?: AgentControls; pin?: SkillPin | nu
     controls: async () => opts.controls ?? LIVE(),
     pin: async () => (opts.pin === undefined ? PIN : opts.pin),
     skillAt: async (commit) => (assert.equal(commit, COMMIT), opts.skill ?? SKILL),
-    submission: async () => SUBMISSION(opts.email),
+    submission: async () => ({ ...SUBMISSION(opts.email), ...(opts.message !== undefined ? { message: opts.message } : {}) }),
     decisions: async () => "- 2026-11-01 (organization): chose discovery first. Why: scope unclear",
     arrivalMark: async () => opts.mark ?? null,
+    dismissedSenders: async () => {
+      if (opts.dismissed instanceof Error) throw opts.dismissed
+      return opts.dismissed ?? { emails: new Set(), domains: new Set() }
+    },
     model: () => model,
     taskSpend: async () => {
       if (opts.spend instanceof Error) throw opts.spend
@@ -530,4 +536,65 @@ test("an engine run is attached and cleared through the ledger step, and checked
   assert.equal(db.task("t")?.engineRun, undefined)
   assert.throws(() => engineRunOf("has a space", NOW), LedgerRefused)
   assert.throws(() => engineRunOf("wrun_1", "not a time"), LedgerRefused)
+})
+
+// ── The solicitation pre-check (founder, 2026-11-19: no paid drafts for solicitations or spam) ────────────────────────
+const NONE: DismissedSenders = { emails: new Set(), domains: new Set() }
+const PITCH = "Hi team, we help agencies like yours earn more. Our referral partnership pays a 20% commission on every client you send. We also offer a free SEO audit to boost your website traffic."
+
+test("the pre-check holds a seller's pitch and a dismissed sender or domain, and never one signal or a real agency request", () => {
+  const held = precheckArrival({ email: "pat@gurus.example", message: PITCH }, NONE)
+  assert.equal(held.hold && held.why, "solicitation")
+  assert.ok(held.signals.includes("referral-commission") && held.signals.includes("free-audit") && held.signals.includes("grow-your"))
+  // One signal alone is unsure: it drafts as usual.
+  assert.deepEqual(precheckArrival({ email: "a@b.example", message: "We'd like a brand film. Could you send a free mockup of the concept?" }, NONE), { hold: false, signals: ["free-audit"] })
+  // An agency seeking a production partner is a request the procedure qualifies (master 9.5), not a solicitation.
+  const agency = precheckArrival({ email: "lee@agency.example", requestType: "Agency seeking a production partner", message: "We are an agency with a client launch in March and need a production partner for a 60-second commercial, white-label." }, NONE)
+  assert.equal(agency.hold, false)
+  assert.equal(precheckArrival({ email: "Pat@Gurus.example", message: "Hello" }, { emails: new Set(["pat@gurus.example"]), domains: new Set() }).hold, true)
+  const byDomain = precheckArrival({ email: "sam@gurus.example", message: "Hello" }, { emails: new Set(), domains: new Set(["gurus.example"]) })
+  assert.equal(byDomain.hold && byDomain.why, "dismissed-domain")
+  // A free-mail domain is never blocked as a domain.
+  assert.equal(precheckArrival({ email: "new@gmail.com", message: "Hello" }, { emails: new Set(), domains: new Set(["gmail.com"]) }).hold, false)
+})
+
+test("a held arrival gets no model call and no draft: the hold is recorded for To do and the ledger says why", async () => {
+  const { db, deps, calls } = await intakeSetup({ message: PITCH, controls: LIVE("draft") })
+  const taskId = await queueIntake(db, { formId: "form1", email: SINK }, LIVE("draft"), at())
+  const out = await runIntake(taskId!, deps)
+  assert.equal(out.ok === false && out.code, "held-solicitation")
+  assert.equal(calls.length, 0, "the model was never called")
+  assert.equal(db.col(SEND_APPROVALS_COLLECTION).size, 0)
+  const hold = db.get<IntakeHold>(INTAKE_HOLDS_COLLECTION, "form1")!
+  assert.deepEqual([hold.activityId, hold.why, hold.taskId], ["contact_forms:form1", "solicitation", taskId])
+  assert.match(hold.summary, /^Looks like a solicitation: it offers a referral fee or commission/)
+  assert.ok(!JSON.stringify(hold).includes(SINK) && !JSON.stringify(hold).includes("20%"), "no address or words of theirs on the hold")
+  assert.equal(db.task(taskId!)!.state, "cancelled")
+  assert.equal(db.entries(taskId!).at(-1)!.reasonCode, "held-solicitation")
+  assert.deepEqual(verifyChain(db.entries(taskId!)), { ok: true })
+})
+
+test("the pre-check fails open: unsure, or the dismissed senders unreadable, drafts as usual and says why on the draft", async () => {
+  {
+    const { db, deps, calls } = await intakeSetup({ message: "Please quote a brand film. Also, do you offer a free trial edit?", controls: LIVE("draft") })
+    const taskId = await queueIntake(db, { formId: "form1", email: SINK }, LIVE("draft"), at())
+    assert.equal((await runIntake(taskId!, deps)).ok, true)
+    assert.ok(calls.length > 0)
+    const a = db.get<{ precheck?: { signals: string[]; summary: string } }>(SEND_APPROVALS_COLLECTION, `ap-${taskId}`)!
+    assert.deepEqual(a.precheck?.signals, ["free-audit"])
+    assert.match(a.precheck!.summary, /One seller signal, so it was drafted anyway/)
+  }
+  {
+    const { db, deps } = await intakeSetup({ dismissed: new Error("Firestore down"), controls: LIVE("draft") })
+    const taskId = await queueIntake(db, { formId: "form1", email: SINK }, LIVE("draft"), at())
+    assert.equal((await runIntake(taskId!, deps)).ok, true)
+    assert.match(db.get<{ precheck?: { summary: string } }>(SEND_APPROVALS_COLLECTION, `ap-${taskId}`)!.precheck!.summary, /could not be read/)
+  }
+  {
+    // A plain arrival carries no pre-check note at all.
+    const { db, deps } = await intakeSetup({ message: "We need a documentary on our foundation's 50th year.", controls: LIVE("draft") })
+    const taskId = await queueIntake(db, { formId: "form1", email: SINK }, LIVE("draft"), at())
+    assert.equal((await runIntake(taskId!, deps)).ok, true)
+    assert.equal(db.get<{ precheck?: unknown }>(SEND_APPROVALS_COLLECTION, `ap-${taskId}`)!.precheck, undefined)
+  }
 })

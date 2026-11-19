@@ -18,8 +18,9 @@ import { AGENT_CONTROLS_DOC, SKILL_MODES, parseControls, readAgentControls, type
 import { AGENT_LEDGER_COLLECTION, AGENT_TASKS_COLLECTION, OPEN_STATES, planStop, type AgentTask, type LedgerEntry } from "./ledger"
 import { applyStop, firestoreAgentDb, step, type AgentDb } from "./ledger-server"
 import { SEND_APPROVALS_COLLECTION, sendApprovedEmail, type SendResult } from "./send-email"
-import { INTAKE_SKILL } from "./intake"
-import { REASON_CODES, WEEK_MS, arrivalActivityId, costSummary, groupReasons, handoffWaits, reviewItem, runSummary, sortQueue, type ReviewItem, type StoredApproval } from "./review"
+import { INTAKE_HOLDS_COLLECTION, INTAKE_SKILL, type IntakeHold } from "./intake"
+import { DISMISSED_SENDERS_COLLECTION, senderDomain } from "./solicitation"
+import { DISMISS_REASON_CODE, REASON_CODES, WEEK_MS, arrivalActivityId, costSummary, groupReasons, handoffWaits, reviewItem, runSummary, sortQueue, type ReviewItem, type StoredApproval } from "./review"
 import { costSince, todayBrief } from "./today"
 import type { Activity, Organization } from "../../types/core-model"
 import type { Viewer } from "../core-model/read"
@@ -56,7 +57,10 @@ export async function decideApproval(input: DecideInput, now = new Date().toISOS
       const memory = buildDecision({
         id: decisionId,
         subject: { kind: "contact", id: contactId },
-        chosen: `${input.decision === "approved" ? "Approved" : "Rejected"} the intake reply${a.routing?.outcome ? ` (routing: ${a.routing.outcome})` : ""}`,
+        chosen:
+          input.reasonCode === DISMISS_REASON_CODE && input.decision === "rejected"
+            ? "Dismissed the arrival as spam or a solicitation; no reply was sent"
+            : `${input.decision === "approved" ? "Approved" : "Rejected"} the intake reply${a.routing?.outcome ? ` (routing: ${a.routing.outcome})` : ""}`,
         why: input.reason.trim().slice(0, 600),
         ...(input.decision === "rejected" ? { revisit_when: "They write again, or the founder reopens it" } : {}),
         by: "founder",
@@ -153,6 +157,149 @@ export async function closeArrivalLive(approval: Pick<StoredApproval, "arrival">
   return out
 }
 
+/** One sender the founder dismissed: what the pre-check reads (lib/agent/solicitation.ts). */
+export interface DismissedSender {
+  id: string
+  email: string
+  /** The company domain, or "" for a free-mail address (one Gmail user never holds every Gmail sender). */
+  domain: string
+  formId: string
+  at: string
+  by: string
+}
+
+export interface DismissDeps {
+  /** The arrival as the inbox shows it, or null when it is no longer there. */
+  activity: (id: string) => Promise<Activity | null>
+  /** The inbox's own Dismiss (triage `dismiss`): the arrival leaves the inbox and To do. */
+  triage: (activity: Activity) => Promise<void>
+  /** The submission marked spam (`submission_states`), so the token guard refuses any later run for it. */
+  markSpam: (formId: string) => Promise<void>
+  recordSender: (row: DismissedSender) => Promise<void>
+  /** The decision-memory record, for an arrival with no draft (a draft's rejection writes its own). */
+  recordDecision: (memory: ReturnType<typeof buildDecision>) => Promise<void>
+}
+
+export interface DismissInput {
+  /** The arrival: `contact_forms:<formId>`. Only website-form arrivals are dismissed this way. */
+  activityId: string
+  /** The draft for it, when there is one, and the hash he was shown. */
+  approvalId?: string
+  shownHash?: string
+  reason?: string
+  actor: string
+}
+
+export type DismissResult = { dismissed: true; activityId: string; draftRejected: boolean; leftInbox: boolean; warnings: string[] }
+
+export const DISMISS_DEFAULT_REASON = "Spam or solicitation; no reply."
+
+/**
+ * **Dismiss: spam or solicitation** (founder, 2026-11-19). Sends nothing. In order:
+ *  1. the decision: a draft is rejected with the reason code `solicitation` (its decision memory and ledger entry
+ *     with it); an arrival with no draft gets its decision-memory record;
+ *  2. the submission is marked spam, so the token guard refuses any later run for it;
+ *  3. the sender, and their company domain unless it is free mail, are recorded, so a later arrival from them is held
+ *     by the pre-check with no draft;
+ *  4. the arrival leaves the inbox and To do (triage `dismiss`).
+ * The decision is the only step that can refuse. A later step that fails is reported as a warning, not raised: the
+ * decision is already recorded, and the founder can finish the rest by hand.
+ */
+export async function dismissSolicitation(input: DismissInput, deps: DismissDeps, now = new Date().toISOString(), store: AgentDb = db()): Promise<DismissResult> {
+  const formId = /^contact_forms:(.+)$/.exec(input.activityId)?.[1]
+  if (!formId) throw new ApprovalBlocked("Only a website-form arrival can be dismissed as spam or a solicitation")
+  const reason = (input.reason ?? "").trim() || DISMISS_DEFAULT_REASON
+  const activity = await deps.activity(input.activityId)
+  let email = activity?.contact.email ?? ""
+  let draftRejected = false
+  if (input.approvalId) {
+    if (!input.shownHash) throw new ApprovalBlocked("The draft's hash is required")
+    const a = await readApproval(input.approvalId, store)
+    if (!a) throw new ApprovalBlocked("No such draft")
+    if (a.arrival?.formId !== formId) throw new ApprovalBlocked("That draft answers a different arrival")
+    await decideApproval({ approvalId: input.approvalId, decision: "rejected", shownHash: input.shownHash, reasonCode: DISMISS_REASON_CODE, reason }, now, store)
+    draftRejected = true
+    email ||= a.payload.to[0] ?? ""
+  } else {
+    if (!activity) throw new ApprovalBlocked("The arrival is not in the inbox")
+  }
+  const { emailClaimId } = await import("../core-model/firestore-util")
+  const { normalizeEmail } = await import("../core-model/identity")
+  const normalized = normalizeEmail(email)
+  const warnings: string[] = []
+  const attempt = async (what: string, fn: () => Promise<void>) => {
+    try {
+      await fn()
+    } catch (e) {
+      const m = e instanceof Error ? e.message : String(e)
+      console.error(`[agent:dismiss] ${input.activityId}: ${what} failed: ${m}`)
+      warnings.push(`${what} failed: ${m}`)
+    }
+  }
+  if (!draftRejected && normalized) {
+    await attempt("The decision record", () =>
+      deps.recordDecision(
+        buildDecision({
+          id: `dec-dismiss-${formId.replace(/[^A-Za-z0-9_-]/g, "_")}`,
+          subject: { kind: "contact", id: emailClaimId(normalized) },
+          chosen: "Dismissed the arrival as spam or a solicitation; no reply was sent",
+          why: reason.slice(0, 600),
+          revisit_when: "They write again with a real request, or the founder reopens it",
+          by: "founder",
+          at: now,
+        }),
+      ),
+    )
+  }
+  await attempt("Marking the submission spam", () => deps.markSpam(formId))
+  if (normalized) {
+    await attempt("Recording the sender", () => deps.recordSender({ id: emailClaimId(normalized), email: normalized, domain: senderDomain(normalized), formId, at: now, by: input.actor }))
+  } else {
+    warnings.push("The arrival has no email address, so later arrivals from this sender cannot be held")
+  }
+  let leftInbox = !activity || activity.triaged
+  if (activity && !activity.triaged) {
+    await attempt("Taking the arrival out of the inbox", async () => {
+      try {
+        await deps.triage(activity)
+      } catch (e) {
+        if (!/already been triaged/.test(e instanceof Error ? e.message : String(e))) throw e
+      }
+      leftInbox = true
+    })
+  }
+  return { dismissed: true, activityId: input.activityId, draftRejected, leftInbox, warnings }
+}
+
+/** The live wiring: the core view as the founder sees it, the core triage, and Firestore. */
+export async function dismissSolicitationLive(input: DismissInput, viewer: Viewer): Promise<DismissResult> {
+  const [{ getVisibleCoreView, invalidateCoreView }, { firestoreCoreStore, firestoreLeadPath }, { triageActivity }, { listIcpCohorts }, { pendingArrivals }, { setSubmissionState }, { getDb }] = await Promise.all([
+    import("../core-model/read"),
+    import("../core-model/firestore-store"),
+    import("../core-model/service"),
+    import("../firestore-icp-cohorts"),
+    import("../google-contacts/server"),
+    import("../firestore-submission-states"),
+    import("../firebase-admin"),
+  ])
+  invalidateCoreView()
+  const out = await dismissSolicitation(input, {
+    activity: async (id) => (await getVisibleCoreView(viewer)).activities.find((a) => a.id === id) ?? null,
+    triage: async (activity) => {
+      await triageActivity(firestoreCoreStore, firestoreLeadPath, { activity, decision: "dismiss", actor: input.actor, founder: true }, await listIcpCohorts(), pendingArrivals)
+    },
+    markSpam: (formId) => setSubmissionState("contact_forms", formId, "spam", input.actor),
+    recordSender: async (row) => {
+      await getDb().collection(DISMISSED_SENDERS_COLLECTION).doc(row.id).set(row)
+    },
+    recordDecision: async (memory) => {
+      await getDb().collection(CRM_COLLECTIONS.DECISIONS).doc(memory.id).set(memory)
+    },
+  })
+  invalidateCoreView()
+  return out
+}
+
 /** One row of "Waiting on you": the draft, and the arrival it answers as the inbox shows it. */
 export interface WaitingItem extends ReviewItem {
   arrival?: { name: string; email?: string; company?: string; body?: string; occurredAt: string; triaged: boolean; fit?: { grade?: string; score?: number } }
@@ -164,13 +311,18 @@ export interface WaitingItem extends ReviewItem {
  * hand-off names a next owner in words only, and the task registry records none, so nothing is routed to anyone else
  * yet: per-person routing follows the connector's per-person permissions.
  */
-export async function readWaiting(viewer: Viewer, now = new Date().toISOString()): Promise<{ now: string; items: WaitingItem[] }> {
+export async function readWaiting(viewer: Viewer, now = new Date().toISOString()): Promise<{ now: string; items: WaitingItem[]; holds: HeldArrival[] }> {
   const { getDb } = await import("../firebase-admin")
   const { getVisibleCoreView } = await import("../core-model/read")
   const d = getDb()
-  const [approvalsSnap, view] = await Promise.all([
+  const [approvalsSnap, view, holdsSnap] = await Promise.all([
     d.collection(SEND_APPROVALS_COLLECTION).orderBy("createdAt", "desc").limit(100).get(),
     getVisibleCoreView(viewer),
+    // The pre-check's holds. A read error leaves them out: the arrivals still show in To do, without the hint.
+    d.collection(INTAKE_HOLDS_COLLECTION).orderBy("at", "desc").limit(100).get().catch((e: unknown) => {
+      console.error("[agent:waiting] the pre-check's holds could not be read:", e instanceof Error ? e.message : e)
+      return null
+    }),
   ])
   const approvals = approvalsSnap.docs.map((x) => x.data() as StoredApproval)
   const taskIds = [...new Set(approvals.map((a) => a.taskId))]
@@ -199,7 +351,20 @@ export async function readWaiting(viewer: Viewer, now = new Date().toISOString()
       },
     }
   })
-  return { now, items }
+  // A hold shows only while its arrival is still waiting to be triaged.
+  const holds = (holdsSnap?.docs ?? [])
+    .map((x) => x.data() as IntakeHold)
+    .filter((h) => { const act = activities.get(h.activityId); return act && !act.triaged })
+    .map((h): HeldArrival => ({ activityId: h.activityId, why: h.why, summary: h.summary, at: h.at }))
+  return { now, items, holds }
+}
+
+/** An arrival the pre-check held with no draft, as To do marks it. */
+export interface HeldArrival {
+  activityId: string
+  why: IntakeHold["why"]
+  summary: string
+  at: string
 }
 
 /** One approval as stored, or null. */

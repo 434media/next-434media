@@ -21,6 +21,7 @@ export const WEEK_MS = 7 * 24 * 60 * 60 * 1000
  * The reasons the founder picks from. A short code groups the repeats; his words go with it. "other" takes free text
  * only. The list is the console's, not a policy: a code here decides nothing.
  */
+export const DISMISS_REASON_CODE = "solicitation"
 export const REASON_CODES = {
   approve: [
     { code: "as-drafted", label: "Right as drafted" },
@@ -36,14 +37,33 @@ export const REASON_CODES = {
     { code: "not-now", label: "Not the right time" },
     { code: "handle-myself", label: "I'll handle it myself" },
     { code: "other", label: "Other" },
+    /**
+     * Set by **Dismiss: spam or solicitation**, not picked from the Reject list (founder, 2026-11-19): nothing is sent,
+     * the arrival leaves To do, and the sender's later arrivals are held with no draft (lib/agent/solicitation.ts).
+     */
+    { code: DISMISS_REASON_CODE, label: "Spam or solicitation" },
   ],
 } as const
+
+/**
+ * The flag's first sentence, at most FLAG_SHORT characters: what it is and the decision he needs to make. Flags drafted
+ * before 2026-11-19 run to a paragraph; the rest stays one tap away, and the full detail is in the intake record.
+ */
+export const FLAG_SHORT = 160
+export function shortFlag(flag: string): { short: string; truncated: boolean } {
+  const text = flag.trim().replace(/\s+/g, " ")
+  const sentence = text.match(/^.+?[.!?](?=\s|$)/)?.[0] ?? text
+  const short = sentence.length > FLAG_SHORT ? `${sentence.slice(0, FLAG_SHORT).replace(/\s+\S*$/, "")}…` : sentence
+  return { short, truncated: short !== text }
+}
 
 /** A stored approval, with what the intake run added to it (lib/agent/intake.ts). */
 export type StoredApproval = SendApproval & {
   routing?: { outcome: RoutingOutcome; flag?: string }
   intake?: { policyVersion?: string; record?: string; nextOwner?: string; due?: string; returnCondition?: string; model?: string }
   arrival?: { formId?: string; receivedAt?: string }
+  /** The pre-check's note when it was unsure and drafted anyway (lib/agent/solicitation.ts). */
+  precheck?: { signals: string[]; summary: string }
 }
 
 export interface ReviewItem {
@@ -75,6 +95,8 @@ export interface ReviewItem {
   activityId?: string
   /** Edits made before the decision; the drafted text is kept on the approval as evidence. */
   edits: number
+  /** What the solicitation pre-check saw, when it was unsure and drafted anyway. */
+  precheck?: string
 }
 
 /** The People Inbox Activity an intake draft answers: the website form it was drafted from. */
@@ -110,6 +132,7 @@ export function reviewItem(a: StoredApproval, now: string, task?: Pick<AgentTask
     taskCancelled: !!task?.cancelled,
     ...(arrivalActivityId(a) ? { activityId: arrivalActivityId(a) } : {}),
     edits: a.revisions?.length ?? 0,
+    ...(a.precheck?.summary ? { precheck: a.precheck.summary } : {}),
   }
 }
 
