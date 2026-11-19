@@ -6,6 +6,7 @@ import {
   getSalesReps,
   getAllTasks,
 } from "@/lib/firestore-crm"
+import { isQuotaError } from "@/lib/firestore-quota"
 import type { OpportunityStage } from "@/types/crm-types"
 
 // Check admin access
@@ -47,20 +48,36 @@ export async function GET() {
     // cache, so getOpportunities() below — which derives from crm_clients — reuses
     // it without a second Firestore read. Sales reps are read fresh too; tasks are
     // uncached post-migration.
-    const clients = await getClients({ fresh: true }).catch(() => [])
+    // A failed read still degrades to an empty list, but is remembered: the
+    // warning below is driven by real read errors, never by an empty store
+    // (a preview's staging store is legitimately empty).
+    const readErrors: unknown[] = []
+    const orEmpty = <T,>(read: Promise<T[]>): Promise<T[]> =>
+      read.catch((err) => {
+        readErrors.push(err)
+        console.error("[GET /api/admin/crm] read failed:", err)
+        return [] as T[]
+      })
+    const clients = await orEmpty(getClients({ fresh: true }))
     const [opportunities, salesReps, allTasks] = await Promise.all([
-      getOpportunities().catch(() => []),
-      getSalesReps({ fresh: true }).catch(() => []),
-      getAllTasks().catch(() => []),
+      orEmpty(getOpportunities()),
+      orEmpty(getSalesReps({ fresh: true })),
+      orEmpty(getAllTasks()),
     ])
+    const warning = readErrors.some(isQuotaError)
+      ? "Firebase quota exceeded. Data may be incomplete. Please wait a few minutes and refresh."
+      : readErrors.length > 0
+        ? "Some CRM data could not be loaded. Data may be incomplete. Please refresh."
+        : null
 
-    // Check if data is empty (likely quota exceeded)
-    const isQuotaExceeded = clients.length === 0 && opportunities.length === 0 && allTasks.length === 0
+    // Archived deals are out of the active pipeline (the pipeline board's rule:
+    // is_opportunity && !is_archived). Closed-won totals stay all-time.
+    const archivedIds = new Set(clients.filter((c) => c.is_archived).map((c) => c.id))
 
     // Calculate stats from the data we already have (no additional reads)
     const activeClients = clients.filter((c) => c.status === "active").length
     const pipelineOpportunities = opportunities.filter(
-      (o) => o.stage !== "closed_won" && o.stage !== "closed_lost"
+      (o) => !archivedIds.has(o.id) && o.stage !== "closed_won" && o.stage !== "closed_lost"
     )
     const pipelineValue = pipelineOpportunities.reduce(
       (sum, o) => sum + (o.value || 0),
@@ -114,7 +131,7 @@ export async function GET() {
 
     // Build pipeline view from opportunities we already have (no additional reads)
     const pipeline = PIPELINE_STAGES.map(({ stage, label, color }) => {
-      const stageOpportunities = opportunities.filter((o) => o.stage === stage)
+      const stageOpportunities = opportunities.filter((o) => o.stage === stage && !archivedIds.has(o.id))
       const totalValue = stageOpportunities.reduce(
         (sum, o) => sum + (o.value || 0),
         0
@@ -144,9 +161,7 @@ export async function GET() {
         salesReps: salesReps.length,
         tasks: allTasks.length,
       },
-      ...(isQuotaExceeded && {
-        warning: "Firebase quota exceeded. Data may be incomplete. Please wait a few minutes and refresh.",
-      }),
+      ...(warning && { warning }),
     })
   } catch (error) {
     console.error("Error fetching CRM dashboard:", error)

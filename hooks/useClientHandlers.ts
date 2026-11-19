@@ -135,12 +135,27 @@ function clientContactsToForm(client: Client): ContactFormEntry[] {
   return contacts
 }
 
+// The API's own error text when it sent one, else the HTTP status.
+async function saveErrorMessage(response: Response): Promise<string> {
+  const body = await response.json().catch(() => null) as { error?: unknown } | null
+  return typeof body?.error === "string" && body.error ? body.error : `the server answered ${response.status}`
+}
+
+function errorText(err: unknown): string {
+  return err instanceof Error && err.message ? err.message : "network error"
+}
+
 interface UseClientHandlersProps {
   clients: Client[]
   setClients: Dispatch<SetStateAction<Client[]>>
   setToast: Dispatch<SetStateAction<ToastType | null>>
-  loadClients: () => Promise<void>
+  loadClients: (options?: { fresh?: boolean }) => Promise<void>
   loadDashboard: () => Promise<void>
+  // Called the moment a drawer's save succeeds, before the list reloads, so the
+  // page can drop its ?open= / ?openOpportunity= deep link and the reload
+  // cannot reopen the drawer it just closed.
+  onClientSaved?: () => void
+  onOpportunitySaved?: () => void
   // Client form state
   editingClient: Client | null
   setEditingClient: Dispatch<SetStateAction<Client | null>>
@@ -180,15 +195,17 @@ export function useClientHandlers({
   setLinkedTasks,
   setLinkedClientForPanel,
   setShowLinkedTasksPanel,
+  onClientSaved,
+  onOpportunitySaved,
 }: UseClientHandlersProps) {
   const [isSaving, setIsSaving] = useState(false)
   const [isSavingOpportunity, setIsSavingOpportunity] = useState(false)
 
   // Save client
-  const handleSaveClient = async () => {
+  const handleSaveClient = async (): Promise<boolean> => {
     if (!clientForm.company_name.trim()) {
       setToast({ message: "Client name is required", type: "error" })
-      return
+      return false
     }
 
     setIsSaving(true)
@@ -227,29 +244,33 @@ export function useClientHandlers({
         credentials: "include",
         body: JSON.stringify(body),
       })
-      if (!response.ok) throw new Error("Failed to save contact")
+      if (!response.ok) throw new Error(await saveErrorMessage(response))
 
+      onClientSaved?.()
       setToast({ message: `Contact ${editingClient ? "updated" : "created"} successfully`, type: "success" })
       setShowClientForm(false)
       setEditingClient(null)
       setClientForm(EMPTY_CLIENT_FORM)
-      loadClients()
-    } catch {
-      setToast({ message: "Failed to save contact", type: "error" })
+      loadClients({ fresh: true })
+      return true
+    } catch (err) {
+      // Keep the drawer open with the user's edits; say what failed.
+      setToast({ message: `Contact not saved: ${errorText(err)}`, type: "error" })
+      return false
     } finally {
       setIsSaving(false)
     }
   }
 
   // Save opportunity
-  const handleSaveOpportunity = async () => {
+  const handleSaveOpportunity = async (): Promise<boolean> => {
     if (!opportunityForm.company_name.trim()) {
       setToast({ message: "Client name is required", type: "error" })
-      return
+      return false
     }
     if (!opportunityForm.brand) {
       setToast({ message: "Please select a platform", type: "error" })
-      return
+      return false
     }
 
     if (opportunityForm.disposition === "closed_won" && opportunityForm.doc !== "100") {
@@ -258,7 +279,7 @@ export function useClientHandlers({
         "Opportunities must have 100% DOC to count towards Remaining and Pacing.\n\n" +
         "Do you want to proceed anyway? (The opportunity will appear in the exceptions report)"
       )
-      if (!confirmProceed) return
+      if (!confirmProceed) return false
     }
 
     setIsSavingOpportunity(true)
@@ -308,7 +329,10 @@ export function useClientHandlers({
         credentials: "include",
         body: JSON.stringify(body),
       })
-      if (!response.ok) throw new Error("Failed to save opportunity")
+      if (!response.ok) throw new Error(await saveErrorMessage(response))
+      // The record itself is saved: from here on, nothing may reopen the drawer
+      // or report the save as failed.
+      onOpportunitySaved?.()
 
       // Sync contacts to related clients with the same company name
       const companyNameLower = opportunityForm.company_name.trim().toLowerCase()
@@ -319,6 +343,7 @@ export function useClientHandlers({
           !c.is_opportunity
       })
 
+      let syncFailures = 0
       for (const relatedClient of relatedClients) {
         const existingContacts = relatedClient.contacts || []
         const existingContactMap = new Map<string, typeof existingContacts[0]>()
@@ -394,25 +419,33 @@ export function useClientHandlers({
         }
 
         try {
-          await fetch("/api/admin/crm/clients", {
+          const syncResponse = await fetch("/api/admin/crm/clients", {
             method: "PUT",
             headers: { "Content-Type": "application/json" },
             credentials: "include",
             body: JSON.stringify(updatePayload),
           })
+          if (!syncResponse.ok) syncFailures++
         } catch (syncErr) {
+          syncFailures++
           console.error("Failed to sync to related client:", syncErr)
         }
       }
 
-      setToast({ message: isEditingOpportunity ? "Opportunity updated successfully" : "Opportunity created successfully", type: "success" })
+      const saved = isEditingOpportunity ? "Opportunity updated" : "Opportunity created"
+      setToast(syncFailures > 0
+        ? { message: `${saved}, but ${syncFailures} related contact record${syncFailures === 1 ? "" : "s"} did not update`, type: "error" }
+        : { message: `${saved} successfully`, type: "success" })
       setShowOpportunityForm(false)
       setIsEditingOpportunity(false)
       setOpportunityForm(EMPTY_OPPORTUNITY_FORM)
-      loadClients()
+      loadClients({ fresh: true })
       loadDashboard()
-    } catch {
-      setToast({ message: "Failed to save opportunity", type: "error" })
+      return true
+    } catch (err) {
+      // Keep the drawer open with the user's edits; say what failed.
+      setToast({ message: `Opportunity not saved: ${errorText(err)}`, type: "error" })
+      return false
     } finally {
       setIsSavingOpportunity(false)
     }
