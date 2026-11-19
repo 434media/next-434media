@@ -337,12 +337,12 @@ function KanbanCard({
 
           {/* Meta info */}
           <div className="flex items-center gap-2 mt-2">
-            {item.value && item.value > 0 && (
+            {!!item.value && item.value > 0 && (
               <span className="inline-flex items-center gap-1 text-xs font-medium tabular-nums text-neutral-900">
                 {formatCurrency(item.value, true)}
               </span>
             )}
-            {item.value && item.value > 0 && item.brand && (
+            {!!item.value && item.value > 0 && item.brand && (
               <span className="text-neutral-300" aria-hidden="true">·</span>
             )}
             {item.brand && (
