@@ -19,7 +19,6 @@ import {
   PipelineView,
   OpportunitiesKanbanView,
   ClientsView,
-  TasksView,
   ClientDetailDrawer,
   OpportunityDetailDrawer,
   TaskDetailDrawer,
@@ -154,7 +153,6 @@ function SalesCRMPageInner() {
   // View state
   const [viewMode, setViewMode] = useState<ViewMode>("dashboard")
   const [searchQuery, setSearchQuery] = useState("")
-  const [brandFilter, setBrandFilter] = useState<string>("all")
   const [assigneeFilter, setAssigneeFilter] = useState<string>("all")
   const [opportunityAssigneeFilter, setOpportunityAssigneeFilter] = useState<string>("all")
   const [clientAssigneeFilter, setClientAssigneeFilter] = useState<string>("all")
@@ -406,16 +404,11 @@ function SalesCRMPageInner() {
     isSavingTask,
     isUploadingFile,
     openTaskModal,
-    handleAddTask,
-    handleOpenTaskFromNotification,
     handleDeleteTask,
-    handleBulkDeleteTasks,
-    handleDeleteTeamTasks,
     handleSaveTask,
     handleFileUpload,
     handleRemoveAttachment,
     handleFileDrop,
-    handleQuickStatusChange,
     handleUpdateTaskDisposition,
     handleAddLink,
     handleRemoveLink,
@@ -447,7 +440,6 @@ function SalesCRMPageInner() {
     currentOpportunityForLinked,
     setLinkedTasks,
     setShowLinkedTasksPanel,
-    setViewMode,
   })
 
   // Remember a drawer whose deep link was just closed or saved, until the URL
@@ -529,17 +521,6 @@ function SalesCRMPageInner() {
     }
   }, [toast])
 
-  // Check for task or content post to open from notification (from admin top bar)
-  useEffect(() => {
-    if (!isLoading && tasks.length > 0) {
-      const storedTaskId = sessionStorage.getItem("openTaskId")
-      if (storedTaskId) {
-        sessionStorage.removeItem("openTaskId")
-        handleOpenTaskFromNotification(storedTaskId)
-      }
-    }
-  }, [isLoading, tasks])
-
   // URL-driven Client drawer open state. ?open=<clientId> opens the drawer for
   // that client (used by Customer 360 cross-section pills, notification
   // deep-links, and refresh-restores-place behavior). When the drawer is open
@@ -593,6 +574,15 @@ function SalesCRMPageInner() {
     // Legacy redirect — the Social Calendar moved to its own /admin/content
     // route. Old links (?tab=social-calendar, optionally ?openContent=) forward
     // there so bookmarks and notifications keep working.
+    // Tasks moved to their own route, /admin/tasks (founder, 2026-11-19). Old ?tab=tasks links forward there with
+    // the rest of the query (?openTask=, ?new=task), so a deep link still opens the task or the form.
+    if (tabParam === "tasks") {
+      const params = new URLSearchParams(searchParams?.toString() ?? "")
+      params.delete("tab")
+      const qs = params.toString()
+      router.replace(qs ? `/admin/tasks?${qs}` : "/admin/tasks")
+      return
+    }
     if (tabParam === "social-calendar") {
       const openContent = searchParams?.get("openContent")
       router.replace(
@@ -665,7 +655,9 @@ function SalesCRMPageInner() {
       })
       setShowOpportunityForm(true)
     } else if (newParam === "task") {
-      handleAddTask()
+      // Tasks have their own page (/admin/tasks); an old ?new=task link lands there.
+      router.replace("/admin/tasks?new=task")
+      return
     }
     const params = new URLSearchParams(searchParams?.toString() ?? "")
     params.delete("new")
@@ -779,8 +771,6 @@ function SalesCRMPageInner() {
       loadTasks()
     } else if (viewMode === "clients") {
       loadClients()
-    } else if (viewMode === "tasks") {
-      loadTasks()
     } else if (viewMode === "pipeline") {
       loadPipeline()
       loadClients()
@@ -968,23 +958,6 @@ function SalesCRMPageInner() {
             }}
             onEditClient={handleEditClient}
             onBulkDelete={handleBulkDeleteClients}
-          />
-        )}
-
-        {/* Tasks View */}
-        {viewMode === "tasks" && (
-          <TasksView
-            tasks={tasks}
-            searchQuery={searchQuery}
-            brandFilter={brandFilter}
-            assigneeFilter={assigneeFilter}
-            onSearchChange={setSearchQuery}
-            onBrandFilterChange={setBrandFilter}
-            onAssigneeFilterChange={setAssigneeFilter}
-            onAddTask={handleAddTask}
-            onOpenTask={openTaskModal}
-            onQuickStatusChange={handleQuickStatusChange}
-            onBulkDelete={handleBulkDeleteTasks}
           />
         )}
 
