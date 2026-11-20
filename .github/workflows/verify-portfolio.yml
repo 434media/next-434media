@@ -142,6 +142,8 @@ jobs:
       # The SKILL.md loader on an invented skill: the specification and size checks, the fingerprint pin, the tool
       # allow-list, the folder-confined reader, and a full agent run on the mock model.
       - run: tsx --test lib/__tests__/skill-loader.test.ts
+      # The Agents page's Skills list on an invented catalog: the description split, every shown field, the SOP link.
+      - run: tsx --test lib/__tests__/skills-catalog-view.test.ts
       - run: tsx --test lib/__tests__/engine-foundation.test.ts
       # The exam (V1 item 3, IMP-27) on invented data: the suite format, a case added as a file, the mock tools' scope
       # checks, the four build plan v3 cases on good and bad recorded outputs, the engine on the mock model, the judge,
