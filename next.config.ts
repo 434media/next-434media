@@ -1,8 +1,10 @@
 import type { NextConfig } from "next";
 import { withBotId } from 'botid/next/config';
 import { REMOTE_IMAGE_PATTERNS } from './lib/image-hosts';
+import { securityHeaders } from './lib/security-headers';
 
 const nextConfig: NextConfig = {
+  poweredByHeader: false,
   typescript: {
     ignoreBuildErrors: true,
   },
@@ -56,8 +58,11 @@ const nextConfig: NextConfig = {
 
   // A brand book shared with a vendor (plan v11.2.1 Step 4 item 4): the link carries its access token, so the page is
   // never indexed and no referrer leaves it, as response headers as well as the page's own meta tags.
+  // Security headers on every response (lib/security-headers.ts, security log SW-9). Listed first: for the same key a
+  // later match wins, so /share keeps its stricter no-referrer.
   async headers() {
     return [
+      { source: '/:path*', headers: securityHeaders },
       {
         source: '/share/:path*',
         headers: [
