@@ -99,7 +99,7 @@ function Pill({ children, tone = "neutral", title }: { children: React.ReactNode
   )
 }
 
-export function AgentsConsole() {
+export function AgentsConsole({ skills }: { skills?: React.ReactNode } = {}) {
   const [data, setData] = useState<Console | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
@@ -228,6 +228,8 @@ export function AgentsConsole() {
             <ConsoleView data={data} exams={examReports} onLoadExams={loadExams} onOpenExam={(r) => setExam(examView(r))} />
           </>
         )}
+
+        {skills}
       </main>
 
       {exam && (
