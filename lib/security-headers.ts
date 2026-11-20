@@ -41,6 +41,7 @@ const csp: Record<string, string[]> = {
     "https://identitytoolkit.googleapis.com",
     "https://securetoken.googleapis.com",
     "https://*.google-analytics.com",
+    "https://analytics.google.com",
     "https://*.analytics.google.com",
     "https://*.googletagmanager.com",
     "https://www.google.com",
