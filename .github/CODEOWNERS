@@ -139,6 +139,8 @@
 /instrumentation.ts                          @434media/founder
 /lib/ai-gateway-text.ts                      @434media/founder
 /next.config.ts                              @434media/founder
+/lib/security-headers.ts                     @434media/founder
+/lib/__tests__/security-headers.test.ts      @434media/founder
 /lib/firebase-admin.ts                       @434media/founder
 /lib/cron-auth.ts                            @434media/founder
 /lib/unsubscribe-token.ts                    @434media/founder

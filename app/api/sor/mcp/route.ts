@@ -47,6 +47,7 @@ import { createMcpHandler, withMcpAuth } from "mcp-handler"
 import { z } from "zod4"
 import { listCollection, getOne, listPartnerServices, type Envelope } from "@/lib/sor/read"
 import { type Scope } from "@/lib/sor/visibility"
+import { secretMatches } from "@/lib/secret-compare"
 
 export const maxDuration = 60
 
@@ -182,19 +183,13 @@ const handler = createMcpHandler((server) => {
 })
 
 /**
- * A token is compared with `timingSafeEqual` on equal-length buffers. A plain
+ * A token is compared with `secretMatches` (both sides hashed, then `timingSafeEqual`), so no length leaks either. A plain
  * `===` on a secret leaks its length and prefix to a patient caller, and there
  * is no reason to accept that when the fix is three lines.
  */
 async function verifyToken(_req: Request, bearer?: string): Promise<AuthInfo | undefined> {
   if (!bearer) return undefined
-  const { timingSafeEqual } = await import("node:crypto")
-  const matches = (expected?: string) => {
-    if (!expected) return false
-    const a = Buffer.from(bearer)
-    const b = Buffer.from(expected)
-    return a.length === b.length && timingSafeEqual(a, b)
-  }
+  const matches = (expected?: string) => secretMatches(bearer, expected)
   if (matches(process.env.SOR_MCP_TOKEN_INTERNAL)) {
     return { token: bearer, clientId: "sor-internal", scopes: ["sor:internal", "sor:public"] }
   }
