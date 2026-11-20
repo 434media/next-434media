@@ -8,8 +8,27 @@
  */
 import { CATALOG_PATH, CONTEXT_REPO, SkillSourceError, readFileAt, resolveCommit, type SourceDeps } from "./source"
 
+export interface SkillStep {
+  text: string
+  /** The step where the skill stops for a person. */
+  waits: boolean
+}
+
 export interface SkillCard {
+  /** The skill's real name, as the code base and 434-context call it. */
   name: string
+  /** The plain name from the skill's card (card.json in 434-context); the real name when it has no card. */
+  label: string
+  /** One line: what it does. From the card, or the description's first sentence. */
+  summary: string
+  /** When it runs, from the card; empty without one (the long "when" below stands in). */
+  runsWhen: string
+  /** Four to six plain steps from the card, the stop marked; empty without one. */
+  steps: SkillStep[]
+  /** What it is not for, from the card, or the description's "Not for" / "Do not use" sentences. */
+  notFor: string
+  /** True when the plain fields came from the skill's card rather than the long description. */
+  hasCard: boolean
   /** The description up to its "Use …" sentence: what the skill does (its steps, in brief). */
   does: string
   /** From the "Use …" sentence on: when to use it, and when not to. */
@@ -51,6 +70,32 @@ const BRAND_NAMES: Record<string, string> = {
 
 const str = (v: unknown): string | null => (typeof v === "string" && v.trim() ? v.trim() : null)
 
+/** The first sentence of a text (up to its first ". " or the dash that opens a list), for a one-line fallback. */
+function firstSentence(text: string): string {
+  const cut = text.split(/\s+—\s+|(?<=[.!?])\s+/)[0] ?? text
+  return cut.replace(/[.:]$/, "")
+}
+
+/** The description's "Not for…" / "Do not use…" sentences, for the fallback "Not for". */
+function notForOf(text: string): string {
+  const m = /(?:^|(?<=[.!?…])\s+)((?:Not for|Do not use)\b[\s\S]*)$/.exec(text)
+  return m ? m[1].trim() : ""
+}
+
+function cardOf(v: unknown): { label: string; summary: string; when: string; steps: SkillStep[]; not_for: string } | null {
+  if (!v || typeof v !== "object") return null
+  const c = v as Record<string, unknown>
+  const label = str(c.label)
+  if (!label) return null
+  const steps = Array.isArray(c.steps)
+    ? c.steps.flatMap((s) => {
+        const t = str((s as { text?: unknown })?.text)
+        return t ? [{ text: t, waits: (s as { waits?: unknown }).waits === true }] : []
+      })
+    : []
+  return { label, summary: str(c.summary) ?? "", when: str(c.when) ?? "", steps, not_for: str(c.not_for) ?? "" }
+}
+
 /**
  * Splits a catalog description at its first sentence that begins "Use" (or, failing one, "Runs only", "Not for" or
  * "Do not use"): before it, what the skill does; from it, when to use it and when not.
@@ -81,8 +126,15 @@ export function parseCatalog(catalogText: string): SkillCard[] {
     const ceiling = str(e?.autonomy_ceiling)
     const exam = (e?.exam ?? {}) as { status?: unknown; suites?: unknown }
     const sop = str(e?.sop)
+    const card = cardOf(e?.card)
     return {
       name,
+      label: card?.label ?? name,
+      summary: card?.summary || firstSentence(does),
+      runsWhen: card?.when ?? "",
+      steps: card?.steps ?? [],
+      notFor: card?.not_for || notForOf(when),
+      hasCard: card !== null,
       does,
       when,
       owner: str(e?.owner),
