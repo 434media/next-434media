@@ -14,8 +14,9 @@ export const maxDuration = 300
 // members never have their status changed (no resurrection of opt-outs) — only
 // brand-new emails get `subscribed`, and tags refresh harmlessly.
 //
-// An address Mailchimp permanently deleted is recorded on its first refusal and skipped from then on, the
-// daily full pass included (lib/firestore-mailchimp-removed.ts). A merge-field refusal is logged with the field
+// An address Mailchimp permanently deleted, or judged fake or invalid, is recorded on its first refusal and skipped
+// from then on, the daily full pass included (lib/firestore-mailchimp-removed.ts). A member refused for a stale
+// Source value (434Media, Website) is sent again with Source set to 434MEDIA (staleSourceFix). A merge-field refusal is logged with the field
 // Mailchimp names, never the address.
 //
 // Preview without writing: GET this route with `?dryRun=1` and the header
@@ -30,12 +31,14 @@ export async function GET(request: NextRequest) {
         `[${result.dryRun ? "dry-run" : "live"}${result.fullPass ? ", full pass" : ""}] ` +
         `${result.pending} of ${result.uniqueContacts} unique contacts ${verb} ` +
         `(${result.included} included / ${result.skipped} skipped, ${result.groups.length} tag-groups` +
-        (result.excludedRemoved ? `, ${result.excludedRemoved} skipped as permanently deleted in Mailchimp` : "") +
+        (result.excludedRemoved ? `, ${result.excludedRemoved} skipped as permanently deleted or invalid in Mailchimp` : "") +
         `)` +
         (result.push
           ? ` — ${result.push.newMembers} new, ${result.push.updatedMembers} updated, ${result.push.errors} errors` +
             (result.push.deferred ? `, ${result.push.deferred} left for the next run` : "") +
-            (result.push.markedRemoved ? `, ${result.push.markedRemoved} newly marked permanently deleted` : "") +
+            (result.push.markedRemoved ? `, ${result.push.markedRemoved} marked permanently deleted` : "") +
+            (result.push.markedInvalid ? `, ${result.push.markedInvalid} marked invalid` : "") +
+            (result.push.sourceFixed ? `, ${result.push.sourceFixed} stale Source values set to 434MEDIA` : "") +
             (result.push.errorReasons.length
               ? ` — errors: ${result.push.errorReasons.map((r) => `${r.code}${r.field ? ` [${r.field}]` : ""} ×${r.count} ("${r.sample}")`).join("; ")}`
               : "")

@@ -862,6 +862,8 @@ export interface MailchimpPushMember {
   email: string
   firstName?: string
   lastName?: string
+  /** Other merge fields to set, e.g. a stale Source value corrected (staleSourceFix in lib/mailchimp-push-plan.ts). */
+  mergeFields?: Record<string, string>
 }
 
 export type MailchimpMemberStatus = "subscribed" | "pending" | "unsubscribed" | "transactional"
@@ -919,6 +921,7 @@ export async function pushMembersToMailchimp(
         // keep their current status, new members get the requested status.
         status_if_new: status,
         merge_fields: {
+          ...(m.mergeFields ?? {}),
           ...(m.firstName ? { FNAME: m.firstName } : {}),
           ...(m.lastName ? { LNAME: m.lastName } : {}),
         },
