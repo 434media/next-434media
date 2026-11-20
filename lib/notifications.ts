@@ -78,8 +78,9 @@ export async function sendCommentNotification(data: NotificationData): Promise<{
 
     // Create the email content
     const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://434media.com'
-    // Sanitize taskUrl to prevent SSRF/injection; fall back to safe constructed URL
-    const taskLink = taskUrl ? sanitizeUrl(taskUrl) : `${baseUrl}/admin/opportunities?task=${encodeURIComponent(taskId)}`
+    // Sanitize taskUrl to prevent SSRF/injection; fall back to safe constructed URL. The fallback opens the task's
+    // drawer on the Tasks page (?openTask=, app/admin/tasks/page.tsx); `/admin/opportunities?task=` was read by nothing.
+    const taskLink = taskUrl ? sanitizeUrl(taskUrl) : `${baseUrl}/admin/tasks?openTask=${encodeURIComponent(taskId)}`
     
     // Escape user-controlled content to prevent HTML injection in email
     const safeTaskTitle = escapeHtml(taskTitle)
