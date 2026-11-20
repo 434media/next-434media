@@ -47,7 +47,7 @@ export interface AutoSyncResult {
   /** Consent-bearing contacts excluded because they're on the suppression list. */
   excludedSuppressed: number
   /**
-   * Contacts skipped because Mailchimp permanently deleted them and refuses them back
+   * Contacts skipped because Mailchimp permanently deleted them or judged the address invalid
    * (lib/firestore-mailchimp-removed.ts). Counted in `uniqueContacts`, never pushed.
    */
   excludedRemoved: number
@@ -72,8 +72,12 @@ export interface AutoSyncResult {
     /** Errors by Mailchimp error code (and merge field, when named), with one redacted example each. */
     errorReasons: ErrorReason[]
     deferred: number
-    /** Addresses newly refused as permanently deleted this run, now marked and skipped from the next run on. */
+    /** Addresses refused as permanently deleted this run, now marked and skipped from the next run on. */
     markedRemoved: number
+    /** Addresses refused as fake or invalid this run, now marked and skipped until the address changes. */
+    markedInvalid: number
+    /** Members refused for a stale Source value (434Media, Website) and accepted with it set to 434MEDIA. */
+    sourceFixed: number
   }
 }
 
@@ -144,10 +148,10 @@ export async function runAutoSync(
   const planned: PlannedMember[] = []
   let excludedRemoved = 0
   for (const m of merged.values()) {
-    // Mailchimp permanently deleted this address: skip it on every pass, the full pass included, until the
-    // person gives consent again after the refusal was recorded.
-    const removedAt = removed.get(m.email)
-    if (removedAt !== undefined && stillRemoved(removedAt, m.consentAt)) {
+    // Mailchimp permanently deleted this address, or judged it invalid: skip it on every pass, the full pass
+    // included, until the person gives consent again after a deletion was recorded (never, for an invalid one).
+    const mark = removed.get(m.email)
+    if (mark !== undefined && stillRemoved(mark.removedAt, m.consentAt, mark.reason)) {
       excludedRemoved++
       continue
     }
@@ -194,7 +198,7 @@ export async function runAutoSync(
       (members, tags) => pushMembersToMailchimp(audienceId, members, "subscribed", tags),
       { deadline: startedAt.getTime() + PUSH_BUDGET_MS },
     )
-    // Record permanent-deletion refusals before the state, so a failed state write never loses them.
+    // Record permanent refusals before the state, so a failed state write never loses them.
     if (drained.removed.length) await markMailchimpRemoved(drained.removed, new Date().toISOString())
     await writeMailchimpPushState({
       sent: nextSentSet(planned, remembered, drained.accepted),
@@ -210,7 +214,9 @@ export async function runAutoSync(
       errors,
       errorReasons: reasons,
       deferred,
-      markedRemoved: new Set(drained.removed).size,
+      markedRemoved: new Set(drained.removed.filter((r) => r.reason === "permanently_deleted").map((r) => r.email)).size,
+      markedInvalid: new Set(drained.removed.filter((r) => r.reason === "invalid_address").map((r) => r.email)).size,
+      sourceFixed: drained.sourceFixed,
     }
   }
 

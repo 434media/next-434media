@@ -10,6 +10,9 @@ import {
   MERGE_TEXT_MAX,
   cleanMergeText,
   isPermanentlyDeletedRefusal,
+  isInvalidAddressRefusal,
+  errorEmail,
+  staleSourceFix,
   stillRemoved,
   PUSH_CHUNK,
   drainPending,
@@ -145,7 +148,7 @@ test("drainPending: a permanently deleted refusal is reported for marking and no
     errors: [{ email: "Gone@Example.com", code: "ERROR_GENERIC", message: DELETED.replace("a@example.com", "Gone@Example.com") }],
   })
   const r = await drainPending([m("gone@example.com"), m("ok@example.com")], push, { deadline: Number.POSITIVE_INFINITY })
-  assert.deepEqual(r.removed, ["gone@example.com"])
+  assert.deepEqual(r.removed, [{ email: "gone@example.com", reason: "permanently_deleted" }])
   assert.equal(r.retryable, 0)
   assert.equal(r.accepted.length, 2)
   assert.equal(r.reasons[0].sample.includes("@"), false)
@@ -157,7 +160,7 @@ test("drainPending: merge-field refusals are grouped by the field Mailchimp name
     updatedMembers: 0,
     errors: [
       { email: "a@example.com", code: "ERROR_GENERIC", message: "Your merge fields were invalid.", field: "PHONE", fieldMessage: "Please enter a valid phone for a@example.com" },
-      { email: "b@example.com", code: "ERROR_GENERIC", message: "Your merge fields were invalid.", field: "PHONE", fieldMessage: "Please enter a valid phone" },
+      { email: "b@example.com", code: "ERROR_GENERIC", message: "Your merge fields were invalid.", field: "PHONE", fieldMessage: "Please enter a valid phone for b@example.com" },
       { email: "c@example.com", code: "ERROR_GENERIC", message: "Your merge fields were invalid.", field: "FNAME" },
     ],
   })
@@ -186,4 +189,116 @@ test("cleanMergeText: strings only, control characters and extra space removed, 
   assert.equal(cleanMergeText(["Ana"]), undefined)
   assert.equal(cleanMergeText("x".repeat(400))!.length, MERGE_TEXT_MAX)
   assert.equal(cleanMergeText("Zoë"), "Zoë")
+})
+
+const SOURCE_REFUSAL = (stored: string) => ({
+  code: "ERROR_GENERIC",
+  message: "Your merge fields were invalid.",
+  field: "MMERGE7",
+  fieldMessage: `Value must be one of: In-Person Contact (Business Card/V-Card), Acquired Lists (bought or received), Social Media, 434MEDIA (not ${stored})`,
+})
+
+test("staleSourceFix: only 434Media and Website on MMERGE7 become 434MEDIA; anything else is left alone", () => {
+  assert.deepEqual(staleSourceFix(SOURCE_REFUSAL("434Media")), { MMERGE7: "434MEDIA" })
+  assert.deepEqual(staleSourceFix(SOURCE_REFUSAL("Website")), { MMERGE7: "434MEDIA" })
+  assert.equal(staleSourceFix(SOURCE_REFUSAL("website")), undefined)
+  assert.equal(staleSourceFix(SOURCE_REFUSAL("Referral")), undefined)
+  assert.equal(staleSourceFix(SOURCE_REFUSAL("toString")), undefined)
+  assert.equal(staleSourceFix({ ...SOURCE_REFUSAL("434Media"), field: "MMERGE8" }), undefined)
+  assert.equal(staleSourceFix({ message: "Your merge fields were invalid." }), undefined)
+})
+
+test("drainPending: a stale Source refusal is sent again with Source corrected, in the same tags; others stay logged", async () => {
+  const calls: Array<{ members: Array<{ email: string; mergeFields?: Record<string, string> }>; tags: string[] }> = []
+  const push: PushFn = async (members, tags) => {
+    calls.push({ members: members.map(({ email, mergeFields }) => ({ email, ...(mergeFields ? { mergeFields } : {}) })), tags })
+    if (calls.length === 1) {
+      return {
+        newMembers: 0,
+        updatedMembers: 1,
+        errors: [
+          { email: "a@example.com", ...SOURCE_REFUSAL("434Media") },
+          { email: "b@example.com", ...SOURCE_REFUSAL("Website") },
+          { email: "c@example.com", ...SOURCE_REFUSAL("Referral") },
+        ],
+      }
+    }
+    return { newMembers: 0, updatedMembers: members.length, errors: [] }
+  }
+  const pending = ["a", "b", "c", "ok"].map((x) => m(`${x}@example.com`, ["t"]))
+  const r = await drainPending(pending, push, { deadline: Number.POSITIVE_INFINITY })
+  assert.deepEqual(calls[1], {
+    members: [
+      { email: "a@example.com", mergeFields: { MMERGE7: "434MEDIA" } },
+      { email: "b@example.com", mergeFields: { MMERGE7: "434MEDIA" } },
+    ],
+    tags: ["t"],
+  })
+  assert.equal(calls.length, 2)
+  assert.equal(r.attempted, 4)
+  assert.equal(r.updatedMembers, 3)
+  assert.equal(r.sourceFixed, 2)
+  assert.equal(r.errors, 1)
+  assert.deepEqual(r.reasons.map((x) => [x.field, x.count]), [["MMERGE7", 1]])
+  assert.match(r.reasons[0].sample, /\(not Referral\)/)
+  assert.equal(r.accepted.length, 4)
+})
+
+test("drainPending: a stale Source member refused again on the resend is counted once, with the resend's error", async () => {
+  let n = 0
+  const push: PushFn = async () => {
+    n++
+    return n === 1
+      ? { newMembers: 0, updatedMembers: 0, errors: [{ email: "a@example.com", ...SOURCE_REFUSAL("Website") }] }
+      : { newMembers: 0, updatedMembers: 0, errors: [{ email: "a@example.com", code: "ERROR_GENERIC", message: "Your merge fields were invalid.", field: "PHONE" }] }
+  }
+  const r = await drainPending([m("a@example.com")], push, { deadline: Number.POSITIVE_INFINITY })
+  assert.equal(r.sourceFixed, 0)
+  assert.equal(r.errors, 1)
+  assert.deepEqual(r.reasons.map((x) => x.field), ["PHONE"])
+})
+
+const INVALID = "x@example.com looks fake or invalid, please enter a real email address."
+
+test("isInvalidAddressRefusal: Mailchimp's fake-or-invalid refusal only", () => {
+  assert.ok(isInvalidAddressRefusal(INVALID))
+  assert.ok(!isInvalidAddressRefusal(DELETED))
+  assert.ok(!isInvalidAddressRefusal(undefined))
+})
+
+test("stillRemoved: an invalid address stays skipped whatever the consent", () => {
+  assert.ok(stillRemoved("2026-11-20T00:00:00Z", "2026-12-01T00:00:00Z", "invalid_address"))
+  assert.ok(!stillRemoved("2026-11-20T00:00:00Z", "2026-12-01T00:00:00Z", "permanently_deleted"))
+})
+
+test("errorEmail: the named address, else the first address in the message", () => {
+  assert.equal(errorEmail({ email: " A@Example.com ", message: DELETED }), "a@example.com")
+  assert.equal(errorEmail({ email: "", message: DELETED.replace("a@example.com", "Gone@Example.com") }), "gone@example.com")
+  assert.equal(errorEmail({ email: "", message: "no address" }), "")
+})
+
+// Reproduces the 2026-11-20 00:00Z full pass: the log showed "ERROR_GENERIC ×17" with one deletion sample, but only
+// one of the 17 was a deletion, and only that one was marked. Grouping by code hid the other messages.
+test("drainPending: refusals of one code but different messages are logged apart; deleted and invalid are both marked", async () => {
+  const push: PushFn = async () => ({
+    newMembers: 0,
+    updatedMembers: 0,
+    errors: [
+      { email: "gone@example.com", code: "ERROR_GENERIC", message: DELETED.replace("a@example.com", "gone@example.com") },
+      { email: "x@example.com", code: "ERROR_GENERIC", message: INVALID },
+      { email: "", code: "ERROR_GENERIC", message: INVALID.replace("x@example.com", "y@example.com") },
+      { email: "c@example.com", code: "ERROR_GENERIC", message: "c@example.com is in a compliance state due to unsubscribe, bounce, or compliance review and cannot be subscribed." },
+    ],
+  })
+  const plan = ["gone", "x", "y", "c"].map((x) => m(`${x}@example.com`))
+  const r = await drainPending(plan, push, { deadline: Number.POSITIVE_INFINITY })
+  assert.deepEqual(r.removed, [
+    { email: "gone@example.com", reason: "permanently_deleted" },
+    { email: "x@example.com", reason: "invalid_address" },
+    { email: "y@example.com", reason: "invalid_address" },
+  ])
+  assert.deepEqual(r.reasons.map((x) => x.count), [2, 1, 1])
+  assert.match(r.reasons[0].sample, /looks fake or invalid/)
+  assert.ok(r.reasons.some((x) => /compliance state/.test(x.sample)))
+  assert.ok(r.reasons.every((x) => !x.sample.includes("@")))
 })

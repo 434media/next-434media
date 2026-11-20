@@ -111,12 +111,65 @@ export function isPermanentlyDeletedRefusal(message: string | undefined): boolea
   return !!message && /permanently deleted|forgotten email/i.test(message)
 }
 
+/** Mailchimp's refusal of an address it judges fake or invalid ("… looks fake or invalid, please enter a real email address."). */
+export function isInvalidAddressRefusal(message: string | undefined): boolean {
+  return !!message && /looks fake or invalid/i.test(message)
+}
+
+/** Why an address is marked and skipped (lib/firestore-mailchimp-removed.ts). */
+export type UnpushableReason = "permanently_deleted" | "invalid_address"
+
+/** A refusal the same address will hit on every push, so the address is marked and skipped; undefined for any other. */
+export function unpushableReason(message: string | undefined): UnpushableReason | undefined {
+  if (isPermanentlyDeletedRefusal(message)) return "permanently_deleted"
+  if (isInvalidAddressRefusal(message)) return "invalid_address"
+  return undefined
+}
+
 /**
- * Whether an address Mailchimp permanently deleted is still to be skipped. It stays skipped until the person gives
- * consent again after the refusal was recorded: a consent record (signup or opted-in registration) dated later.
- * A missing or unreadable date never clears the mark.
+ * The address an error is about, lowercased. Mailchimp names it in `email_address`; when that is blank, the first
+ * address in the message (its refusals start with the address).
  */
-export function stillRemoved(removedAt: string, latestConsentAt: string | undefined): boolean {
+export function errorEmail(e: Pick<PushError, "email" | "message">): string {
+  const named = (e.email ?? "").trim().toLowerCase()
+  if (named) return named
+  const inMessage = (e.message ?? "").match(/[^\s@<>"'(),;:]+@[^\s@<>"'(),;:]+\.[a-z]{2,}/i)
+  return inMessage ? inMessage[0].toLowerCase() : ""
+}
+
+/**
+ * Stale values on the Source dropdown (MMERGE7) that Mailchimp no longer lists as a choice (founder, 2026-11-20:
+ * "approve, website to 434MEDIA"). The push never sets Source, but Mailchimp re-validates a member's stored merge
+ * fields on every update and refuses the whole update while one is invalid ("Value must be one of: … 434MEDIA
+ * (not 434Media)"). A member refused for exactly one of these values is sent again with Source set to its valid
+ * choice. Any other invalid value is left as it is and logged: never guessed. The dropdown's choices are Mailchimp's
+ * settings and are not changed here.
+ */
+export const SOURCE_MERGE_FIELD = "MMERGE7"
+export const STALE_SOURCE_FIXES: Readonly<Record<string, string>> = { "434Media": "434MEDIA", Website: "434MEDIA" }
+
+/** The merge field correction for a refusal of a stale Source value, or undefined when it is anything else. */
+export function staleSourceFix(e: Pick<PushError, "field" | "message" | "fieldMessage">): Record<string, string> | undefined {
+  if (e.field?.trim() !== SOURCE_MERGE_FIELD) return undefined
+  const text = [e.fieldMessage ?? "", e.message ?? ""].join(" ")
+  const stored = text.match(/\(not ([^)]*)\)/)?.[1]
+  if (stored === undefined || !Object.prototype.hasOwnProperty.call(STALE_SOURCE_FIXES, stored)) return undefined
+  return { [SOURCE_MERGE_FIELD]: STALE_SOURCE_FIXES[stored] }
+}
+
+/**
+ * Whether a marked address is still to be skipped. One Mailchimp permanently deleted stays skipped until the person
+ * gives consent again after the refusal was recorded: a consent record (signup or opted-in registration) dated
+ * later. A missing or unreadable date never clears the mark. One Mailchimp judged invalid is always skipped.
+ */
+export function stillRemoved(
+  removedAt: string,
+  latestConsentAt: string | undefined,
+  reason: UnpushableReason = "permanently_deleted",
+): boolean {
+  // An address Mailchimp judges invalid stays skipped whatever the consent: the same address is refused again. It is
+  // pushed once the contact's address changes, because the mark belongs to the old one.
+  if (reason === "invalid_address") return true
   const r = Date.parse(removedAt)
   const c = latestConsentAt ? Date.parse(latestConsentAt) : NaN
   if (!Number.isFinite(c)) return true
@@ -154,8 +207,10 @@ export interface DrainResult {
   deferred: number
   /** Fingerprints not to send again until they change: accepted, or rejected for a reason a retry won't fix. */
   accepted: string[]
-  /** Addresses Mailchimp refused as permanently deleted (isPermanentlyDeletedRefusal), lowercased. */
-  removed: string[]
+  /** Addresses Mailchimp refused for good (unpushableReason), lowercased, with the reason: to be marked and skipped. */
+  removed: Array<{ email: string; reason: UnpushableReason }>
+  /** Members refused for a stale Source value and accepted when sent again with it corrected (staleSourceFix). */
+  sourceFixed: number
 }
 
 /**
@@ -179,6 +234,7 @@ export async function drainPending(
     deferred: 0,
     accepted: [],
     removed: [],
+    sourceFixed: 0,
   }
   const reasons = new Map<string, ErrorReason>()
   const requests = pushRequests(pending)
@@ -195,25 +251,57 @@ export async function drainPending(
     res.attempted += members.length
     res.newMembers += r.newMembers
     res.updatedMembers += r.updatedMembers
-    res.errors += r.errors.length
+    let errors = r.errors
+
+    // A member refused only for a stale Source value is sent once more, in this request, with it corrected.
+    const fixes = new Map<string, Record<string, string>>()
+    for (const e of errors) {
+      const fix = staleSourceFix(e)
+      const email = errorEmail(e)
+      if (fix && email) fixes.set(email, fix)
+    }
+    if (fixes.size) {
+      const resend = members.filter((m) => fixes.has(m.email.trim().toLowerCase()))
+      const again = await push(
+        resend.map(({ email, firstName, lastName }) => ({
+          email,
+          firstName,
+          lastName,
+          mergeFields: fixes.get(email.trim().toLowerCase()),
+        })),
+        tags,
+      )
+      res.newMembers += again.newMembers
+      res.updatedMembers += again.updatedMembers
+      const resent = new Set(resend.map((m) => m.email.trim().toLowerCase()))
+      const stillRefused = new Set(again.errors.map(errorEmail))
+      res.sourceFixed += [...resent].filter((e) => !stillRefused.has(e)).length
+      errors = [...errors.filter((e) => !resent.has(errorEmail(e))), ...again.errors]
+    }
+
+    res.errors += errors.length
     const retry = new Set<string>()
-    for (const e of r.errors) {
+    for (const e of errors) {
       const code = e.code || "unknown"
+      const email = errorEmail(e)
       if (RETRYABLE_ERROR_CODES.has(code)) {
-        retry.add(e.email.trim().toLowerCase())
+        retry.add(email)
         res.retryable++
       }
-      if (isPermanentlyDeletedRefusal(e.message)) res.removed.push(e.email.trim().toLowerCase())
+      const unpushable = unpushableReason(e.message)
+      if (unpushable && email) res.removed.push({ email, reason: unpushable })
+      // Grouped by code, field and the message with addresses removed, so each distinct refusal shows in the log
+      // (2026-11-20: grouping by code alone showed one sample for 17 errors of several kinds).
       const field = e.field?.trim() || undefined
-      const key = field ? `${code}|${field}` : code
-      const text = [e.message ?? "", e.fieldMessage ?? ""].filter(Boolean).join(" ")
-      const reason = reasons.get(key) ?? { code, ...(field ? { field } : {}), count: 0, sample: redactEmails(text).slice(0, 200) }
+      const text = redactEmails([e.message ?? "", e.fieldMessage ?? ""].filter(Boolean).join(" ")).slice(0, 200)
+      const key = [code, field ?? "", text].join("\u0000")
+      const reason = reasons.get(key) ?? { code, ...(field ? { field } : {}), count: 0, sample: text }
       reason.count++
       reasons.set(key, reason)
     }
     for (const m of members) if (!retry.has(m.email.trim().toLowerCase())) res.accepted.push(fingerprint(m))
   }
-  res.reasons = [...reasons.values()].sort((a, b) => b.count - a.count || a.code.localeCompare(b.code) || (a.field ?? "").localeCompare(b.field ?? ""))
+  res.reasons = [...reasons.values()].sort((a, b) => b.count - a.count || a.code.localeCompare(b.code) || (a.field ?? "").localeCompare(b.field ?? "") || a.sample.localeCompare(b.sample))
   return res
 }
 
