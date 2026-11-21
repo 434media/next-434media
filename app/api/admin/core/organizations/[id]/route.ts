@@ -1,6 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { requireAdmin } from "@/lib/auth"
-import { getVisibleCoreView, organizationDetail } from "@/lib/core-model/read"
+import { getVisibleCoreView, organizationDetail, rebuildVisibleCoreView } from "@/lib/core-model/read"
+import { findWithOneRebuild } from "@/lib/core-model/detail-lookup"
 import { firestoreCoreStore } from "@/lib/core-model/firestore-store"
 import { normalizeDomain } from "@/lib/core-model/identity"
 import { canSee } from "@/lib/core-model/visibility"
@@ -20,7 +21,13 @@ export async function GET(_request: NextRequest, ctx: Ctx) {
   const { id } = await ctx.params
   try {
     const viewer = await viewerOf(auth.session)
-    const detail = organizationDetail(await getVisibleCoreView(viewer), decodeURIComponent(id))
+    const organizationId = decodeURIComponent(id)
+    // A record saved a moment ago on another instance may be missing from this one's cached view: rebuild once.
+    const detail = await findWithOneRebuild(
+      () => getVisibleCoreView(viewer),
+      () => rebuildVisibleCoreView(viewer),
+      (view) => organizationDetail(view, organizationId),
+    )
     if (!detail || !canSee(detail.organization, viewer)) return NextResponse.json({ error: "Not found" }, { status: 404 })
     return NextResponse.json({ success: true, data: detail })
   } catch (error) {
@@ -57,7 +64,15 @@ export async function PATCH(request: NextRequest, ctx: Ctx) {
   try {
     const viewer = await viewerOf(auth.session)
     // The viewer's own view: a record they may not see is not found, and cannot be edited.
-    const [view, cohorts] = await Promise.all([getVisibleCoreView(viewer), listIcpCohorts().catch(() => [])])
+    // Rebuilt once when the record is missing: it may have been saved a moment ago on another instance.
+    const [view, cohorts] = await Promise.all([
+      findWithOneRebuild(
+        () => getVisibleCoreView(viewer),
+        () => rebuildVisibleCoreView(viewer),
+        (v) => (v.organizations.some((r) => r.id === id) ? v : null),
+      ).then((v) => v ?? getVisibleCoreView(viewer)),
+      listIcpCohorts().catch(() => []),
+    ])
     const org = await editOrganizationRecord(firestoreCoreStore, view, id, edit, { viewer, actor: auth.session.email, cohorts })
     return NextResponse.json({ success: true, data: org })
   } catch (error) {

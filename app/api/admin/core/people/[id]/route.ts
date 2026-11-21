@@ -1,6 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { requireAdmin } from "@/lib/auth"
-import { getVisibleCoreView, personDetail } from "@/lib/core-model/read"
+import { getVisibleCoreView, personDetail, rebuildVisibleCoreView } from "@/lib/core-model/read"
+import { findWithOneRebuild } from "@/lib/core-model/detail-lookup"
 import { firestoreCoreStore } from "@/lib/core-model/firestore-store"
 import { personColdGate } from "@/lib/core-model/cold-gate"
 import { canEmail } from "@/lib/core-model/consent"
@@ -35,8 +36,13 @@ export async function GET(_request: NextRequest, ctx: Ctx) {
   const { id } = await ctx.params
   try {
     const viewer = await viewerOf(auth.session)
-    const view = await getVisibleCoreView(viewer)
-    const detail = personDetail(view, decodeURIComponent(id))
+    const personId = decodeURIComponent(id)
+    // A record saved a moment ago on another instance may be missing from this one's cached view: rebuild once.
+    const detail = await findWithOneRebuild(
+      () => getVisibleCoreView(viewer),
+      () => rebuildVisibleCoreView(viewer),
+      (view) => personDetail(view, personId),
+    )
     if (!detail || !canSee(detail.person, viewer)) {
       return NextResponse.json({ error: "Not found" }, { status: 404 })
     }
@@ -129,7 +135,15 @@ export async function PATCH(request: NextRequest, ctx: Ctx) {
   try {
     const viewer = await viewerOf(auth.session)
     // The viewer's own view: a record they may not see is not found, and cannot be edited.
-    const [view, cohorts] = await Promise.all([getVisibleCoreView(viewer), listIcpCohorts().catch(() => [])])
+    // Rebuilt once when the record is missing: it may have been saved a moment ago on another instance.
+    const [view, cohorts] = await Promise.all([
+      findWithOneRebuild(
+        () => getVisibleCoreView(viewer),
+        () => rebuildVisibleCoreView(viewer),
+        (v) => (v.people.some((r) => r.id === id) ? v : null),
+      ).then((v) => v ?? getVisibleCoreView(viewer)),
+      listIcpCohorts().catch(() => []),
+    ])
     const person = await editPersonRecord(firestoreCoreStore, view, id, edit, { viewer, actor: auth.session.email, cohorts })
     return NextResponse.json({ success: true, data: person })
   } catch (error) {

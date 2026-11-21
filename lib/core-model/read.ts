@@ -30,6 +30,7 @@ export interface BuiltCoreView extends CoreView {
 const CACHE_TTL = 30 * 1000
 let cache: { data: BuiltCoreView; ts: number } | null = null
 let inFlight: Promise<BuiltCoreView> | null = null
+let inFlightGeneration = -1
 let generation = 0
 
 export function invalidateCoreView(): void {
@@ -88,24 +89,37 @@ async function build(): Promise<BuiltCoreView> {
 
 export async function getCoreView(): Promise<BuiltCoreView> {
   if (cache && Date.now() - cache.ts < CACHE_TTL) return cache.data
-  if (inFlight) return inFlight
+  // Share a build only if it started after the last write; a read after a write never gets a build from before it.
+  if (inFlight && inFlightGeneration === generation) return inFlight
   const startedAt = generation
-  inFlight = build()
+  const pending: Promise<BuiltCoreView> = build()
     .then((data) => {
       // A write during the build makes this result stale: serve it to the waiting callers, but don't cache it.
       if (startedAt === generation) cache = { data, ts: Date.now() }
       return data
     })
     .finally(() => {
-      inFlight = null
+      if (inFlight === pending) inFlight = null
     })
-  return inFlight
+  inFlight = pending
+  inFlightGeneration = startedAt
+  return pending
 }
 
 export type { Viewer } from "./view-filter"
 
 /** The view a viewer may see (filterViewFor over the cached whole view). */
 export async function getVisibleCoreView(viewer: Viewer): Promise<BuiltCoreView> {
+  return filterViewFor(await getCoreView(), viewer)
+}
+
+/**
+ * The view a viewer may see, built fresh: this instance's cache is dropped first. Used once by a detail GET whose id
+ * is missing from the cached view (lib/core-model/detail-lookup.ts), because the write may have happened on another
+ * instance.
+ */
+export async function rebuildVisibleCoreView(viewer: Viewer): Promise<BuiltCoreView> {
+  invalidateCoreView()
   return filterViewFor(await getCoreView(), viewer)
 }
 
