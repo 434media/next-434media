@@ -22,6 +22,7 @@ import { INTAKE_HOLDS_COLLECTION, INTAKE_SKILL, type IntakeHold } from "./intake
 import { DISMISSED_SENDERS_COLLECTION, senderDomain } from "./solicitation"
 import { DISMISS_REASON_CODE, REASON_CODES, WEEK_MS, arrivalActivityId, costSummary, groupReasons, handoffWaits, reviewItem, runSummary, sortQueue, type ReviewItem, type StoredApproval } from "./review"
 import { costSince, todayBrief } from "./today"
+import { POLI_SKILL } from "./poli"
 import type { Activity, Organization } from "../../types/core-model"
 import type { Viewer } from "../core-model/read"
 
@@ -311,11 +312,11 @@ export interface WaitingItem extends ReviewItem {
  * hand-off names a next owner in words only, and the task registry records none, so nothing is routed to anyone else
  * yet: per-person routing follows the connector's per-person permissions.
  */
-export async function readWaiting(viewer: Viewer, now = new Date().toISOString()): Promise<{ now: string; items: WaitingItem[]; holds: HeldArrival[] }> {
+export async function readWaiting(viewer: Viewer, now = new Date().toISOString()): Promise<{ now: string; items: WaitingItem[]; holds: HeldArrival[]; poli: PoliRow[] }> {
   const { getDb } = await import("../firebase-admin")
   const { getVisibleCoreView } = await import("../core-model/read")
   const d = getDb()
-  const [approvalsSnap, view, holdsSnap] = await Promise.all([
+  const [approvalsSnap, view, holdsSnap, poli] = await Promise.all([
     d.collection(SEND_APPROVALS_COLLECTION).orderBy("createdAt", "desc").limit(100).get(),
     getVisibleCoreView(viewer),
     // The pre-check's holds. A read error leaves them out: the arrivals still show in To do, without the hint.
@@ -323,6 +324,7 @@ export async function readWaiting(viewer: Viewer, now = new Date().toISOString()
       console.error("[agent:waiting] the pre-check's holds could not be read:", e instanceof Error ? e.message : e)
       return null
     }),
+    readPoliRows(),
   ])
   const approvals = approvalsSnap.docs.map((x) => x.data() as StoredApproval)
   const taskIds = [...new Set(approvals.map((a) => a.taskId))]
@@ -356,7 +358,41 @@ export async function readWaiting(viewer: Viewer, now = new Date().toISOString()
     .map((x) => x.data() as IntakeHold)
     .filter((h) => { const act = activities.get(h.activityId); return act && !act.triaged })
     .map((h): HeldArrival => ({ activityId: h.activityId, why: h.why, summary: h.summary, at: h.at }))
-  return { now, items, holds }
+  return { now, items, holds, poli }
+}
+
+/** A founder-owned task Polí's rule pass raised and still open, as To do shows it (V1 item 4, Polí slice 1). */
+export interface PoliRow {
+  id: string
+  ref?: string
+  title: string
+  detail: string
+  path: string
+  recordRef?: string
+  createdAt: string | null
+}
+
+/**
+ * Polí's open tasks, oldest first. They live in `crm_tasks` (`source: "poli"`) and open on the Tasks page; To do is a
+ * view over them, never a store. A read error leaves them out: they still show on the Tasks page.
+ */
+async function readPoliRows(): Promise<PoliRow[]> {
+  try {
+    const [{ getDb }, { taskView, toIso }, { POLI_SOURCE }] = await Promise.all([import("../firebase-admin"), import("./poli-server"), import("./poli")])
+    const snap = await getDb().collection("crm_tasks").where("source", "==", POLI_SOURCE).limit(200).get()
+    return snap.docs
+      .map((d) => ({ d: d.data(), v: taskView(d.id, d.data()) }))
+      .filter(({ v }) => v.status !== "completed" && v.status !== "deferred")
+      .map(({ d, v }): PoliRow => {
+        const poli = (d.poli ?? {}) as Record<string, unknown>
+        const desc = typeof d.description === "string" ? d.description : ""
+        return { id: v.id, ...(v.ref ? { ref: v.ref } : {}), title: v.title ?? "", detail: desc.split(" Raised by Polí")[0], path: typeof poli.path === "string" ? poli.path : "", ...(typeof poli.record_ref === "string" ? { recordRef: poli.record_ref } : {}), createdAt: toIso(d.created_at) }
+      })
+      .sort((a, b) => (a.createdAt ?? "").localeCompare(b.createdAt ?? ""))
+  } catch (e) {
+    console.error("[agent:waiting] Polí's tasks could not be read:", e instanceof Error ? e.message : e)
+    return []
+  }
 }
 
 /** An arrival the pre-check held with no draft, as To do marks it. */
@@ -403,9 +439,10 @@ export async function readStoredControls(): Promise<AgentControls> {
   return parseControls((await (await controlsRef()).get()).data())
 }
 
-/** Sets intake's mode and its send flag, the Ask panel's on/off, and resumes after a stop. A stop goes through `stopAgents`. */
-export async function setControls(change: { intakeMode?: SkillMode; intakeSends?: boolean; ask?: boolean; resume?: boolean }, now = new Date().toISOString()): Promise<AgentControls> {
+/** Sets intake's mode and its send flag, Polí's mode, the Ask panel's on/off, and resumes after a stop. A stop goes through `stopAgents`. */
+export async function setControls(change: { intakeMode?: SkillMode; intakeSends?: boolean; ask?: boolean; poliMode?: SkillMode; resume?: boolean }, now = new Date().toISOString()): Promise<AgentControls> {
   if (change.intakeMode !== undefined && !(SKILL_MODES as readonly string[]).includes(change.intakeMode)) throw new Error("Unknown mode")
+  if (change.poliMode !== undefined && !(SKILL_MODES as readonly string[]).includes(change.poliMode)) throw new Error("Unknown mode")
   const ref = await controlsRef()
   const { getDb } = await import("../firebase-admin")
   await getDb().runTransaction(async (t) => {
@@ -413,6 +450,7 @@ export async function setControls(change: { intakeMode?: SkillMode; intakeSends?
     const skills = { ...((cur?.skills as Record<string, unknown>) ?? {}) }
     const sends = { ...((cur?.sends as Record<string, unknown>) ?? {}) }
     if (change.intakeMode !== undefined) skills[INTAKE_SKILL] = change.intakeMode
+    if (change.poliMode !== undefined) skills[POLI_SKILL] = change.poliMode
     if (change.intakeSends !== undefined) sends.intake_reply = change.intakeSends
     // A document that never existed starts stopped (fails closed); only an explicit resume clears it.
     const stopped = change.resume ? false : typeof cur?.stopped === "boolean" ? cur.stopped : true
@@ -443,6 +481,7 @@ export async function readConsole(now = new Date().toISOString()) {
   const since = new Date(Date.parse(now) - WEEK_MS).toISOString()
   const d = getDb()
   const watch = readWatch(new Date(now))
+  const poli = import("./poli-server").then(({ readPoliToday }) => readPoliToday(now))
   const month = readAskMonth(now)
   const months = import("../spend-caps-server").then(({ monthStatus }) => Promise.all([monthStatus("engine-exam", now), monthStatus("intake", now)]))
   const [approvalsSnap, tasksSnap, ledgerSnap, costsSnap, controls, pin, askPin] = await Promise.all([
@@ -476,8 +515,23 @@ export async function readConsole(now = new Date().toISOString()) {
     runs,
     waits: handoffWaits(entries),
     costs: costTotals,
-    today: todayBrief({ now, ...(await watch), runs, costs: costTotals, cost24hUsd: costSince(costs, now) }),
+    poli: await poliState(poli),
+    today: todayBrief({ now, ...(await watch), runs, costs: costTotals, cost24hUsd: costSince(costs, now), poli: await poliLine(poli, now) }),
   }
+}
+
+/** Polí's line for Today (lib/agent/poli.ts poliTodayLine), or none when it could not be read. */
+async function poliLine(p: Promise<Awaited<ReturnType<typeof import("./poli-server").readPoliToday>>>, now: string) {
+  const r = await p
+  if (!r) return null
+  const { poliTodayLine } = await import("./poli")
+  return poliTodayLine(r.plan, r.mode, now)
+}
+
+/** Polí's mode, for the Agents page's row. */
+async function poliState(p: Promise<Awaited<ReturnType<typeof import("./poli-server").readPoliToday>>>) {
+  const r = await p
+  return r ? { mode: r.mode } : null
 }
 
 /**
