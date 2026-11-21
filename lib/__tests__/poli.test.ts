@@ -13,6 +13,7 @@ import { verifyChain } from "../agent/ledger"
 import { IDLE_DAYS, MAX_OPEN_POLI, planPass, poliTodayLine, routeTask, type PoliMode, type PoliTaskView } from "../agent/poli"
 import { CRM_TASKS, readPoliMode, runPoliPass, taskView, toIso, type PoliPassDeps } from "../agent/poli-server"
 import { todayBrief } from "../agent/today"
+import { STAGING_PROJECT_ID } from "../preview-auth"
 
 const NOW = "2026-11-21T15:00:00.000Z"
 const DAY = 24 * 3_600_000
@@ -206,9 +207,9 @@ test("the switch: production reads the kill switch; only a staging preview may r
     GCP_PROJECT_NUMBER: "1",
     GCP_WORKLOAD_IDENTITY_POOL_ID: "p",
     GCP_WORKLOAD_IDENTITY_POOL_PROVIDER_ID: "v",
-    GCP_SERVICE_ACCOUNT_EMAIL: "runner@c434-staging.iam.gserviceaccount.com",
-    FIREBASE_PROJECT_ID: "c434-staging",
-    NEXT_PUBLIC_FIREBASE_PROJECT_ID: "c434-staging",
+    GCP_SERVICE_ACCOUNT_EMAIL: `staging-app@${STAGING_PROJECT_ID}.iam.gserviceaccount.com`,
+    FIREBASE_PROJECT_ID: STAGING_PROJECT_ID,
+    NEXT_PUBLIC_FIREBASE_PROJECT_ID: STAGING_PROJECT_ID,
   }
   assert.equal(await readPoliMode(staging, draft), "draft")
   assert.equal(await readPoliMode({ ...staging, FIREBASE_PROJECT_ID: "prod-project" }, draft), "off")
