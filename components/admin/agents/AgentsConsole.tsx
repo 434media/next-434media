@@ -13,6 +13,7 @@ import Link from "next/link"
 import {
   AlertCircle,
   CheckCircle2,
+  ClipboardList,
   FlaskConical,
   MessageSquareText,
   Pin,
@@ -42,10 +43,13 @@ interface Console {
   runs: RunSummary
   waits: HandoffWait[]
   costs: CostSummary
+  /** Polí's mode as it runs here (lib/agent/poli-server.ts readPoliMode): off on any deployment but Production and staging previews. */
+  poli?: { mode: Mode } | null
 }
 
 const SKILL = "434-intake-qualification"
 const ASK_SKILL = "admin-ask"
+const POLI_SKILL = "chief-of-staff"
 /** The Ask panel runs on Haiku, so its exam does too (lib/ask/limits.ts). */
 const ASK_EXAM_MODEL = ASK_MODEL
 const EXAM_STATE = { running: "Running", done: "Done", failed: "Failed", "timed-out": "Timed out" } as const
@@ -152,6 +156,13 @@ export function AgentsConsole({ skills }: { skills?: React.ReactNode } = {}) {
     await load()
   }
 
+  async function runPoli() {
+    const r = await post("/api/admin/agent/poli", {})
+    if (r.ok) say("success", String(r.body.message ?? "Polí's pass ran."))
+    else say("error", String(r.body.error ?? "Polí's pass could not run"))
+    await load()
+  }
+
   async function pinLatest(skill = SKILL) {
     const r = await post("/api/admin/agent/skills/pin", { skill, ref: "main" })
     if (r.ok) say("success", `Pinned ${skill === SKILL ? "the intake skill" : "the Ask skill"} at ${String((r.body.pin as { commit?: string })?.commit ?? "").slice(0, 7)}.`)
@@ -224,6 +235,7 @@ export function AgentsConsole({ skills }: { skills?: React.ReactNode } = {}) {
           <>
             <ControlsBar data={data} busy={busy} onControls={controls} onPin={() => pinLatest()} onExam={runExam} />
             <AskBar data={data} busy={busy} onControls={controls} onPin={() => pinLatest(ASK_SKILL)} onExam={(m) => runExam(m, "admin-ask")} />
+            <PoliBar data={data} busy={busy} onControls={controls} onRun={() => void runPoli()} />
 
             <ConsoleView data={data} exams={examReports} onLoadExams={loadExams} onOpenExam={(r) => setExam(examView(r))} />
           </>
@@ -360,6 +372,41 @@ function AskBar({ data, busy, onControls, onPin, onExam }: { data: Console; busy
         </button>
         <button disabled={busy} onClick={() => onExam(ASK_EXAM_MODEL)} className="inline-flex items-center gap-1 rounded-md border border-neutral-200 px-2.5 py-1.5 text-xs font-medium text-neutral-700 hover:bg-neutral-50 disabled:opacity-40">
           <FlaskConical className="w-3.5 h-3.5" /> Exam: {ASK_EXAM_MODEL.replace("anthropic/claude-", "")}
+        </button>
+      </div>
+    </div>
+  )
+}
+
+/**
+ * Polí's row (V1 item 4, Polí slice 1): its mode and Run now. Rules only, no model call, never sends. Off at merge.
+ * `proof` reports what it would raise on Today and writes nothing; `draft` raises founder-owned tasks.
+ */
+function PoliBar({ data, busy, onControls, onRun }: { data: Console; busy: boolean; onControls: (c: Record<string, unknown>, done: string) => void; onRun: () => void }) {
+  const mode = data.controls.skills[POLI_SKILL] ?? "off"
+  const running = data.poli?.mode ?? "off"
+  return (
+    <div className="mb-4 rounded-xl border border-neutral-200 bg-white px-4 py-3 flex flex-col gap-3 lg:flex-row lg:items-center">
+      <div className="flex items-center gap-2 lg:w-56">
+        <ClipboardList className="w-4 h-4 text-neutral-500" />
+        <div>
+          <div className="text-sm font-medium">Polí</div>
+          <div className="text-xs text-neutral-500">{data.controls.stopped ? "Off while agents are stopped" : running === mode ? "Every 10 minutes, rules only" : "Off on this deployment"}</div>
+        </div>
+      </div>
+      <div className="flex flex-wrap items-center gap-2 flex-1">
+        <div role="radiogroup" aria-label="Polí mode" className="flex gap-1 rounded-lg border border-neutral-200 p-0.5">
+          {(["off", "proof", "draft"] as const).map((m) => (
+            <button key={m} role="radio" aria-checked={mode === m} disabled={busy} onClick={() => onControls({ poliMode: m }, `Polí is now ${m}.`)} title={m === "off" ? "Polí's pass does nothing" : m === "proof" ? "Polí reports on Today what it would raise, and writes nothing" : "Polí raises a task for you for each decision"} className={`rounded-md px-2.5 py-1 text-xs font-medium capitalize disabled:opacity-40 ${mode === m ? "bg-neutral-900 text-white" : "text-neutral-600 hover:bg-neutral-100"}`}>
+              {m}
+            </button>
+          ))}
+        </div>
+        <span className="text-xs text-neutral-500">Raises a task for you when one needs an owner, a date or a nudge; never sends, calls a model or changes a stage.</span>
+      </div>
+      <div className="flex flex-wrap items-center gap-2">
+        <button disabled={busy || running === "off"} onClick={onRun} className="inline-flex items-center gap-1 rounded-md border border-neutral-200 px-2.5 py-1.5 text-xs font-medium text-neutral-700 hover:bg-neutral-50 disabled:opacity-40">
+          <Play className="w-3.5 h-3.5" /> Run now
         </button>
       </div>
     </div>
