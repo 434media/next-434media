@@ -111,9 +111,12 @@ export function isPermanentlyDeletedRefusal(message: string | undefined): boolea
   return !!message && /permanently deleted|forgotten email/i.test(message)
 }
 
-/** Mailchimp's refusal of an address it judges fake or invalid ("… looks fake or invalid, please enter a real email address."). */
+/**
+ * Mailchimp's refusal of an address it judges fake or invalid ("… looks fake or invalid, please enter a real email
+ * address."), or one it cannot read as an address at all ("Please provide a valid email address.", 2026-11-21 02:00Z).
+ */
 export function isInvalidAddressRefusal(message: string | undefined): boolean {
-  return !!message && /looks fake or invalid/i.test(message)
+  return !!message && /looks fake or invalid|please provide a valid email address/i.test(message)
 }
 
 /**

@@ -349,3 +349,15 @@ test("drainPending: a failed request is retried, never suppressed", async () => 
   assert.deepEqual(r.suppressed, [])
   assert.equal(r.retryable, 1)
 })
+
+test("isInvalidAddressRefusal: an address Mailchimp cannot read is marked invalid like a fake one", async () => {
+  assert.ok(isInvalidAddressRefusal("Please provide a valid email address."))
+  const push: PushFn = async () => ({
+    newMembers: 0,
+    updatedMembers: 0,
+    errors: [{ email: "bad@example.com", code: "ERROR_GENERIC", message: "Please provide a valid email address." }],
+  })
+  const r = await drainPending([m("bad@example.com")], push, { deadline: Number.POSITIVE_INFINITY })
+  assert.deepEqual(r.removed, [{ email: "bad@example.com", reason: "invalid_address" }])
+  assert.deepEqual(r.suppressed, [])
+})
