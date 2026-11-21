@@ -26,10 +26,19 @@ export type WebhookAction =
   | { kind: "subscribe" }
   | { kind: "ignore"; why: string }
 
-/** A lowercased, trimmed address, or undefined when the value is not one. */
+/**
+ * A lowercased, trimmed address, or undefined when the value is not one: at most 254 characters, no whitespace, one
+ * "@" with text before it, and a dot inside the part after it. Checked without a backtracking regular expression, since
+ * the value comes from the request (CodeQL js/polynomial-redos).
+ */
 export function webhookEmail(v: string | undefined): string | undefined {
   const e = (v ?? "").trim().toLowerCase()
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e) ? e : undefined
+  if (!e || e.length > 254 || /\s/.test(e)) return undefined
+  const at = e.indexOf("@")
+  if (at < 1 || at !== e.lastIndexOf("@")) return undefined
+  const domain = e.slice(at + 1)
+  const dot = domain.indexOf(".")
+  return dot > 0 && !domain.endsWith(".") ? e : undefined
 }
 
 /**

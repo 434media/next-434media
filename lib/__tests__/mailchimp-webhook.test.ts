@@ -63,6 +63,16 @@ test("a missing or malformed address is ignored", () => {
   assert.equal(mailchimpWebhookAction(ev("unsubscribe", { list_id: AUD }), AUD).kind, "ignore")
   assert.equal(mailchimpWebhookAction(ev("cleaned", { email: "not-an-address", list_id: AUD }), AUD).kind, "ignore")
   assert.equal(webhookEmail("a b@example.com"), undefined)
+  for (const bad of ["@example.com", "a@b@example.com", "a@example", "a@.com", "a@example.", "x".repeat(250) + "@example.com"]) {
+    assert.equal(webhookEmail(bad), undefined, bad)
+  }
+  assert.equal(webhookEmail(" A.B+tag@Sub.Example.co "), "a.b+tag@sub.example.co")
+})
+
+test("a long crafted value is rejected quickly (CodeQL js/polynomial-redos)", () => {
+  const t = Date.now()
+  assert.equal(webhookEmail("!@!." + "!.".repeat(50_000)), undefined)
+  assert.ok(Date.now() - t < 200)
 })
 
 test("only suppression reasons exist: the module has no clear or subscribe path", () => {
