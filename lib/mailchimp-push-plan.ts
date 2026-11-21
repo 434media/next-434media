@@ -111,10 +111,30 @@ export function isPermanentlyDeletedRefusal(message: string | undefined): boolea
   return !!message && /permanently deleted|forgotten email/i.test(message)
 }
 
-/** Mailchimp's refusal of an address it judges fake or invalid ("… looks fake or invalid, please enter a real email address."). */
+/**
+ * Mailchimp's refusal of an address it judges fake or invalid ("… looks fake or invalid, please enter a real email
+ * address."), or one it cannot read as an address at all ("Please provide a valid email address.", 2026-11-21 02:00Z).
+ */
 export function isInvalidAddressRefusal(message: string | undefined): boolean {
-  return !!message && /looks fake or invalid/i.test(message)
+  return !!message && /looks fake or invalid|please provide a valid email address/i.test(message)
 }
+
+/**
+ * Mailchimp's refusal of an address in a compliance state: the person unsubscribed, the address bounced, or Mailchimp
+ * holds it for compliance review ("… is in a compliance state due to unsubscribe, bounce, or compliance review and
+ * cannot be subscribed."). Only the person can re-subscribe, through Mailchimp's own form. 15 a full pass on
+ * 2026-11-21.
+ */
+export function isComplianceStateRefusal(message: string | undefined): boolean {
+  return !!message && /in a compliance state/i.test(message)
+}
+
+/**
+ * The `email_suppression` reason recorded for a compliance-state refusal (lib/firestore-suppression.ts). Suppression,
+ * not a Mailchimp-removed mark: the person opted out or the address bounced, so no surface emails it, and no consent
+ * record clears it.
+ */
+export const COMPLIANCE_STATE_SUPPRESSION_REASON = "mailchimp-compliance-state"
 
 /** Why an address is marked and skipped (lib/firestore-mailchimp-removed.ts). */
 export type UnpushableReason = "permanently_deleted" | "invalid_address"
@@ -211,6 +231,11 @@ export interface DrainResult {
   removed: Array<{ email: string; reason: UnpushableReason }>
   /** Members refused for a stale Source value and accepted when sent again with it corrected (staleSourceFix). */
   sourceFixed: number
+  /**
+   * Addresses Mailchimp refused as in a compliance state (isComplianceStateRefusal), lowercased: to be suppressed.
+   * Not counted in `errors` or `reasons`.
+   */
+  suppressed: string[]
 }
 
 /**
@@ -235,6 +260,7 @@ export async function drainPending(
     accepted: [],
     removed: [],
     sourceFixed: 0,
+    suppressed: [],
   }
   const reasons = new Map<string, ErrorReason>()
   const requests = pushRequests(pending)
@@ -279,11 +305,17 @@ export async function drainPending(
       errors = [...errors.filter((e) => !resent.has(errorEmail(e))), ...again.errors]
     }
 
-    res.errors += errors.length
     const retry = new Set<string>()
     for (const e of errors) {
       const code = e.code || "unknown"
       const email = errorEmail(e)
+      // A compliance-state refusal is the person's opt-out or a bounce, not a fault: reported for suppression and
+      // counted there, never as an error (founder, 2026-11-21).
+      if (email && !RETRYABLE_ERROR_CODES.has(code) && isComplianceStateRefusal(e.message)) {
+        if (!res.suppressed.includes(email)) res.suppressed.push(email)
+        continue
+      }
+      res.errors++
       if (RETRYABLE_ERROR_CODES.has(code)) {
         retry.add(email)
         res.retryable++

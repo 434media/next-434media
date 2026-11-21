@@ -7,10 +7,11 @@ import {
   mailchimpIntentForEventRegistration,
   type MailchimpIntent,
 } from "./mailchimp-intent"
-import { getSuppressedEmails } from "./firestore-suppression"
+import { addSuppressions, getSuppressedEmails } from "./firestore-suppression"
 import { getMailchimpRemoved, markMailchimpRemoved } from "./firestore-mailchimp-removed"
 import { readMailchimpPushState, writeMailchimpPushState } from "./firestore-mailchimp-push-state"
 import {
+  COMPLIANCE_STATE_SUPPRESSION_REASON,
   PUSH_BUDGET_MS,
   cleanMergeText,
   drainPending,
@@ -78,6 +79,11 @@ export interface AutoSyncResult {
     markedInvalid: number
     /** Members refused for a stale Source value (434Media, Website) and accepted with it set to 434MEDIA. */
     sourceFixed: number
+    /**
+     * Addresses refused as in a compliance state (unsubscribed, bounced or under compliance review in Mailchimp) this
+     * run, now suppressed (email_suppression): skipped from the next run on, counted in `excludedSuppressed`.
+     */
+    markedSuppressed: number
   }
 }
 
@@ -200,6 +206,11 @@ export async function runAutoSync(
     )
     // Record permanent refusals before the state, so a failed state write never loses them.
     if (drained.removed.length) await markMailchimpRemoved(drained.removed, new Date().toISOString())
+    // A compliance-state refusal means the person unsubscribed or the address bounced: suppress it, so this push and
+    // every other surface skip it and nothing subscribes it again (founder, 2026-11-21).
+    const markedSuppressed = drained.suppressed.length
+      ? await addSuppressions(drained.suppressed, COMPLIANCE_STATE_SUPPRESSION_REASON)
+      : 0
     await writeMailchimpPushState({
       sent: nextSentSet(planned, remembered, drained.accepted),
       lastFullPassAt: fullPass ? startedAt.toISOString() : state.lastFullPassAt!,
@@ -217,6 +228,7 @@ export async function runAutoSync(
       markedRemoved: new Set(drained.removed.filter((r) => r.reason === "permanently_deleted").map((r) => r.email)).size,
       markedInvalid: new Set(drained.removed.filter((r) => r.reason === "invalid_address").map((r) => r.email)).size,
       sourceFixed: drained.sourceFixed,
+      markedSuppressed,
     }
   }
 
