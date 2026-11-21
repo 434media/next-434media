@@ -74,8 +74,13 @@ export function taskView(id: string, d: Record<string, unknown>): PoliTaskView {
   }
 }
 
-/** Every task not completed, from the unified `crm_tasks`. */
-export async function readOpenTasks(): Promise<{ tasks: PoliTaskView[]; truncated: boolean }> {
+/**
+ * Every task not completed, from the unified `crm_tasks`. Before the unified-tasks migration (`crm_meta/task_migration`)
+ * the tasks live in the per-person collections, which Polí does not read: it reports `notUnified` and raises nothing.
+ */
+export async function readOpenTasks(): Promise<{ tasks: PoliTaskView[]; truncated: boolean; notUnified?: boolean }> {
+  const { isTaskMigrationCompleted } = await import("../firestore-crm")
+  if (!(await isTaskMigrationCompleted())) return { tasks: [], truncated: false, notUnified: true }
   const { getDb } = await import("../firebase-admin")
   const snap = await getDb().collection(CRM_TASKS).where("status", "!=", "completed").limit(POLI_READ_LIMIT).get()
   return { tasks: snap.docs.map((d) => taskView(d.id, d.data())), truncated: snap.size >= POLI_READ_LIMIT }
@@ -101,7 +106,7 @@ export async function readFounderAssignee(): Promise<string | null> {
 export interface PoliPassDeps {
   db: AgentDb
   mode: () => Promise<PoliMode>
-  listOpen: () => Promise<{ tasks: PoliTaskView[]; truncated: boolean }>
+  listOpen: () => Promise<{ tasks: PoliTaskView[]; truncated: boolean; notUnified?: boolean }>
   founder: () => Promise<string | null>
   now: () => string
   /** Gives a raised task its TSK reference after it commits (lib/record-refs.ts). Best effort. */
@@ -121,7 +126,7 @@ export interface PoliPassResult {
   skipped: number
   truncated: boolean
   /** Why nothing was written, when that is the case. */
-  note?: "off" | "proof" | "founder-unresolved"
+  note?: "off" | "proof" | "founder-unresolved" | "tasks-not-unified"
   plan?: PoliPlan
 }
 
@@ -158,7 +163,8 @@ export async function runPoliPass(deps: PoliPassDeps): Promise<PoliPassResult> {
   const mode = await deps.mode()
   if (mode === "off") return { mode, raised: [], handled: [], held: 0, skipped: 0, truncated: false, note: "off" }
   const now = deps.now()
-  const { tasks, truncated } = await deps.listOpen()
+  const { tasks, truncated, notUnified } = await deps.listOpen()
+  if (notUnified) return { mode, raised: [], handled: [], held: 0, skipped: 0, truncated: false, note: "tasks-not-unified" }
   const plan = planPass(tasks, now, deps.maxOpen)
   const base = { mode, raised: [] as string[], handled: [] as string[], held: plan.held.length, skipped: 0, truncated, plan }
   if (mode === "proof") return { ...base, note: "proof" }
@@ -213,6 +219,7 @@ export async function readPoliToday(now: string): Promise<{ plan: PoliPlan; mode
 
 export function summarize(r: PoliPassResult): string {
   if (r.note === "off") return "Polí off"
+  if (r.note === "tasks-not-unified") return `Polí ${r.mode}: tasks are not yet in the unified crm_tasks, nothing read`
   const base = `Polí ${r.mode}: raised ${r.raised.length}, handled elsewhere ${r.handled.length}, held ${r.held}, skipped ${r.skipped}${r.truncated ? ", list cut at the read limit" : ""}`
   return r.note === "founder-unresolved" ? `${base}; the founder is not on the roster, nothing raised` : r.note === "proof" ? `${base} (proof: nothing written)` : base
 }

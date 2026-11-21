@@ -197,6 +197,13 @@ test("off and proof write nothing; an unresolved founder raises nothing", async 
   assert.equal(db.commits, 0)
 })
 
+test("before the unified-tasks migration, Polí reads and writes nothing", async () => {
+  const db = store([base("t1", { assigned_to: "" })])
+  const r = await runPoliPass(deps(db, { listOpen: async () => ({ tasks: [], truncated: false, notUnified: true }) }))
+  assert.equal(r.note, "tasks-not-unified")
+  assert.equal(db.commits, 0)
+})
+
 test("the switch: production reads the kill switch; only a staging preview may run; anything else is off", async () => {
   const draft = async () => ({ stopped: false, skills: { "chief-of-staff": "draft" } })
   assert.equal(await readPoliMode({ VERCEL_ENV: "production" }, draft), "draft")
