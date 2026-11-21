@@ -258,6 +258,10 @@ jobs:
       - run: tsx --test lib/__tests__/security-sweep-2026-10-29.test.ts
       # /api/parse-event behind the admin gate (security log PSM-1): requireAdmin first, no wildcard CORS, one caller.
       - run: tsx --test lib/__tests__/parse-event-gated.test.ts
+      # Backlog close-out 2026-11-21: the admin session ignores cross-site and sibling-subdomain requests (ADM-14); the
+      # shared SSRF range list, caption links held to the story's hosts (CP-6, CP-7); addressOf linear (alert 107).
+      - run: tsx --test lib/__tests__/fetch-metadata.test.ts
+      - run: tsx --test lib/__tests__/safe-remote-ranges.test.ts
       # The hourly Firestore -> Mailchimp push sends only new or changed contacts, all of them once a day, and stops at a
       # time budget inside maxDuration; errored or deferred contacts are retried the next run.
       - run: tsx --test lib/__tests__/mailchimp-push-plan.test.ts

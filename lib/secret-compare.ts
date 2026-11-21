@@ -1,4 +1,9 @@
-import { createHash, timingSafeEqual } from "node:crypto"
+import { createHmac, randomBytes, timingSafeEqual } from "node:crypto"
+
+// A per-process random key. Both sides are HMACed under it only to get equal-length digests for timingSafeEqual; nothing
+// is stored. (CodeQL read the earlier plain sha256 as password hashing, js/insufficient-password-hash, alert 102.)
+const COMPARE_KEY = randomBytes(32)
+const digest = (value: string) => createHmac("sha256", COMPARE_KEY).update(value).digest()
 
 /**
  * Constant-time check of an `Authorization: Bearer <secret>` header against the expected secret (security log ADM-10).
@@ -9,8 +14,8 @@ export function bearerSecretMatches(authorization: string | null | undefined, ex
   if (!expected || !authorization) return false
   const match = /^Bearer (.+)$/.exec(authorization)
   if (!match) return false
-  const a = createHash("sha256").update(match[1]).digest()
-  const b = createHash("sha256").update(expected).digest()
+  const a = digest(match[1])
+  const b = digest(expected)
   return timingSafeEqual(a, b)
 }
 
@@ -20,8 +25,8 @@ export function bearerSecretMatches(authorization: string | null | undefined, ex
  */
 export function secretMatches(provided: string | null | undefined, expected: string | null | undefined): boolean {
   if (!provided || !expected) return false
-  const a = createHash("sha256").update(provided).digest()
-  const b = createHash("sha256").update(expected).digest()
+  const a = digest(provided)
+  const b = digest(expected)
   return timingSafeEqual(a, b)
 }
 

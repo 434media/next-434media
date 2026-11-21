@@ -1,4 +1,5 @@
-import { cookies } from 'next/headers'
+import { cookies, headers } from 'next/headers'
+import { crossSiteRefused } from './fetch-metadata'
 import { ADMIN_ROLES, SESSION_COOKIE, parseSessionCookieWithExpiry, sessionLifetime, signPayload } from './session-cookie'
 import type { AdminRole, AuthProvider, User } from './session-cookie'
 import { applyRosterDecision, createRosterChecker } from './session-roster'
@@ -175,6 +176,11 @@ async function currentSession(): Promise<{ user: User; expiresAt: Date | null } 
   const cookieStore = await cookies()
   const parsed = parseSessionCookieWithExpiry(cookieStore.get(SESSION_COOKIE)?.value)
   if (!parsed) return null
+  // A request another site (or a sibling *.434media.com origin) makes with the cookie is not signed in (ADM-14).
+  if (crossSiteRefused(await headers())) {
+    console.warn(`[auth] cross-site request with an admin session refused (Sec-Fetch-Site)`)
+    return null
+  }
   const decision = await rosterChecker.decide(parsed.user.email)
   const user = applyRosterDecision(parsed.user, decision)
   if (!user) {

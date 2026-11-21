@@ -11,7 +11,7 @@ import { fetch as pinnedFetch, Agent } from "undici"
 // range (v4 or v6). Called on every address the host RESOLVES to, so it also
 // covers hostnames that point at internal IPs and numeric/octal/hex encodings
 // (getaddrinfo normalizes "2130706433", "0x7f000001", etc. before we see them).
-function ipInPrivateRange(ip: string): boolean {
+export function ipInPrivateRange(ip: string): boolean {
   const fam = net.isIP(ip)
   if (fam === 4) {
     const o = ip.split(".").map(Number)
@@ -22,7 +22,12 @@ function ipInPrivateRange(ip: string): boolean {
       (o[0] === 169 && o[1] === 254) || // link-local (incl. 169.254.169.254 metadata)
       (o[0] === 172 && o[1] >= 16 && o[1] <= 31) || // private
       (o[0] === 192 && o[1] === 168) || // private
-      (o[0] === 100 && o[1] >= 64 && o[1] <= 127) // CGNAT 100.64/10
+      (o[0] === 100 && o[1] >= 64 && o[1] <= 127) || // CGNAT 100.64/10
+      (o[0] === 192 && o[1] === 0 && (o[2] === 0 || o[2] === 2)) || // IETF 192.0.0/24, TEST-NET-1 192.0.2/24
+      (o[0] === 198 && (o[1] === 18 || o[1] === 19)) || // benchmarking 198.18/15
+      (o[0] === 198 && o[1] === 51 && o[2] === 100) || // TEST-NET-2
+      (o[0] === 203 && o[1] === 0 && o[2] === 113) || // TEST-NET-3
+      o[0] >= 224 // multicast 224/4 and reserved 240/4, broadcast (CP-6)
     )
   }
   if (fam === 6) {
@@ -31,6 +36,8 @@ function ipInPrivateRange(ip: string): boolean {
     if (a.startsWith("fe80") || a.startsWith("fc") || a.startsWith("fd")) return true // link-local + ULA
     const mapped = a.match(/^::ffff:(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})$/) // IPv4-mapped
     if (mapped) return ipInPrivateRange(mapped[1])
+    // NAT64 64:ff9b::/96, documentation 2001:db8::/32, 6to4 2002::/16, multicast ff00::/8 (CP-6)
+    if (a.startsWith("64:ff9b:") || a.startsWith("2001:db8:") || a.startsWith("2002:") || a.startsWith("ff")) return true
     return false
   }
   return false
@@ -110,4 +117,18 @@ export async function fetchAllowingSafeRedirects(
     addresses = next.addresses
   }
   throw new Error("too many redirects")
+}
+
+/**
+ * A fetch that connects only to the addresses it has just checked as public (CP-6): the host is resolved once, every
+ * address must pass ipInPrivateRange, and the socket is pinned to them, so a DNS answer cannot change between the
+ * check and the connect. Same call shape as global fetch for one hop; redirects stay with the caller (redirect: manual).
+ */
+export async function pinnedPublicFetch(url: URL, init: RequestInit = {}): Promise<Response> {
+  const host = url.hostname.replace(/^\[|\]$/g, "").toLowerCase()
+  const addrs = await dns.lookup(host, { all: true })
+  if (addrs.length === 0 || addrs.some((a) => ipInPrivateRange(a.address))) throw new Error("not_public")
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const { cache: _cache, ...rest } = init
+  return (await pinnedFetch(url.toString(), { ...(rest as object), dispatcher: pinnedAgent(addrs) })) as unknown as Response
 }

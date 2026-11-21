@@ -284,8 +284,11 @@ export function createMcuAi(deps: { models: Record<PipelineStep, string>; search
         ...withInstructions([{ role: "system", content: `From the research notes and the search-result URLs below, submit up to ${count + 2} candidates, best first. Use URLs exactly as they appear in the search results; prefer the original primary source as primaryUrl, and put other primary pages for the same subject in alternateUrls. Return no candidates, with the reason in note, only when the notes found none.` },
           { role: "user", content: `NOTES:\n${searched.text.slice(0, count > 8 ? 24_000 : 12_000) || "(none)"}\n\nSEARCH-RESULT URLS:\n${searched.urls.slice(0, 60).join("\n") || "(none)"}` }]),
       }), r => submitted<z.infer<typeof candidateSchema>>(r, "submit_candidates"))
-      const candidates = (extracted.candidates ?? []).slice(0, count + 2)
-      console.info("[content-pipeline] research", JSON.stringify({ kind, steps: searched.steps, searches: searched.searches, resultUrls: searched.urls.length, notesChars: searched.text.length, candidates: candidates.length, inResults: candidates.filter(c => seen.has(normalizeUrl(c.primaryUrl))).length, alternates: candidates.reduce((n, c) => n + (c.alternateUrls?.length ?? 0), 0), note: extracted.note?.slice(0, 300) ?? null }))
+      // Only a candidate whose primaryUrl the search actually returned (CP-7): a URL the model wrote from its notes, or
+      // one a page's text told it to use, is dropped rather than trusted.
+      const submittedCandidates = (extracted.candidates ?? []).slice(0, count + 2)
+      const candidates = submittedCandidates.filter(c => seen.has(normalizeUrl(c.primaryUrl)))
+      console.info("[content-pipeline] research", JSON.stringify({ kind, steps: searched.steps, searches: searched.searches, resultUrls: searched.urls.length, notesChars: searched.text.length, candidates: candidates.length, submitted: submittedCandidates.length, alternates: candidates.reduce((n, c) => n + (c.alternateUrls?.length ?? 0), 0), note: extracted.note?.slice(0, 300) ?? null }))
       const note = meaningful(extracted.note)
       return { candidates, ...(note ? { note } : {}) }
     },

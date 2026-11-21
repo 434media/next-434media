@@ -43,6 +43,8 @@
 
 # Sign-in and permissions
 /lib/auth.ts                                 @434media/founder
+/lib/fetch-metadata.ts                       @434media/founder
+/lib/__tests__/fetch-metadata.test.ts        @434media/founder
 /lib/session-cookie.ts                       @434media/founder
 /lib/firebase-signin.ts                      @434media/founder
 /lib/preview-auth.ts                         @434media/founder

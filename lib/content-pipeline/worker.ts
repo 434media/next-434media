@@ -1001,6 +1001,22 @@ function fix(f: FrameCopy, _index: number, d: McuDraft, today: string): FrameCop
   if (f.series === "icymi_cover" && series.fields.some(x => x.name === "story_numbers")) out.story_numbers = Array.from({ length: icymiCount(d.story) }, (_, i) => String(i + 1).padStart(2, "0")).join("\n")
   return { ...f, fields: out }
 }
+/** Hosts of the http(s) and www. links in a caption, lower-case, without "www." (CP-7). Linear scans only. */
+export function captionUrlHosts(caption: string): string[] {
+  const hosts = new Set<string>()
+  for (const m of caption.matchAll(/https?:\/\/[^\s<>"')\]]+|\bwww\.[^\s<>"')\]]+/gi)) {
+    try { hosts.add(new URL(/^https?:/i.test(m[0]) ? m[0] : `https://${m[0]}`).hostname.toLowerCase().replace(/^www\./, "")) } catch { /* not a URL */ }
+  }
+  return [...hosts]
+}
+function storyHosts(story: Story): Set<string> {
+  const out = new Set<string>()
+  for (const u of [story.primaryUrl, ...(story.supporting ?? []).map(s => s.url)]) {
+    try { out.add(new URL(u).hostname.toLowerCase().replace(/^www\./, "")) } catch { /* skip */ }
+  }
+  return out
+}
+
 /**
  * The copy's problems, sorted by the plan v9 hold bar (Phase 1 direction 1): a draft is held only for a safety problem
  * (a fact or subject error, an unsourced figure, copy past the template's limits or otherwise a broken card, a cut-off
@@ -1018,6 +1034,8 @@ export function copyProblems(frames: FrameCopy[], caption: string, story: Story)
   if (/@[A-Za-z0-9_.]{2,}/.test(caption)) safety.push("caption contains an @handle; use plain names (tags need verified accounts)")
   // Credit and notice lines carry license versions and item numbers, not story facts.
   const body = caption.split("\n").filter(l => !/^(Archive image|Image|Photo): /.test(l) && l !== DOD_NOTICE).join("\n")
+  const strayHosts = captionUrlHosts(body).filter(h => !storyHosts(story).has(h))
+  if (strayHosts.length) safety.push(`caption links to a site that is not this story's source (${strayHosts.slice(0, 3).join(", ")}); leave the link out`)
   const nums = unsourcedNumbers([body, ...frames.flatMap(f => Object.entries(f.fields).filter(([k]) => k !== "date" && k !== "counter").map(([, v]) => v))], story.sourceText)
   if (nums.length) safety.push(`these figures are not in the source: ${nums.join(", ")}`)
   // The caption ends with its own "Source:" line, and a DT101 caption is the mission brief (gate round 2: a DT101 with

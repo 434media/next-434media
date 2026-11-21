@@ -1,6 +1,7 @@
 import { getResend, DEFAULT_FROM } from "@/lib/resend"
 import { TEAM_MEMBERS, SOCIAL_PLATFORM_OPTIONS } from "@/components/crm/types"
 import type { ContentPost } from "@/components/crm/types"
+import { normalizeEmail } from "./core-model/identity"
 
 // Reviewers who approve content. Comma-separated override via env without a
 // redeploy, mirroring lib/contact-form-notification.ts's INBOX_NOTIFY_TO.
@@ -11,7 +12,6 @@ const CONTENT_REVIEW_NOTIFY_TO = (
   .map((s) => s.trim())
   .filter(Boolean)
 
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
 function escapeHtml(s: string): string {
   return s
@@ -116,7 +116,7 @@ export async function notifyContentNeedsApproval(post: ContentPost): Promise<voi
   ${assigneeEmail ? `<p style="font-size:12px;color:#a3a3a3;margin:12px 0 0;line-height:1.5;">Replying to this email reaches ${escapeHtml(assigneeEmail)} (the assignee) directly.</p>` : ""}
 </div>`
 
-    const replyTo = assigneeEmail && EMAIL_RE.test(assigneeEmail) ? assigneeEmail : undefined
+    const replyTo = assigneeEmail && normalizeEmail(assigneeEmail) ? assigneeEmail : undefined
 
     const { error } = await getResend().emails.send({
       from: DEFAULT_FROM,

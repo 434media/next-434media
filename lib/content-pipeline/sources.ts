@@ -1,5 +1,6 @@
 import { lookup } from "node:dns/promises"
 import net from "node:net"
+import { ipInPrivateRange, pinnedPublicFetch } from "../safe-remote-fetch"
 
 /**
  * Server-side sourcing for the MCU skill, no browser: read a source page as text (with its stated publication date and
@@ -13,7 +14,9 @@ export const USER_AGENT = "Mozilla/5.0 (compatible; 434MEDIA-content-bot/1.0; +h
 const MAX_PAGE_BYTES = 3 * 1024 * 1024
 export const MAX_IMAGE_BYTES = 20 * 1024 * 1024
 
+// The shared range list (lib/safe-remote-fetch.ts) plus this module's own stricter rules (CP-6).
 function privateAddress(ip: string): boolean {
+  if (ipInPrivateRange(ip)) return true
   if (net.isIP(ip) === 4) {
     const o = ip.split(".").map(Number)
     return o[0] === 0 || o[0] === 10 || o[0] === 127 || (o[0] === 169 && o[1] === 254) || (o[0] === 172 && o[1] >= 16 && o[1] <= 31) || (o[0] === 192 && o[1] === 168) || (o[0] === 100 && o[1] >= 64 && o[1] <= 127) || o[0] >= 224
@@ -34,6 +37,8 @@ export async function assertPublicHttps(raw: string, resolve: (host: string) => 
 }
 
 export interface Fetcher { (url: URL, init: RequestInit): Promise<Response> }
+/** The default for page and image fetches: connects only to the addresses it checked (no DNS rebinding, CP-6). */
+export const pinnedFetcher: Fetcher = (url, init) => pinnedPublicFetch(url, init)
 /**
  * Follows up to 4 redirects, re-checking each hop. A hop to plain http is asked for over https instead (servers
  * behind a TLS proxy often redirect to their own http:// address); the hop is then checked like any other, so
@@ -89,7 +94,7 @@ export function parsePage(url: string, html: string): SourcePage {
   const body = pageText(html), text = body.length >= 400 ? body : [body, embeddedText(html)].filter(Boolean).join("\n").slice(0, 40_000)
   return { url, title, text, ...(publishedAt ? { publishedAt } : {}), ...(meta(html, "og:image") ? { image: meta(html, "og:image") } : {}), ...(meta(html, "og:site_name") ? { siteName: meta(html, "og:site_name") } : {}), ...(meta(html, "og:description") ? { description: meta(html, "og:description") } : {}) }
 }
-export async function fetchSourcePage(url: string, fetcher: Fetcher = fetch as Fetcher, check = assertPublicHttps): Promise<SourcePage> {
+export async function fetchSourcePage(url: string, fetcher: Fetcher = pinnedFetcher, check = assertPublicHttps): Promise<SourcePage> {
   const res = await guardedFetch(url, fetcher, "text/html,application/xhtml+xml", check)
   if (!res.ok) throw new Error(`http_${res.status}`)
   const type = res.headers.get("content-type") || ""
@@ -97,7 +102,7 @@ export async function fetchSourcePage(url: string, fetcher: Fetcher = fetch as F
   return parsePage(res.url || url, new TextDecoder().decode(await readBounded(res, MAX_PAGE_BYTES)))
 }
 /** Image bytes (JPEG or PNG only, by signature) for vision checks and uploads. */
-export async function fetchImage(url: string, fetcher: Fetcher = fetch as Fetcher, check = assertPublicHttps): Promise<{ bytes: Uint8Array; mime: "image/jpeg" | "image/png" }> {
+export async function fetchImage(url: string, fetcher: Fetcher = pinnedFetcher, check = assertPublicHttps): Promise<{ bytes: Uint8Array; mime: "image/jpeg" | "image/png" }> {
   const res = await guardedFetch(url, fetcher, "image/jpeg,image/png", check)
   if (!res.ok) throw new Error(`http_${res.status}`)
   const bytes = await readBounded(res, MAX_IMAGE_BYTES)

@@ -6,6 +6,7 @@ import type { BroadcastRecipient } from "./broadcast-recipients"
 import { recordMessage } from "./core-model/messages-server"
 import { broadcastMessage } from "./core-model/message-paths"
 import { BROADCAST_PLACEHOLDERS } from "./core-model/messages"
+import { normalizeEmail } from "./core-model/identity"
 
 // Phase 3 send engine. Renders the branded invite per-recipient (FNAME + signed
 // unsubscribe URL), sends via Resend batch API in throttled chunks, and logs the
@@ -31,7 +32,8 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
  *  leading/double dots, missing parts) so they don't poison a batch. */
 function isValidEmail(raw: string): boolean {
   const email = (raw || "").trim()
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return false
+  // Linear check, not the backtracking /^[^\s@]+@[^\s@]+\.[^\s@]+$/ (CodeQL js/polynomial-redos).
+  if (!normalizeEmail(email)) return false
   const [local, domain] = email.split("@")
   if (!local || !domain) return false
   if (local.startsWith(".") || local.endsWith(".") || local.includes("..")) return false
