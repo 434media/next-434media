@@ -1,6 +1,9 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { captureLeadFromEmailSignup } from "@/lib/firestore-leads"
 import { secretMatches } from "@/lib/secret-compare"
+import { addSuppressions } from "@/lib/firestore-suppression"
+import { getDefaultAudienceId } from "@/lib/mailchimp-config"
+import { mailchimpWebhookAction } from "@/lib/mailchimp-webhook"
 
 export const runtime = "nodejs"
 
@@ -14,6 +17,10 @@ export const runtime = "nodejs"
  *
  * Mailchimp will also call this endpoint with a GET to verify the URL when you
  * register the webhook. We answer GET with 200 OK so the registration succeeds.
+ *
+ * An unsubscribe, a cleaned address (hard bounce or abuse report) or an email change in the 434 Media audience adds a
+ * suppression (email_suppression) at once, so the hourly push skips the address and no surface emails it (founder,
+ * 2026-11-21). This route only adds suppressions; it never clears one or subscribes anyone (lib/mailchimp-webhook.ts).
  */
 const SECRET_PARAM = "secret"
 const SECRET_ENV = "MAILCHIMP_WEBHOOK_SECRET"
@@ -61,13 +68,28 @@ export async function POST(req: NextRequest) {
   }
 
   const type = formData.get("type")
-  // Only fan subscribe events into leads. Other event types (unsubscribe,
-  // cleaned, profile, upemail) are logged for now — easy follow-up to act on.
-  if (type !== "subscribe") {
-    console.log(`[webhooks/mailchimp] received ${type}, no-op`)
+  const fields: Record<string, string> = {}
+  for (const [k, v] of formData.entries()) if (typeof v === "string") fields[k] = v
+  const action = mailchimpWebhookAction(fields, getDefaultAudienceId())
+
+  if (action.kind === "suppress") {
+    try {
+      const added = await addSuppressions([action.email], action.reason)
+      // No address in the log: the reason and whether it was new are enough to trace the event.
+      console.log(`[webhooks/mailchimp] ${type}: ${added ? "suppressed" : "already suppressed"} (${action.reason})`)
+      return NextResponse.json({ ok: true, type, action: added ? "suppressed" : "already_suppressed" })
+    } catch (err) {
+      // Mailchimp counts a non-200 as a failed delivery. The write is idempotent if the event comes again.
+      console.error("[POST /api/webhooks/mailchimp] suppression write failed:", err)
+      return NextResponse.json({ error: "Could not record the suppression" }, { status: 500 })
+    }
+  }
+  if (action.kind === "ignore") {
+    console.log(`[webhooks/mailchimp] received ${type}, no-op (${action.why})`)
     return NextResponse.json({ ok: true, type, action: "no-op" })
   }
 
+  // subscribe: fan into leads, as before. Never clears a suppression.
   const email = formData.get("data[email]")
   if (typeof email !== "string" || !email.trim()) {
     return NextResponse.json({ ok: true, action: "no-op", reason: "no email" })
