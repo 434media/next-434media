@@ -1,10 +1,12 @@
 /**
  * Today: the front door's daily brief, slice 1 (434 build sequence V1 item 4, the front door; founder, 2026-11-17:
- * "approve slice 1"). A founder-only card on To do with at most three lines, each a summary that links to where the
+ * "approve slice 1"). A founder-only card on To do with at most five lines (four today), each a summary that links to where the
  * work lives:
  *  - **Past its limit:** queues whose oldest item is over its limit (lib/queue-age.ts, the watchdog's own check);
  *  - **Needs a check:** agent runs that failed in the last 24 hours, scheduled jobs that did not fire
  *    (lib/cron-watchdog.ts), and a queue that could not be read;
+ *  - **Polí:** the decisions Polí's rule pass raised and still open, any held back, and when the last true-up wrote
+ *    tasks (Polí slice 1, lib/agent/poli.ts; the plan's decisions 2 and 7). It never counts against "All clear";
  *  - **Model cost:** the last 24 hours, the last 7 days, and the top task (the Agents page's records).
  *
  * "A daily brief is a query, not a memory": computed when the page opens, never stored. A line with nothing to say is
@@ -21,7 +23,7 @@ export const DAY_MS = 24 * 60 * 60 * 1000
 
 export type TodayTone = "late" | "check" | "info"
 export interface TodayLine {
-  key: "late" | "check" | "cost"
+  key: "late" | "check" | "poli" | "cost"
   tone: TodayTone
   title: string
   detail: string
@@ -57,6 +59,8 @@ export interface TodayInput {
   costs: CostSummary
   /** Model cost in the 24 hours before `now`. */
   cost24hUsd: number
+  /** Polí's one line (lib/agent/poli.ts poliTodayLine), when it has one. */
+  poli?: TodayLine | null
 }
 
 export function todayBrief(input: TodayInput): Today {
@@ -78,6 +82,7 @@ export function todayBrief(input: TodayInput): Today {
   if (checks.length) lines.push({ key: "check", tone: "check", title: "Needs a check", detail: `${checks.join(". ")}.`, href: "/admin/agents", linkLabel: "Agents" })
 
   const allClear = lines.length === 0
+  if (input.poli) lines.push(input.poli)
   if (input.costs.totalUsd > 0 || input.cost24hUsd > 0) {
     const top = input.costs.byTask[0]
     const detail = [`Last 24 h ${usd(input.cost24hUsd)}`, `last 7 days ${usd(input.costs.totalUsd)}`, ...(top && top.usd > 0 ? [`top task: ${top.key} ${usd(top.usd)}`] : [])].join(" · ")

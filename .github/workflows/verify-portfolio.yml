@@ -160,6 +160,8 @@ jobs:
       - run: tsx --test lib/__tests__/agent-review.test.ts
       # The front door, slice 1 (2026-11-17): the Today card on To do.
       - run: tsx --test lib/__tests__/today.test.ts
+      # Polí slice 1 (2026-11-21): the rule pass on the sweep, its founder-owned tasks and ledger entries, no duplicates.
+      - run: tsx --test lib/__tests__/poli.test.ts
       # One work area (2026-11-16): the edit re-hash, the arrival closed after a send, and Undo on triage.
       - run: tsx --test lib/__tests__/one-work-area.test.ts
       # A repeat inquiry from the same person reaches the inbox; only a double submit (same message within a minute) collapses (2026-11-17).

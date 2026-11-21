@@ -130,6 +130,11 @@ export const LEDGER_KINDS = [
   "edit_applied",
   /** That change put back by its Undo, within the window, by the person who made it or the founder. */
   "edit_undone",
+  /**
+   * Polí's rule pass placed a record on a declared path (lib/agent/poli.ts; V1 item 4, Polí slice 1). `reasonCode` is
+   * the path, `refs.event` the record it is about, and `refs.record` the founder-owned task it raised, when it raised one.
+   */
+  "routed",
 ] as const
 export type LedgerKind = (typeof LEDGER_KINDS)[number]
 

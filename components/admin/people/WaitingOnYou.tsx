@@ -7,7 +7,8 @@
 // an arrival row carries the Inbox's own triage actions and opens the arrival drawer.
 
 import { useMemo, useState } from "react"
-import { AlertTriangle, Clock, FileText } from "lucide-react"
+import Link from "next/link"
+import { AlertTriangle, ClipboardList, Clock, FileText } from "lucide-react"
 import { OUTCOME_LABEL, Pill, STATUS_LABEL, when, type DraftItem } from "@/components/admin/review/DraftDrawer"
 import { waitingRows } from "@/lib/core-model/waiting"
 import type { InboxItem } from "@/types/core-model"
@@ -28,6 +29,17 @@ export interface HeldArrival {
   at: string
 }
 
+/** A founder-owned task Polí's rule pass raised (lib/agent/review-server.ts PoliRow; V1 item 4, Polí slice 1). */
+export interface PoliRow {
+  id: string
+  ref?: string
+  title: string
+  detail: string
+  path: string
+  recordRef?: string
+  createdAt: string | null
+}
+
 export function WaitingOnYou({
   drafts,
   inbox,
@@ -40,6 +52,7 @@ export function WaitingOnYou({
   onDismissSolicitation,
   dismissing,
   confirmingDismiss,
+  poli = [],
 }: {
   drafts: DraftItem[]
   inbox: InboxItem[]
@@ -56,9 +69,17 @@ export function WaitingOnYou({
   dismissing?: string | null
   /** The arrival whose Dismiss is waiting for its confirming second click. */
   confirmingDismiss?: string | null
+  /** Polí's open tasks for the founder. They sit after the drafts and before the arrivals, oldest first. */
+  poli?: PoliRow[]
 }) {
   const [view, setView] = useState<"waiting" | "decided">("waiting")
-  const rows = useMemo(() => waitingRows(drafts, inbox), [drafts, inbox])
+  const rows = useMemo(() => {
+    const all = waitingRows(drafts, inbox)
+    const cut = all.findIndex((r) => r.kind !== "draft")
+    const at = cut === -1 ? all.length : cut
+    const poliRows = poli.map((p) => ({ kind: "poli" as const, key: `poli:${p.id}`, poli: p }))
+    return [...all.slice(0, at), ...poliRows, ...all.slice(at)]
+  }, [drafts, inbox, poli])
   const decided = drafts.filter((i) => i.status !== "pending")
   const late = drafts.filter((i) => i.status === "pending" && i.late).length
   return (
@@ -85,6 +106,8 @@ export function WaitingOnYou({
             {rows.map((r) =>
               r.kind === "draft" ? (
                 <DraftRow key={r.key} item={r.draft} arrival={r.item} onOpen={onOpen} />
+              ) : r.kind === "poli" ? (
+                <PoliTaskRow key={r.key} row={r.poli} />
               ) : (
                 <li key={r.key} className="flex flex-col md:flex-row md:items-center gap-3 px-4 py-3">
                   <button onClick={() => onOpenArrival(r.item)} className="flex-1 min-w-0 text-left">
@@ -130,6 +153,27 @@ export function WaitingOnYou({
         </ul>
       )}
     </div>
+  )
+}
+
+/** One Polí task: what to decide, the finding in one line, and its age. It opens the task on the Tasks page. */
+function PoliTaskRow({ row }: { row: PoliRow }) {
+  return (
+    <li>
+      <Link href={`/admin/tasks?openTask=${encodeURIComponent(row.id)}`} className="w-full flex flex-col md:flex-row md:items-center gap-2 md:gap-3 px-4 py-3 text-left hover:bg-neutral-50">
+        <div className="flex-1 min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-sm font-medium text-neutral-900">{row.title}</span>
+            <Pill tone="dark"><ClipboardList className="w-2.5 h-2.5" /> Polí</Pill>
+            {row.ref && <Pill>{row.ref}</Pill>}
+          </div>
+          <p className="mt-0.5 truncate text-xs text-neutral-500">{row.detail}</p>
+        </div>
+        <div className="flex items-center gap-2 md:w-48 md:justify-end text-xs text-neutral-500">
+          <span>{row.createdAt ? when(row.createdAt) : "—"}</span>
+        </div>
+      </Link>
+    </li>
   )
 }
 

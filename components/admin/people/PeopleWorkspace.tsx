@@ -6,7 +6,7 @@ import { Building2, CheckCircle2, AlertCircle, Inbox, Search, UserPlus, Users, F
 import { DetailDrawer } from "@/components/admin/DetailDrawer"
 import { DraftDrawer, dismissOutcome, type DraftItem } from "@/components/admin/review/DraftDrawer"
 import { InboxReplyModal } from "@/components/admin/people/InboxReplyModal"
-import { WaitingOnYou, type HeldArrival } from "@/components/admin/people/WaitingOnYou"
+import { WaitingOnYou, type HeldArrival, type PoliRow } from "@/components/admin/people/WaitingOnYou"
 import { TodayCard } from "@/components/admin/people/TodayCard"
 import { waitingRows } from "@/lib/core-model/waiting"
 import type { Activity, Affiliation, AffiliationRole, AddressBook, CoreRole, InboxItem, LifecycleStage, Organization, Person, Relationship } from "@/types/core-model"
@@ -124,6 +124,8 @@ export function PeopleWorkspace({ view = "records" }: { view?: "todo" | "records
   const [openDraft, setOpenDraft] = useState<DraftItem | null>(null)
   // The solicitation pre-check's holds (founder only), and Dismiss: spam or solicitation on an arrival row.
   const [holds, setHolds] = useState<Map<string, HeldArrival>>(new Map())
+  // Polí's open tasks (founder only; V1 item 4, Polí slice 1): To do rows that open on the Tasks page.
+  const [poliRows, setPoliRows] = useState<PoliRow[]>([])
   const [confirmingDismiss, setConfirmingDismiss] = useState<string | null>(null)
   const [agents, setAgents] = useState<AgentsLine | null>(null)
   // A phone arrival's dismissal is held for the undo window: once sent, nothing about it is left to restore.
@@ -189,6 +191,7 @@ export function PeopleWorkspace({ view = "records" }: { view?: "todo" | "records
       if (!res.ok) throw new Error(body.error ?? "To do could not be read")
       setDrafts(body.items ?? [])
       setHolds(new Map(((body.holds ?? []) as HeldArrival[]).map((h) => [h.activityId, h])))
+      setPoliRows((body.poli ?? []) as PoliRow[])
     } catch (e) {
       setDrafts([])
       setToast({ type: "error", message: (e as Error).message })
@@ -494,6 +497,7 @@ export function PeopleWorkspace({ view = "records" }: { view?: "todo" | "records
             actions={(item) => <TriageButtons item={item} busy={busy === item.activity.id} founder={founder} onTriage={triage} />}
             sourceLabel={(item) => `${SOURCE_LABEL[item.activity.source] ?? item.activity.source}${item.activity.channel ? ` · ${item.activity.channel}` : ""}`}
             holds={holds}
+            poli={poliRows}
             {...(founder ? { onDismissSolicitation: (item: InboxItem) => void dismissSolicitation(item) } : {})}
             dismissing={busy}
             confirmingDismiss={confirmingDismiss}
