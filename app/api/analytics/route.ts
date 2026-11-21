@@ -18,7 +18,7 @@ import {
 import { getSearchConsoleQueries } from "@/lib/search-console"
 import { getCoreWebVitals, type CruxFormFactor } from "@/lib/crux"
 import { validateAnalyticsConfig, getConfigurationStatus } from "@/lib/analytics-config"
-import { getSession } from "@/lib/auth"
+import { getSession, requireAdmin } from "@/lib/auth"
 import { pctChange } from "@/types/analytics"
 
 // Helper function to convert relative dates to YYYY-MM-DD format
@@ -58,6 +58,11 @@ export async function GET(request: NextRequest) {
   console.log("[Analytics API] =================================")
   console.log("[Analytics API] Request received:", request.url)
   console.log("[Analytics API] Method:", request.method)
+
+  // Signed-in admins only, before anything is read: the property list and the configuration status used to answer
+  // signed-out requests (found re-reading ADM-4, 2026-11-21).
+  const auth = await requireAdmin()
+  if ("error" in auth) return NextResponse.json({ error: auth.error }, { status: auth.status })
 
   try {
     // Properties endpoint just enumerates configured property env vars;

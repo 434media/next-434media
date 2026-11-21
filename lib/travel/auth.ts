@@ -37,7 +37,9 @@ function sessionSecret() {
 }
 
 function sign(payload: string) {
-  return createHmac("sha256", sessionSecret()).update(payload).digest("base64url")
+  // Domain-separated (ADM-12): with the ADMIN_SESSION_SECRET fallback, a travel signature must never be valid as an
+  // admin-cookie signature or the reverse. Existing travel sessions sign in again once.
+  return createHmac("sha256", sessionSecret()).update(`434-travel-session\n${payload}`).digest("base64url")
 }
 
 function signaturesMatch(expected: string, received: string) {

@@ -56,7 +56,11 @@ export interface MessageRecord {
 /** "Name <pat@example.com>" → "pat@example.com", lower-case. Empty when there is no address. */
 export function addressOf(value: string | undefined): string {
   if (!value) return ""
-  const angle = value.match(/<([^>]+)>/)
+  // Bounded and without overlapping classes: the old /<([^>]+)>/ backtracked on many "<" (CodeQL alert 107).
+  const head = value.slice(0, 512)
+  const open = head.indexOf("<")
+  const close = open >= 0 ? head.indexOf(">", open + 1) : -1
+  const angle = open >= 0 && close > open + 1 ? [head, head.slice(open + 1, close)] : null
   return normalizeEmail(angle ? angle[1] : value)
 }
 
