@@ -66,7 +66,7 @@ test("a missing or malformed address is ignored", () => {
   for (const bad of ["@example.com", "a@b@example.com", "a@example", "a@.com", "a@example.", "x".repeat(250) + "@example.com"]) {
     assert.equal(webhookEmail(bad), undefined, bad)
   }
-  assert.equal(webhookEmail(" A.B+tag@Sub.Example.co "), "a.b+tag@sub.example.co")
+  assert.equal(webhookEmail(" A.B+tag@Sub.Example.com "), "a.b+tag@sub.example.com")
 })
 
 test("a long crafted value is rejected quickly (CodeQL js/polynomial-redos)", () => {
