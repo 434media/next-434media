@@ -11,6 +11,8 @@ import {
   cleanMergeText,
   isPermanentlyDeletedRefusal,
   isInvalidAddressRefusal,
+  isComplianceStateRefusal,
+  COMPLIANCE_STATE_SUPPRESSION_REASON,
   errorEmail,
   staleSourceFix,
   stillRemoved,
@@ -301,4 +303,48 @@ test("drainPending: refusals of one code but different messages are logged apart
   assert.match(r.reasons[0].sample, /looks fake or invalid/)
   assert.ok(r.reasons.some((x) => /compliance state/.test(x.sample)))
   assert.ok(r.reasons.every((x) => !x.sample.includes("@")))
+  assert.deepEqual(r.suppressed, ["c@example.com"])
+})
+
+const COMPLIANCE = "c@example.com is in a compliance state due to unsubscribe, bounce, or compliance review and cannot be subscribed."
+
+test("isComplianceStateRefusal: Mailchimp's compliance-state message; not deletion, invalid or merge-field refusals", () => {
+  assert.ok(isComplianceStateRefusal(COMPLIANCE))
+  assert.ok(!isComplianceStateRefusal(DELETED))
+  assert.ok(!isComplianceStateRefusal(INVALID))
+  assert.ok(!isComplianceStateRefusal("Your merge fields were invalid."))
+  assert.ok(!isComplianceStateRefusal(undefined))
+  assert.equal(COMPLIANCE_STATE_SUPPRESSION_REASON, "mailchimp-compliance-state")
+})
+
+// Reproduces the 2026-11-21 01:00Z full pass: 15 compliance-state refusals, retried on every full pass until now.
+test("drainPending: compliance-state refusals are reported for suppression once each, not marked removed, not retried", async () => {
+  const refused = Array.from({ length: 15 }, (_, i) => `u${i}@example.com`)
+  const push: PushFn = async (members) => ({
+    newMembers: 0,
+    updatedMembers: members.length - refused.length,
+    errors: [
+      ...refused.map((e) => ({ email: "", code: "ERROR_GENERIC", message: COMPLIANCE.replace("c@example.com", e.toUpperCase()) })),
+      { email: "u0@example.com", code: "ERROR_GENERIC", message: COMPLIANCE.replace("c@example.com", "u0@example.com") },
+    ],
+  })
+  const plan = [...refused, "ok@example.com"].map((e) => m(e))
+  const r = await drainPending(plan, push, { deadline: Number.POSITIVE_INFINITY })
+  assert.deepEqual(r.suppressed, refused)
+  assert.deepEqual(r.removed, [])
+  assert.equal(r.retryable, 0)
+  assert.equal(r.accepted.length, plan.length)
+  assert.equal(r.reasons.length, 1)
+  assert.ok(!r.reasons[0].sample.includes("@"))
+})
+
+test("drainPending: a failed request is retried, never suppressed", async () => {
+  const push: PushFn = async (members) => ({
+    newMembers: 0,
+    updatedMembers: 0,
+    errors: members.map((x) => ({ email: x.email, code: "request_failed", message: "socket hang up" })),
+  })
+  const r = await drainPending([m("a@example.com")], push, { deadline: Number.POSITIVE_INFINITY })
+  assert.deepEqual(r.suppressed, [])
+  assert.equal(r.retryable, 1)
 })

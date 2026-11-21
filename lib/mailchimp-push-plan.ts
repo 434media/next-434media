@@ -116,6 +116,23 @@ export function isInvalidAddressRefusal(message: string | undefined): boolean {
   return !!message && /looks fake or invalid/i.test(message)
 }
 
+/**
+ * Mailchimp's refusal of an address in a compliance state: the person unsubscribed, the address bounced, or Mailchimp
+ * holds it for compliance review ("… is in a compliance state due to unsubscribe, bounce, or compliance review and
+ * cannot be subscribed."). Only the person can re-subscribe, through Mailchimp's own form. 15 a full pass on
+ * 2026-11-21.
+ */
+export function isComplianceStateRefusal(message: string | undefined): boolean {
+  return !!message && /in a compliance state/i.test(message)
+}
+
+/**
+ * The `email_suppression` reason recorded for a compliance-state refusal (lib/firestore-suppression.ts). Suppression,
+ * not a Mailchimp-removed mark: the person opted out or the address bounced, so no surface emails it, and no consent
+ * record clears it.
+ */
+export const COMPLIANCE_STATE_SUPPRESSION_REASON = "mailchimp-compliance-state"
+
 /** Why an address is marked and skipped (lib/firestore-mailchimp-removed.ts). */
 export type UnpushableReason = "permanently_deleted" | "invalid_address"
 
@@ -211,6 +228,8 @@ export interface DrainResult {
   removed: Array<{ email: string; reason: UnpushableReason }>
   /** Members refused for a stale Source value and accepted when sent again with it corrected (staleSourceFix). */
   sourceFixed: number
+  /** Addresses Mailchimp refused as in a compliance state (isComplianceStateRefusal), lowercased: to be suppressed. */
+  suppressed: string[]
 }
 
 /**
@@ -235,6 +254,7 @@ export async function drainPending(
     accepted: [],
     removed: [],
     sourceFixed: 0,
+    suppressed: [],
   }
   const reasons = new Map<string, ErrorReason>()
   const requests = pushRequests(pending)
@@ -290,6 +310,7 @@ export async function drainPending(
       }
       const unpushable = unpushableReason(e.message)
       if (unpushable && email) res.removed.push({ email, reason: unpushable })
+      else if (email && isComplianceStateRefusal(e.message) && !res.suppressed.includes(email)) res.suppressed.push(email)
       // Grouped by code, field and the message with addresses removed, so each distinct refusal shows in the log
       // (2026-11-20: grouping by code alone showed one sample for 17 errors of several kinds).
       const field = e.field?.trim() || undefined

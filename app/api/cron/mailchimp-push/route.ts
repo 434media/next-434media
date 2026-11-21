@@ -15,7 +15,8 @@ export const maxDuration = 300
 // brand-new emails get `subscribed`, and tags refresh harmlessly.
 //
 // An address Mailchimp permanently deleted, or judged fake or invalid, is recorded on its first refusal and skipped
-// from then on, the daily full pass included (lib/firestore-mailchimp-removed.ts). A member refused for a stale
+// from then on, the daily full pass included (lib/firestore-mailchimp-removed.ts). An address Mailchimp refuses as in a
+// compliance state (unsubscribed, bounced, compliance review) is suppressed (email_suppression) and skipped. A member refused for a stale
 // Source value (434Media, Website) is sent again with Source set to 434MEDIA (staleSourceFix). A merge-field refusal is logged with the field
 // Mailchimp names, never the address.
 //
@@ -31,6 +32,7 @@ export async function GET(request: NextRequest) {
         `[${result.dryRun ? "dry-run" : "live"}${result.fullPass ? ", full pass" : ""}] ` +
         `${result.pending} of ${result.uniqueContacts} unique contacts ${verb} ` +
         `(${result.included} included / ${result.skipped} skipped, ${result.groups.length} tag-groups` +
+        (result.excludedSuppressed ? `, ${result.excludedSuppressed} skipped as suppressed` : "") +
         (result.excludedRemoved ? `, ${result.excludedRemoved} skipped as permanently deleted or invalid in Mailchimp` : "") +
         `)` +
         (result.push
@@ -38,6 +40,7 @@ export async function GET(request: NextRequest) {
             (result.push.deferred ? `, ${result.push.deferred} left for the next run` : "") +
             (result.push.markedRemoved ? `, ${result.push.markedRemoved} marked permanently deleted` : "") +
             (result.push.markedInvalid ? `, ${result.push.markedInvalid} marked invalid` : "") +
+            (result.push.markedSuppressed ? `, ${result.push.markedSuppressed} suppressed as unsubscribed, bounced or under compliance review in Mailchimp` : "") +
             (result.push.sourceFixed ? `, ${result.push.sourceFixed} stale Source values set to 434MEDIA` : "") +
             (result.push.errorReasons.length
               ? ` — errors: ${result.push.errorReasons.map((r) => `${r.code}${r.field ? ` [${r.field}]` : ""} ×${r.count} ("${r.sample}")`).join("; ")}`
