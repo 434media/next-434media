@@ -299,9 +299,10 @@ test("drainPending: refusals of one code but different messages are logged apart
     { email: "x@example.com", reason: "invalid_address" },
     { email: "y@example.com", reason: "invalid_address" },
   ])
-  assert.deepEqual(r.reasons.map((x) => x.count), [2, 1, 1])
+  assert.deepEqual(r.reasons.map((x) => x.count), [2, 1])
+  assert.equal(r.errors, 3)
   assert.match(r.reasons[0].sample, /looks fake or invalid/)
-  assert.ok(r.reasons.some((x) => /compliance state/.test(x.sample)))
+  assert.ok(!r.reasons.some((x) => /compliance state/.test(x.sample)))
   assert.ok(r.reasons.every((x) => !x.sample.includes("@")))
   assert.deepEqual(r.suppressed, ["c@example.com"])
 })
@@ -318,7 +319,7 @@ test("isComplianceStateRefusal: Mailchimp's compliance-state message; not deleti
 })
 
 // Reproduces the 2026-11-21 01:00Z full pass: 15 compliance-state refusals, retried on every full pass until now.
-test("drainPending: compliance-state refusals are reported for suppression once each, not marked removed, not retried", async () => {
+test("drainPending: compliance-state refusals are reported for suppression once each, not as errors, not marked removed, not retried", async () => {
   const refused = Array.from({ length: 15 }, (_, i) => `u${i}@example.com`)
   const push: PushFn = async (members) => ({
     newMembers: 0,
@@ -334,8 +335,8 @@ test("drainPending: compliance-state refusals are reported for suppression once 
   assert.deepEqual(r.removed, [])
   assert.equal(r.retryable, 0)
   assert.equal(r.accepted.length, plan.length)
-  assert.equal(r.reasons.length, 1)
-  assert.ok(!r.reasons[0].sample.includes("@"))
+  assert.equal(r.errors, 0)
+  assert.deepEqual(r.reasons, [])
 })
 
 test("drainPending: a failed request is retried, never suppressed", async () => {

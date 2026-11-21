@@ -228,7 +228,10 @@ export interface DrainResult {
   removed: Array<{ email: string; reason: UnpushableReason }>
   /** Members refused for a stale Source value and accepted when sent again with it corrected (staleSourceFix). */
   sourceFixed: number
-  /** Addresses Mailchimp refused as in a compliance state (isComplianceStateRefusal), lowercased: to be suppressed. */
+  /**
+   * Addresses Mailchimp refused as in a compliance state (isComplianceStateRefusal), lowercased: to be suppressed.
+   * Not counted in `errors` or `reasons`.
+   */
   suppressed: string[]
 }
 
@@ -299,18 +302,23 @@ export async function drainPending(
       errors = [...errors.filter((e) => !resent.has(errorEmail(e))), ...again.errors]
     }
 
-    res.errors += errors.length
     const retry = new Set<string>()
     for (const e of errors) {
       const code = e.code || "unknown"
       const email = errorEmail(e)
+      // A compliance-state refusal is the person's opt-out or a bounce, not a fault: reported for suppression and
+      // counted there, never as an error (founder, 2026-11-21).
+      if (email && !RETRYABLE_ERROR_CODES.has(code) && isComplianceStateRefusal(e.message)) {
+        if (!res.suppressed.includes(email)) res.suppressed.push(email)
+        continue
+      }
+      res.errors++
       if (RETRYABLE_ERROR_CODES.has(code)) {
         retry.add(email)
         res.retryable++
       }
       const unpushable = unpushableReason(e.message)
       if (unpushable && email) res.removed.push({ email, reason: unpushable })
-      else if (email && isComplianceStateRefusal(e.message) && !res.suppressed.includes(email)) res.suppressed.push(email)
       // Grouped by code, field and the message with addresses removed, so each distinct refusal shows in the log
       // (2026-11-20: grouping by code alone showed one sample for 17 errors of several kinds).
       const field = e.field?.trim() || undefined
