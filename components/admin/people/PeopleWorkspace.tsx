@@ -1056,14 +1056,16 @@ function PersonDrawer({
         <div className="space-y-6">
           <dl className="grid grid-cols-2 gap-4">
             <Field label="Stage">{STAGE_LABEL[p.lifecycle_stage]}</Field>
+            <Field label="Title">{p.title}</Field>
             <Field label="First touch">{SOURCE_LABEL[p.source] ?? p.source}</Field>
             <Field label="Email consent">{detail.email_allowed.reason}</Field>
             <Field label="Cold outreach">{detail.cold_gate.cold ? `${detail.cold_gate.allowed ? "Allowed" : "Blocked"}: ${detail.cold_gate.reason}` : "Not cold"}</Field>
+            <Field label="Email">{p.emails.join(", ")}</Field>
             <Field label="Phone">{p.phones.join(", ")}</Field>
             <Field label="Relationship">{p.relationship === "personal" ? "Personal (founder only)" : "Business"}</Field>
             <Field label="Visibility">{p.visibility === "private" ? "Private" : p.visibility === "restricted" ? "Restricted" : "Business"}</Field>
             <Field label="Roles">{p.roles.join(", ")}</Field>
-            <Field label="Read from">{p.legacy_refs.map((r) => r.collection).filter((c, i, all) => all.indexOf(c) === i).join(", ") || "Stored"}</Field>
+            <Field label="Originally from">{p.legacy_refs.map((r) => RECORD_SOURCE_LABEL[r.collection] ?? r.collection).filter((c, i, all) => all.indexOf(c) === i).join(", ") || "Saved here"}</Field>
             {p.google && (
               <Field label="Google Contacts">
                 {p.google.deleted_at ? "Deleted in Google; kept here" : p.google.in_434_group ? "Synced, in the 434 group" : "Synced"}
@@ -1353,7 +1355,7 @@ function PersonEditForm({
     <div className="space-y-3">
       {p.read_only && (
         <p className="rounded-lg border border-neutral-200 bg-neutral-50 px-3 py-2 text-xs text-neutral-600">
-          Read from {p.legacy_refs.map((r) => RECORD_SOURCE_LABEL[r.collection] ?? r.collection).filter((c, i, all) => all.indexOf(c) === i).join(", ")}. Saving keeps a new record that replaces it here; the old list is not changed.
+          Originally from {p.legacy_refs.map((r) => RECORD_SOURCE_LABEL[r.collection] ?? r.collection).filter((c, i, all) => all.indexOf(c) === i).join(", ")}. Saving keeps a new record that replaces it here; the old list is not changed.
         </p>
       )}
       {p.google && (
@@ -1477,7 +1479,7 @@ function OrgEditForm({
     <div className="space-y-3">
       {org.read_only && (
         <p className="rounded-lg border border-neutral-200 bg-neutral-50 px-3 py-2 text-xs text-neutral-600">
-          Read from {sourcesOf(org)}. Saving keeps a new record that replaces it here; the old list is not changed.
+          Originally from {sourcesOf(org)}. Saving keeps a new record that replaces it here; the old list is not changed.
         </p>
       )}
       <FormRow label="Name"><input value={name} onChange={(e) => setName(e.target.value)} className={inputClass} /></FormRow>
