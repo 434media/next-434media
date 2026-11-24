@@ -242,10 +242,19 @@ export function CreateTable({ onPostsReady }: { onPostsReady?: () => void }) {
   async function runRow(r: CreateRow): Promise<boolean> {
     patchState(r.id, s => ({ ...s, busy: "run", message: "Filling Canva templates…", error: undefined }))
     try {
-      const res = await fetch("/api/admin/content/create-run", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ row: r }) })
-      const data = await res.json()
+      let res: Response, data: { error?: string; processing?: boolean; message?: string; posts?: RunPost[] }
+      // While Canva imports the row's video the server answers 202 "processing" and keeps the job; asking again resumes
+      // it. The server bounds the import (15 minutes once streamed), so this loop ends with the design or a reason.
+      for (let tries = 0; ; tries++) {
+        res = await fetch("/api/admin/content/create-run", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ row: r }) })
+        data = await res.json()
+        if (res.status !== 202 || !data.processing || tries >= 60) break
+        patchState(r.id, s => ({ ...s, busy: "run", message: `${data.message || "Canva is importing the video"}…` }))
+        await new Promise(done => setTimeout(done, 15_000))
+      }
+      if (res.status === 202) throw new Error("Canva is still importing the video. Run the row again in a few minutes; it carries on where it stopped")
       if (!res.ok) throw new Error(data.error || "Run job failed for this row")
-      patchState(r.id, { posts: data.posts, done: true, message: `In Review: ${(data.posts as RunPost[]).map(p => FORMAT_LABEL[p.format]).join(" + ")}` })
+      patchState(r.id, { posts: data.posts, busy: undefined, done: true, message: `In Review: ${(data.posts as RunPost[]).map(p => FORMAT_LABEL[p.format]).join(" + ")}` })
       return true
     } catch (e) { patchState(r.id, { error: e instanceof Error ? e.message : "Run job failed" }); return false }
   }

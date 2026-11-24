@@ -58,6 +58,11 @@ export async function POST(req: NextRequest) {
   } catch (err) {
     if (err instanceof CreateRowError) return NextResponse.json({ error: err.message, problems: err.problems }, { status: err.status })
     const name = err instanceof Error ? err.name : ""
+    // Canva is still importing the row's video: not a failure. The job is kept, and the table runs the row again to resume it.
+    if (name === "CanvaError" && (err as { code?: string }).code === "processing") {
+      console.info("[content/create-run] processing", JSON.stringify({ row: r.id, brand: r.brand, kind: r.kind }))
+      return NextResponse.json({ processing: true, message: (err as Error).message }, { status: 202 })
+    }
     // Canva's own reason (code and message) goes to the log so a failed fill can be diagnosed; the screen gets ours.
     const canva = name === "CanvaError" ? { code: (err as { code?: string }).code, detail: (err as { detail?: string }).detail } : {}
     console.error("[POST /api/admin/content/create-run] failed:", r.id, JSON.stringify({ brand: r.brand, kind: r.kind, media: r.media ? { kind: r.media.kind, bytes: r.media.bytes, durationSec: r.media.durationSec } : null, ...canva }), err)

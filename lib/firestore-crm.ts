@@ -1902,7 +1902,7 @@ export function canvaVideoUploads(): import("./canva-create").VideoUploadLedger 
   return {
     async get(url) {
       const d = (await col().doc(key(url)).get()).data()
-      return d && d.url === url && (d.path === "/url-asset-uploads" || d.path === "/asset-uploads") && typeof d.jobId === "string" && d.jobId ? { path: d.path, jobId: d.jobId, ...(typeof d.assetId === "string" && d.assetId ? { assetId: d.assetId } : {}) } : null
+      return d && d.url === url && (d.path === "/url-asset-uploads" || d.path === "/asset-uploads") && typeof d.jobId === "string" && d.jobId && typeof d.startedAtMs === "number" ? { path: d.path, jobId: d.jobId, startedAtMs: d.startedAtMs, ...(typeof d.assetId === "string" && d.assetId ? { assetId: d.assetId } : {}) } : null
     },
     async put(url, value) { if (value) await col().doc(key(url)).set({ url, ...value, at: new Date().toISOString() }); else await col().doc(key(url)).delete() },
   }
