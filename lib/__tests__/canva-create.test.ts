@@ -2,7 +2,7 @@
 import { test } from "node:test"
 import assert from "node:assert/strict"
 import { seal, CanvaError, shownCanvaCode, type CanvaDeps, type CanvaTokenRecord, type CanvaTokenStore } from "../canva-export"
-import { createFromTemplate, failedJobReason, templateFields, templateRevision, profileTemplateIds, canvaEditUrl, type CreateDeps, type CreatedDesign, type WorkingFolder } from "../canva-create"
+import { createFromTemplate, failedJobReason, templateFields, templateRevision, profileTemplateIds, canvaEditUrl, type CreateDeps, type CreatedDesign, type WorkingFolder, type VideoUpload, type VideoUploadLedger } from "../canva-create"
 import { TOOL_SCOPE } from "../owned-meta-connector"
 import { SERVICE_TOOL_SCOPE } from "../owned-meta-service"
 
@@ -145,6 +145,80 @@ test("a video over 100 MB is streamed into the asset upload; over 500 MB, or wit
   assert.equal((up.init.headers as Record<string, string>)["content-length"], String(200 * 1024 * 1024))
   await assert.rejects(createFromTemplate(s.deps, { ...rest, requestId: "admin:create:row00003:feed", video: { ...video, bytes: 600 * 1024 * 1024 } }), /under 500 MB/)
   await assert.rejects(createFromTemplate(s.deps, { ...rest, requestId: "admin:create:row00004:feed", image, video }), /not both/)
+})
+
+// ── 2026-11-24: every News post with a video failed. Canva refuses a second URL upload of the same URL ("already
+// exists"), so a run that timed out could never resume, and a row's second size could never upload its video. ──
+function videoLedger() {
+  const kept = new Map<string, VideoUpload>()
+  const ledger: VideoUploadLedger = { get: async u => kept.get(u) ?? null, put: async (u, v) => { if (v) kept.set(u, v); else kept.delete(u) } }
+  return { kept, ledger }
+}
+const CLIP = { field: "media", url: "https://abc.public.blob.vercel-storage.com/content-create/news.mp4", name: "Clip", bytes: 26_007_864 }
+const isUrlPost = (url: string, init: RequestInit) => url.endsWith("/url-asset-uploads") && init.method === "POST"
+
+test("a video upload that outlasts the run is kept and resumed by the next run, never started twice", async () => {
+  let done = false
+  const s = setup((url, init) => {
+    if (isUrlPost(url, init)) return Response.json({ job: { id: "uv1", status: "in_progress" } })
+    if (url.endsWith("/url-asset-uploads/uv1")) return Response.json({ job: done ? { id: "uv1", status: "success", asset: { id: "MAvideo1" } } : { id: "uv1", status: "in_progress" } })
+    return happy(url, init)
+  })
+  const { kept, ledger } = videoLedger(); s.deps.videoUploads = ledger
+  const { image: _image, ...rest } = INPUT
+  const first = await createFromTemplate(s.deps, { ...rest, requestId: "admin:create:row00010:feed", video: CLIP }, { polls: 3, intervalMs: 1 }).catch(e => e)
+  assert.ok(first instanceof CanvaError); assert.equal(first.code, "timeout")
+  assert.deepEqual(kept.get(CLIP.url), { path: "/url-asset-uploads", jobId: "uv1" })
+  done = true
+  const second = await createFromTemplate(s.deps, { ...rest, requestId: "admin:create:row00010:feed", video: CLIP }, { polls: 3, intervalMs: 1 })
+  assert.equal(second.design.video?.assetId, "MAvideo1")
+  assert.equal(s.calls.filter(c => isUrlPost(c.url, c.init)).length, 1, "the upload was started once")
+  assert.equal(kept.get(CLIP.url)?.assetId, "MAvideo1")
+})
+
+test("a row's second size reuses the video asset the first size uploaded", async () => {
+  const s = setup((url, init) => {
+    if (isUrlPost(url, init)) return s.calls.filter(c => isUrlPost(c.url, c.init)).length > 1 ? Response.json({ code: "invalid_request", message: `Asset Upload for url ${CLIP.url} already exists` }, { status: 400 }) : Response.json({ job: { id: "uv1", status: "in_progress" } })
+    if (url.endsWith("/url-asset-uploads/uv1")) return Response.json({ job: { id: "uv1", status: "success", asset: { id: "MAvideo1" } } })
+    return happy(url, init)
+  })
+  s.deps.videoUploads = videoLedger().ledger
+  const { image: _image, ...rest } = INPUT
+  await createFromTemplate(s.deps, { ...rest, requestId: "admin:create:row00011:feed", video: CLIP }, { polls: 3, intervalMs: 1 })
+  const reels = await createFromTemplate(s.deps, { ...rest, requestId: "admin:create:row00011:reels", video: CLIP }, { polls: 3, intervalMs: 1 })
+  assert.equal(reels.design.video?.assetId, "MAvideo1")
+  assert.equal(s.calls.filter(c => isUrlPost(c.url, c.init)).length, 1)
+})
+
+test("a URL Canva already has an untracked upload of (before jobs were kept) is streamed through instead", async () => {
+  const s = setup((url, init) => {
+    if (isUrlPost(url, init)) return Response.json({ code: "invalid_request", message: `Asset Upload for url ${CLIP.url} already exists` }, { status: 400 })
+    return happy(url, init)
+  })
+  const { kept, ledger } = videoLedger(); s.deps.videoUploads = ledger
+  const streamed: string[] = []
+  s.deps.streamVideo = async url => { streamed.push(url); return { body: new Blob([new Uint8Array(4)]).stream(), bytes: CLIP.bytes } }
+  const { image: _image, ...rest } = INPUT
+  const r = await createFromTemplate(s.deps, { ...rest, requestId: "admin:create:row00012:feed", video: CLIP }, { polls: 3, intervalMs: 1 })
+  assert.deepEqual(streamed, [CLIP.url]); assert.equal(r.design.video?.assetId, "MAasset1")
+  assert.deepEqual(kept.get(CLIP.url), { path: "/asset-uploads", jobId: "up1", assetId: "MAasset1" })
+})
+
+test("a kept upload that failed is forgotten, and the next run streams the video again", async () => {
+  const s = setup((url, init) => {
+    if (url.endsWith("/url-asset-uploads/uv1")) return Response.json({ job: { id: "uv1", status: "failed", error: { code: "fetch_failed", message: "x" } } })
+    if (isUrlPost(url, init)) return Response.json({ code: "invalid_request", message: `Asset Upload for url ${CLIP.url} already exists` }, { status: 400 })
+    return happy(url, init)
+  })
+  const { kept, ledger } = videoLedger(); s.deps.videoUploads = ledger
+  kept.set(CLIP.url, { path: "/url-asset-uploads", jobId: "uv1" })
+  s.deps.streamVideo = async () => ({ body: new Blob([new Uint8Array(4)]).stream(), bytes: CLIP.bytes })
+  const { image: _image, ...rest } = INPUT
+  await assert.rejects(createFromTemplate(s.deps, { ...rest, requestId: "admin:create:row00013:feed", video: CLIP }, { polls: 3, intervalMs: 1 }), /could not download the media file/)
+  assert.equal(kept.has(CLIP.url), false)
+  const r = await createFromTemplate(s.deps, { ...rest, requestId: "admin:create:row00013:feed", video: CLIP }, { polls: 3, intervalMs: 1 })
+  assert.equal(r.design.video?.assetId, "MAasset1")
+  assert.equal(s.calls.filter(c => c.url.endsWith("/asset-uploads") && !c.url.endsWith("/url-asset-uploads") && c.init.method === "POST").length, 1, "streamed once")
 })
 
 test("the allow-list is every feed and Reels template in the published profiles, and nothing else", () => {

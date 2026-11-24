@@ -1895,6 +1895,18 @@ export function canvaCreateLedger(): import("./canva-create").CreateLedger {
     async put(requestId, design) { await col().doc(key(requestId)).set({ requestId, design, at: new Date().toISOString() }) },
   }
 }
+/** Video uploads to Canva by source URL (lib/canva-create.ts VideoUploadLedger), beside the design ledger. */
+export function canvaVideoUploads(): import("./canva-create").VideoUploadLedger {
+  const col = () => getDb().collection("crm_meta").doc("owned_meta_canva").collection("video_uploads")
+  const key = (url: string) => createHash("sha256").update(url).digest("hex")
+  return {
+    async get(url) {
+      const d = (await col().doc(key(url)).get()).data()
+      return d && d.url === url && (d.path === "/url-asset-uploads" || d.path === "/asset-uploads") && typeof d.jobId === "string" && d.jobId ? { path: d.path, jobId: d.jobId, ...(typeof d.assetId === "string" && d.assetId ? { assetId: d.assetId } : {}) } : null
+    },
+    async put(url, value) { if (value) await col().doc(key(url)).set({ url, ...value, at: new Date().toISOString() }); else await col().doc(key(url)).delete() },
+  }
+}
 /**
  * The Canva team folder new designs move into (Step 3 part 2), found by name and its id kept beside the ledger. The
  * name defaults to the folder the founder made ("434 Working Designs"); CANVA_WORKING_FOLDER_NAME overrides it.

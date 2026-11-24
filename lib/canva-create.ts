@@ -41,6 +41,18 @@ export interface CreateDeps {
   allowedTemplates: ReadonlySet<string>
   /** The shared team folder new designs are moved into, when configured. */
   folder?: WorkingFolder
+  /** Video uploads by source URL: the Canva job kept as soon as it starts, then its asset (see uploadVideo). */
+  videoUploads?: VideoUploadLedger
+}
+/**
+ * One video's Canva upload, keyed by its stored URL (a Create upload's URL is unique to its bytes). Canva refuses a second
+ * URL upload of the same URL ("Asset Upload for url … already exists"), so the job is kept the moment it starts: a run
+ * that timed out resumes it, and the row's other sizes reuse its asset instead of uploading the video again.
+ */
+export interface VideoUpload { path: "/url-asset-uploads" | "/asset-uploads"; jobId: string; assetId?: string }
+export interface VideoUploadLedger {
+  get(url: string): Promise<VideoUpload | null>
+  put(url: string, value: VideoUpload | null): Promise<void>
 }
 /** The team folder by name, with its id kept once found (never hard-coded). */
 export interface WorkingFolder {
@@ -259,20 +271,55 @@ async function uploadVideo(deps: CreateDeps, token: string, v: NonNullable<Creat
   if (!v.url.startsWith("https://")) throw new CanvaError("Video must be a public https URL", "video_url")
   if (!Number.isSafeInteger(v.bytes) || v.bytes <= 0 || v.bytes > MAX_VIDEO_BYTES) throw new CanvaError("Video must be under 500 MB", "video_size")
   const name = (v.name.trim() || "Video").slice(0, 50)
-  // A video takes longer than a photo for Canva to import: up to five minutes.
+  // A video takes longer than a photo for Canva to import: up to five minutes a run, and a later run resumes the job.
   const slow = { polls: Math.max(limits.polls, 150), intervalMs: limits.intervalMs }
-  let job: Job
-  if (v.bytes <= MAX_URL_VIDEO_BYTES) {
-    const started = await api(deps.canva, token, "/url-asset-uploads", { method: "POST", body: JSON.stringify({ name, url: v.url }) })
-    job = await poll(deps.canva, token, "/url-asset-uploads", started.job as Job, slow)
-  } else {
-    if (!deps.streamVideo) throw new CanvaError("Videos over 100 MB cannot be uploaded here", "video_size")
-    const { body, bytes } = await deps.streamVideo(v.url)
-    if (bytes > MAX_VIDEO_BYTES) throw new CanvaError("Video must be under 500 MB", "video_size")
-    const started = await api(deps.canva, token, "/asset-uploads", { method: "POST", body, duplex: "half", signal: AbortSignal.timeout(600_000), headers: { "content-type": "application/octet-stream", "content-length": String(bytes), "asset-upload-metadata": JSON.stringify({ name_base64: Buffer.from(name, "utf8").toString("base64") }) } } as RequestInit)
-    job = await poll(deps.canva, token, "/asset-uploads", started.job as Job, slow)
+  const ledger = deps.videoUploads
+  const kept = await ledger?.get(v.url) ?? null
+  if (kept?.assetId) return kept.assetId
+  if (kept) {
+    // The job an earlier run started (timed out, or another size of the row): carry on polling it, never start another.
+    const resumed = await api(deps.canva, token, `${kept.path}/${encodeURIComponent(kept.jobId)}`).then(d => d.job as Job, (err: unknown) => {
+      if (err instanceof CanvaError && ["not_found", "http_404"].includes(err.code ?? "")) return null
+      throw err
+    })
+    if (resumed) {
+      const job = await poll(deps.canva, token, kept.path, resumed, slow).catch(async (err: unknown) => {
+        // A failed import is forgotten so the next run starts afresh (streamed: the URL path refuses the same URL again).
+        if (err instanceof CanvaError && err.code !== "timeout") await ledger!.put(v.url, null)
+        throw err
+      })
+      return keepAsset(ledger, v.url, kept.path, job)
+    }
+    await ledger!.put(v.url, null)
   }
+  // Canva fetches a video up to 100 MB from its URL; it refuses a URL it has already been given, so a URL with an
+  // earlier upload (a failed one, or one started before jobs were kept) is streamed through instead.
+  if (v.bytes <= MAX_URL_VIDEO_BYTES && !kept) {
+    const started = await api(deps.canva, token, "/url-asset-uploads", { method: "POST", body: JSON.stringify({ name, url: v.url }) }).catch((err: unknown) => {
+      if (err instanceof CanvaError && err.code === "invalid_request" && /already exists/i.test(err.detail ?? "") && deps.streamVideo) return null
+      throw err
+    })
+    if (started) return keepAsset(ledger, v.url, "/url-asset-uploads", await pollKept(deps, token, ledger, v.url, "/url-asset-uploads", started.job as Job, slow))
+  }
+  if (!deps.streamVideo) throw new CanvaError(v.bytes > MAX_URL_VIDEO_BYTES ? "Videos over 100 MB cannot be uploaded here" : "Canva already has an upload of this video; add the video to the row again", "video_size")
+  const { body, bytes } = await deps.streamVideo(v.url)
+  if (bytes > MAX_VIDEO_BYTES) throw new CanvaError("Video must be under 500 MB", "video_size")
+  const started = await api(deps.canva, token, "/asset-uploads", { method: "POST", body, duplex: "half", signal: AbortSignal.timeout(600_000), headers: { "content-type": "application/octet-stream", "content-length": String(bytes), "asset-upload-metadata": JSON.stringify({ name_base64: Buffer.from(name, "utf8").toString("base64") }) } } as RequestInit)
+  return keepAsset(ledger, v.url, "/asset-uploads", await pollKept(deps, token, ledger, v.url, "/asset-uploads", started.job as Job, slow))
+}
+
+/** Keeps a just-started upload job before polling it, so a run that times out leaves the next one something to resume. */
+async function pollKept(deps: CreateDeps, token: string, ledger: VideoUploadLedger | undefined, url: string, path: VideoUpload["path"], job: Job, limits: { polls: number; intervalMs: number }): Promise<Job> {
+  if (job?.id) await ledger?.put(url, { path, jobId: job.id })
+  return poll(deps.canva, token, path, job, limits).catch(async (err: unknown) => {
+    if (err instanceof CanvaError && err.code !== "timeout") await ledger?.put(url, null)
+    throw err
+  })
+}
+
+async function keepAsset(ledger: VideoUploadLedger | undefined, url: string, path: VideoUpload["path"], job: Job): Promise<string> {
   if (!job.asset?.id) throw new CanvaError("Canva did not return the uploaded video", "asset")
+  await ledger?.put(url, { path, jobId: job.id ?? "", assetId: job.asset.id })
   return job.asset.id
 }
 
